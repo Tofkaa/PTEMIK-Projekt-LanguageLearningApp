@@ -13,7 +13,7 @@ Technológiai stack: React.js (Frontend), Spring Boot (Backend), PostgreSQL (Ada
 - [ ] **2. hét: Adatbázis entitások és Adathozzáférés (Aktuális hét)**
   - [x] A specifikált ER diagram leképezése JPA Entitásokra (User, Lesson, Exercise stb.).
   - [x] JSONB adattípus leképezése a Java modellben az `exercises` tábla számára.
-  - [ ] Spring Data JPA Repository interfészek létrehozása az entitásokhoz.
+  - [x] Spring Data JPA Repository interfészek létrehozása az entitásokhoz.
 - [ ] **3. hét: Biztonság és Autentikáció**
   - [ ] Spring Security konfigurálása BCrypt jelszótitkosítással.
   - [ ] Dual Token mechanizmus (JWT Access Token + HttpOnly Refresh Token) implementálása.
