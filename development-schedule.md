@@ -1,7 +1,7 @@
 # Fejlesztési Ütemterv - Language Learning Application
 
 - 2026-02-15: Projekt Setup és Docker környezet (1. hét) - [KÉSZ]
-- 2026-02-22: Adatbázis Tervezés és Repository Réteg (2. hét) - [FOLYAMATBAN]
+- 2026-02-22: Adatbázis Tervezés és Backend Alapok (2. hét) - [FOLYAMATBAN]
 - 2026-03-01: Biztonság és Autentikáció (3. hét)
 - 2026-03-08: Alapvető Üzleti Logika és API (4. hét)
 - 2026-03-15: Frontend Alapok és Bejelentkezés (5. hét)
@@ -19,8 +19,8 @@
 ## Projekt Setup és Docker környezet
 A fejlesztési környezet és a háromrétegű architektúra (kliens-szerver modell) alapjainak lefektetése. Magában foglalja a Spring Boot backend, a React.js frontend és a PostgreSQL adatbázis inicializálását. A rendszer komponensei egy közös `docker-compose.yml` fájl segítségével kerülnek konténerizálásra, amely biztosítja az izolált, platformfüggetlen és stabil lokális fejlesztési környezetet.
 
-## Adatbázis Tervezés és Repository Réteg
-Az adatbázis séma kialakítása a specifikált ER diagram alapján. A fő entitások (User, Lesson, Exercise, Progress, Result, stb.) és a köztük lévő relációk (1:N, M:N kapcsolótáblákkal) pontos leképezése JPA entitásokra UUID alapú azonosítókkal. Kiemelt feladat a rugalmas feladattípusokat támogató PostgreSQL specifikus JSONB adattípus integrálása a Java modellbe. Ezt követi a Spring Data JPA Repository interfészek létrehozása, amelyek automatizált, SQL-írás nélküli adathozzáférést biztosítanak a backend számára.
+## Adatbázis Tervezés és Backend Alapok
+Az adatbázis séma kialakítása a specifikált ER diagram alapján. A fő entitások (User, Lesson, Exercise, Progress, Result, stb.) és a köztük lévő relációk pontos leképezése JPA entitásokra UUID alapú azonosítókkal, kiegészítve a JSONB adattípus kezelésével. Ezt követi a Spring Data JPA Repository interfészek és a statisztikai lekérdezések (Projections) létrehozása. A fázis végén lefektetjük a kommunikáció alapjait is: létrehozzuk az API kérések/válaszok szabványosítására szolgáló Payload DTO-kat, valamint beállítunk egy Központi Hibakezelőt (Global Exception Handler), amely az esetleges rendszerhibákat egységes, HTTP státuszkódokkal ellátott JSON válaszokká alakítja.
 
 ## Biztonság és Autentikáció
 Biztonságos bejelentkezés, regisztráció és Role-Based Access Control (RBAC - Diák, Tanár, Admin) jogosultságkezelés implementálása a Spring Security keretrendszerrel. A rendszer Stateless munkamenetet használ, így a kommunikáció védelmét a Dual Token mechanizmus látja el: egy rövid lejáratú JWT Access Token a kérések fejlécében, és egy HttpOnly Cookie-ban tárolt Refresh Token a munkamenet fenntartásához. A jelszavak védelmét BCrypt titkosítás garantálja.
