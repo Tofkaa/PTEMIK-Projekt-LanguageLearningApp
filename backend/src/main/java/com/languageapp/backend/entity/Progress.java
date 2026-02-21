@@ -1,14 +1,18 @@
 package com.languageapp.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
-
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Getter
+@Setter
+@NoArgsConstructor
 @Entity
 @Table(name = "progress")
-@Data
+
 public class Progress {
 
     @Id

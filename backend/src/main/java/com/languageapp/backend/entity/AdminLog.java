@@ -1,15 +1,19 @@
 package com.languageapp.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
-
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Getter
+@Setter
+@NoArgsConstructor
 @Entity
 @Table(name = "admin_logs")
-@Data
+
 public class AdminLog {
 
     @Id
