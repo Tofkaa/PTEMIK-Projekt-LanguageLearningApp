@@ -109,9 +109,13 @@ public class RefreshTokenService {
      * @param rawToken the token to be deleted
      */
     @Transactional
-    public void deleteByRawToken(String rawToken) {
-        log.info("Deleting refresh token for logout...");
-        findByRawToken(rawToken).ifPresent(refreshTokenRepository::delete);
+    public String deleteByRawToken(String rawToken) {
+        return findByRawToken(rawToken).map(token -> {
+            String email = token.getUser().getEmail();
+            refreshTokenRepository.delete(token);
+            log.debug("Refresh token successfully deleted for user: {}", email);
+            return email;
+        }).orElse("Unknown user (deleted/expired token)");
     }
 
     /**

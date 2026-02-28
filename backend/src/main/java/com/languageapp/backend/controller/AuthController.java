@@ -93,8 +93,10 @@ public class AuthController {
     public ResponseEntity<Void> logout(
             @CookieValue(name = "refreshToken", required = false) String refreshToken) {
 
+        String loggedOutUser = "Unkonw/Guest";
+
         if (refreshToken != null && !refreshToken.trim().isEmpty()) {
-            authenticationService.logout(refreshToken);
+            loggedOutUser = authenticationService.logout(refreshToken);
         }
 
         ResponseCookie deadCookie = ResponseCookie.from("refreshToken", "")
@@ -105,7 +107,7 @@ public class AuthController {
                 .sameSite("Strict")
                 .build();
 
-        log.info("User successfully logged out, cookie invalidated.");
+        log.info("User: {} successfully logged out, cookie invalidated.", loggedOutUser);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, deadCookie.toString())

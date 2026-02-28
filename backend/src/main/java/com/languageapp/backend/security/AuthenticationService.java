@@ -152,8 +152,8 @@ public class AuthenticationService {
      * @param rawRefreshToken the refresh token to be deleted.
      */
     @Transactional
-    public void logout(String rawRefreshToken) {
-        refreshTokenService.deleteByRawToken(rawRefreshToken);
+    public String logout(String rawRefreshToken) {
+        return refreshTokenService.deleteByRawToken(rawRefreshToken);
     }
 
     /**
