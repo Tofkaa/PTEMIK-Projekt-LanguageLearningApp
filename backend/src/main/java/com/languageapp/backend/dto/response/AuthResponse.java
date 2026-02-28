@@ -7,8 +7,8 @@ import java.util.UUID;
 @Data
 @AllArgsConstructor
 public class AuthResponse {
-    private String accessToken;  // A rövid lejáratú JWT token
-    // A refresh token nem kerül ide, mert azt HttpOnly Cookie-ban küldjük
+    private String accessToken;  // Short-lived JWT access token
+    // The refresh token does not get placed here, as we send it within a HttpOnly Cookie
     private UUID userId;
     private String name;
     private String email;
