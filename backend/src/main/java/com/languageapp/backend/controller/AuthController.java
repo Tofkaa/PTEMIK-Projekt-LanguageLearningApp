@@ -3,6 +3,7 @@ package com.languageapp.backend.controller;
 import com.languageapp.backend.dto.request.LoginRequest;
 import com.languageapp.backend.dto.request.RegisterRequest;
 import com.languageapp.backend.dto.response.AuthResponse;
+import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.security.AuthenticationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +65,25 @@ public class AuthController {
     }
 
     /**
+     * Refreshes the JWT Access Token using the HttpOnly Refresh Token cookie.
+     *
+     * @param refreshToken the refresh token automatically sent by the browser
+     * @return {@link ResponseEntity} containing the new access token
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(
+            @CookieValue(name = "refreshToken", required = false) String refreshToken) {
+
+        if (refreshToken == null || refreshToken.trim().isEmpty()) {
+            log.warn("Token refresh failed: Missing refreshToken cookie.");
+            throw new BadRequestException("Missing refresh token, please login again.");
+        }
+
+        AuthResponse response = authenticationService.refreshToken(refreshToken);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Creates a refresh token cookie with secure attributes.
      *
      * @param refreshToken JWT refresh token value
@@ -72,7 +92,7 @@ public class AuthController {
     private ResponseCookie createCookie(String refreshToken) {
         return ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
-                .secure(false)
+                .secure(true)
                 .path("/")
                 .maxAge(7 * 24 * 60 * 60)
                 .sameSite("Strict")

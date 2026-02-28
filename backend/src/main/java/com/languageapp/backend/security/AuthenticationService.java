@@ -130,4 +130,42 @@ public class AuthenticationService {
         log.info("User successfully authenticated: {}", user.getEmail());
         return new AuthResult(response, refreshToken);
     }
+
+    /**
+     * Generates a new Access Token using a valid Refresh Token.
+     * * @param rawRefreshToken the raw refresh token string from the HttpOnly cookie
+     * @return {@link AuthResponse} containing the new JWT access token
+     * @throws BadRequestException if the refresh token is invalid or expired
+     */
+    @Transactional(readOnly = true)
+    public AuthResponse refreshToken(String rawRefreshToken) {
+        log.info("Attempting to refresh access token...");
+
+        return refreshTokenService.findByRawToken(rawRefreshToken)
+                .map(refreshTokenService::verifyExpiration)
+                .map(com.languageapp.backend.entity.RefreshToken::getUser)
+                .map(user -> {
+                    UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
+                            .username(user.getEmail())
+                            .password(user.getPasswordHash())
+                            .authorities(user.getRole())
+                            .build();
+
+                    String newAccessToken = jwtService.generateToken(userDetails);
+                    log.info("Access token successfully refreshed for user: {}", user.getEmail());
+
+                    return new AuthResponse(
+                            newAccessToken,
+                            user.getUserId(),
+                            user.getName(),
+                            user.getEmail(),
+                            user.getRole()
+                    );
+                })
+                .orElseThrow(() -> {
+                    log.warn("Refresh token validation failed: Token not found or invalid hash.");
+                    return new BadRequestException("An error occurred, please login again.");
+                });
+    }
+
 }
