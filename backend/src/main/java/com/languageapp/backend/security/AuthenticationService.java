@@ -16,6 +16,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 /**
  * Service responsible for user authentication and registration logic.
  * <p>
@@ -74,6 +76,9 @@ public class AuthenticationService {
                 .authorities(user.getRole())
                 .build();
 
+        user.setLastLogin(LocalDateTime.now());
+        userRepository.save(user);
+
         String jwtToken = jwtService.generateToken(userDetails);
         String refreshToken = refreshTokenService.createRefreshToken(user.getUserId());
 
@@ -114,6 +119,9 @@ public class AuthenticationService {
                     return new BadRequestException("Invalid login credentials.");
                 });
 
+        user.setLastLogin(LocalDateTime.now());
+        userRepository.save(user);
+
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 
         String jwtToken = jwtService.generateToken(userDetails);
@@ -129,6 +137,15 @@ public class AuthenticationService {
 
         log.info("User successfully authenticated: {}", user.getEmail());
         return new AuthResult(response, refreshToken);
+    }
+
+    /**
+     * Deletes the refresh token if a user requests to log out.
+     * @param rawRefreshToken the refresh token to be deleted.
+     */
+    @Transactional
+    public void logout(String rawRefreshToken) {
+        refreshTokenService.deleteByRawToken(rawRefreshToken);
     }
 
     /**

@@ -105,6 +105,16 @@ public class RefreshTokenService {
     }
 
     /**
+     * Deletes the refresh token from the DataBase.
+     * @param rawToken the token to be deleted
+     */
+    @Transactional
+    public void deleteByRawToken(String rawToken) {
+        log.info("Deleting refresh token for logout...");
+        findByRawToken(rawToken).ifPresent(refreshTokenRepository::delete);
+    }
+
+    /**
      * Generates a one-way SHA-256 hash of the provided token string.
      *
      * @param token the raw token string
