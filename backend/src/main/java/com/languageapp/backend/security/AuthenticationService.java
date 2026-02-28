@@ -65,7 +65,15 @@ public class AuthenticationService {
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setName(request.getName());
 
-        user.setRole("STUDENT");
+        String requestedRole = request.getRole() != null ? request.getRole().trim().toUpperCase() : "";
+
+        if ("TEACHER".equals(requestedRole)) {
+            user.setRole("TEACHER");
+            log.info("Registering TEACHER user with email: {}...", request.getEmail());
+        } else {
+            user.setRole("STUDENT");
+            log.info("Registering STUDENT user with email: {}...", request.getEmail());
+        }
 
         userRepository.save(user);
         log.info("User successfully saved to database with ID: {}", user.getUserId());
