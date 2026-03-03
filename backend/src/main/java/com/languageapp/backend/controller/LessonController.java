@@ -2,11 +2,19 @@ package com.languageapp.backend.controller;
 
 import com.languageapp.backend.dto.response.ExerciseResponse;
 import com.languageapp.backend.dto.response.LessonResponse;
+import com.languageapp.backend.service.EvaluationService;
 import com.languageapp.backend.service.LessonService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.languageapp.backend.dto.request.LessonSubmitRequest;
+import com.languageapp.backend.dto.response.LessonSubmitResponse;
+import com.languageapp.backend.entity.User;
+import com.languageapp.backend.exception.ResourceNotFoundException;
+import com.languageapp.backend.repository.UserRepository;
+import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +32,8 @@ import java.util.UUID;
 public class LessonController {
 
     private final LessonService lessonService;
+    private final EvaluationService evaluationService;
+    private final UserRepository userRepository;
 
     /**
      * Retrieves a summary list of all available lessons.
@@ -46,5 +56,34 @@ public class LessonController {
     public ResponseEntity<List<ExerciseResponse>> getExercisesByLesson(@PathVariable UUID id) {
         log.info("REST request to fetch exercises for lesson ID: {}", id);
         return ResponseEntity.ok(lessonService.getExercisesByLessonId(id));
+    }
+
+    /**
+     * Submits a completed lesson for evaluation.
+     *
+     * @param id the UUID of the lesson
+     * @param request the submission payload
+     * @param authentication the current authenticated user's security context
+     * @return a {@link ResponseEntity} containing the evaluation results
+     */
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<LessonSubmitResponse> submitLesson(
+            @PathVariable UUID id,
+            @Valid @RequestBody LessonSubmitRequest request,
+            Authentication authentication) {
+
+        log.info("REST request to submit answers for lesson ID: {}", id);
+
+        // Get user email from SecurityContext.
+        String userEmail = authentication.getName();
+
+        // get UUID
+        // TODO : UserService
+        User currentUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
+
+        LessonSubmitResponse response = evaluationService.evaluateLesson(currentUser.getUserId(), id, request);
+
+        return ResponseEntity.ok(response);
     }
 }
