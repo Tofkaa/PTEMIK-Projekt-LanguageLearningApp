@@ -36,14 +36,18 @@ public class LessonController {
     private final UserRepository userRepository;
 
     /**
-     * Retrieves a summary list of all available lessons.
+     * Retrieves a list of available lessons tailored to the authenticated user's difficulty level.
      *
+     * @param authentication the current authenticated user's security context
      * @return a {@link ResponseEntity} containing a list of {@link LessonResponse}
      */
     @GetMapping
-    public ResponseEntity<List<LessonResponse>> getAllLessons() {
-        log.info("REST request to fetch all lessons.");
-        return ResponseEntity.ok(lessonService.getAllLessons());
+    public ResponseEntity<List<LessonResponse>> getAllLessons(Authentication authentication) {
+        log.info("REST request to get all lessons for authenticated user");
+
+        String userEmail = authentication.getName();
+
+        return ResponseEntity.ok(lessonService.getAllLessonsForUser(userEmail));
     }
 
     /**
