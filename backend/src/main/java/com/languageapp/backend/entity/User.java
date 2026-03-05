@@ -1,5 +1,6 @@
 package com.languageapp.backend.entity;
 
+import com.languageapp.backend.enums.DifficultyLevel;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -51,4 +52,12 @@ public class User {
 
     @Column(name = "preferred_language", nullable = false, length = 10)
     private String preferredLanguage = "en";
+
+    /**
+     * User's preferred difficulty level for adaptive learning.
+     * Enforced by Java Enum to guarantee type safety and prevent invalid values.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "preferred_difficulty", length = 20, nullable = false)
+    private DifficultyLevel preferredDifficulty = DifficultyLevel.DYNAMIC;
 }
