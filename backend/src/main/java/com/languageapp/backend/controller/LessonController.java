@@ -1,20 +1,18 @@
 package com.languageapp.backend.controller;
 
+import com.languageapp.backend.dto.request.LessonSubmitRequest;
 import com.languageapp.backend.dto.response.ExerciseResponse;
 import com.languageapp.backend.dto.response.LessonResponse;
+import com.languageapp.backend.dto.response.LessonSubmitResponse;
 import com.languageapp.backend.service.EvaluationService;
 import com.languageapp.backend.service.LessonService;
+import com.languageapp.backend.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import com.languageapp.backend.dto.request.LessonSubmitRequest;
-import com.languageapp.backend.dto.response.LessonSubmitResponse;
-import com.languageapp.backend.entity.User;
-import com.languageapp.backend.exception.ResourceNotFoundException;
-import com.languageapp.backend.repository.UserRepository;
-import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,7 +31,7 @@ public class LessonController {
 
     private final LessonService lessonService;
     private final EvaluationService evaluationService;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     /**
      * Retrieves a list of available lessons tailored to the authenticated user's difficulty level.
@@ -80,13 +78,8 @@ public class LessonController {
 
         // Get user email from SecurityContext.
         String userEmail = authentication.getName();
-
-        // get UUID
-        // TODO : UserService
-        User currentUser = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
-
-        LessonSubmitResponse response = evaluationService.evaluateLesson(currentUser.getUserId(), id, request);
+        UUID userId = userService.getUserProfile(userEmail).getUserId();
+        LessonSubmitResponse response = evaluationService.evaluateLesson(userId, id, request);
 
         return ResponseEntity.ok(response);
     }

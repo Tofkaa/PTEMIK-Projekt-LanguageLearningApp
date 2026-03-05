@@ -8,6 +8,7 @@ import com.languageapp.backend.repository.LessonRepository;
 import com.languageapp.backend.repository.LessonTopicRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +33,7 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     @Transactional
-    public void run(String... args) {
+    public void run(String @NonNull ... args) {
         // Run it only when the DB is empty.
         if (topicRepository.count() == 0) {
             log.info("Database is empty. Initializing structured seed data...");
