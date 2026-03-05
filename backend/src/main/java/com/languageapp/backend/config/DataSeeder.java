@@ -16,8 +16,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Automatically loads the DB with test data,
- * if it is completely empty.
+ * Component responsible for bootstrapping the database with initial learning materials.
+ * <p>
+ * Populates the system with topics, lessons, and exercises categorized by
+ * different difficulty levels (EASY, MEDIUM, HARD) to support the adaptive learning engine.
  */
 @Slf4j
 @Component
@@ -33,64 +35,79 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) {
         // Run it only when the DB is empty.
         if (topicRepository.count() == 0) {
-            log.info("The DataBase is empty, seeding in progress...");
+            log.info("Database is empty. Initializing structured seed data...");
             seedLearningMaterials();
-            log.info("Initial learning material successfully loaded!");
+            log.info("Seed data initialization completed successfully.");
         } else {
-            log.info("Database not empty, seeding skipped.");
+            log.info("Database already contains learning materials. Seeding skipped.");
         }
     }
 
     private void seedLearningMaterials() {
-        // 1. Add topic
+        // Add topic
         LessonTopic basicsTopic = new LessonTopic();
-        basicsTopic.setName("Angol Alapok");
-        basicsTopic.setDescription("Kezdő angol szókincs és egyszerű nyelvtan.");
+        basicsTopic.setName("Basic English");
+        basicsTopic.setDescription("Beginner vocabulary and grammar essential for daily communication.");
         topicRepository.save(basicsTopic);
 
-        // 2. Add lesson
-        Lesson colorsLesson = new Lesson();
-        colorsLesson.setTopic(basicsTopic);
-        colorsLesson.setTitle("1. Lecke: Színek és Gyümölcsök");
-        colorsLesson.setDifficulty("KÖNNYŰ");
-        colorsLesson.setLanguage("en");
-        colorsLesson.setDescription("Tanuljuk meg az alapvető színeket és pár gyümölcs nevét!");
-        lessonRepository.save(colorsLesson);
+        // EASY
+        Lesson easyLesson = createLesson(basicsTopic, "Colors & Fruits (EASY)", "EASY",
+                "Learn basic vocabulary with visual aids and multiple choice questions.");
 
-        // 3. Add exercises using JSONB
+        createExercise(easyLesson, "IMAGE_CHOICE",
+                Map.of("question", "What color is the apple?", "options", List.of("Red", "Blue", "Green")),
+                Map.of("answer", "Red"), "https://example.com/red-apple.jpg");
 
-        // 1. Exercise (Multiple Choice)
-        Exercise ex1 = new Exercise();
-        ex1.setLesson(colorsLesson);
-        ex1.setType("MULTIPLE_CHOICE");
-        ex1.setContent(Map.of(
-                "question", "Hogy van angolul az Alma?",
-                "options", List.of("Apple", "Banana", "Orange", "Grape")
-        ));
-        ex1.setCorrectAnswer(Map.of("answer", "Apple")); // This will be hidden in the DTO
-        exerciseRepository.save(ex1);
+        createExercise(easyLesson, "MULTIPLE_CHOICE",
+                Map.of("question", "How do you say 'Banán' in English?", "options", List.of("Apple", "Banana", "Orange")),
+                Map.of("answer", "Banana"), null);
 
-        // 2. Exercise (Translation)
-        Exercise ex2 = new Exercise();
-        ex2.setLesson(colorsLesson);
-        ex2.setType("TRANSLATION");
-        ex2.setContent(Map.of(
-                "question", "Fordítsd le: A nap sárga.",
-                "hint", "A nap = The sun"
-        ));
-        ex2.setCorrectAnswer(Map.of("answer", "The sun is yellow."));
-        exerciseRepository.save(ex2);
+        // MEDIUM
+        Lesson mediumLesson = createLesson(basicsTopic, "Colors & Fruits (MEDIUM)", "MEDIUM",
+                "Practice your vocabulary with translations and subtle hints.");
 
-        // 3. Exercise (Image-based)
-        Exercise ex3 = new Exercise();
-        ex3.setLesson(colorsLesson);
-        ex3.setType("IMAGE_CHOICE");
-        ex3.setImageUrl("https://example.com/images/red-car.jpg"); // fake URL for testing
-        ex3.setContent(Map.of(
-                "question", "Milyen színű az autó a képen?",
-                "options", List.of("Red", "Blue", "Green", "Black")
-        ));
-        ex3.setCorrectAnswer(Map.of("answer", "Red"));
-        exerciseRepository.save(ex3);
+        createExercise(mediumLesson, "MULTIPLE_CHOICE",
+                Map.of("question", "Which of the following fruits is yellow?", "options", List.of("Apple", "Banana", "Grape")),
+                Map.of("answer", "Banana"), null);
+
+        createExercise(mediumLesson, "TRANSLATION",
+                Map.of("question", "Translate to English: Az alma piros.", "hint", "alma = apple, piros = red"),
+                Map.of("answer", "The apple is red."), null);
+
+        // HARD
+        Lesson hardLesson = createLesson(basicsTopic, "Colors & Fruits (HARD)", "HARD",
+                "Advanced translation practice without any hints or visual aids.");
+
+        createExercise(hardLesson, "TRANSLATION",
+                Map.of("question", "Translate to English: A nap sárga és az ég kék."),
+                Map.of("answer", "The sun is yellow and the sky is blue."), null);
+
+        createExercise(hardLesson, "TRANSLATION",
+                Map.of("question", "Translate to English: Szeretem a zöld almát."),
+                Map.of("answer", "I like the green apple."), null);
+    }
+
+    // Helper factory methods
+
+    private Lesson createLesson(LessonTopic topic, String title, String difficulty, String description) {
+        Lesson lesson = new Lesson();
+        lesson.setTopic(topic);
+        lesson.setTitle(title);
+        lesson.setDifficulty(difficulty);
+        lesson.setLanguage("en");
+        lesson.setDescription(description);
+        return lessonRepository.save(lesson);
+    }
+
+    private void createExercise(Lesson lesson, String type, Map<String, Object> content, Map<String, Object> correctAnswer, String imageUrl) {
+        Exercise exercise = new Exercise();
+        exercise.setLesson(lesson);
+        exercise.setType(type);
+        exercise.setContent(content);
+        exercise.setCorrectAnswer(correctAnswer);
+        if (imageUrl != null) {
+            exercise.setImageUrl(imageUrl);
+        }
+        exerciseRepository.save(exercise);
     }
 }
