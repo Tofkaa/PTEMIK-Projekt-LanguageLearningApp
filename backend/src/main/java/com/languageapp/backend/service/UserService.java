@@ -34,8 +34,7 @@ public class UserService {
     public UserResponse getUserProfile(String email) {
         log.debug("Fetching profile for user: {}", email);
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = getUserByEmail(email);
 
         return UserResponse.builder()
                 .userId(user.getUserId())
@@ -58,8 +57,7 @@ public class UserService {
     public List<ProgressResponse> getUserProgress(String email) {
         log.debug("Fetching progress for user: {}", email);
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = getUserByEmail(email);
 
         return progressRepository.findByUserUserId(user.getUserId()).stream()
                 .map(progress -> ProgressResponse.builder()
@@ -71,5 +69,16 @@ public class UserService {
                         .completedAt(progress.getCompletedAt())
                         .build())
                 .toList();
+    }
+
+    /**
+     * Fetches a user by email or throws a standard ResourceNotFoundException.
+     */
+    private User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    log.error("Authenticated user not found in the database with email: {}", email);
+                    return new ResourceNotFoundException("User not found");
+                });
     }
 }
