@@ -34,7 +34,7 @@ public class LessonService {
 
     private final LessonRepository lessonRepository;
     private final UserRepository userRepository;
-    private final ResultRepository resultRepository;
+    private final UserDifficultyCalculator userDifficultyCalculator;
 
     /**
      * Retrieves all lessons filtered by the user's preferred or dynamically calculated difficulty.
@@ -50,7 +50,7 @@ public class LessonService {
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
 
         // 1. Calculate target difficulty
-        String targetDifficulty = determineTargetDifficulty(user);
+        String targetDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
         log.info("Target difficulty for user {} is set to: {}", userEmail, targetDifficulty);
 
         // 2. Only get the correct lessons for desired difficulty
@@ -59,42 +59,6 @@ public class LessonService {
         return tailoredLessons.stream()
                 .map(this::mapToLessonResponse)
                 .toList();
-    }
-
-    /**
-     * Core Business Logic for Adaptive Learning.
-     * Determines the exact difficulty level based on user preference and past performance.
-     */
-    private String determineTargetDifficulty(User user) {
-        // If the students preferred difficulty is not dynamic, respect their choice
-        if (!"DYNAMIC".equals(user.getPreferredDifficulty().name())) {
-            return user.getPreferredDifficulty().name();
-        }
-
-        // If it is dynamic, get their last 3 results.
-        List<Result> recentResults = resultRepository.findTop3ByUserUserIdOrderBySubmittedAtDesc(user.getUserId());
-
-        // If they do not have 3 results, start them from MEDIUM.
-        if (recentResults.isEmpty()) {
-            return "MEDIUM";
-        }
-
-        // Calculate average
-        double averageScore = recentResults.stream()
-                .mapToInt(Result::getScore)
-                .average()
-                .orElse(0.0);
-
-        log.debug("User's average score over last 3 lessons: {}", averageScore);
-
-        // Decision tree
-        if (averageScore >= 85.0) {
-            return "HARD";
-        } else if (averageScore < 50.0) {
-            return "EASY";
-        } else {
-            return "MEDIUM";
-        }
     }
 
     /**
@@ -119,7 +83,7 @@ public class LessonService {
                 });
 
         if ("STUDENT".equals(user.getRole())) {
-            String allowedDifficulty = determineTargetDifficulty(user);
+            String allowedDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
 
             if (!lesson.getDifficulty().equals(allowedDifficulty)) {
                 log.warn("SECURITY ALERT: User {} attempted to bypass difficulty settings! Requested: {}, Allowed: {}",

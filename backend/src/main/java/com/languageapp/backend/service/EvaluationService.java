@@ -4,6 +4,7 @@ import com.languageapp.backend.dto.request.ExerciseSubmission;
 import com.languageapp.backend.dto.request.LessonSubmitRequest;
 import com.languageapp.backend.dto.response.LessonSubmitResponse;
 import com.languageapp.backend.entity.*;
+import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.LessonRepository;
 import com.languageapp.backend.repository.ProgressRepository;
@@ -38,15 +39,8 @@ public class EvaluationService {
     private final LessonRepository lessonRepository;
     private final ResultRepository resultRepository;
     private final ProgressRepository progressRepository;
+    private final UserDifficultyCalculator userDifficultyCalculator;
 
-    /**
-     * Evaluates a submitted lesson, calculates the score, and updates user statistics.
-     *
-     * @param userId  the UUID of the authenticated user
-     * @param lessonId the UUID of the lesson being evaluated
-     * @param request the submission payload containing answers and time taken
-     * @return a {@link LessonSubmitResponse} detailing the evaluation outcome
-     */
     @Transactional
     public LessonSubmitResponse evaluateLesson(UUID userId, UUID lessonId, LessonSubmitRequest request) {
         log.debug("Starting evaluation for user: {} and lesson: {}", userId, lessonId);
@@ -57,22 +51,38 @@ public class EvaluationService {
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
 
+        validateUserDifficultyAccess(user, lesson);
+
         List<Exercise> exercises = lesson.getExercises();
         int totalQuestions = exercises.size();
         int correctAnswersCount = calculateCorrectAnswers(exercises, request);
 
         int score = totalQuestions == 0 ? 0 : (int) Math.round(((double) correctAnswersCount / totalQuestions) * 100);
         boolean passed = score >= PASSING_SCORE_THRESHOLD;
-        int xpEarned = passed ? (correctAnswersCount * XP_PER_CORRECT_ANSWER) : 0;
 
-        if (xpEarned > 0) {
+        Progress progress = progressRepository.findByUserUserIdAndLessonLessonId(userId, lessonId)
+                .orElseGet(() -> {
+                    Progress newProgress = new Progress();
+                    newProgress.setUser(user);
+                    newProgress.setLesson(lesson);
+                    newProgress.setHighestScore(0);
+                    newProgress.setIsCompleted(false);
+                    return newProgress;
+                });
+
+        int xpEarned = 0;
+        if (passed && !progress.getIsCompleted()) {
+            xpEarned = correctAnswersCount * XP_PER_CORRECT_ANSWER;
             user.setXp(user.getXp() + xpEarned);
             userRepository.save(user);
             log.info("User {} earned {} XP. Total XP: {}", user.getEmail(), xpEarned, user.getXp());
+        } else if (passed && progress.getIsCompleted()) {
+            log.debug("User {} already completed this lesson. No new XP awarded.", user.getEmail());
         }
 
         Result savedResult = saveResult(user, lesson, request, correctAnswersCount, totalQuestions, score);
-        updateProgress(user, lesson, score, passed);
+
+        updateProgress(progress, score, passed);
 
         String feedback = passed ? "Congratulations! You passed the lesson." : "Keep practicing! You can do better.";
 
@@ -87,11 +97,23 @@ public class EvaluationService {
                 .build();
     }
 
+    private void validateUserDifficultyAccess(User user, Lesson lesson) {
+        if ("STUDENT".equals(user.getRole())) {
+            String allowedDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+            if (!lesson.getDifficulty().equals(allowedDifficulty)) {
+                log.warn("SECURITY ALERT: User {} attempted to SUBMIT restricted difficulty! Requested: {}, Allowed: {}",
+                        user.getEmail(), lesson.getDifficulty(), allowedDifficulty);
+                throw new ForbiddenException("Access denied : you cant access this difficulty!");
+            }
+        }
+    }
+
     private int calculateCorrectAnswers(List<Exercise> exercises, LessonSubmitRequest request) {
         Map<UUID, String> submittedAnswers = request.getAnswers().stream()
                 .collect(Collectors.toMap(
                         ExerciseSubmission::getExerciseId,
-                        submission -> String.valueOf(submission.getAnswer()).trim().toLowerCase()
+                        submission -> String.valueOf(submission.getAnswer()).trim().toLowerCase(),
+                        (existing, replacement) -> existing
                 ));
 
         int correctCount = 0;
@@ -100,7 +122,7 @@ public class EvaluationService {
                 String correctAnswer = String.valueOf(exercise.getCorrectAnswer().get("answer")).trim().toLowerCase();
                 String submittedAnswer = submittedAnswers.get(exercise.getExerciseId());
 
-                if (correctAnswer.equals(submittedAnswer)) {
+                if (submittedAnswer != null && correctAnswer.equals(submittedAnswer)) {
                     correctCount++;
                 }
             }
@@ -124,16 +146,7 @@ public class EvaluationService {
         return resultRepository.save(result);
     }
 
-    private void updateProgress(User user, Lesson lesson, int score, boolean passed) {
-        Progress progress = progressRepository.findByUserUserIdAndLessonLessonId(user.getUserId(), lesson.getLessonId())
-                .orElseGet(() -> {
-                    Progress newProgress = new Progress();
-                    newProgress.setUser(user);
-                    newProgress.setLesson(lesson);
-                    newProgress.setHighestScore(0);
-                    return newProgress;
-                });
-
+    private void updateProgress(Progress progress, int score, boolean passed) {
         progress.setLastAttemptAt(LocalDateTime.now());
 
         if (score > progress.getHighestScore()) {
