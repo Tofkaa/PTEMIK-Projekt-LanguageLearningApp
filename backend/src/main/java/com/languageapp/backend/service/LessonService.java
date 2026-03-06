@@ -6,12 +6,14 @@ import com.languageapp.backend.entity.Exercise;
 import com.languageapp.backend.entity.Lesson;
 import com.languageapp.backend.entity.Result;
 import com.languageapp.backend.entity.User;
+import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.LessonRepository;
 import com.languageapp.backend.repository.ResultRepository;
 import com.languageapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -97,20 +99,34 @@ public class LessonService {
 
     /**
      * Retrieves all exercises for a specific lesson, strictly omitting the correct answers.
+     * Includes IDOR security checks to prevent students from accessing restricted difficulty levels.
      *
      * @param lessonId the unique identifier of the lesson
+     * @param userEmail the email of the authenticated user requesting the exercises
      * @return a list of {@link ExerciseResponse}
-     * @throws ResourceNotFoundException if the requested lesson does not exist
      */
     @Transactional(readOnly = true)
-    public List<ExerciseResponse> getExercisesByLessonId(UUID lessonId) {
-        log.debug("Fetching safe exercises for lesson ID: {}", lessonId);
+    public List<ExerciseResponse> getExercisesByLessonId(UUID lessonId, String userEmail) {
+        log.debug("Fetching safe exercises for lesson ID: {} for user: {}", lessonId, userEmail);
+
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
 
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> {
                     log.warn("Fetch failed: Lesson not found with ID {}", lessonId);
                     return new ResourceNotFoundException("No lesson found with this ID!");
                 });
+
+        if ("STUDENT".equals(user.getRole())) {
+            String allowedDifficulty = determineTargetDifficulty(user);
+
+            if (!lesson.getDifficulty().equals(allowedDifficulty)) {
+                log.warn("SECURITY ALERT: User {} attempted to bypass difficulty settings! Requested: {}, Allowed: {}",
+                        userEmail, lesson.getDifficulty(), allowedDifficulty);
+                throw new ForbiddenException("Access denied: lesson difficulty does not match preferred difficulty!.");
+            }
+        }
 
         return lesson.getExercises().stream()
                 .map(this::mapToExerciseResponse)

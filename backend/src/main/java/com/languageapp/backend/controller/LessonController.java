@@ -55,9 +55,9 @@ public class LessonController {
      * @return a {@link ResponseEntity} containing a list of {@link ExerciseResponse}
      */
     @GetMapping("/{id}/exercises")
-    public ResponseEntity<List<ExerciseResponse>> getExercisesByLesson(@PathVariable UUID id) {
+    public ResponseEntity<List<ExerciseResponse>> getExercisesByLesson(@PathVariable UUID id, Authentication authentication) {
         log.info("REST request to fetch exercises for lesson ID: {}", id);
-        return ResponseEntity.ok(lessonService.getExercisesByLessonId(id));
+        return ResponseEntity.ok(lessonService.getExercisesByLessonId(id, authentication.getName()));
     }
 
     /**
