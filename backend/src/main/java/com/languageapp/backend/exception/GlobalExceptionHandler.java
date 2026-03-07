@@ -63,6 +63,21 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles {@link ForbiddenException}.
+     */
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbiddenException(ForbiddenException ex, HttpServletRequest request) {
+        log.warn("Forbidden at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse errorResponse = buildErrorResponse(
+                HttpStatus.FORBIDDEN,
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
+
+    /**
      * Handles Validation exceptions (e.g. @Valid on @RequestBody).
      * Extracts all field errors and joins them into a readable string.
      */

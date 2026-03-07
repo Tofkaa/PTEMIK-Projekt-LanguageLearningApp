@@ -18,4 +18,8 @@ public interface LessonRepository extends JpaRepository<Lesson, UUID> {
             "LEFT JOIN Result r ON r.lesson.lessonId = l.lessonId " +
             "GROUP BY l.lessonId, l.title, l.difficulty")
     List<com.languageapp.backend.dto.projection.LessonPerformanceDTO> getLessonPerformanceStats();
+    /**
+     * Retrieves all lessons matching a specific difficulty level (e.g., "EASY", "MEDIUM").
+     */
+    List<Lesson> findByDifficulty(String difficulty);
 }

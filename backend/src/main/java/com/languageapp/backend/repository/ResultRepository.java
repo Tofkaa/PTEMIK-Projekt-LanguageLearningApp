@@ -11,4 +11,8 @@ import java.util.UUID;
 public interface ResultRepository extends JpaRepository<Result, UUID> {
     List<Result> findByUserUserId(UUID userId);
     List<Result> findByChallengeChallengeId(UUID challengeId);
+    /**
+     * Retrieves the 3 most recent lesson results for a specific user to calculate dynamic difficulty.
+     */
+    List<Result> findTop3ByUserUserIdOrderBySubmittedAtDesc(UUID userId);
 }
