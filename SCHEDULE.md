@@ -3,7 +3,7 @@
 - 2026-02-15: Projekt Setup és Docker környezet (1. hét) - [KÉSZ]
 - 2026-02-22: Adatbázis Tervezés és Backend Alapok (2. hét) - [KÉSZ]
 - 2026-03-01: Biztonság és Autentikáció (3. hét) - [KÉSZ]
-- 2026-03-08: Alapvető Üzleti Logika és API (4. hét)
+- 2026-03-08: Alapvető Üzleti Logika és API (4. hét) - [KÉSZ]
 - 2026-03-15: Frontend Alapok és Bejelentkezés (5. hét)
 - 2026-03-22: Tanulási Felület és Core Loop (6. hét)
 - 2026-03-29: Proof of Concept (PoC) Prezentáció (7. hét)
