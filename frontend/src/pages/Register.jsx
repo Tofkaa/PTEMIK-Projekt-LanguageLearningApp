@@ -1,17 +1,62 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Form, Button, Card, Container, Row, Col } from 'react-bootstrap';
+import { Link, useNavigate } from 'react-router-dom';
+import { Form, Button, Card, Container, Row, Col, Alert } from 'react-bootstrap';
+import api from '../services/api.jsx';
 
+/**
+ * Register Component
+ * Responsible for handling new user registration.
+ * Submits user details to the backend and navigates to the login page upon success.
+ */
 const Register = () => {
-    // 1. States for registration (Name, Email, Password)
+    // Component-level state for form inputs and feedback messages
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    
+    const navigate = useNavigate();
 
-    const handleSubmit = (e) => {
+    /**
+     * Asynchronous handler for form submission.
+     * Executes the registration API call and manages success/error states.
+     * @param {React.FormEvent} e - The form submission event
+     */
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Regisztrációs kísérlet:', { name, email });
-        // TODO POST auth/register call
+        
+        // Clear previous feedback messages before a new attempt
+        setError('');
+        setSuccess('');
+        
+        console.log(`Initiating registration attempt for: ${name} (${email})`);
+
+        try {
+            // Send POST request to the backend registration endpoint
+            const response = await api.post('/auth/register', { 
+                name, 
+                email, 
+                password 
+            });
+
+            // Display success message and delay navigation to allow the user to read it
+            setSuccess('Sikeres regisztráció! Irányítás a bejelentkezéshez...');
+            setTimeout(() => {
+                navigate('/login');
+            }, 2000);
+
+        } catch (err) {
+            console.error("Registration error:", err);
+            
+            // Extract and display specific error message from the backend if available
+            if (err.response && err.response.data) {
+                setError(err.response.data.message || 'Hiba történt a regisztráció során. (Foglalt email?)');
+            } else {
+                // Fallback error message for network or unexpected issues
+                setError('Nem sikerült csatlakozni a szerverhez.');
+            }
+        }
     };
 
     return (
@@ -22,42 +67,28 @@ const Register = () => {
                         <Card.Body className="p-5">
                             <h2 className="text-center mb-4 fw-bold">Új fiók létrehozása</h2>
                             
+                            {/* Render success/error alerts based on component state */}
+                            {error && <Alert variant="danger">{error}</Alert>}
+                            {success && <Alert variant="success">{success}</Alert>}
+
                             <Form onSubmit={handleSubmit}>
                                 <Form.Group className="mb-3" controlId="formName">
-                                    <Form.Label>Teljes név (vagy Becenév)</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        placeholder="Pl. Teszt Elek"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        required
-                                    />
+                                    <Form.Label>Teljes név</Form.Label>
+                                    <Form.Control type="text" placeholder="Pl. Teszt Elek" value={name} onChange={(e) => setName(e.target.value)} required />
                                 </Form.Group>
 
                                 <Form.Group className="mb-3" controlId="formEmail">
                                     <Form.Label>Email cím</Form.Label>
-                                    <Form.Control
-                                        type="email"
-                                        placeholder="pelda@email.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        required
-                                    />
+                                    <Form.Control type="email" placeholder="pelda@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
                                 </Form.Group>
 
                                 <Form.Group className="mb-4" controlId="formPassword">
                                     <Form.Label>Jelszó</Form.Label>
-                                    <Form.Control
-                                        type="password"
-                                        placeholder="Legalább 6 karakter"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                        minLength={6}
-                                    />
+                                    <Form.Control type="password" placeholder="Legalább 6 karakter" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete='new-password'/>
                                 </Form.Group>
 
-                                <Button variant="success" type="submit" className="w-100 mb-3 py-2 fw-bold">
+                                {/* Disable the submit button if registration was successful to prevent duplicate submissions */}
+                                <Button variant="success" type="submit" className="w-100 mb-3 py-2 fw-bold" disabled={!!success}>
                                     Regisztráció
                                 </Button>
                             </Form>
