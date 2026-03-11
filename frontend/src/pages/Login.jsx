@@ -4,6 +4,7 @@ import { Form, Button, Card, Container, Row, Col, Alert } from 'react-bootstrap'
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
+
 /**
  * Login Component
  * Responsible for user authentication, JWT token management, 
@@ -14,6 +15,7 @@ const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
     const navigate = useNavigate();
     const { login } = useAuth();
@@ -26,6 +28,7 @@ const Login = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(''); 
+        setIsLoading(true);
         
         console.log(`Initiating login attempt for: ${email}`);
 
@@ -58,6 +61,8 @@ const Login = () => {
             console.error("Login error:", err);
             // Display a generic error message to the user for security reasons
             setError('Hibás email cím vagy jelszó!');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -95,10 +100,9 @@ const Login = () => {
                                         autoComplete="current-password"
                                     />
                                </Form.Group>
-
-                               <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold">
-                                   Belépés
-                               </Button>
+                                        <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold" disabled={isLoading}>
+                                             {isLoading ? 'Bejelentkezés folyamatban...' : 'Belépés'}
+                                         </Button>
                            </Form>
                            
                            <div className="text-center mt-3">
