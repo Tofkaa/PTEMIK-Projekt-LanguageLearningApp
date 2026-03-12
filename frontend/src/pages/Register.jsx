@@ -63,7 +63,7 @@ const Register = () => {
         <Container className="mt-5">
             <Row className="justify-content-center">
                 <Col md={8} lg={5}>
-                    <Card className="shadow-sm border-0 rounded-lg mt-5">
+                    <Card className="bg-transparent border-0 mt-5 text-light">
                         <Card.Body className="p-5">
                             <h2 className="text-center mb-4 fw-bold">Új fiók létrehozása</h2>
                             
@@ -94,7 +94,7 @@ const Register = () => {
                             </Form>
                             
                             <div className="text-center mt-3">
-                                <span className="text-muted">Már van fiókod? </span>
+                                <span className="text-light">Már van fiókod? </span>
                                 <Link to="/login" className="text-decoration-none fw-bold">Lépj be itt!</Link>
                             </div>
                         </Card.Body>

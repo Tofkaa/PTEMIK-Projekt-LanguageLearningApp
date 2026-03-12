@@ -23,7 +23,6 @@ const Login = () => {
     /**
      * Asynchronous handler for form submission.
      * Executes API calls and redirects the client to the protected route upon successful authentication.
-     * * @param {React.FormEvent} e - The form submission event
      */
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -70,9 +69,9 @@ const Login = () => {
        <Container className="mt-5">
            <Row className="justify-content-center">
                <Col md={8} lg={5}>
-                   <Card className="shadow-sm border-0 rounded-lg mt-5">
+                   <Card className="bg-transparent border-0 mt-5 text-light">
                        <Card.Body className="p-5">
-                           <h2 className="text-center mb-4 fw-bold">Bejelentkezés</h2>
+                           <h2 className="text-center mb-4 fw-bold text-white">Bejelentkezés</h2>
                            
                            {/* Render error alert upon failed authentication */}
                            {error && <Alert variant="danger">{error}</Alert>}
@@ -106,7 +105,7 @@ const Login = () => {
                            </Form>
                            
                            <div className="text-center mt-3">
-                               <span className="text-muted">Nincs még fiókod? </span>
+                               <span className="text-light">Nincs még fiókod? </span>
                                <Link to="/register" className="text-decoration-none fw-bold">Regisztrálj itt!</Link>
                            </div>
                        </Card.Body>

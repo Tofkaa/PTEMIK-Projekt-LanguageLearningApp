@@ -1,0 +1,75 @@
+/* --- src/custom.css --- */
+
+/**
+ * Custom Design System for AdaptiveApp
+ * Version: 1.0 (5th week integration)
+ */
+
+/* 1. Reset and base body styling */
+body {
+    background-color: #333333; 
+    color: #ffffff; /* White text for contrast */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* A clean modern font (can be specialized later) */
+}
+
+/* 2. Primary Color Override */
+:root {
+    --primary-cyan: #3EC1D3; /* Defining the brand color as a CSS variable */
+}
+
+/* Overriding Bootstrap's primary button class */
+.btn-primary {
+    background-color: var(--primary-cyan);
+    border-color: var(--primary-cyan);
+    color: #333333; /* Dark text for better readability on cyan */
+    font-weight: bold;
+    border-radius: 20px; /* Highly rounded corners */
+}
+
+/* Overriding Bootstrap's success button class (used for Lesson Start buttons) */
+.btn-outline-success {
+    color: var(--primary-cyan);
+    border-color: var(--primary-cyan);
+    border-radius: 20px;
+}
+
+.btn-outline-success:hover {
+    background-color: var(--primary-cyan);
+    color: #333333;
+}
+
+/* 3. Global Border Radius (Rounded forms and cards) */
+.form-control, .card, .alert {
+    border-radius: 15px; /* Softer rounded corners for inputs, cards, and alerts */
+}
+
+.card {
+    border: none; /* Removing card borders for a cleaner look */
+}
+
+/* Specialized input styling from login wireframe */
+.form-control {
+    background-color: #ffffff !important;
+    border: 2px solid #ffffff;
+    color: var(--primary-cyan) !important;
+    font-weight: 900;
+    border-radius: 25px !important;
+    padding: 0.8rem 1.5rem;
+}
+
+.form-control::placeholder {
+    color: var(--primary-cyan);
+    opacity: 0.8;
+}
+
+.form-control:focus {
+    border-color: var(--primary-cyan);
+    box-shadow: 0 0 10px rgba(62, 193, 211, 0.5); 
+    outline: none;
+}
+
+/* Special styling for dark-mode cards with light content (like quiz) */
+.bg-light.card {
+    background-color: #E0E0E0 !important; /* Specific light-gray background from your quiz wireframe */
+    color: #333333 !important; /* Specific dark text for readability on light card */
+}

@@ -55,7 +55,7 @@ const Dashboard = () => {
     }, []); // The empty array [] means this runs only once on mount
 
     return (
-        <div className="bg-light min-vh-100 pb-5">
+        <div className="min-vh-100 pb-5 text-light">
             {/* Navigation Bar */}
             <NavigationBar />
 
@@ -64,7 +64,7 @@ const Dashboard = () => {
                 <Row className="mb-4">
                     <Col>
                         <h2 className="fw-bold">Welcome back, {user?.name}! 👋</h2>
-                        <p className="text-muted">
+                        <p className="text-light">
                             Készen állsz a mai tanulásra? Itt a te személyre szabott áttekintésed.
                         </p>
                     </Col>
@@ -73,12 +73,12 @@ const Dashboard = () => {
                 <Row>
                     {/* Left Column: User Statistics Card */}
                    <Col md={4} className="mb-4">
-                        <Card className="shadow-sm border-0 h-100">
+                       <Card className="shadow-sm border-0 h-100 bg-transparent text-light">
                             <Card.Body>
                                 <h5 className="fw-bold border-bottom pb-2">Statisztikák</h5>
                                 
                                 {/* XP and Level Bar */}
-                                <div className="mb-4 mt-3 p-3 bg-light rounded">
+                                <div className="mb-4 mt-3 p-3 bg-dark rounded border border-secondary">
                                     <div className="d-flex justify-content-between mb-1">
                                         <span className="fw-bold text-primary">Szint {currentLevel}</span>
                                         <span className="text-muted small fw-bold">
@@ -92,7 +92,7 @@ const Dashboard = () => {
                                         style={{ height: '12px' }} 
                                         animated={progressPercentage > 0}
                                     />
-                                    <div className="text-center mt-2 small text-muted">
+                                    <div className="text-center mt-2 small text-light">
                                         Még {xpForNextLevel - currentXp} XP a szintlépéshez!
                                     </div>
                                 </div>
@@ -105,7 +105,7 @@ const Dashboard = () => {
 
                     {/* Right Column: Lessons List */}
                     <Col md={8} className="mb-4">
-                        <Card className="shadow-sm border-0 h-100 bg-transparent">
+                        <Card className="shadow-sm border-0 h-100 bg-transparent text-light">
                             <Card.Body className="p-0">
                                 <h5 className="fw-bold border-bottom pb-2 mb-3">Elérhető Leckék</h5>
                                 
@@ -113,7 +113,7 @@ const Dashboard = () => {
                                 {isLoading && (
                                     <div className="text-center py-5">
                                         <Spinner animation="border" variant="primary" />
-                                        <p className="mt-2 text-muted">Leckék keresése...</p>
+                                        <p className="mt-2 text-light">Leckék keresése...</p>
                                     </div>
                                 )}
 
@@ -131,10 +131,10 @@ const Dashboard = () => {
                                         {/* .map() iterates through the array and creates a UI card for each lesson */}
                                         {lessons.map((lesson) => (
                                             <Col md={6} key={lesson.id} className="mb-3">
-                                                <Card className="h-100 border-0 shadow-sm">
+                                                <Card className="h-100 border-0 shadow-sm bg-dark text-light">
                                                     <Card.Body>
                                                         <Card.Title className="fw-bold">{lesson.title}</Card.Title>
-                                                        <Card.Text className="text-muted small">
+                                                        <Card.Text className="text-light small">
                                                             {lesson.description}
                                                         </Card.Text>
                                                         <div className="d-flex justify-content-between align-items-center mt-3">
