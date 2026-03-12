@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import Lesson from './pages/LessonPlayer.jsx';
 import PrivateRoute from './components/PrivateRoute.jsx';
 
 function App() {
@@ -21,6 +22,15 @@ function App() {
             </PrivateRoute>
           } 
         />
+        
+        <Route
+          path="/lesson/:id" 
+          element={
+            <PrivateRoute>
+              <Lesson />
+            </PrivateRoute>
+          } 
+          />
 
         {/* Invalid URL-s get sent to login page */}
         <Route path="*" element={<Navigate to="/login" replace />} />

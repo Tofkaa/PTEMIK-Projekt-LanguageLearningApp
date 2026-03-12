@@ -3,6 +3,7 @@ import { Container, Row, Col, Card, Button, Spinner, Alert } from 'react-bootstr
 import { useAuth } from '../context/AuthContext.jsx';
 import NavigationBar from '../components/NavigationBar.jsx';
 import api from '../services/api.jsx';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Dashboard Component
@@ -17,6 +18,7 @@ const Dashboard = () => {
     const [lessons, setLessons] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+    const navigate = useNavigate();
 
     /**
      * useEffect Hook
@@ -110,7 +112,7 @@ const Dashboard = () => {
                                                         </Card.Text>
                                                         <div className="d-flex justify-content-between align-items-center mt-3">
                                                             <span className="badge bg-primary">{lesson.difficultyLevel}</span>
-                                                            <Button variant="outline-success" size="sm">
+                                                            <Button variant="outline-success" size="sm" onClick={() => navigate(`/lesson/${lesson.id}`)}>
                                                                 Indítás
                                                             </Button>
                                                         </div>
