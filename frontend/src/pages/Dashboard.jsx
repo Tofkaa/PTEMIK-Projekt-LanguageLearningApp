@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Spinner, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Spinner, Alert, ProgressBar } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
 import NavigationBar from '../components/NavigationBar.jsx';
 import api from '../services/api.jsx';
 import { useNavigate } from 'react-router-dom';
+
 
 /**
  * Dashboard Component
@@ -19,6 +20,12 @@ const Dashboard = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const navigate = useNavigate();
+
+    const currentXp = user?.xp || 0;
+    const currentLevel = Math.floor(currentXp / 100) + 1; 
+    const xpForNextLevel = currentLevel * 100;
+    const xpInCurrentLevel = currentXp % 100;
+    const progressPercentage = (xpInCurrentLevel / 100) * 100;
 
     /**
      * useEffect Hook
@@ -65,12 +72,32 @@ const Dashboard = () => {
 
                 <Row>
                     {/* Left Column: User Statistics Card */}
-                    <Col md={4} className="mb-4">
+                   <Col md={4} className="mb-4">
                         <Card className="shadow-sm border-0 h-100">
                             <Card.Body>
                                 <h5 className="fw-bold border-bottom pb-2">Statisztikák</h5>
-                                <p className="mb-1"><strong>Szerepkör:</strong> {user?.role}</p>
-                                <p className="mb-1"><strong>Tapasztalat:</strong> {user?.xp || 0} XP</p>
+                                
+                                {/* XP and Level Bar */}
+                                <div className="mb-4 mt-3 p-3 bg-light rounded">
+                                    <div className="d-flex justify-content-between mb-1">
+                                        <span className="fw-bold text-primary">Szint {currentLevel}</span>
+                                        <span className="text-muted small fw-bold">
+                                            {currentXp} / {xpForNextLevel} XP
+                                        </span>
+                                    </div>
+                                    <ProgressBar 
+                                        now={progressPercentage} 
+                                        variant="warning" 
+                                        className="rounded-pill shadow-sm" 
+                                        style={{ height: '12px' }} 
+                                        animated={progressPercentage > 0}
+                                    />
+                                    <div className="text-center mt-2 small text-muted">
+                                        Még {xpForNextLevel - currentXp} XP a szintlépéshez!
+                                    </div>
+                                </div>
+
+                                <p className="mb-1"><strong>Szerepkör:</strong> <span className="badge bg-secondary">{user?.role}</span></p>
                                 <p className="mb-1"><strong>Email:</strong> {user?.email}</p>
                             </Card.Body>
                         </Card>
