@@ -1,11 +1,11 @@
-import { Navbar, Container, Nav, Button, Badge } from 'react-bootstrap';
+import { Navbar, Container, Nav, Badge, NavDropdown } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 
 /**
  * NavigationBar Component
  * Renders the top navigation bar containing the app branding, 
- * user statistics (XP, Role), and the logout functionality.
+ * user statistics (XP), and a profile dropdown menu.
  */
 const NavigationBar = () => {
     const { user, logout } = useAuth();
@@ -23,10 +23,14 @@ const NavigationBar = () => {
     if (!user) return null;
 
     return (
-        <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm mb-4">
+        <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm mb-4 border-bottom border-secondary">
             <Container>
                 {/* Brand / Logo Area */}
-                <Navbar.Brand className="fw-bold" style={{ cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>
+                <Navbar.Brand 
+                    className="fw-bold" 
+                    style={{ cursor: 'pointer', color: 'var(--primary-cyan)' }} 
+                    onClick={() => navigate('/dashboard')}
+                >
                     🚀 AdaptiveApp
                 </Navbar.Brand>
                 
@@ -37,22 +41,29 @@ const NavigationBar = () => {
                 <Navbar.Collapse id="basic-navbar-nav">
                     <Nav className="me-auto">
                         <Nav.Link onClick={() => navigate('/dashboard')}>Dashboard</Nav.Link>
-                        {/* Future links (e.g., Leaderboard, Profile) can go here */}
                     </Nav>
                     
                     <Nav className="align-items-center">
-                        {/* Display User Name and XP */}
-                        <Navbar.Text className="me-3 text-light">
-                            Hello, <span className="fw-bold text-white">{user.name}</span>! 
-                            <Badge bg="warning" text="dark" className="ms-2">
-                                {user.xp || 0} XP
-                            </Badge>
-                        </Navbar.Text>
+                        {/* Gamified XP Badge */}
+                        <Badge bg="warning" text="dark" className="me-3 rounded-pill px-3 py-2 shadow-sm">
+                            ⭐ {user.xp || 0} XP
+                        </Badge>
                         
-                        {/* Logout Button */}
-                        <Button variant="outline-light" size="sm" onClick={handleLogout}>
-                            Kijelentkezés
-                        </Button>
+                        {/* Profile Dropdown Menu */}
+                        <NavDropdown 
+                            title={<span className="text-light fw-bold">👤 {user.name}</span>} 
+                            id="basic-nav-dropdown" 
+                            align="end" 
+                            menuVariant="dark" /* Keeps the dropdown menu dark! */
+                        >
+                            <NavDropdown.Item onClick={() => navigate('/profile')} className="text-light">
+                                Profilom (Hamarosan)
+                            </NavDropdown.Item>
+                            <NavDropdown.Divider />
+                            <NavDropdown.Item onClick={handleLogout} className="text-danger fw-bold">
+                                Kijelentkezés
+                            </NavDropdown.Item>
+                        </NavDropdown>
                     </Nav>
                 </Navbar.Collapse>
             </Container>
