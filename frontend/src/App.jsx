@@ -4,36 +4,58 @@ import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Lesson from './pages/LessonPlayer.jsx';
 import PrivateRoute from './components/PrivateRoute.jsx';
+import GuestRoute from './components/GuestRoute.jsx'; 
+import NotFound from './pages/NotFound.jsx'; 
 
+/**
+ * Main Application Component
+ * Defines the routing logic and access control for the entire React application.
+ */
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        {/* Default route redirects to login */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* Private routes (only logged in can see) */}
+        {/* Guest Routes: Protected from already authenticated users */}
         <Route 
-          path="/dashboard" 
-          element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          } 
+            path="/login" 
+            element={
+                <GuestRoute>
+                    <Login />
+                </GuestRoute>
+            } 
         />
-        
-        <Route
-          path="/lesson/:id" 
-          element={
-            <PrivateRoute>
-              <Lesson />
-            </PrivateRoute>
-          } 
-          />
+        <Route 
+            path="/register" 
+            element={
+                <GuestRoute>
+                    <Register />
+                </GuestRoute>
+            } 
+        />
 
-        {/* Invalid URL-s get sent to login page */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* Private Routes: Protected from unauthenticated guests */}
+        <Route 
+            path="/dashboard" 
+            element={
+                <PrivateRoute>
+                    <Dashboard />
+                </PrivateRoute>
+            } 
+        />
+        <Route
+            path="/lesson/:id" 
+            element={
+                <PrivateRoute>
+                    <Lesson />
+                </PrivateRoute>
+            } 
+        />
+
+        {/* 404 Route: Catch-all for undefined URLs */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
   );
