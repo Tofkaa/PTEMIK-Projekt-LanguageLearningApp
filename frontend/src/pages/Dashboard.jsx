@@ -63,7 +63,7 @@ const Dashboard = () => {
                 {/* Welcome Header */}
                 <Row className="mb-4">
                     <Col>
-                        <h2 className="fw-bold">Welcome back, {user?.name}! 👋</h2>
+                        <h2 className="fw-bold">Üdv újra, {user?.name}! 👋</h2>
                         <p className="text-light">
                             Készen állsz a mai tanulásra? Itt a te személyre szabott áttekintésed.
                         </p>
@@ -130,7 +130,7 @@ const Dashboard = () => {
                                     <Row>
                                         {/* .map() iterates through the array and creates a UI card for each lesson */}
                                         {lessons.map((lesson) => (
-                                            <Col md={6} key={lesson.id} className="mb-3">
+                                            <Col md={6} key={lesson.lessonId} className="mb-3"> 
                                                 <Card className="h-100 border-0 shadow-sm bg-dark text-light">
                                                     <Card.Body>
                                                         <Card.Title className="fw-bold">{lesson.title}</Card.Title>
@@ -138,8 +138,8 @@ const Dashboard = () => {
                                                             {lesson.description}
                                                         </Card.Text>
                                                         <div className="d-flex justify-content-between align-items-center mt-3">
-                                                            <span className="badge bg-primary">{lesson.difficultyLevel}</span>
-                                                            <Button variant="outline-success" size="sm" onClick={() => navigate(`/lesson/${lesson.id}`)}>
+                                                            <span className="badge bg-primary">{lesson.difficulty}</span> 
+                                                            <Button variant="outline-success" size="sm" onClick={() => navigate(`/lesson/${lesson.lessonId}`)}> 
                                                                 Indítás
                                                             </Button>
                                                         </div>
