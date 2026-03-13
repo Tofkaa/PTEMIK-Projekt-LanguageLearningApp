@@ -33,7 +33,12 @@ api.interceptors.response.use(
     async (error) => {
         // Capture the original request configuration
         const originalRequest = error.config;
-
+        
+        // If the login endpoint throws an error, DO NOT do anything globally, 
+        // just return the error to Login.jsx!
+        if (originalRequest.url.includes('/auth/login')) {
+            return Promise.reject(error);
+        }
         // If the error is 401 (Unauthorized) AND we haven't retried this request yet
         if (error.response && error.response.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true; // Mark as retried to prevent infinite loops

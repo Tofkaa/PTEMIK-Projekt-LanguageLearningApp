@@ -74,7 +74,7 @@ const Login = () => {
                            <h2 className="text-center mb-4 fw-bold text-white">Bejelentkezés</h2>
                            
                            {/* Render error alert upon failed authentication */}
-                           {error && <Alert variant="danger">{error}</Alert>}
+                           {error && <Alert variant="danger" className="text-center rounded-4 border-0 shadow-sm fw-bold">⚠️{error}</Alert>}
 
                            <Form onSubmit={handleSubmit}>
                                <Form.Group className="mb-3" controlId="formBasicEmail">
