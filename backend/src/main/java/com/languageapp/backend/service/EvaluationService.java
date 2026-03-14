@@ -112,15 +112,18 @@ public class EvaluationService {
         Map<UUID, String> submittedAnswers = request.getAnswers().stream()
                 .collect(Collectors.toMap(
                         ExerciseSubmission::getExerciseId,
-                        submission -> String.valueOf(submission.getAnswer()).trim().toLowerCase(),
+                        submission -> normalizeText(String.valueOf(submission.getAnswer())),
                         (existing, replacement) -> existing
                 ));
 
         int correctCount = 0;
         for (Exercise exercise : exercises) {
             if (exercise.getCorrectAnswer() != null && exercise.getCorrectAnswer().containsKey("answer")) {
-                String correctAnswer = String.valueOf(exercise.getCorrectAnswer().get("answer")).trim().toLowerCase();
+                String correctAnswer = normalizeText(String.valueOf(exercise.getCorrectAnswer().get("answer")));
                 String submittedAnswer = submittedAnswers.get(exercise.getExerciseId());
+
+                log.debug("Evaluating Exercise ID {}: Expected '{}' | User submitted '{}'",
+                        exercise.getExerciseId(), correctAnswer, submittedAnswer);
 
                 if (submittedAnswer != null && correctAnswer.equals(submittedAnswer)) {
                     correctCount++;
@@ -159,5 +162,20 @@ public class EvaluationService {
         }
 
         progressRepository.save(progress);
+    }
+
+    /**
+     * Normalizes a string for comparison by removing all punctuation,
+     * converting to lowercase, and collapsing multiple spaces into a single space.
+     */
+    private String normalizeText(String input) {
+        if (input == null || input.isBlank() || "null".equals(input)) {
+            return "";
+        }
+        return input
+                .replaceAll("[\\p{Punct}]", "")
+                .toLowerCase()
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 }
