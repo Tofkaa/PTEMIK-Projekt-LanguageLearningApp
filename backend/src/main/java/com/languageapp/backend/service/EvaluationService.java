@@ -3,6 +3,7 @@ package com.languageapp.backend.service;
 import com.languageapp.backend.dto.request.ExerciseSubmission;
 import com.languageapp.backend.dto.request.LessonSubmitRequest;
 import com.languageapp.backend.dto.response.LessonSubmitResponse;
+import com.languageapp.backend.dto.response.MistakeDTO;
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -55,7 +57,9 @@ public class EvaluationService {
 
         List<Exercise> exercises = lesson.getExercises();
         int totalQuestions = exercises.size();
-        int correctAnswersCount = calculateCorrectAnswers(exercises, request);
+
+        List<MistakeDTO> mistakes = new ArrayList<>();
+        int correctAnswersCount = calculateCorrectAnswers(exercises, request, mistakes);
 
         int score = totalQuestions == 0 ? 0 : (int) Math.round(((double) correctAnswersCount / totalQuestions) * 100);
         boolean passed = score >= PASSING_SCORE_THRESHOLD;
@@ -94,6 +98,7 @@ public class EvaluationService {
                 .xpEarned(xpEarned)
                 .passed(passed)
                 .feedback(feedback)
+                .mistakes(mistakes)
                 .build();
     }
 
@@ -108,25 +113,32 @@ public class EvaluationService {
         }
     }
 
-    private int calculateCorrectAnswers(List<Exercise> exercises, LessonSubmitRequest request) {
+    private int calculateCorrectAnswers(List<Exercise> exercises, LessonSubmitRequest request, List<MistakeDTO> mistakes) {
         Map<UUID, String> submittedAnswers = request.getAnswers().stream()
                 .collect(Collectors.toMap(
                         ExerciseSubmission::getExerciseId,
-                        submission -> normalizeText(String.valueOf(submission.getAnswer())),
+                        submission -> String.valueOf(submission.getAnswer()),
                         (existing, replacement) -> existing
                 ));
 
         int correctCount = 0;
         for (Exercise exercise : exercises) {
             if (exercise.getCorrectAnswer() != null && exercise.getCorrectAnswer().containsKey("answer")) {
-                String correctAnswer = normalizeText(String.valueOf(exercise.getCorrectAnswer().get("answer")));
-                String submittedAnswer = submittedAnswers.get(exercise.getExerciseId());
 
-                log.debug("Evaluating Exercise ID {}: Expected '{}' | User submitted '{}'",
-                        exercise.getExerciseId(), correctAnswer, submittedAnswer);
+                String rawExpected = String.valueOf(exercise.getCorrectAnswer().get("answer"));
+                String rawSubmitted = submittedAnswers.getOrDefault(exercise.getExerciseId(), "");
 
-                if (submittedAnswer != null && correctAnswer.equals(submittedAnswer)) {
+                String cleanExpected = normalizeText(rawExpected);
+                String cleanUser = normalizeText(rawSubmitted);
+
+                if (cleanExpected.equals(cleanUser)) {
                     correctCount++;
+                } else {
+                    String questionText = exercise.getContent() != null && exercise.getContent().containsKey("question")
+                            ? String.valueOf(exercise.getContent().get("question"))
+                            : "Unknown question";
+
+                    mistakes.add(new MistakeDTO(questionText, rawSubmitted, rawExpected));
                 }
             }
         }
