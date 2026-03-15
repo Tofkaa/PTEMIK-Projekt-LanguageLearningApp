@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Card, Button, ProgressBar, Spinner, Form } from 'react-bootstrap';
+import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col } from 'react-bootstrap';
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx'; // <-- Needed to update global XP state
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
@@ -113,25 +113,90 @@ const LessonPlayer = () => {
 
     // --- PHASE 4: RENDER RESULT SCREEN ---
     if (lessonResult) {
+        const isPassed = lessonResult.passed;
+
         return (
-            <div className="min-vh-100 d-flex justify-content-center align-items-center text-light pb-5">
-                <Card className="shadow-lg border-0 bg-dark text-light text-center p-5 rounded-4" style={{ maxWidth: '600px', width: '100%' }}>
-                    <h1 className="display-1 mb-3" style={{ color: lessonResult.passed ? 'var(--primary-cyan)' : '#dc3545' }}>
-                        {lessonResult.passed ? '🎉' : '💔'}
-                    </h1>
-                    <h2 className="fw-bold mb-4">{lessonResult.passed ? 'Lesson Passed!' : 'Lesson Failed.'}</h2>
-                    
-                    <div className="bg-secondary bg-opacity-25 rounded-3 p-4 mb-4">
-                        <h4 className="mb-3 text-info fw-bold">{lessonResult.score}% Accuracy</h4>
-                        <p className="fs-5 mb-1">Correct Answers: <span className="fw-bold text-success">{lessonResult.correctAnswersCount}</span> / {lessonResult.totalQuestionsCount}</p>
-                        <p className="fs-5 mb-0">XP Earned: <span className="fw-bold text-warning">+{lessonResult.xpEarned} ⭐</span></p>
+            <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-light pb-5 pt-5">
+                
+                {/* 1. Header / Icon Area */}
+                <div className="text-center mb-4">
+                    <div 
+                        className="mb-3 d-inline-flex justify-content-center align-items-center rounded-circle shadow-lg"
+                        style={{ 
+                            width: '120px', height: '120px', fontSize: '4rem', 
+                            backgroundColor: isPassed ? 'rgba(25, 135, 84, 0.2)' : 'rgba(220, 53, 69, 0.2)',
+                            border: `4px solid ${isPassed ? '#198754' : '#dc3545'}`
+                        }}
+                    >
+                        {isPassed ? '🏆' : '💔'}
                     </div>
+                    <h1 className="fw-bold display-5 mb-2">{isPassed ? 'Sikeres Lecke!' : 'Gyakorolj még egy kicsit!'}</h1>
+                    <p className="text-light opacity-75 fs-5 fst-italic">"{lessonResult.feedback}"</p>
+                </div>
 
-                    <p className="text-muted mb-5 fst-italic">"{lessonResult.feedback}"</p>
+                {/* 2. Stats Card */}
+                <Card className="shadow-lg border-0 bg-dark text-light p-3 rounded-4 w-100 mb-4" style={{ maxWidth: '600px' }}>
+                    <Card.Body>
+                        <Row className="text-center mb-4 g-3">
+                            {/* Accuracy Stat */}
+                            <Col xs={6}>
+                                <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
+                                    <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ letterSpacing: '1px' }}>Pontosság</h6>
+                                    <h2 className={isPassed ? 'text-success fw-bold mb-0' : 'text-danger fw-bold mb-0'}>
+                                        {lessonResult.score}%
+                                    </h2>
+                                </div>
+                            </Col>
+                            {/* XP Stat */}
+                            <Col xs={6}>
+                                <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
+                                    <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ letterSpacing: '1px' }}>Szerzett XP</h6>
+                                    <h2 className="text-warning fw-bold mb-0">
+                                        +{lessonResult.xpEarned} ⭐
+                                    </h2>
+                                </div>
+                            </Col>
+                        </Row>
 
-                    <Button variant="info" size="lg" className="fw-bold px-5 py-3 rounded-pill" onClick={() => navigate('/dashboard')}>
-                        Back to Dashboard
-                    </Button>
+                        {/* Detailed Breakdown */}
+                        <div className="d-flex justify-content-between align-items-center p-3 mb-4 bg-black bg-opacity-25 rounded-3 border border-secondary">
+                            <span className="text-light fw-bold">Helyes válaszok</span>
+                            <span className="fs-5 fw-bold text-info">
+                                {lessonResult.correctAnswersCount} <span className="text-light opacity-50 fs-6">/ {lessonResult.totalQuestionsCount}</span>
+                            </span>
+                        </div>
+
+                        {lessonResult.mistakes && lessonResult.mistakes.length > 0 && (
+                            <div className="mt-4 text-start">
+                                <h5 className="text-warning fw-bold mb-3 border-bottom border-secondary pb-2">Hibák áttekintése:</h5>
+                                {lessonResult.mistakes.map((mistake, idx) => (
+                                    <div key={idx} className="bg-black bg-opacity-50 p-3 rounded-3 mb-3 border border-secondary">
+                                        <p className="mb-2 text-light fw-bold">{mistake.question}</p>
+                                        <p className="mb-1 text-danger small fw-bold">❌ Te válaszod: <span className="fw-normal">{mistake.submittedAnswer || '(Üresen hagyva)'}</span></p>
+                                        <p className="mb-0 text-success small fw-bold">✅ Helyes válasz: <span className="fw-normal">{mistake.correctAnswer}</span></p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* 3. Action Buttons */}
+                        <div className="d-grid gap-3 mt-4">
+                            {isPassed ? (
+                                <Button variant="info" size="lg" className="fw-bold rounded-pill text-dark py-3" onClick={() => navigate('/dashboard')}>
+                                    Vissza a Dashboardra
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button variant="outline-info" size="lg" className="fw-bold rounded-pill py-3" onClick={() => window.location.reload()}>
+                                        Újrapróbálom
+                                    </Button>
+                                    <Button variant="link" className="text-light opacity-50 text-decoration-none" onClick={() => navigate('/dashboard')}>
+                                        Befejezés később
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    </Card.Body>
                 </Card>
             </div>
         );
@@ -161,10 +226,10 @@ const LessonPlayer = () => {
     return (
         <div className="min-vh-100 pb-5 text-light d-flex align-items-center">
             <Container>
-                {/* Progress Bar Header */}
+               {/* Progress Bar Header */}
                 <div className="mb-4">
-                    <div className="d-flex justify-content-between mb-2 fw-bold text-muted small">
-                        <span>Question: {currentIndex + 1} / {exercises.length}</span>
+                    <div className="d-flex justify-content-between mb-2 fw-bold text-light opacity-75 small">
+                        <span>Kérdés: {currentIndex + 1} / {exercises.length}</span>
                         <span>{Math.round(progressPercentage)}%</span>
                     </div>
                     <ProgressBar now={progressPercentage} variant="info" style={{ height: '10px', backgroundColor: '#333' }} className="rounded-pill border border-secondary" />
