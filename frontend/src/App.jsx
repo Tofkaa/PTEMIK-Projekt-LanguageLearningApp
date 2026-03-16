@@ -6,6 +6,7 @@ import Lesson from './pages/LessonPlayer.jsx';
 import PrivateRoute from './components/PrivateRoute.jsx';
 import GuestRoute from './components/GuestRoute.jsx'; 
 import NotFound from './pages/NotFound.jsx'; 
+import Profile from './pages/Profile.jsx'
 
 /**
  * Main Application Component
@@ -53,6 +54,14 @@ function App() {
                 </PrivateRoute>
             } 
         />
+        <Route 
+             path="/profile" 
+             element={
+                <PrivateRoute>
+                        <Profile />
+                </PrivateRoute>
+            } 
+/>
 
         {/* 404 Route: Catch-all for undefined URLs */}
         <Route path="*" element={<NotFound />} />

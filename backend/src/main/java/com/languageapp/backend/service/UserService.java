@@ -3,6 +3,7 @@ package com.languageapp.backend.service;
 import com.languageapp.backend.dto.response.ProgressResponse;
 import com.languageapp.backend.dto.response.UserResponse;
 import com.languageapp.backend.entity.User;
+import com.languageapp.backend.enums.DifficultyLevel;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.ProgressRepository;
 import com.languageapp.backend.repository.UserRepository;
@@ -80,5 +81,21 @@ public class UserService {
                     log.error("Authenticated user not found in the database with email: {}", email);
                     return new ResourceNotFoundException("User not found");
                 });
+    }
+
+    /**
+     * Updates a user's preferences by email or throws a standard ResourceNotFoundException
+     * @param email - The user's email address allocated to the account
+     * @param newDifficulty - The new difficulty setting they wish to save to their profile
+     */
+
+    @Transactional
+    public void updateUserPreferences(String email, String newDifficulty) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setPreferredDifficulty(DifficultyLevel.valueOf(newDifficulty));
+        userRepository.save(user);
+        log.info("User {} updated preferred difficulty to {}", email, newDifficulty);
     }
 }

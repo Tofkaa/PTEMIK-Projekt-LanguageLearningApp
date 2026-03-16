@@ -31,7 +31,7 @@ const NavigationBar = () => {
                     style={{ cursor: 'pointer', color: 'var(--primary-cyan)' }} 
                     onClick={() => navigate('/dashboard')}
                 >
-                    🚀 AdaptiveApp
+                    🚀 LanguageLearning APP
                 </Navbar.Brand>
                 
                 {/* Mobile Toggle Button */}
@@ -57,7 +57,7 @@ const NavigationBar = () => {
                             menuVariant="dark" /* Keeps the dropdown menu dark! */
                         >
                             <NavDropdown.Item onClick={() => navigate('/profile')} className="text-light">
-                                Profilom (Hamarosan)
+                                Profilom
                             </NavDropdown.Item>
                             <NavDropdown.Divider />
                             <NavDropdown.Item onClick={handleLogout} className="text-danger fw-bold">
