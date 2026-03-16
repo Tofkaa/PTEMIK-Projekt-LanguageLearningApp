@@ -32,6 +32,7 @@ const LessonPlayer = () => {
     const [currentAnswer, setCurrentAnswer] = useState(''); // Text currently typed by the user
     const [collectedAnswers, setCollectedAnswers] = useState([]); // Array of answers to be submitted
     const [startTime, setStartTime] = useState(null); // Timestamp for tracking completion time
+    const [elapsedTime, setElapsedTime] = useState(0); // Timestamp for tracking elapsed time mid-lesson
 
     // --- PHASE 1: DATA FETCHING ---
     useEffect(() => {
@@ -54,6 +55,26 @@ const LessonPlayer = () => {
 
         fetchExercises();
     }, [lessonId]);
+
+    useEffect(() => {
+        let timer;
+        // Csak akkor fusson az óra, ha már betöltött, van kezdési idő, és még nem küldtük be
+        if (startTime && !isSubmitting && !lessonResult) {
+            timer = setInterval(() => {
+                // Kiszámoljuk a pontos különbséget a kezdés óta
+                setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+            }, 1000);
+        }
+        // Takarítás, ha a komponens leáll, vagy a függőségek változnak
+        return () => clearInterval(timer);
+    }, [startTime, isSubmitting, lessonResult]);
+
+    // Segédfüggvény az idő formázásához (pl. 65 mp -> "01:05")
+    const formatTime = (totalSeconds) => {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    };
 
     // Helper variables for UI
     const progressPercentage = exercises.length > 0 ? (currentIndex / exercises.length) * 100 : 0;
@@ -81,11 +102,10 @@ const LessonPlayer = () => {
         } else {
             // --- PHASE 3: SUBMIT TO BACKEND ---
             setIsSubmitting(true);
-            const timeTakenSeconds = Math.floor((Date.now() - startTime) / 1000);
 
             // Construct the payload expected by the backend
             const payload = {
-                timeTakenSeconds: timeTakenSeconds,
+                timeTakenSeconds: elapsedTime,
                 answers: finalAnswers
             };
 
@@ -139,21 +159,30 @@ const LessonPlayer = () => {
                     <Card.Body>
                         <Row className="text-center mb-4 g-3">
                             {/* Accuracy Stat */}
-                            <Col xs={6}>
+                           <Col xs={4}>
                                 <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
-                                    <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ letterSpacing: '1px' }}>Pontosság</h6>
-                                    <h2 className={isPassed ? 'text-success fw-bold mb-0' : 'text-danger fw-bold mb-0'}>
+                                    <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Pontosság</h6>
+                                    <h3 className={isPassed ? 'text-success fw-bold mb-0' : 'text-danger fw-bold mb-0'}>
                                         {lessonResult.score}%
-                                    </h2>
+                                    </h3>
+                                </div>
+                            </Col>
+                            {/* Time Taken*/}
+                            <Col xs={4}>
+                                <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
+                                    <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Idő</h6>
+                                    <h3 className="text-info fw-bold mb-0">
+                                        {formatTime(elapsedTime)}
+                                    </h3>
                                 </div>
                             </Col>
                             {/* XP Stat */}
-                            <Col xs={6}>
+                            <Col xs={4}>
                                 <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
-                                    <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ letterSpacing: '1px' }}>Szerzett XP</h6>
-                                    <h2 className="text-warning fw-bold mb-0">
-                                        +{lessonResult.xpEarned} ⭐
-                                    </h2>
+                                    <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>XP</h6>
+                                    <h3 className="text-warning fw-bold mb-0">
+                                        +{lessonResult.xpEarned}⭐
+                                    </h3>
                                 </div>
                             </Col>
                         </Row>
@@ -228,9 +257,14 @@ const LessonPlayer = () => {
             <Container>
                {/* Progress Bar Header */}
                 <div className="mb-4">
-                    <div className="d-flex justify-content-between mb-2 fw-bold text-light opacity-75 small">
-                        <span>Kérdés: {currentIndex + 1} / {exercises.length}</span>
-                        <span>{Math.round(progressPercentage)}%</span>
+                    <div className="d-flex justify-content-between align-items-center mb-2 fw-bold text-light opacity-75 small">
+                        <span style={{ width: '60px' }}>{currentIndex + 1} / {exercises.length}</span>
+                        
+                        <span className="text-info fs-6 px-3 py-1 bg-dark rounded-pill border border-secondary">
+                            ⏱️ {formatTime(elapsedTime)}
+                        </span>
+                        
+                        <span className="text-end" style={{ width: '60px' }}>{Math.round(progressPercentage)}%</span>
                     </div>
                     <ProgressBar now={progressPercentage} variant="info" style={{ height: '10px', backgroundColor: '#333' }} className="rounded-pill border border-secondary" />
                 </div>
