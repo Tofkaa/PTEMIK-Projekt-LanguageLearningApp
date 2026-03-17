@@ -53,7 +53,10 @@ public class EvaluationService {
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
 
-        validateUserDifficultyAccess(user, lesson);
+        boolean hasStarted = progressRepository
+                .findByUserUserIdAndLessonLessonId(user.getUserId(), lessonId).isPresent();
+
+        validateUserDifficultyAccess(user, lesson, hasStarted);
 
         List<Exercise> exercises = lesson.getExercises();
         int totalQuestions = exercises.size();
@@ -102,10 +105,10 @@ public class EvaluationService {
                 .build();
     }
 
-    private void validateUserDifficultyAccess(User user, Lesson lesson) {
+    private void validateUserDifficultyAccess(User user, Lesson lesson, boolean hasStarted) {
         if ("STUDENT".equals(user.getRole())) {
             String allowedDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
-            if (!lesson.getDifficulty().equals(allowedDifficulty)) {
+            if (!lesson.getDifficulty().equals(allowedDifficulty) && !hasStarted) {
                 log.warn("SECURITY ALERT: User {} attempted to SUBMIT restricted difficulty! Requested: {}, Allowed: {}",
                         user.getEmail(), lesson.getDifficulty(), allowedDifficulty);
                 throw new ForbiddenException("Access denied : you cant access this difficulty!");
