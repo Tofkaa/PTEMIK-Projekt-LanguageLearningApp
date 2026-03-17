@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
      */
     useEffect(() => {
         const checkLoggedInUser = async () => {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             
             if (token) {
                 try {
@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }) => {
                     console.error("Error fetching user profile (expired token?):", error);
                     // Clear invalid/expired token and reset user state
                     localStorage.removeItem('token');
+                    sessionStorage.removeItem('token');
                     setUser(null);
                 }
             }
@@ -53,8 +54,12 @@ export const AuthProvider = ({ children }) => {
      * * @param {string} token - The JWT access token
      * @param {Object} userData - The authenticated user's profile data
      */
-    const login = (token, userData) => {
-        localStorage.setItem('token', token);
+    const login = (token, userData, rememberMe = false) => {
+        if (rememberMe) {
+            localStorage.setItem('token', token);
+        } else {
+            sessionStorage.setItem('token', token);
+        }
         setUser(userData);
     };
 
@@ -73,7 +78,7 @@ export const AuthProvider = ({ children }) => {
         } finally {
             // 2. Regardless of server response, immediately discard the client-side Access Token
             localStorage.removeItem('token');
-            
+            sessionStorage.removeItem('token');
             // 3. Reset the React state, which triggers a redirect to the Login page via PrivateRoute
             setUser(null);
         }

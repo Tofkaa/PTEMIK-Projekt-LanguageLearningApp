@@ -2,19 +2,32 @@ import axios from 'axios';
 
 const api = axios.create({
     baseURL: 'http://localhost:8081/api',
-    withCredentials: true, // Crucial for sending HttpOnly cookies (like the refresh token)
+    withCredentials: true, // Szükséges a HttpOnly cookie-khoz
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
-/**
- * Request Interceptor
- * Attaches the JWT Access Token from LocalStorage to the Authorization header of every request.
- */
+// --- SEGÉDFÜGGVÉNYEK A TOKEN KEZELÉSHEZ ---
+const getToken = () => sessionStorage.getItem('token') || localStorage.getItem('token');
+
+const setToken = (token) => {
+    if (sessionStorage.getItem('token')) {
+        sessionStorage.setItem('token', token);
+    } else {
+        localStorage.setItem('token', token);
+    }
+};
+
+const clearTokens = () => {
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+};
+
+// --- REQUEST INTERCEPTOR ---
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        const token = getToken();
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;
         }
@@ -23,58 +36,81 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-/**
- * Response Interceptor
- * Handles global API errors. Specifically intercepts 401 Unauthorized responses
- * to automatically attempt a silent token refresh using the HttpOnly cookie.
- */
+// --- FRISSÍTÉSI VÁRÓLISTA (REFRESH LOCK) ---
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    failedQueue = [];
+};
+
+// --- RESPONSE INTERCEPTOR ---
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
-        // Capture the original request configuration
         const originalRequest = error.config;
-        
-        // If the login endpoint throws an error, DO NOT do anything globally, 
-        // just return the error to Login.jsx!
-        if (originalRequest.url.includes('/auth/login')) {
+
+        // VÉDELEM: Ne csináljunk semmit, ha maga a login vagy a refresh végpont hibázik! (Ez okozta a kidobást)
+        if (originalRequest.url.includes('/auth/login') || originalRequest.url.includes('/auth/refresh')) {
             return Promise.reject(error);
         }
-        // If the error is 401 (Unauthorized) AND we haven't retried this request yet
-        if (error.response && error.response.status === 401 && !originalRequest._retry) {
-            originalRequest._retry = true; // Mark as retried to prevent infinite loops
+
+        // Ha 401 vagy 403 a hiba, és még nem próbáltuk újra
+        if (error.response && (error.response.status === 401 || error.response.status === 403) && !originalRequest._retry) {
+            
+            // Ha épp folyamatban van egy frissítés, akkor a többi kérést VÁRÓLISTÁRA tesszük
+            if (isRefreshing) {
+                return new Promise(function(resolve, reject) {
+                    failedQueue.push({ resolve, reject });
+                }).then(token => {
+                    originalRequest.headers['Authorization'] = 'Bearer ' + token;
+                    return api(originalRequest);
+                }).catch(err => {
+                    return Promise.reject(err);
+                });
+            }
+
+            originalRequest._retry = true;
+            isRefreshing = true;
 
             try {
-                console.log('Access token expired. Attempting silent refresh...');
-                
-                // Call the backend refresh endpoint. 
-                // Note: The HttpOnly refreshToken cookie is automatically sent because of withCredentials: true
+                console.log('Access token expired or unauthorized. Attempting silent refresh...');
                 const refreshResponse = await api.post('/auth/refresh');
-                
-                // Extract the new access token
                 const newToken = refreshResponse.data.accessToken;
                 
-                // Save the new token to LocalStorage
-                localStorage.setItem('token', newToken);
+                // Mentsük le az új tokent a megfelelő helyre
+                setToken(newToken);
                 
-                // Update the Authorization header of the original failed request
+                // Frissítsük az aktuális elakadt kérés fejlécét
                 originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
                 
-                // Resend the original request with the new token!
+                // Engedjük el a várólistán lévő többi kérést is az új tokennel!
+                processQueue(null, newToken);
+                
+                // Indítsuk újra az eredeti kérést
                 return api(originalRequest);
 
             } catch (refreshError) {
-                // If the refresh request ALSO fails (e.g., the refresh token cookie expired or is invalid)
                 console.warn('Refresh token expired or invalid. Forcing logout...');
+                processQueue(refreshError, null);
+                clearTokens();
                 
-                localStorage.removeItem('token');
-                // Redirect the user to the login page
+                // Csak akkor dobjuk ki a usert, ha tényleg lejárt a refresh token is
                 window.location.href = '/login'; 
-                
                 return Promise.reject(refreshError);
+            } finally {
+                // Engedjük fel a zárat
+                isRefreshing = false;
             }
         }
         
-        // For all other errors, just reject the promise as usual
         return Promise.reject(error);
     }
 );
