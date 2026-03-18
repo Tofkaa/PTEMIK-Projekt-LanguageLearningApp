@@ -14,5 +14,5 @@ public interface ResultRepository extends JpaRepository<Result, UUID> {
     /**
      * Retrieves the 3 most recent lesson results for a specific user to calculate dynamic difficulty.
      */
-    List<Result> findTop3ByUserUserIdOrderBySubmittedAtDesc(UUID userId);
+    List<Result> findTop5ByUserUserIdOrderBySubmittedAtDesc(UUID userId);
 }
