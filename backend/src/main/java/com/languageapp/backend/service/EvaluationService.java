@@ -188,7 +188,7 @@ public class EvaluationService {
             return "";
         }
         return input
-                .replaceAll("[\\p{Punct}]", "")
+                .replaceAll("\\p{Punct}", "")
                 .toLowerCase()
                 .replaceAll("\\s+", " ")
                 .trim();

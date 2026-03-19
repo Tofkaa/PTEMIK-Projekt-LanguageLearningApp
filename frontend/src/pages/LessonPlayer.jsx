@@ -5,6 +5,7 @@ import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx'; // <-- Needed to update global XP state
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
 import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise.jsx';
+import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
 
 /**
  * LessonPlayer Component
@@ -252,6 +253,58 @@ const LessonPlayer = () => {
     }
 
     // --- PHASE 7: RENDER ACTIVE QUIZ ENGINE ---
+    
+    // Ez a segédfüggvény dönti el, hogy milyen UI-t rajzoljunk ki a típus alapján
+    const renderExercise = () => {
+        if (!currentExercise) return null;
+
+        // 1. ESET: Képes feladat (Saját magának rajzolja a kérdést és a képet)
+        if (currentExercise.type === 'IMAGE_CHOICE') {
+            return (
+                <ImageChoiceExercise 
+                    exercise={currentExercise} 
+                    currentAnswer={currentAnswer} 
+                    onAnswer={setCurrentAnswer} 
+                />
+            );
+        }
+
+        // 2. ESET: Az összes többi régi feladat (Közös fejléccel)
+        return (
+            <>
+                <h4 className="mb-4 text-info fw-bold">Translate the following sentence!</h4>
+                <p className="fs-4 mb-5 border border-secondary rounded p-3 bg-gradient">
+                    {currentExercise.content?.question?.replace('Translate to English: ', '').replace('Rakd sorba: ', '')}
+                </p>
+                
+                {currentExercise.type === 'WORD_BANK' ? (
+                    <WordBankExercise 
+                        data={currentExercise.content} 
+                        onAnswer={setCurrentAnswer} 
+                    />
+                ) : currentExercise.type === 'MULTIPLE_CHOICE' ? (
+                    <MultipleChoiceExercise 
+                        data={currentExercise.content} 
+                        currentAnswer={currentAnswer} 
+                        onAnswer={setCurrentAnswer} 
+                    />
+                ) : (
+                    <Form.Group className="mb-5 text-start">
+                        <Form.Control 
+                            as="textarea" 
+                            rows={3} 
+                            placeholder="Type the English translation here..." 
+                            value={currentAnswer} 
+                            onChange={(e) => setCurrentAnswer(e.target.value)} 
+                            className="fs-5" 
+                            autoFocus 
+                        />
+                    </Form.Group>
+                )}
+            </>
+        );
+    };
+
     return (
         <div className="min-vh-100 pb-5 text-light d-flex align-items-center">
             <Container>
@@ -272,35 +325,10 @@ const LessonPlayer = () => {
                {/* Quiz Card */}
                 <Card className="shadow-lg border-0 bg-dark text-light">
                     <Card.Body className="p-4 p-md-5 text-center">
-                        <h4 className="mb-4 text-info fw-bold">Translate the following sentence!</h4>
-                        <p className="fs-4 mb-5 border border-secondary rounded p-3 bg-gradient">
-                            {currentExercise?.content?.question?.replace('Translate to English: ', '').replace('Rakd sorba: ', '')}
-                        </p>
                         
-                        {currentExercise?.type === 'WORD_BANK' ? (
-                            <WordBankExercise 
-                                data={currentExercise.content} 
-                                onAnswer={setCurrentAnswer} 
-                            />
-                       ) : currentExercise?.type === 'MULTIPLE_CHOICE' ? (
-                            <MultipleChoiceExercise 
-                                data={currentExercise.content} 
-                                currentAnswer={currentAnswer} 
-                                onAnswer={setCurrentAnswer} 
-                            />
-                        ) : (
-                            <Form.Group className="mb-5 text-start">
-                                <Form.Control 
-                                    as="textarea" 
-                                    rows={3} 
-                                    placeholder="Type the English translation here..." 
-                                    value={currentAnswer} 
-                                    onChange={(e) => setCurrentAnswer(e.target.value)} 
-                                    className="fs-5" 
-                                    autoFocus 
-                                />
-                            </Form.Group>
-                        )}
+                        {/* Itt hívjuk meg a fenti tiszta függvényt! */}
+                        {renderExercise()}
+                        
                         <div className="d-flex justify-content-between mt-4">
                             <Button variant="outline-secondary" onClick={() => navigate('/dashboard')}>Finish Later</Button>
                             
