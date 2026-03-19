@@ -164,6 +164,7 @@ const LessonPlayer = () => {
         const totalAttempts = originalTotalQ + mistakesCount;
         const totalCorrectAnswers = lessonResult.correctAnswersCount; 
         const displayAccuracy = Math.round((totalCorrectAnswers / totalAttempts) * 100);
+        const isAlreadyCompleted = isPassed && lessonResult.xpEarned === 0;
 
         const maxPotentialXp = originalTotalQ * 10;
         const lostXp = maxPotentialXp - lessonResult.xpEarned;
@@ -212,13 +213,25 @@ const LessonPlayer = () => {
                             <Col xs={4}>
                                 <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
                                     <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>XP</h6>
-                                    <h3 className="text-warning fw-bold mb-0">
-                                        +{lessonResult.xpEarned}⭐
-                                    </h3>
-                                    {lostXp > 0 && (
-                                        <span className="text-danger mt-1 d-block" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                            -{lostXp} XP (hibák miatt)
-                                        </span>
+                                    
+                                    {isAlreadyCompleted ? (
+                                        <>
+                                            <h4 className="text-secondary fw-bold mb-0">0⭐</h4>
+                                            <span className="text-info mt-1 d-block" style={{ fontSize: '0.70rem', fontWeight: 'bold' }}>
+                                                Már teljesítve
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <h3 className="text-warning fw-bold mb-0">
+                                                +{lessonResult.xpEarned}⭐
+                                            </h3>
+                                            {lostXp > 0 && (
+                                                <span className="text-danger mt-1 d-block" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                                    -{lostXp} XP (hibák)
+                                                </span>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             </Col>
