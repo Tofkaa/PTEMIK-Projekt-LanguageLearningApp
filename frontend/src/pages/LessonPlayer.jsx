@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col } from 'react-bootstrap';
+import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col, Alert } from 'react-bootstrap';
 import api from '../services/api.jsx';
-import { useAuth } from '../context/AuthContext.jsx'; // <-- Needed to update global XP state
+import { useAuth } from '../context/AuthContext.jsx';
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
 import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise.jsx';
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
@@ -15,26 +15,23 @@ import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx
 const LessonPlayer = () => {
     const { id: lessonId } = useParams();
     const navigate = useNavigate();
-    
-    // Use the login function to update the in-memory XP after completing a lesson
     const { user, login } = useAuth(); 
 
     // --- STATE MANAGEMENT ---
-    
-    // Network and data states
     const [exercises, setExercises] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false); // Active while waiting for backend evaluation
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState(null);
-    const [lessonResult, setLessonResult] = useState(null); // Stores the successful POST response
+    const [lessonResult, setLessonResult] = useState(null);
 
-    // Quiz engine internal states
-    const [currentIndex, setCurrentIndex] = useState(0); // Index of the current exercise
-    const [currentAnswer, setCurrentAnswer] = useState(''); // Text currently typed by the user
-    const [collectedAnswers, setCollectedAnswers] = useState([]); // Array of answers to be submitted
-    const [startTime, setStartTime] = useState(null); // Timestamp for tracking completion time
-    const [elapsedTime, setElapsedTime] = useState(0); // Timestamp for tracking elapsed time mid-lesson
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [currentAnswer, setCurrentAnswer] = useState('');
+    const [collectedAnswers, setCollectedAnswers] = useState([]);
+    const [startTime, setStartTime] = useState(null);
+    const [elapsedTime, setElapsedTime] = useState(0);
 
+    const [feedback, setFeedback] = useState(null);
+    const [isChecking, setIsChecking] = useState(false); 
     // --- PHASE 1: DATA FETCHING ---
     useEffect(() => {
         const fetchExercises = async () => {
@@ -44,7 +41,7 @@ const LessonPlayer = () => {
                     setError("No exercises found for this lesson.");
                 } else {
                     setExercises(response.data);
-                    setStartTime(Date.now()); // Start the timer
+                    setStartTime(Date.now());
                 }
             } catch (err) {
                 console.error("Error fetching exercises:", err);
@@ -59,83 +56,117 @@ const LessonPlayer = () => {
 
     useEffect(() => {
         let timer;
-        // Csak akkor fusson az óra, ha már betöltött, van kezdési idő, és még nem küldtük be
         if (startTime && !isSubmitting && !lessonResult) {
             timer = setInterval(() => {
-                // Kiszámoljuk a pontos különbséget a kezdés óta
                 setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
             }, 1000);
         }
-        // Takarítás, ha a komponens leáll, vagy a függőségek változnak
         return () => clearInterval(timer);
     }, [startTime, isSubmitting, lessonResult]);
 
-    // Segédfüggvény az idő formázásához (pl. 65 mp -> "01:05")
     const formatTime = (totalSeconds) => {
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    // Helper variables for UI
     const progressPercentage = exercises.length > 0 ? (currentIndex / exercises.length) * 100 : 0;
     const currentExercise = exercises[currentIndex];
+    
+    const isInputDisabled = feedback && feedback.type !== 'warning';
 
-    // --- PHASE 2: NEXT QUESTION OR SUBMIT ---
-    const handleNextOrSubmit = async () => {
-        // Since React state updates are asynchronous, we create a local array 
-        // to immediately include the final answer before submission.
+    // --- PHASE 2: IMMEDIATE FEEDBACK & NEXT QUESTION ---
+    const handleCheckOrNext = async () => {
+        
+        if (!feedback || feedback.type === 'warning') {
+            setIsChecking(true);
+            try {
+                const response = await api.post(`/exercises/${currentExercise.exerciseId}/check`, {
+                    answer: currentAnswer.trim()
+                });
+
+                const { correct, almostCorrect, feedbackMessage } = response.data;
+
+                if (correct) {
+                    setFeedback({ type: 'success', msg: feedbackMessage });
+                } else if (almostCorrect) {
+                    setFeedback({ type: 'warning', msg: feedbackMessage });
+                } else {
+                    setFeedback({ type: 'danger', msg: feedbackMessage });
+                    
+                    // CLONE the lesson if it has not been retried yet, and the user failed it
+                    if (!currentExercise.isRetry) {
+                        setExercises(prev => [...prev, { ...currentExercise, isRetry: true }]);
+                    }
+                }
+            } catch (err) {
+                console.error("Hiba az ellenőrzés során:", err);
+                finalizeAnswerAndMove();
+            } finally {
+                setIsChecking(false);
+            }
+        } 
+        else {
+            finalizeAnswerAndMove();
+        }
+    };
+
+    const finalizeAnswerAndMove = () => {
         const finalAnswers = [
             ...collectedAnswers, 
             {
                 exerciseId: currentExercise.exerciseId,
-                answer: currentAnswer.trim()
+                answer: currentAnswer.trim(),
+                isRetry: !!currentExercise.isRetry
             }
         ];
         
-        // Save the current answer and clear the input field
         setCollectedAnswers(finalAnswers);
         setCurrentAnswer('');
+        setFeedback(null);
 
         if (currentIndex < exercises.length - 1) {
-            // If there are more questions, increment the index
             setCurrentIndex(prevIndex => prevIndex + 1);
         } else {
-            // --- PHASE 3: SUBMIT TO BACKEND ---
-            setIsSubmitting(true);
+            submitLesson(finalAnswers);
+        }
+    };
 
-            // Construct the payload expected by the backend
-            const payload = {
-                timeTakenSeconds: elapsedTime,
-                answers: finalAnswers
-            };
+    // --- PHASE 3: SUBMIT TO BACKEND ---
+    const submitLesson = async (finalAnswers) => {
+        setIsSubmitting(true);
+        const payload = {
+            timeTakenSeconds: elapsedTime,
+            answers: finalAnswers
+        };
 
-            try {
-                console.log("Submitting payload:", payload);
-                const response = await api.post(`/lessons/${lessonId}/submit`, payload);
-                console.log("Evaluation successful:", response.data);
-                
-                // Store the result, which triggers the rendering of the Result Screen
-                setLessonResult(response.data);
+        try {
+            console.log("Submitting final payload:", payload);
+            const response = await api.post(`/lessons/${lessonId}/submit`, payload);
+            setLessonResult(response.data);
+            
+            const updatedUser = { ...user, xp: user.xp + (response.data.xpEarned || 0) };
+            login(localStorage.getItem('token'), updatedUser); 
 
-                // EXTRA: Update the global User Context to immediately reflect the newly earned XP
-                // in the Navigation Bar and Dashboard without requiring a page reload.
-                const updatedUser = { ...user, xp: user.xp + (response.data.xpEarned || 0) };
-                login(localStorage.getItem('token'), updatedUser); 
-
-            } catch (err) {
-                console.error("Submission error:", err);
-                setError("An error occurred while submitting your answers.");
-            } finally {
-                setIsSubmitting(false);
-            }
+        } catch (err) {
+            console.error("Submission error:", err);
+            setError("An error occurred while submitting your answers.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     // --- PHASE 4: RENDER RESULT SCREEN ---
     if (lessonResult) {
         const isPassed = lessonResult.passed;
+        const originalTotalQ = lessonResult.totalQuestionsCount || 1;
+        const mistakesCount = lessonResult.mistakes ? lessonResult.mistakes.length : 0;
+        const totalAttempts = originalTotalQ + mistakesCount;
+        const totalCorrectAnswers = lessonResult.correctAnswersCount; 
+        const displayAccuracy = Math.round((totalCorrectAnswers / totalAttempts) * 100);
 
+        const maxPotentialXp = originalTotalQ * 10;
+        const lostXp = maxPotentialXp - lessonResult.xpEarned;
         return (
             <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-light pb-5 pt-5">
                 
@@ -160,15 +191,15 @@ const LessonPlayer = () => {
                     <Card.Body>
                         <Row className="text-center mb-4 g-3">
                             {/* Accuracy Stat */}
-                           <Col xs={4}>
+                            <Col xs={4}>
                                 <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
                                     <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Pontosság</h6>
-                                    <h3 className={isPassed ? 'text-success fw-bold mb-0' : 'text-danger fw-bold mb-0'}>
-                                        {lessonResult.score}%
+                                    <h3 className={displayAccuracy >= 60 ? 'text-success fw-bold mb-0' : 'text-warning fw-bold mb-0'}>
+                                        {displayAccuracy}%
                                     </h3>
                                 </div>
                             </Col>
-                            {/* Time Taken*/}
+                            {/* Time Taken */}
                             <Col xs={4}>
                                 <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
                                     <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Idő</h6>
@@ -177,33 +208,43 @@ const LessonPlayer = () => {
                                     </h3>
                                 </div>
                             </Col>
-                            {/* XP Stat */}
+                            {/* XP Stat - with lost XP displayed */}
                             <Col xs={4}>
                                 <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
                                     <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>XP</h6>
                                     <h3 className="text-warning fw-bold mb-0">
                                         +{lessonResult.xpEarned}⭐
                                     </h3>
+                                    {lostXp > 0 && (
+                                        <span className="text-danger mt-1 d-block" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                            -{lostXp} XP (hibák miatt)
+                                        </span>
+                                    )}
                                 </div>
                             </Col>
                         </Row>
 
                         {/* Detailed Breakdown */}
                         <div className="d-flex justify-content-between align-items-center p-3 mb-4 bg-black bg-opacity-25 rounded-3 border border-secondary">
-                            <span className="text-light fw-bold">Helyes válaszok</span>
+                            <span className="text-light fw-bold">Helyes válaszok (próbálkozásokkal)</span>
                             <span className="fs-5 fw-bold text-info">
-                                {lessonResult.correctAnswersCount} <span className="text-light opacity-50 fs-6">/ {lessonResult.totalQuestionsCount}</span>
+                                {totalCorrectAnswers} <span className="text-light opacity-50 fs-6">/ {totalAttempts}</span>
                             </span>
                         </div>
 
+                        {/* Mistakes List */}
                         {lessonResult.mistakes && lessonResult.mistakes.length > 0 && (
                             <div className="mt-4 text-start">
                                 <h5 className="text-warning fw-bold mb-3 border-bottom border-secondary pb-2">Hibák áttekintése:</h5>
                                 {lessonResult.mistakes.map((mistake, idx) => (
                                     <div key={idx} className="bg-black bg-opacity-50 p-3 rounded-3 mb-3 border border-secondary">
                                         <p className="mb-2 text-light fw-bold">{mistake.question}</p>
-                                        <p className="mb-1 text-danger small fw-bold">❌ Te válaszod: <span className="fw-normal">{mistake.submittedAnswer || '(Üresen hagyva)'}</span></p>
-                                        <p className="mb-0 text-success small fw-bold">✅ Helyes válasz: <span className="fw-normal">{mistake.correctAnswer}</span></p>
+                                        <p className="mb-1 text-danger small fw-bold">
+                                            ❌ Te válaszod: <span className="fw-normal">{mistake.submittedAnswer ? mistake.submittedAnswer.replace(/[\[\]]/g, '') : '(Üresen hagyva)'}</span>
+                                        </p>
+                                        <p className="mb-0 text-success small fw-bold">
+                                            ✅ Helyes válasz: <span className="fw-normal">{mistake.correctAnswer}</span>
+                                        </p>
                                     </div>
                                 ))}
                             </div>
@@ -253,23 +294,20 @@ const LessonPlayer = () => {
     }
 
     // --- PHASE 7: RENDER ACTIVE QUIZ ENGINE ---
-    
-    // Ez a segédfüggvény dönti el, hogy milyen UI-t rajzoljunk ki a típus alapján
     const renderExercise = () => {
         if (!currentExercise) return null;
 
-        // 1. ESET: Képes feladat (Saját magának rajzolja a kérdést és a képet)
         if (currentExercise.type === 'IMAGE_CHOICE') {
             return (
                 <ImageChoiceExercise 
                     exercise={currentExercise} 
                     currentAnswer={currentAnswer} 
                     onAnswer={setCurrentAnswer} 
+                    disabled={isInputDisabled}
                 />
             );
         }
 
-        // 2. ESET: Az összes többi régi feladat (Közös fejléccel)
         return (
             <>
                 <h4 className="mb-4 text-info fw-bold">Translate the following sentence!</h4>
@@ -281,12 +319,15 @@ const LessonPlayer = () => {
                     <WordBankExercise 
                         data={currentExercise.content} 
                         onAnswer={setCurrentAnswer} 
+                        currentAnswer={currentAnswer}
+                        disabled={isInputDisabled}
                     />
                 ) : currentExercise.type === 'MULTIPLE_CHOICE' ? (
                     <MultipleChoiceExercise 
                         data={currentExercise.content} 
                         currentAnswer={currentAnswer} 
                         onAnswer={setCurrentAnswer} 
+                        disabled={isInputDisabled}
                     />
                 ) : (
                     <Form.Group className="mb-5 text-start">
@@ -298,6 +339,7 @@ const LessonPlayer = () => {
                             onChange={(e) => setCurrentAnswer(e.target.value)} 
                             className="fs-5" 
                             autoFocus 
+                            disabled={isInputDisabled}
                         />
                     </Form.Group>
                 )}
@@ -305,10 +347,32 @@ const LessonPlayer = () => {
         );
     };
 
+    // --- DYNAMICALLY PAINT AND LABEL BUTTONS ---
+    let buttonText = 'Ellenőrzés';
+    let buttonVariant = 'info';
+
+    if (feedback) {
+        if (feedback.type === 'warning') {
+            buttonText = 'Újraellenőrzés';
+            buttonVariant = 'warning';
+        } else if (feedback.type === 'success') {
+            buttonText = 'Tovább';
+            buttonVariant = 'success';
+        } else {
+            buttonText = 'Tovább';
+            buttonVariant = 'danger';
+        }
+    }
+
+    // If this is the last exercise and it has already been checked
+    if (currentIndex === exercises.length - 1 && feedback && feedback.type !== 'warning') {
+        buttonText = 'Befejezés és Értékelés';
+    }
+
     return (
         <div className="min-vh-100 pb-5 text-light d-flex align-items-center">
             <Container>
-               {/* Progress Bar Header */}
+                {/* Progress Bar Header */}
                 <div className="mb-4">
                     <div className="d-flex justify-content-between align-items-center mb-2 fw-bold text-light opacity-75 small">
                         <span style={{ width: '60px' }}>{currentIndex + 1} / {exercises.length}</span>
@@ -322,19 +386,29 @@ const LessonPlayer = () => {
                     <ProgressBar now={progressPercentage} variant="info" style={{ height: '10px', backgroundColor: '#333' }} className="rounded-pill border border-secondary" />
                 </div>
 
-               {/* Quiz Card */}
+                {/* Quiz Card */}
                 <Card className="shadow-lg border-0 bg-dark text-light">
                     <Card.Body className="p-4 p-md-5 text-center">
                         
-                        {/* Itt hívjuk meg a fenti tiszta függvényt! */}
                         {renderExercise()}
+
+                        {/* IMMEDIATE FEEDBACK BOX */}
+                        {feedback && (
+                            <Alert variant={feedback.type} className="mt-4 fw-bold text-start fs-5 border-0 shadow-sm transition-all">
+                                {feedback.msg}
+                            </Alert>
+                        )}
                         
                         <div className="d-flex justify-content-between mt-4">
                             <Button variant="outline-secondary" onClick={() => navigate('/dashboard')}>Finish Later</Button>
                             
-                            {/* Dynamically update button text based on quiz progress */}
-                            <Button variant="info" className="px-5 fw-bold text-dark" onClick={handleNextOrSubmit} disabled={currentAnswer.trim().length === 0}>
-                                {currentIndex === exercises.length - 1 ? 'Submit & Evaluate' : 'Next'}
+                            <Button 
+                                variant={buttonVariant} 
+                                className="px-5 fw-bold text-dark" 
+                                onClick={handleCheckOrNext} 
+                                disabled={currentAnswer.trim().length === 0 || isChecking}
+                            >
+                                {isChecking ? <Spinner size="sm" animation="border" /> : buttonText}
                             </Button>
                         </div>
                     </Card.Body>
