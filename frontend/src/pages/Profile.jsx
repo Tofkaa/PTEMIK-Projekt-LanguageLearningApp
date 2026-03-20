@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import api from '../services/api.jsx';
 import Navigation from '../components/NavigationBar.jsx'; 
 import AchievementsSection from '../components/profile/AchievementSection.jsx';
+import RecentResultsSection from '../components/profile/RecentResultsSection.jsx';
 
 /**
  * Profile Component
@@ -148,18 +149,16 @@ const Profile = () => {
                             </Card.Body>
                         </Card>
 
-                        {/* Results */} {/*TODO*/}
+                        {/* Results */}
                         <Card className="bg-dark text-light border-0 shadow-lg mb-4 rounded-4 p-2">
-                            <Card.Body>
-                                <h4 className="fw-bold text-info mb-3">
-                                    <span className="me-2">🏆</span> Legutóbbi Eredmények
-                                </h4>
-                                <div className="p-3 border border-secondary rounded-3 bg-black bg-opacity-25 text-center">
-                                    <p className="text-light opacity-50 fst-italic mb-0">
-                                        Még nincsenek megjeleníthető eredményeid. Teljesíts egy leckét a Dashboardon!
-                                    </p>
-                                </div>
-                            </Card.Body>
+                                <Card.Body>
+                                    <h4 className="fw-bold text-info mb-3 border-bottom border-secondary pb-2">
+                                        <span className="me-2">📊</span> Legutóbbi Eredmények
+                                    </h4>
+                                    
+                                    <RecentResultsSection />
+                                    
+                                </Card.Body>
                         </Card>
 
                         {/* Trophies */}
