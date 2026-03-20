@@ -253,7 +253,7 @@ const LessonPlayer = () => {
                                     <div key={idx} className="bg-black bg-opacity-50 p-3 rounded-3 mb-3 border border-secondary">
                                         <p className="mb-2 text-light fw-bold">{mistake.question}</p>
                                         <p className="mb-1 text-danger small fw-bold">
-                                            ❌ Te válaszod: <span className="fw-normal">{mistake.submittedAnswer ? mistake.submittedAnswer.replace(/[\[\]]/g, '') : '(Üresen hagyva)'}</span>
+                                            ❌ Te válaszod: <span className="fw-normal">{mistake.submittedAnswer ? mistake.submittedAnswer.replace(/[[\]]/g, '') : '(Üresen hagyva)'}</span>
                                         </p>
                                         <p className="mb-0 text-success small fw-bold">
                                             ✅ Helyes válasz: <span className="fw-normal">{mistake.correctAnswer}</span>

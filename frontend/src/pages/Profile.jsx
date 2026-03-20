@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Container, Row, Col, Card, Form, Button, Badge, Spinner, Alert } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../services/api.jsx';
 import Navigation from '../components/NavigationBar.jsx'; 
+import AchievementsSection from '../components/profile/AchievementSection.jsx';
 
 /**
  * Profile Component
@@ -18,7 +19,7 @@ const Profile = () => {
     const [message, setMessage] = useState({ type: '', text: '' });
     
     // Placeholder state for future achievement/history fetching
-    const [isLoadingStats, setIsLoadingStats] = useState(false);
+    //const [isLoadingStats, setIsLoadingStats] = useState(false);
 
     // --- EVENT HANDLERS ---
     
@@ -147,22 +148,31 @@ const Profile = () => {
                             </Card.Body>
                         </Card>
 
-                        {/* Recent Results Placeholder */}
-                        <Card className="shadow-lg border-0 bg-dark rounded-4 opacity-75">
-                            <Card.Body className="p-4">
-                                <h4 className="text-info fw-bold mb-3">🏆 Legutóbbi Eredmények</h4>
-                                {isLoadingStats ? (
-                                    <Spinner animation="border" variant="info" />
-                                ) : (
-                                    <div className="text-center p-4 border border-secondary border-dashed rounded-3 bg-black bg-opacity-25">
-                                        <p className="text-light opacity-75 mb-0 fst-italic">
-                                            Még nincsenek megjeleníthető eredményeid. Teljesíts egy leckét a Dashboardon!
-                                        </p>
-                                    </div>
-                                )}
+                        {/* Results */} {/*TODO*/}
+                        <Card className="bg-dark text-light border-0 shadow-lg mb-4 rounded-4 p-2">
+                            <Card.Body>
+                                <h4 className="fw-bold text-info mb-3">
+                                    <span className="me-2">🏆</span> Legutóbbi Eredmények
+                                </h4>
+                                <div className="p-3 border border-secondary rounded-3 bg-black bg-opacity-25 text-center">
+                                    <p className="text-light opacity-50 fst-italic mb-0">
+                                        Még nincsenek megjeleníthető eredményeid. Teljesíts egy leckét a Dashboardon!
+                                    </p>
+                                </div>
                             </Card.Body>
                         </Card>
 
+                        {/* Trophies */}
+                        <Card className="bg-dark text-light border-0 shadow-lg rounded-4 p-2">
+                            <Card.Body>
+                                <h4 className="fw-bold text-warning mb-3 border-bottom border-secondary pb-2">
+                                    <span className="me-2">🎖️</span> Kitüntetéseim
+                                </h4>
+
+                                <AchievementsSection />
+                                
+                            </Card.Body>
+                        </Card>
                     </Col>
                 </Row>
             </Container>

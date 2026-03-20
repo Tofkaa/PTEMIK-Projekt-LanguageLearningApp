@@ -8,11 +8,7 @@ import com.languageapp.backend.dto.response.MistakeDTO;
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
-import com.languageapp.backend.repository.LessonRepository;
-import com.languageapp.backend.repository.ProgressRepository;
-import com.languageapp.backend.repository.ResultRepository;
-import com.languageapp.backend.repository.UserRepository;
-import com.languageapp.backend.repository.ExerciseRepository;
+import com.languageapp.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,8 +38,8 @@ public class EvaluationService {
     private final ProgressRepository progressRepository;
     private final UserDifficultyCalculator userDifficultyCalculator;
     private final ExerciseRepository exerciseRepository;
-
-
+    private final AchievementRepository achievementRepository;
+    private final AchievementService achievementService;
 
 
     /**
@@ -113,6 +109,8 @@ public class EvaluationService {
         updateProgress(progress, score, passed);
 
         String feedback = passed ? "Congratulations! You passed the lesson." : "Keep practicing! You can do better.";
+
+        achievementService.checkAndAwardAchievements(user, score);
 
         return LessonSubmitResponse.builder()
                 .resultId(savedResult.getResultId())
