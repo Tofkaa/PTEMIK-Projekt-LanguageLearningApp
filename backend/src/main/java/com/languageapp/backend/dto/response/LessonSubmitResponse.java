@@ -3,6 +3,7 @@ package com.languageapp.backend.dto.response;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -19,4 +20,5 @@ public class LessonSubmitResponse {
     private int xpEarned;
     private boolean passed;
     private String feedback;
+    private List<MistakeDTO> mistakes;
 }

@@ -14,6 +14,7 @@ const Login = () => {
     // Component-level state for input fields and error handling
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -33,25 +34,33 @@ const Login = () => {
 
         try {
             // 1. Send authentication request to the backend
-            const response = await api.post('/auth/login', { 
+           const response = await api.post('/auth/login', { 
                 email, 
-                password 
+                password,
+                rememberMe
             });
             
             const token = response.data.accessToken;
             console.log("Token received!");
 
+            localStorage.removeItem('token');
+            sessionStorage.removeItem('token');
+
             // 2. Immediately store the token in LocalStorage.
             // This ensures the Axios interceptor can attach it to the subsequent (/users/me) request
             // before the Context is fully updated.
-            localStorage.setItem('token', token);
+           if (rememberMe) {
+                localStorage.setItem('token', token);
+            } else {
+                sessionStorage.setItem('token', token);
+            }
 
             // 3. Fetch the authenticated user's profile
             const userResponse = await api.get('/users/me');
             console.log("Profile data fetched:", userResponse.data);
 
             // 4. Synchronize the global authentication state (Context)
-            login(token, userResponse.data); 
+           login(token, userResponse.data, rememberMe);
 
             // 5. Redirect to the protected Dashboard view
             navigate('/dashboard');
@@ -99,9 +108,19 @@ const Login = () => {
                                         autoComplete="current-password"
                                     />
                                </Form.Group>
+                               
+                               <Form.Group className="mb-4 text-start" controlId="rememberMeCheckbox">
+                                   <Form.Check 
+                                       type="checkbox" 
+                                       label="Jegyezz meg ezen az eszközön" 
+                                       className="text-light opacity-75 custom-checkbox"
+                                       checked={rememberMe}
+                                       onChange={(e) => setRememberMe(e.target.checked)}
+                                   />
+                               </Form.Group>
                                         <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold" disabled={isLoading}>
                                              {isLoading ? 'Bejelentkezés folyamatban...' : 'Belépés'}
-                                         </Button>
+                                        </Button>
                            </Form>
                            
                            <div className="text-center mt-3">

@@ -1,6 +1,7 @@
 package com.languageapp.backend.repository;
 
 import com.languageapp.backend.entity.Result;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,7 +13,13 @@ public interface ResultRepository extends JpaRepository<Result, UUID> {
     List<Result> findByUserUserId(UUID userId);
     List<Result> findByChallengeChallengeId(UUID challengeId);
     /**
-     * Retrieves the 3 most recent lesson results for a specific user to calculate dynamic difficulty.
+     * Retrieves the 5 most recent lesson results for a specific user to calculate dynamic difficulty.
      */
+    List<Result> findTop5ByUserUserIdOrderBySubmittedAtDesc(UUID userId);
+
+    /**
+     * Retrieves the 3 most recent lesson results for a specific user to show recent results on profile page.
+     */
+    @EntityGraph(attributePaths = {"lesson"})
     List<Result> findTop3ByUserUserIdOrderBySubmittedAtDesc(UUID userId);
 }

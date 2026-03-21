@@ -1,6 +1,8 @@
 package com.languageapp.backend.controller;
 
+import com.languageapp.backend.dto.request.ExerciseCheckRequest;
 import com.languageapp.backend.dto.request.LessonSubmitRequest;
+import com.languageapp.backend.dto.response.ExerciseCheckResponse;
 import com.languageapp.backend.dto.response.ExerciseResponse;
 import com.languageapp.backend.dto.response.LessonResponse;
 import com.languageapp.backend.dto.response.LessonSubmitResponse;

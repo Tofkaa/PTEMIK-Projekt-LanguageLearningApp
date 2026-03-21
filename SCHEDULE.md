@@ -5,8 +5,8 @@
 - 2026-03-01: Biztonság és Autentikáció (3. hét) - [KÉSZ]
 - 2026-03-08: Alapvető Üzleti Logika és API (4. hét) - [KÉSZ]
 - 2026-03-15: Frontend Alapok és Bejelentkezés (5. hét) - [KÉSZ]
-- 2026-03-22: Tanulási Felület és Core Loop (6. hét)
-- 2026-03-29: Proof of Concept (PoC) Prezentáció (7. hét)
+- 2026-03-22: Tanulási Felület és Core Loop (6. hét) - [KÉSZ]
+- 2026-03-29: Proof of Concept (PoC) Prezentáció (7. hét) - [FOLYAMATBAN]
 - 2026-04-05: Gamifikáció és Dashboard (8. hét)
 - 2026-04-12: Osztályterem Modul - Backend (9. hét)
 - 2026-04-19: Osztályterem Modul - Frontend (10. hét)
