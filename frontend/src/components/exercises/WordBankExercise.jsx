@@ -1,92 +1,83 @@
-import { useState, useEffect } from 'react';
-import { Button } from 'react-bootstrap';
+import { Badge } from 'react-bootstrap';
 
 /**
  * WordBankExercise Component
- * Renders a word bank interactive exercise.
- * Users click available words to form a sentence, which updates the parent's answer state.
- * * @param {Object} props - Component props
- * @param {Object} props.data - The content object from the backend containing the question and wordBank array
- * @param {Function} props.onAnswer - Callback function to update the parent component's current answer
+ * * Interactive sentence-building exercise.
+ * ARCHITECTURE NOTE: Uses "Derived State" instead of local `useState`/`useEffect`.
+ * The selected and available words are calculated directly from the `currentAnswer` string 
+ * provided by the parent. This guarantees a Single Source of Truth, prevents cascading renders, 
+ * and cleanly handles duplicate words in the word bank.
  */
-const WordBankExercise = ({ data, onAnswer }) => {
-    const [availableWords, setAvailableWords] = useState([]);
-    const [selectedWords, setSelectedWords] = useState([]);
+const WordBankExercise = ({ data, currentAnswer, onAnswer, disabled }) => {
+    
+    // 1. Derive selected words array from the parent's string state
+    const selectedWords = currentAnswer ? currentAnswer.trim().split(/\s+/) : [];
 
-    // Initialize and shuffle words whenever the data (new question) changes
-    useEffect(() => {
-        if (data && data.wordBank) {
-            // Simple array shuffle so the correct answer isn't in obvious order
-            const shuffled = [...data.wordBank].sort(() => Math.random() - 0.5);
-            setAvailableWords(shuffled);
-            setSelectedWords([]); // Reset selected words for the new question
-            onAnswer(''); // Clear the parent's current answer state
+    // 2. Derive available words by subtracting selected words from the initial options
+    const availableWords = [...(data?.options || [])];
+    selectedWords.forEach(word => {
+        const index = availableWords.indexOf(word);
+        if (index > -1) {
+            availableWords.splice(index, 1);
         }
-    }, [data, onAnswer]);
+    });
 
     /**
-     * Moves a word from the available pool to the constructed sentence.
+     * Appends a word from the bank to the user's current sentence.
      */
-    const handleSelectWord = (word, index) => {
+    const handleSelect = (word) => {
+        if (disabled) return;
         const newSelected = [...selectedWords, word];
-        setSelectedWords(newSelected);
-        
-        const newAvailable = [...availableWords];
-        newAvailable.splice(index, 1);
-        setAvailableWords(newAvailable);
-        
-        // Update the parent component with the current sentence string
-        onAnswer(newSelected.join(' '));
+        onAnswer(newSelected.join(' ')); // Emit new state to parent
     };
 
     /**
-     * Removes a word from the constructed sentence and puts it back in the available pool.
+     * Removes a specific word from the user's current sentence, returning it to the bank.
      */
-    const handleDeselectWord = (word, index) => {
-        const newAvailable = [...availableWords, word];
-        setAvailableWords(newAvailable);
-        
+    const handleDeselect = (index) => {
+        if (disabled) return;
         const newSelected = [...selectedWords];
         newSelected.splice(index, 1);
-        setSelectedWords(newSelected);
-        
-        // Update the parent component
-        onAnswer(newSelected.join(' '));
+        onAnswer(newSelected.join(' ')); // Emit new state to parent
     };
 
     return (
-        <div className="word-bank-container mt-4">
-            {/* 1. Constructed Sentence Area (Top) */}
+        <div className="text-center">
+            {/* --- Answer Construction Area --- */}
             <div 
-                className="selected-area border-bottom border-secondary mb-5 pb-3 d-flex flex-wrap gap-2 justify-content-center align-items-center" 
-                style={{ minHeight: '60px' }}
+                className="mb-4 p-3 border-bottom border-info border-opacity-50 d-flex flex-wrap gap-2 justify-content-center align-items-center rounded-top" 
+                style={{ minHeight: '80px', backgroundColor: 'rgba(13, 202, 240, 0.05)' }}
             >
                 {selectedWords.length === 0 && (
-                    <span className="text-muted fst-italic">Kattints a szavakra a mondat építéséhez...</span>
+                    <span className="text-secondary fst-italic">Kattints a lenti szavakra a mondatépítéshez...</span>
                 )}
                 {selectedWords.map((word, idx) => (
-                    <Button 
+                    <Badge 
                         key={`sel-${idx}`} 
-                        variant="info" 
-                        className="fw-bold text-dark rounded-pill px-4 shadow-sm" 
-                        onClick={() => handleDeselectWord(word, idx)}
+                        bg="info" 
+                        text="dark" 
+                        className="fs-5 p-2 shadow-sm"
+                        onClick={() => handleDeselect(idx)} 
+                        style={{ cursor: disabled ? 'default' : 'pointer' }}
                     >
                         {word}
-                    </Button>
+                    </Badge>
                 ))}
             </div>
 
-            {/* 2. Available Words Area (Bottom) */}
-            <div className="available-area d-flex flex-wrap gap-3 justify-content-center">
+            {/* --- Available Words Bank --- */}
+            <div className="d-flex flex-wrap gap-2 justify-content-center">
                 {availableWords.map((word, idx) => (
-                    <Button 
+                    <Badge 
                         key={`avail-${idx}`} 
-                        variant="outline-light" 
-                        className="rounded-pill px-4 fw-bold shadow-sm" 
-                        onClick={() => handleSelectWord(word, idx)}
+                        bg="dark" 
+                        border="secondary"
+                        className="fs-5 p-3 border border-info border-opacity-25 text-light shadow-sm transition-all hover-border-info"
+                        onClick={() => handleSelect(word)}
+                        style={{ cursor: disabled ? 'default' : 'pointer' }}
                     >
                         {word}
-                    </Button>
+                    </Badge>
                 ))}
             </div>
         </div>

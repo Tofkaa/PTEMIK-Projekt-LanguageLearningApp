@@ -19,8 +19,6 @@ const Profile = () => {
     const [isUpdating, setIsUpdating] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
     
-    // Placeholder state for future achievement/history fetching
-    //const [isLoadingStats, setIsLoadingStats] = useState(false);
 
     // --- EVENT HANDLERS ---
     

@@ -54,6 +54,27 @@ const Dashboard = () => {
         fetchLessons();
     }, []); // The empty array [] means this runs only once on mount
 
+    const groupedLessons = lessons.reduce((acc, lesson) => {
+        // Ha valamiért hiányozna a topicName, "Egyéb" kategóriába tesszük
+        const topic = lesson.topicName || "Egyéb Témakörök";
+        
+        if (!acc[topic]) {
+            acc[topic] = [];
+        }
+        acc[topic].push(lesson);
+        
+        return acc;
+    }, {});
+
+    const getDifficultyBadge = (difficulty) => {
+        switch (difficulty) {
+            case 'HARD': return <span className="badge bg-danger">HARD</span>;
+            case 'MEDIUM': return <span className="badge bg-warning text-dark">MEDIUM</span>;
+            case 'EASY': return <span className="badge bg-success">EASY</span>;
+            default: return <span className="badge bg-primary">{difficulty}</span>;
+        }
+    };
+
     return (
         <div className="min-vh-100 pb-5 text-light">
             {/* Navigation Bar */}
@@ -107,49 +128,61 @@ const Dashboard = () => {
                     <Col md={8} className="mb-4">
                         <Card className="shadow-sm border-0 h-100 bg-transparent text-light">
                             <Card.Body className="p-0">
-                                <h5 className="fw-bold border-bottom pb-2 mb-3">Elérhető Leckék</h5>
+                                <h5 className="fw-bold border-bottom border-secondary pb-2 mb-4">📚 Tanulási Útvonal</h5>
                                 
-                                {/* Loading State */}
+                                {/* Loading / Error / Empty States */}
                                 {isLoading && (
                                     <div className="text-center py-5">
-                                        <Spinner animation="border" variant="primary" />
-                                        <p className="mt-2 text-light">Leckék keresése...</p>
+                                        <Spinner animation="border" variant="info" />
+                                        <p className="mt-2 text-light opacity-75">Tananyagok betöltése...</p>
                                     </div>
                                 )}
-
-                                {/* Error State */}
                                 {error && <Alert variant="danger">{error}</Alert>}
-
-                                {/* Empty State */}
                                 {!isLoading && !error && lessons.length === 0 && (
-                                    <Alert variant="info">Jelenleg nincsenek elérhető leckék.</Alert>
+                                    <Alert variant="info" className="bg-dark text-info border-info">Jelenleg nincsenek elérhető leckék a szinteden.</Alert>
                                 )}
 
-                                {/* Render Fetched Lessons */}
-                                {!isLoading && !error && lessons.length > 0 && (
-                                    <Row>
-                                        {/* .map() iterates through the array and creates a UI card for each lesson */}
-                                        {lessons.map((lesson) => (
-                                            <Col md={6} key={lesson.lessonId} className="mb-3"> 
-                                                <Card className="h-100 border-0 shadow-sm bg-dark text-light">
-                                                    <Card.Body>
-                                                        <Card.Title className="fw-bold">{lesson.title}</Card.Title>
-                                                        <Card.Text className="text-light small">
-                                                            {lesson.description}
-                                                        </Card.Text>
-                                                        <div className="d-flex justify-content-between align-items-center mt-3">
-                                                            <span className="badge bg-primary">{lesson.difficulty}</span> 
-                                                            <Button variant="outline-success" size="sm" onClick={() => navigate(`/lesson/${lesson.lessonId}`)}> 
-                                                                Indítás
-                                                            </Button>
-                                                        </div>
-                                                    </Card.Body>
-                                                </Card>
-                                            </Col>
+                                {/* --- GROUPED DISPLAY --- */}
+                                {!isLoading && !error && Object.keys(groupedLessons).length > 0 && (
+                                    <div className="d-flex flex-column gap-5">
+                                        {/* Iterate through topics */}
+                                        {Object.entries(groupedLessons).map(([topicName, topicLessons]) => (
+                                            <div key={topicName}>
+                                                {/* Topic header */}
+                                                <h4 className="text-info fw-bold mb-3 px-2">
+                                                    {topicName}
+                                                </h4>
+                                                
+                                                {/* Grid for the topic's lessons*/}
+                                                <Row className="g-3">
+                                                    {topicLessons.map((lesson) => (
+                                                        <Col md={6} key={lesson.lessonId}> 
+                                                            <Card className="h-100 border border-secondary shadow-sm bg-dark text-light" style={{ transition: 'transform 0.2s', cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+                                                                <Card.Body className="d-flex flex-column p-4">
+                                                                    <Card.Title className="fw-bold mb-2">{lesson.title}</Card.Title>
+                                                                    <Card.Text className="text-light opacity-50 small mb-4 flex-grow-1">
+                                                                        {lesson.description}
+                                                                    </Card.Text>
+                                                                    <div className="d-flex justify-content-between align-items-center mt-auto pt-3 border-top border-secondary border-opacity-50">
+                                                                        {getDifficultyBadge(lesson.difficulty)}
+                                                                        <Button 
+                                                                            variant="outline-info" 
+                                                                            size="sm" 
+                                                                            className="rounded-pill px-4 fw-bold"
+                                                                            onClick={() => navigate(`/lesson/${lesson.lessonId}`)}
+                                                                        > 
+                                                                            Indítás
+                                                                        </Button>
+                                                                    </div>
+                                                                </Card.Body>
+                                                            </Card>
+                                                        </Col>
+                                                    ))}
+                                                </Row>
+                                            </div>
                                         ))}
-                                    </Row>
+                                    </div>
                                 )}
-
                             </Card.Body>
                         </Card>
                     </Col>

@@ -66,6 +66,10 @@ public class CurriculumService {
                         exercise.setContent(exerciseReq.getContent());
                         exercise.setCorrectAnswer(exerciseReq.getCorrectAnswer());
 
+                        if (exerciseReq.getImageUrl() != null) {
+                            exercise.setImageUrl(exerciseReq.getImageUrl());
+                        }
+
                         exerciseRepository.save(exercise);
                     }
                     log.info("    Saved {} exercises for lesson.", lessonReq.getExercises().size());

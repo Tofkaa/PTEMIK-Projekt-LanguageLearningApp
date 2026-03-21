@@ -310,47 +310,72 @@ const LessonPlayer = () => {
     const renderExercise = () => {
         if (!currentExercise) return null;
 
-        if (currentExercise.type === 'IMAGE_CHOICE') {
-            return (
-                <ImageChoiceExercise 
-                    exercise={currentExercise} 
-                    currentAnswer={currentAnswer} 
-                    onAnswer={setCurrentAnswer} 
-                    disabled={isInputDisabled}
-                />
-            );
-        }
+        const { type, content } = currentExercise;
+        
+        // Clean up the question text (if there are any unnecessary prefixes left in the database)
+        const questionText = content?.question?.replace('Translate: ', '').replace('Translate to English: ', '') || '';
+
+        // Dynamic header depending on task type
+        const getTitle = () => {
+            switch (type) {
+                case 'TRANSLATION': return '📝 Fordítási feladat';
+                case 'MULTIPLE_CHOICE': return '✅ Feleletválasztós kérdés';
+                case 'WORD_BANK': return '🧩 Szókirakó';
+                case 'IMAGE_CHOICE': return '🖼️ Képes feladat';
+                default: return 'Feladat';
+            }
+        };
 
         return (
             <>
-                <h4 className="mb-4 text-info fw-bold">Translate the following sentence!</h4>
-                <p className="fs-4 mb-5 border border-secondary rounded p-3 bg-gradient">
-                    {currentExercise.content?.question?.replace('Translate to English: ', '').replace('Rakd sorba: ', '')}
-                </p>
+                {/* Dynamic, task-specific title */}
+                <h4 className="mb-4 text-info fw-bold">{getTitle()}</h4>
                 
-                {currentExercise.type === 'WORD_BANK' ? (
-                    <WordBankExercise 
-                        data={currentExercise.content} 
-                        onAnswer={setCurrentAnswer} 
-                        currentAnswer={currentAnswer}
-                        disabled={isInputDisabled}
-                    />
-                ) : currentExercise.type === 'MULTIPLE_CHOICE' ? (
-                    <MultipleChoiceExercise 
-                        data={currentExercise.content} 
+                {/* Display the question/instruction (if it exists) */}
+                {questionText && (
+                    <p className="fs-4 mb-4 border border-secondary rounded p-3 bg-black bg-opacity-25">
+                        {questionText}
+                    </p>
+                )}
+
+                {/* --- DYNAMIC LOADING OF COMPONENTS BY TYPE --- */}
+                
+                {type === 'IMAGE_CHOICE' && (
+                    <ImageChoiceExercise 
+                        exercise={currentExercise} 
                         currentAnswer={currentAnswer} 
                         onAnswer={setCurrentAnswer} 
                         disabled={isInputDisabled}
                     />
-                ) : (
+                )}
+
+                {type === 'WORD_BANK' && (
+                    <WordBankExercise 
+                        data={content} 
+                        onAnswer={setCurrentAnswer} 
+                        currentAnswer={currentAnswer}
+                        disabled={isInputDisabled}
+                    />
+                )}
+
+                {type === 'MULTIPLE_CHOICE' && (
+                    <MultipleChoiceExercise 
+                        data={content} 
+                        currentAnswer={currentAnswer} 
+                        onAnswer={setCurrentAnswer} 
+                        disabled={isInputDisabled}
+                    />
+                )}
+
+                {type === 'TRANSLATION' && (
                     <Form.Group className="mb-5 text-start">
                         <Form.Control 
                             as="textarea" 
                             rows={3} 
-                            placeholder="Type the English translation here..." 
+                            placeholder="Írd ide a fordítást angolul..." 
                             value={currentAnswer} 
                             onChange={(e) => setCurrentAnswer(e.target.value)} 
-                            className="fs-5" 
+                            className="fs-5 bg-dark text-light border-secondary shadow-none" 
                             autoFocus 
                             disabled={isInputDisabled}
                         />
