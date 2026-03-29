@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -22,4 +23,11 @@ public interface ResultRepository extends JpaRepository<Result, UUID> {
      */
     @EntityGraph(attributePaths = {"lesson"})
     List<Result> findTop3ByUserUserIdOrderBySubmittedAtDesc(UUID userId);
+
+    /**
+     * Retrieves the absolute latest lesson result submitted by the user.
+     * * CRITICAL FOR GAMIFICATION: Used by the EvaluationService to determine if the user
+     * maintained their daily learning streak (comparing this date to LocalDate.now()).
+     */
+    Optional<Result> findFirstByUserUserIdOrderBySubmittedAtDesc(UUID userId);
 }

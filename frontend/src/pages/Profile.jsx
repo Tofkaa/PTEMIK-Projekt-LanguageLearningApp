@@ -88,10 +88,20 @@ const Profile = () => {
                                     {user.role === 'ADMIN' ? 'Rendszergazda' : 'Diák'}
                                 </Badge>
 
-                                {/* Total Experience Points */}
-                                <div className="w-100 p-3 bg-black bg-opacity-25 rounded-3 border border-secondary text-start">
-                                    <span className="text-light opacity-75 small text-uppercase fw-bold">Összes XP</span>
-                                    <h3 className="text-warning fw-bold mb-0">⭐ {user.xp}</h3>
+                              <div className="d-flex flex-column gap-3 w-100 mb-2"> 
+                                    
+                                    {/* Total Experience Points */}
+                                    <div className="w-100 p-3 bg-black bg-opacity-25 rounded-3 border border-secondary text-start">
+                                        <span className="text-light opacity-75 small text-uppercase fw-bold">Összes XP</span>
+                                        <h3 className="text-warning fw-bold mb-0">⭐ {user.xp}</h3>
+                                    </div>
+
+                                    {/* Daily Streak */}
+                                    <div className="w-100 p-3 bg-black bg-opacity-25 rounded-3 border border-secondary d-flex justify-content-between align-items-center">
+                                        <span className="text-light opacity-75 small text-uppercase fw-bold">Napi sorozat</span>
+                                        <h4 className="text-warning fw-bold mb-0">🔥 {user.streak || 0} nap</h4>
+                                    </div>
+                                    
                                 </div>
                             </Card.Body>
                         </Card>

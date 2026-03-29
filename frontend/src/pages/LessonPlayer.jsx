@@ -140,14 +140,27 @@ const LessonPlayer = () => {
             answers: finalAnswers
         };
 
-        try {
+       try {
             console.log("Submitting final payload:", payload);
             const response = await api.post(`/lessons/${lessonId}/submit`, payload);
             setLessonResult(response.data);
             
-            const updatedUser = { ...user, xp: user.xp + (response.data.xpEarned || 0) };
-            login(localStorage.getItem('token'), updatedUser); 
-
+            // --- ROBUST STATE SYNCHRONIZATION ---
+            // Instead of manually calculating XP and streaks on the client (which can lead to desyncs if the user
+            // navigates away quickly), we fetch the authoritative User Profile directly from the backend.
+            try {
+                const userResponse = await api.get('/users/me'); 
+                login(localStorage.getItem('token'), userResponse.data); // Update global AuthContext
+            } catch (fetchErr) {
+                console.warn("Failed to fetch fresh profile, initiating fallback update:", fetchErr);
+                // Safety net fallback: Apply manual calculations if the profile fetch fails
+                const updatedUser = { 
+                    ...user, 
+                    xp: user.xp + (response.data.xpEarned || 0),
+                    streak: response.data.newStreak !== undefined ? response.data.newStreak : user.streak
+                };
+                login(localStorage.getItem('token'), updatedUser); 
+            }
         } catch (err) {
             console.error("Submission error:", err);
             setError("An error occurred while submitting your answers.");
@@ -155,7 +168,6 @@ const LessonPlayer = () => {
             setIsSubmitting(false);
         }
     };
-
     // --- PHASE 4: RENDER RESULT SCREEN ---
     if (lessonResult) {
         const isPassed = lessonResult.passed;

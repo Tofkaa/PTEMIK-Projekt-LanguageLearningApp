@@ -113,6 +113,12 @@ const Dashboard = () => {
                                         style={{ height: '12px' }} 
                                         animated={progressPercentage > 0}
                                     />
+                                    <div className="d-flex justify-content-between align-items-center mt-4 p-2 bg-black bg-opacity-25 rounded border border-secondary">
+                                        <span className="fw-bold text-warning fs-5">🔥 Napi sorozat</span>
+                                        <span className="text-light fw-bold fs-5">
+                                            {user?.streak || 0} nap
+                                        </span>
+                                    </div>
                                     <div className="text-center mt-2 small text-light">
                                         Még {xpForNextLevel - currentXp} XP a szintlépéshez!
                                     </div>

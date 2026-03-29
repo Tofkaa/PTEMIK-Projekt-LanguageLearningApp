@@ -44,7 +44,7 @@ public class EvaluationService {
 
     /**
      * Orchestrates the entire submission process for a completed lesson.
-     * Validates security, calculates scores and XP, updates user progress, and saves the final result.
+     * Validates security, calculates scores and XP, updates the Daily Streak, and saves the final result.
      *
      * @param userId   The ID of the user submitting the lesson.
      * @param lessonId The ID of the lesson being submitted.
@@ -93,15 +93,45 @@ public class EvaluationService {
 
         int xpEarned = 0;
 
+        // --- 1. XP ALLOCATION LOGIC ---
         // Only award XP if the user passed and hadn't already completed this lesson in the past
         if (passed && !progress.getIsCompleted()) {
-            xpEarned = potentialXp; // Assign the dynamically calculated XP
-
+            xpEarned = potentialXp;
             user.setXp(user.getXp() + xpEarned);
-            userRepository.save(user);
             log.info("User {} earned {} XP. Total XP: {}", user.getEmail(), xpEarned, user.getXp());
         } else if (passed && progress.getIsCompleted()) {
             log.debug("User {} already completed this lesson. No new XP awarded.", user.getEmail());
+        }
+
+        // --- 2. GAMIFICATION: DAILY STREAK ENGINE ---
+        // Runs on every successful lesson completion (even practice/repeats) to encourage daily engagement.
+        if (passed) {
+            Result lastResult = resultRepository.findFirstByUserUserIdOrderBySubmittedAtDesc(userId).orElse(null);
+            java.time.LocalDate today = java.time.LocalDate.now();
+            int currentStreak = (user.getStreak() != null) ? user.getStreak() : 0;
+
+            if (lastResult != null) {
+                java.time.LocalDate lastDate = lastResult.getSubmittedAt().toLocalDate();
+
+                if (lastDate.equals(today.minusDays(1))) {
+                    // Maintained streak: User studied yesterday and today
+                    user.setStreak(currentStreak + 1);
+                } else if (lastDate.isBefore(today.minusDays(1))) {
+                    // Broken streak: User skipped at least one day
+                    user.setStreak(1);
+                } else if (lastDate.equals(today)) {
+                    // EDGE CASE SAFETY NET: If the user studied today, but their memory streak is 0, initialize it.
+                    if (currentStreak == 0) {
+                        user.setStreak(1);
+                    }
+                }
+            } else {
+                // First successful lesson ever
+                user.setStreak(1);
+            }
+
+            // Persist the updated XP and/or Streak to the database
+            userRepository.save(user);
         }
 
         // Save historical result and update ongoing progress
@@ -121,6 +151,7 @@ public class EvaluationService {
                 .passed(passed)
                 .feedback(feedback)
                 .mistakes(mistakes)
+                .newStreak(user.getStreak() != null ? user.getStreak() : 0) // Attach final streak for the frontend
                 .build();
     }
 
