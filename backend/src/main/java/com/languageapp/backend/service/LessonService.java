@@ -4,6 +4,7 @@ import com.languageapp.backend.dto.response.ExerciseResponse;
 import com.languageapp.backend.dto.response.LessonResponse;
 import com.languageapp.backend.entity.Exercise;
 import com.languageapp.backend.entity.Lesson;
+import com.languageapp.backend.entity.Progress;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
@@ -56,7 +57,7 @@ public class LessonService {
         List<Lesson> tailoredLessons = lessonRepository.findByDifficulty(targetDifficulty);
 
         return tailoredLessons.stream()
-                .map(this::mapToLessonResponse)
+                .map(lesson -> mapToLessonResponse(lesson, user))
                 .toList();
     }
 
@@ -97,14 +98,20 @@ public class LessonService {
                 .toList();
     }
 
-    private LessonResponse mapToLessonResponse(Lesson lesson) {
+    private LessonResponse mapToLessonResponse(Lesson lesson, User user) {
+        boolean isCompleted = progressRepository
+                .findByUserUserIdAndLessonLessonId(user.getUserId(), lesson.getLessonId())
+                .map(Progress::getIsCompleted)
+                .orElse(false);
+
         return new LessonResponse(
                 lesson.getLessonId(),
                 lesson.getTopic().getName(),
                 lesson.getTitle(),
                 lesson.getDifficulty(),
                 lesson.getLanguage(),
-                lesson.getDescription()
+                lesson.getDescription(),
+                isCompleted
         );
     }
 

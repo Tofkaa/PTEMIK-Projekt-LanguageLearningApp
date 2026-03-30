@@ -20,4 +20,5 @@ public class LessonResponse {
     private String difficulty;
     private String language;
     private String description;
+    private boolean isCompleted;
 }
