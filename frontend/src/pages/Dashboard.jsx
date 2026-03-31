@@ -29,15 +29,57 @@ const Dashboard = () => {
     const xpInCurrentLevel = currentXp % 100;
     const progressPercentage = (xpInCurrentLevel / 100) * 100;
 
-    // --- DERIVED STATE: LESSON PROGRESS CALCULATIONS ---
+  // --- DERIVED STATE: LESSON PROGRESS CALCULATIONS ---
     const totalLessonsCount = lessons.length;
-    // NOTE: We check for 'completed' (not 'isCompleted') due to Spring Boot's Jackson JSON serialization behavior.
     const completedLessonsCount = lessons.filter(lesson => lesson.completed).length;
     const courseProgressPercentage = totalLessonsCount === 0 ? 0 : (completedLessonsCount / totalLessonsCount) * 100;
 
+    // --- DERIVED STATE: HERO WIDGET LOGIC ---
+    let heroState = null;
+
+    if (!isLoading && !error && totalLessonsCount > 0) {
+        // Megkeressük a legelső befejezetlen leckét
+        const nextLesson = lessons.find(lesson => !lesson.completed);
+
+        if (!nextLesson && completedLessonsCount > 0) {
+            // Everything completed
+            const randomLesson = lessons[Math.floor(Math.random() * totalLessonsCount)];
+            heroState = {
+                type: 'ALL_DONE',
+                title: 'Minden elérhető leckét teljesítettél! 🎉',
+                subtitle: 'Fantasztikus munka! Frissítsd fel a tudásod egy korábbi lecke ismétlésével.',
+                lesson: randomLesson,
+                buttonText: 'Tudás felfrissítése 🔄',
+                buttonVariant: 'warning',
+                borderColor: 'border-warning'
+            };
+        } else if (completedLessonsCount === 0 && nextLesson) {
+            // No completed lessons
+            heroState = {
+                type: 'FIRST_STEPS',
+                title: 'Készen állsz az első kalandra? 🚀',
+                subtitle: `Kezdd el a nyelvtanulást a(z) "${nextLesson.title}" leckével!`,
+                lesson: nextLesson,
+                buttonText: 'Első lecke indítása',
+                buttonVariant: 'success',
+                borderColor: 'border-success'
+            };
+        } else if (nextLesson) {
+            // Normal progress
+            heroState = {
+                type: 'CONTINUE',
+                title: 'Folytasd a tanulást! 📚',
+                subtitle: `A következő logikus lépés: ${nextLesson.title} (${nextLesson.topicName || 'Egyéb'})`,
+                lesson: nextLesson,
+                buttonText: 'Folytatás ➡️',
+                buttonVariant: 'info',
+                borderColor: 'border-info'
+            };
+        }
+    }
+
     /**
      * Component Lifecycle: Initialization
-     * Fetches the tailored lesson catalog for the user upon component mount.
      */
     useEffect(() => {
         const fetchLessons = async () => {
@@ -57,7 +99,6 @@ const Dashboard = () => {
     }, []); 
 
     // --- DATA TRANSFORMATION ---
-    // Groups the flat array of lessons into an object categorized by topic names.
     const groupedLessons = lessons.reduce((acc, lesson) => {
         const topic = lesson.topicName || "Egyéb Témakörök";
         if (!acc[topic]) {
@@ -93,6 +134,34 @@ const Dashboard = () => {
                         </p>
                     </Col>
                 </Row>
+                {/* --- HERO WIDGET SECTION --- */}
+                {heroState && (
+                    <Row className="mb-4">
+                        <Col>
+                            <Card className={`border-2 ${heroState.borderColor} bg-dark bg-gradient shadow-lg`}>
+                                <Card.Body className="d-flex flex-column flex-md-row align-items-md-center justify-content-between p-4 p-md-5">
+                                    <div className="mb-4 mb-md-0">
+                                        <h3 className="fw-bold text-light mb-2">{heroState.title}</h3>
+                                        <p className="text-light opacity-75 fs-5 mb-0">
+                                            {heroState.subtitle}
+                                        </p>
+                                    </div>
+                                    <div className="text-md-end">
+                                        <Button 
+                                            variant={heroState.buttonVariant} 
+                                            size="lg" 
+                                            className="px-5 py-3 rounded-pill fw-bold shadow-sm"
+                                            style={{ minWidth: '250px' }}
+                                            onClick={() => navigate(`/lesson/${heroState.lesson.lessonId}`)}
+                                        >
+                                            {heroState.buttonText}
+                                        </Button>
+                                    </div>
+                                </Card.Body>
+                            </Card>
+                        </Col>
+                    </Row>
+                )}
 
                 <Row>
                     {/* --- LEFT COLUMN: USER STATISTICS --- */}
