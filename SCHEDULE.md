@@ -6,8 +6,8 @@
 - 2026-03-08: Alapvető Üzleti Logika és API (4. hét) - [KÉSZ]
 - 2026-03-15: Frontend Alapok és Bejelentkezés (5. hét) - [KÉSZ]
 - 2026-03-22: Tanulási Felület és Core Loop (6. hét) - [KÉSZ]
-- 2026-03-29: Proof of Concept (PoC) Prezentáció (7. hét) - [FOLYAMATBAN]
-- 2026-04-05: Gamifikáció és Dashboard (8. hét)
+- 2026-03-29: Proof of Concept (PoC) Prezentáció (7. hét) - [KÉSZ]
+- 2026-04-05: Gamifikáció, Dashboard és Aszinkron Kihívások (8. hét) - [FOLYAMATBAN]
 - 2026-04-12: Osztályterem Modul - Backend (9. hét)
 - 2026-04-19: Osztályterem Modul - Frontend (10. hét)
 - 2026-04-26: Admin Panel és Nginx Reverse Proxy (11. hét)
@@ -37,8 +37,8 @@ A PoC legfontosabb technikai elemének, az interaktív feladatmegoldó felületn
 ## Proof of Concept (PoC) Prezentáció
 A projekt félidei, legfontosabb technikai mérföldköve. Ennek a fázisnak a célja annak demonstrálása, hogy az alkalmazás szoftveres "magja" működőképes és stabil. A PoC során bemutatásra kerül a teljes tanulási életciklus (Core Loop): egy diák sikeresen regisztrál/bejelentkezik, elindít egy rendelkezésre álló minta leckét, interaktívan megoldja a feladatokat, majd a rendszer helyesen kiszámítja és letárolja az eredményeit.
 
-## Gamifikáció és Dashboard
-A felhasználói elköteleződést és motivációt segítő funkciók fejlesztése. A backend oldalon megvalósul a tapasztalati pontok (XP) számításának és a napi gyakorlási sorozatok (Streak) nyomon követésének algoritmusa. A frontend oldalon elkészül a letisztult Diák Dashboard, amely vizuálisan jeleníti meg ezeket a személyes statisztikákat, a legutóbbi leckét, valamint a tanuló aktuális haladását.
+## Gamifikáció, Dashboard és Aszinkron Kihívások
+A felhasználói elköteleződést és motivációt segítő funkciók fejlesztése. A backend oldalon megvalósul a tapasztalati pontok (XP) számításának, a napi gyakorlási sorozatok (Streak) nyomon követésének algoritmusa, valamint az aszinkron (levelezős sakk szerű) játékos-játékos elleni (PvP) kihívások motorja. A frontend oldalon elkészül a letisztult Diák Dashboard, amely vizuálisan jeleníti meg a személyes statisztikákat, a tanuló haladását, és megalapozza a barátok ranglistájának és a kihívásoknak a megjelenítését.
 
 ## Osztályterem Modul - Backend
 A tanári jogosultságokhoz kötött csoportkezelés háttérlogikájának megvalósítása. Biztonságos API végpontok készülnek a virtuális osztálytermek létrehozására, a meghívókódok egyedi generálására, valamint a diákok csatlakozási kérelmeinek és a `classroom_members` kapcsolótáblának a menedzselésére.
