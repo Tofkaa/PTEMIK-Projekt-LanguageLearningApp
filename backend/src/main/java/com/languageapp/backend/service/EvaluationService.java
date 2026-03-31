@@ -52,7 +52,7 @@ public class EvaluationService {
      * @return LessonSubmitResponse containing the evaluation results for the frontend.
      */
     @Transactional
-    public LessonSubmitResponse evaluateLesson(UUID userId, UUID lessonId, LessonSubmitRequest request) {
+    public LessonSubmitResponse evaluateLesson(UUID userId, UUID lessonId, LessonSubmitRequest request, String fallbackLevel) {
         log.debug("Starting evaluation for user: {} and lesson: {}", userId, lessonId);
 
         User user = userRepository.findById(userId)
@@ -66,7 +66,7 @@ public class EvaluationService {
         boolean hasStarted = existingProgressOpt.isPresent();
 
         // SECURITY: Ensure the user is not trying to hack the adaptive difficulty system
-        validateUserDifficultyAccess(user, lesson, hasStarted);
+        validateUserDifficultyAccess(user, lesson, hasStarted, fallbackLevel);
 
         List<Exercise> exercises = lesson.getExercises();
         int totalQuestions = exercises.size();
@@ -155,13 +155,13 @@ public class EvaluationService {
                 .build();
     }
 
-    private void validateUserDifficultyAccess(User user, Lesson lesson, boolean hasStarted) {
+    private void validateUserDifficultyAccess(User user, Lesson lesson, boolean hasStarted, String fallbackLevel) {
         if ("STUDENT".equals(user.getRole())) {
-            String allowedDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+            String allowedDifficulty = userDifficultyCalculator.determineTargetDifficulty(user, fallbackLevel);
+
             if (!lesson.getDifficulty().equals(allowedDifficulty) && !hasStarted) {
-                log.warn("SECURITY ALERT: User {} attempted to SUBMIT restricted difficulty! Requested: {}, Allowed: {}",
-                        user.getEmail(), lesson.getDifficulty(), allowedDifficulty);
-                throw new ForbiddenException("Access denied : you cant access this difficulty!");
+                log.warn("SECURITY ALERT: User {} attempted to SUBMIT restricted difficulty!", user.getEmail());
+                throw new ForbiddenException("Access denied: you cant access this difficulty!");
             }
         }
     }

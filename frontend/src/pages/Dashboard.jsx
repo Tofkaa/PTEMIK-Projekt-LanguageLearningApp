@@ -82,11 +82,21 @@ const Dashboard = () => {
      * Component Lifecycle: Initialization
      */
     useEffect(() => {
-        const fetchLessons = async () => {
-            try {
-                const response = await api.get('/lessons');
-                console.log("Lessons fetched successfully:", response.data);
-                setLessons(response.data);
+    const fetchLessons = async () => {
+        try {
+            // Read saved level from registration
+            const savedStartingLevel = localStorage.getItem('dynamicStartingLevel');
+            console.log("Kiolvasott kezdőszint a memóriából:", savedStartingLevel); // DEBUG log
+
+            const response = await api.get('/lessons', { 
+                params: { fallbackLevel: savedStartingLevel } 
+            });
+
+            setLessons(response.data);
+
+            if (response.data.some(l => l.completed)) {
+                localStorage.removeItem('dynamicStartingLevel');
+            }
             } catch (err) {
                 console.error("Error fetching lessons:", err);
                 setError('Nem sikerült betölteni a leckéket a szerverről.');
@@ -96,7 +106,7 @@ const Dashboard = () => {
         };
 
         fetchLessons();
-    }, []); 
+    }, []);
 
     // --- DATA TRANSFORMATION ---
     const groupedLessons = lessons.reduce((acc, lesson) => {

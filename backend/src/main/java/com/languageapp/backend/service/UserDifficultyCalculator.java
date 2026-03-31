@@ -27,9 +27,10 @@ public class UserDifficultyCalculator {
      * Determines the optimal target difficulty for the specified user.
      *
      * @param user the authenticated user entity
+     * @param fallbackLevel the requested starting level from the frontend (can be null)
      * @return the calculated or preferred difficulty level ("EASY", "MEDIUM", or "HARD")
      */
-    public String determineTargetDifficulty(User user) {
+    public String determineTargetDifficulty(User user, String fallbackLevel) {
         // 1. Check for manual difficulty override
         if (!"DYNAMIC".equals(user.getPreferredDifficulty().name())) return user
                 .getPreferredDifficulty()
@@ -41,6 +42,14 @@ public class UserDifficultyCalculator {
 
         // Default to MEDIUM if the user has no prior history
         if (recentResults.isEmpty()) {
+            if (fallbackLevel != null) {
+                String level = fallbackLevel.toUpperCase();
+                if (level.equals("EASY") || level.equals("MEDIUM") || level.equals("HARD")) {
+                    log.debug("New user {} starting DYNAMIC mode at requested level: {}", user.getEmail(), level);
+                    return level;
+                }
+            }
+            log.debug("New user {} starting DYNAMIC mode at default level: MEDIUM", user.getEmail());
             return "MEDIUM";
         }
 

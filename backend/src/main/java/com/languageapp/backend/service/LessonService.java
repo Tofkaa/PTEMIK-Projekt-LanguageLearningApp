@@ -40,17 +40,19 @@ public class LessonService {
      * Retrieves all lessons filtered by the user's preferred or dynamically calculated difficulty.
      *
      * @param userEmail the email of the authenticated user
+     * @param fallbackLevel optional starting level for new dynamic users
      * @return a list of {@link LessonResponse}
      */
     @Transactional(readOnly = true)
-    public List<LessonResponse> getAllLessonsForUser(String userEmail) {
+    public List<LessonResponse> getAllLessonsForUser(String userEmail, String fallbackLevel) { // <-- ÚJ PARAMÉTER
         log.debug("Fetching tailored lessons for user: {}", userEmail);
 
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
 
-        // 1. Calculate target difficulty
-        String targetDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+        // 1. Calculate target difficulty (Továbbadjuk a kalkulátornak!)
+        String targetDifficulty = userDifficultyCalculator.determineTargetDifficulty(user, fallbackLevel);
+
         log.info("Target difficulty for user {} is set to: {}", userEmail, targetDifficulty);
 
         // 2. Only get the correct lessons for desired difficulty
@@ -60,7 +62,6 @@ public class LessonService {
                 .map(lesson -> mapToLessonResponse(lesson, user))
                 .toList();
     }
-
     /**
      * Retrieves all exercises for a specific lesson, strictly omitting the correct answers.
      * Includes IDOR security checks to prevent students from accessing restricted difficulty levels.
@@ -70,7 +71,7 @@ public class LessonService {
      * @return a list of {@link ExerciseResponse}
      */
     @Transactional(readOnly = true)
-    public List<ExerciseResponse> getExercisesByLessonId(UUID lessonId, String userEmail) {
+    public List<ExerciseResponse> getExercisesByLessonId(UUID lessonId, String userEmail, String fallbackLevel) {
         log.debug("Fetching safe exercises for lesson ID: {} for user: {}", lessonId, userEmail);
 
         User user = userRepository.findByEmail(userEmail)
@@ -83,7 +84,7 @@ public class LessonService {
                 });
 
         if ("STUDENT".equals(user.getRole())) {
-            String allowedDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+            String allowedDifficulty = userDifficultyCalculator.determineTargetDifficulty(user, fallbackLevel);
             boolean hasStarted = progressRepository.findByUserUserIdAndLessonLessonId(user.getUserId(), lessonId).isPresent();
 
             if (!lesson.getDifficulty().equals(allowedDifficulty) && !hasStarted) {
