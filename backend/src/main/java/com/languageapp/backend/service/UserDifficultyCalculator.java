@@ -56,8 +56,12 @@ public class UserDifficultyCalculator {
         log.debug("Adaptive Eval -> User: {}, Last Difficulty: {}, Weighted Score: {}",
                 user.getEmail(), lastDifficulty, String.format("%.2f", weightedScore));
 
-        // 4. Apply hysteresis to determine the next difficulty level
-        return calculateNextDifficulty(lastDifficulty, weightedScore, recentResults.size());
+        // 4. Fetch the absolute total of lifetime attempts to control progression pacing
+        long totalLifetimeAttempts = resultRepository.countByUserUserId(user.getUserId());
+
+        // Pass the WMA (based on the last 5 results) and the lifetime attempts
+        // to the hysteresis engine to enforce minimum practice requirements per level
+        return calculateNextDifficulty(lastDifficulty, weightedScore, (int) totalLifetimeAttempts);
     }
 
     /**
@@ -84,36 +88,36 @@ public class UserDifficultyCalculator {
     }
 
     /**
-     * Determines the next difficulty using hysteresis to prevent erratic level changes.
+     * Determines the next difficulty using hysteresis and pacing to prevent erratic level changes.
      *
      * @param currentDifficulty the difficulty of the most recent lesson
-     * @param score the calculated weighted average score
-     * @param totalAttempts the total number of recorded attempts
+     * @param score the calculated weighted average score (WMA)
+     * @param totalAttempts the total lifetime number of recorded attempts for the user
      * @return the assigned difficulty level for the next lesson
      */
     private String calculateNextDifficulty(String currentDifficulty, double score, int totalAttempts) {
-        // Protection: Require at least 3 attempts before promoting to HARD
-        if (totalAttempts < 3 && score > 85.0) {
-            return "MEDIUM";
-        }
-
         switch (currentDifficulty) {
             case "HARD":
-                // Forgiving threshold: Since HARD is inherently difficult,
-                // the user only drops to MEDIUM if performance consistently falls below 60%
-                if (score < 60.0) return "MEDIUM";
+                // Master level: Once reached, the user is locked into HARD mode
+                // to maintain the challenge without punishing occasional low scores.
                 return "HARD";
 
             case "EASY":
-                // Fast promotion: Quickly graduate from EASY to prevent boredom
-                if (score >= 75.0) return "MEDIUM";
+                // Pacing buffer: Require at least 3 completed lessons (approx. one topic)
+                // AND a 75%+ WMA score to graduate to the MEDIUM level.
+                if (score >= 75.0 && totalAttempts >= 3) return "MEDIUM";
                 return "EASY";
 
             case "MEDIUM":
             default:
-                // Standard thresholds for the base difficulty
-                if (score >= 85.0) return "HARD";
+                // Gradual promotion: Require at least 6 total lifetime lessons.
+                // Since 3 were spent on EASY, this guarantees at least 3 lessons on MEDIUM before reaching HARD.
+                if (score >= 85.0 && totalAttempts >= 6) return "HARD";
+
+                // Immediate safety net: If performance drops below 50%,
+                // instantly demote to EASY for practice (no delay needed here).
                 if (score < 50.0) return "EASY";
+
                 return "MEDIUM";
         }
     }

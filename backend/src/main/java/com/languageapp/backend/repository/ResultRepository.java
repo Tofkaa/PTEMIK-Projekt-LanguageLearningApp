@@ -13,6 +13,14 @@ import java.util.UUID;
 public interface ResultRepository extends JpaRepository<Result, UUID> {
     List<Result> findByUserUserId(UUID userId);
     List<Result> findByChallengeChallengeId(UUID challengeId);
+
+    /**
+     * Retrieves the absolute total number of lesson attempts for a specific user.
+     * Crucial for pacing the dynamic difficulty progression (e.g., ensuring a user
+     * completes a required number of lessons before being promoted to a higher difficulty).
+     */
+    long countByUserUserId(UUID userId);
+
     /**
      * Retrieves the 5 most recent lesson results for a specific user to calculate dynamic difficulty.
      */
