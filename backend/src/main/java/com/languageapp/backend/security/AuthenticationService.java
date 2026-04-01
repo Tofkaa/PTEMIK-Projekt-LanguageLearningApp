@@ -4,7 +4,6 @@ import com.languageapp.backend.dto.request.LoginRequest;
 import com.languageapp.backend.dto.request.RegisterRequest;
 import com.languageapp.backend.dto.response.AuthResponse;
 import com.languageapp.backend.entity.User;
-import com.languageapp.backend.enums.DifficultyLevel;
 import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -66,16 +65,6 @@ public class AuthenticationService {
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setName(request.getName());
 
-        if (request.getPreferredDifficulty() != null && !request.getPreferredDifficulty().isBlank()) {
-            try {
-                user.setPreferredDifficulty(DifficultyLevel.valueOf(request.getPreferredDifficulty().toUpperCase()));
-            } catch (IllegalArgumentException e) {
-                log.warn("Invalid difficulty received: {}. Falling back to DYNAMIC.", request.getPreferredDifficulty());
-                user.setPreferredDifficulty(DifficultyLevel.DYNAMIC);
-            }
-        } else {
-            user.setPreferredDifficulty(DifficultyLevel.DYNAMIC);
-        }
         String requestedRole = request.getRole() != null ? request.getRole().trim().toUpperCase() : "";
 
         if ("TEACHER".equals(requestedRole)) {

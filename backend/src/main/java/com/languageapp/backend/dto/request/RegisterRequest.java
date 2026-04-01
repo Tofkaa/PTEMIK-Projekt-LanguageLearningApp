@@ -18,6 +18,5 @@ public class RegisterRequest {
     @NotBlank(message = "The password can not be empty!")
     @Size(min = 8, message = "The password has to be at least 8 characters in length!")
     private String password;
-    private String preferredDifficulty;
     private String role;
 }

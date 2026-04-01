@@ -39,21 +39,17 @@ public class LessonController {
      * Retrieves a list of available lessons tailored to the authenticated user's difficulty level.
      *
      * @param authentication the current authenticated user's security context
-     * @param fallbackLevel optional starting level for new dynamic users
      * @return a {@link ResponseEntity} containing a list of {@link LessonResponse}
      */
     @GetMapping
-    public ResponseEntity<List<LessonResponse>> getAllLessons(
-            Authentication authentication,
-            @RequestParam(required = false) String fallbackLevel // <-- IDE JÖN AZ ANNOTÁCIÓ
-    ) {
-        log.info("REST request to get all lessons for user with fallback: {}", fallbackLevel);
+    public ResponseEntity<List<LessonResponse>> getAllLessons(Authentication authentication) {
+        log.info("REST request to get all lessons for authenticated user");
 
         String userEmail = authentication.getName();
 
-        // Továbbpasszoljuk a fallbackLevel-t a Service-nek
-        return ResponseEntity.ok(lessonService.getAllLessonsForUser(authentication.getName(), fallbackLevel));
+        return ResponseEntity.ok(lessonService.getAllLessonsForUser(userEmail));
     }
+
     /**
      * Retrieves all safe exercises (without answers) for a specific lesson.
      *
@@ -61,14 +57,9 @@ public class LessonController {
      * @return a {@link ResponseEntity} containing a list of {@link ExerciseResponse}
      */
     @GetMapping("/{id}/exercises")
-    public ResponseEntity<List<ExerciseResponse>> getExercisesByLesson(
-            @PathVariable UUID id,
-            Authentication authentication,
-            @RequestParam(required = false) String fallbackLevel // <-- 1. ÚJ PARAMÉTER
-    ) {
+    public ResponseEntity<List<ExerciseResponse>> getExercisesByLesson(@PathVariable UUID id, Authentication authentication) {
         log.info("REST request to fetch exercises for lesson ID: {}", id);
-        // 2. TOVÁBBPASSZOLJUK A SERVICE-NEK
-        return ResponseEntity.ok(lessonService.getExercisesByLessonId(id, authentication.getName(), fallbackLevel));
+        return ResponseEntity.ok(lessonService.getExercisesByLessonId(id, authentication.getName()));
     }
 
     /**
@@ -83,16 +74,14 @@ public class LessonController {
     public ResponseEntity<LessonSubmitResponse> submitLesson(
             @PathVariable UUID id,
             @Valid @RequestBody LessonSubmitRequest request,
-            @RequestParam(required = false) String fallbackLevel, // <-- Vedd fel a paramétert!
             Authentication authentication) {
 
         log.info("REST request to submit answers for lesson ID: {}", id);
 
+        // Get user email from SecurityContext.
         String userEmail = authentication.getName();
         UUID userId = userService.getUserProfile(userEmail).getUserId();
-
-        // Passzold tovább a Service-nek (ezt a metódust is frissítened kell az EvaluationService-ben)
-        LessonSubmitResponse response = evaluationService.evaluateLesson(userId, id, request, fallbackLevel);
+        LessonSubmitResponse response = evaluationService.evaluateLesson(userId, id, request);
 
         return ResponseEntity.ok(response);
     }
