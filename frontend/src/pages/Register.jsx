@@ -17,7 +17,7 @@ const Register = () => {
     
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    
+    const [preferredDifficulty, setPreferredDifficulty] = useState('DYNAMIC');
     const navigate = useNavigate();
 
     /**
@@ -41,10 +41,11 @@ const Register = () => {
 
         try {
             // 2. Send POST request to the backend registration endpoint
-            const response = await api.post('/auth/register', { 
+            await api.post('/auth/register', { 
                 name, 
                 email, 
-                password 
+                password,
+                preferredDifficulty
             });
 
             // Display success message and delay navigation to allow the user to read it
@@ -99,7 +100,25 @@ const Register = () => {
                                     <Form.Label>Jelszó újra</Form.Label>
                                     <Form.Control type="password" placeholder="Jelszó megerősítése" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} autoComplete='new-password'/>
                                 </Form.Group>
-
+                                
+                                {/* Select Difficulty Field */}
+                                <Form.Group className="mb-4 p-3 border border-secondary rounded bg-dark bg-opacity-50 shadow-sm">
+                                    <Form.Label className="text-light fw-bold">🧠 Tanulási Mód</Form.Label>
+                                    <Form.Select 
+                                        value={preferredDifficulty}
+                                        onChange={(e) => setPreferredDifficulty(e.target.value)}
+                                        className="bg-secondary text-light border-0 shadow-sm"
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <option value="DYNAMIC">🚀 Dinamikus (Ajánlott)</option>
+                                        <option value="EASY">🟢 Fix: Kezdő (Csak EASY feladatok)</option>
+                                        <option value="MEDIUM">🟡 Fix: Haladó (Csak MEDIUM feladatok)</option>
+                                        <option value="HARD">🔴 Fix: Profi (Csak HARD feladatok)</option>
+                                    </Form.Select>
+                                    <Form.Text className="text-light opacity-50 small mt-2 d-block">
+                                        A beállítást később a profilodban bármikor módosíthatod.
+                                    </Form.Text>
+                                </Form.Group>
                                 {/* Disable the submit button if registration was successful to prevent duplicate submissions */}
                                 <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold" disabled={!!success}>
                                     Regisztráció

@@ -2,6 +2,7 @@ package com.languageapp.backend.service;
 
 import com.languageapp.backend.entity.Result;
 import com.languageapp.backend.entity.User;
+import com.languageapp.backend.enums.DifficultyLevel;
 import com.languageapp.backend.repository.ResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,9 +40,9 @@ public class UserDifficultyCalculator {
         List<Result> recentResults = resultRepository
                 .findTop5ByUserUserIdOrderBySubmittedAtDesc(user.getUserId());
 
-        // Default to MEDIUM if the user has no prior history
+        // Default to EASY if the user has no prior history
         if (recentResults.isEmpty()) {
-            return "MEDIUM";
+            return DifficultyLevel.EASY.name();
         }
 
         // 2. Calculate the weighted average of recent scores

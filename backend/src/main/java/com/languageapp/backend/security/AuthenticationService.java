@@ -65,6 +65,16 @@ public class AuthenticationService {
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setName(request.getName());
 
+        if (request.getPreferredDifficulty() != null && !request.getPreferredDifficulty().isBlank()) {
+            try {
+                user.setPreferredDifficulty(com.languageapp.backend.enums.DifficultyLevel.valueOf(request.getPreferredDifficulty().toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                user.setPreferredDifficulty(com.languageapp.backend.enums.DifficultyLevel.DYNAMIC);
+            }
+        } else {
+            user.setPreferredDifficulty(com.languageapp.backend.enums.DifficultyLevel.DYNAMIC);
+        }
+
         String requestedRole = request.getRole() != null ? request.getRole().trim().toUpperCase() : "";
 
         if ("TEACHER".equals(requestedRole)) {
