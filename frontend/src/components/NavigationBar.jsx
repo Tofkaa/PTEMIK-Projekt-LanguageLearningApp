@@ -37,10 +37,16 @@ const NavigationBar = () => {
                 {/* Mobile Toggle Button */}
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
                 
-                {/* Navigation Links and User Info */}
+               {/* Navigation Links and User Info */}
                 <Navbar.Collapse id="basic-navbar-nav">
-                    <Nav className="me-auto">
-                        <Nav.Link onClick={() => navigate('/dashboard')}>Dashboard</Nav.Link>
+                    <Nav className="me-auto gap-2">
+                        <Nav.Link onClick={() => navigate('/dashboard')} className="fw-bold">
+                            Dashboard
+                        </Nav.Link>
+                        {/* Community */}
+                        <Nav.Link onClick={() => navigate('/friends')} className="fw-bold">
+                            🌐 Közösség
+                        </Nav.Link>
                     </Nav>
                     
                     <Nav className="align-items-center">

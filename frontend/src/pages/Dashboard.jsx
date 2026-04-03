@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Spinner, Alert, ProgressBar } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Spinner, Alert, ProgressBar, Badge } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
 import NavigationBar from '../components/NavigationBar.jsx';
 import api from '../services/api.jsx';
@@ -122,8 +122,6 @@ const Dashboard = () => {
 
     return (
         <div className="min-vh-100 pb-5 text-light">
-            <NavigationBar />
-
             <Container>
                 {/* --- HEADER SECTION --- */}
                 <Row className="mb-4">

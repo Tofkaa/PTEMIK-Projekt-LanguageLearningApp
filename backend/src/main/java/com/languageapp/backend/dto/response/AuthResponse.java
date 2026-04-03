@@ -13,4 +13,6 @@ public class AuthResponse {
     private String name;
     private String email;
     private String role;
+    private String userTag;
+    private String friendCode;
 }

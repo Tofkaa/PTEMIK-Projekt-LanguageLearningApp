@@ -20,4 +20,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("SELECT u.name AS name, u.xp AS xp, u.streak AS streak " +
             "FROM User u ORDER BY u.xp DESC")
     List<UserLeaderboardDTO> getGlobalLeaderboard();
+    boolean existsByFriendCode(String friendCode);
+    boolean existsByNameAndUserTag(String name, String userTag);
+
+    Optional<User> findByFriendCode(String friendCode);
+    Optional<User> findByNameAndUserTag(String name, String userTag);
 }

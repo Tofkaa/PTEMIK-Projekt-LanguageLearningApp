@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Container, Row, Col, Card, Form, Button, Badge, Spinner, Alert } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../services/api.jsx';
-import Navigation from '../components/NavigationBar.jsx'; 
 import AchievementsSection from '../components/profile/AchievementSection.jsx';
 import RecentResultsSection from '../components/profile/RecentResultsSection.jsx';
 
@@ -63,7 +62,6 @@ const Profile = () => {
 
     return (
         <>
-            <Navigation /> 
 
             <Container className="mt-5 pt-4 text-light pb-5">
                 <h2 className="fw-bold mb-4 text-info">Felhasználói Profil</h2>
@@ -81,9 +79,16 @@ const Profile = () => {
                                     👤
                                 </div>
                                 
-                                <h4 className="fw-bold mb-1">{user.name}</h4>
-                                <p className="text-muted mb-3">{user.email}</p>
-                                
+                                <h4 className="fw-bold text-light mb-1">{user.name}</h4>
+                                <p className="text-light mb-3">{user.email}</p>
+                                <div className="text-center mt-3 mb-4">
+                                    <h3 className="text-light fw-bold mb-1">
+                                        {user.name} <span className="text-info opacity-75 fs-5">#{user.userTag}</span>
+                                    </h3>
+                                    <Badge bg="dark" border="secondary" className="border text-light font-monospace px-3 py-2 mt-2 fs-6">
+                                        Barátkód: <span className="text-warning">{user.friendCode}</span>
+                                    </Badge>
+                                </div>
                                 <Badge bg="info" text="dark" className="px-3 py-2 rounded-pill mb-4 fw-bold">
                                     {user.role === 'ADMIN' ? 'Rendszergazda' : 'Diák'}
                                 </Badge>

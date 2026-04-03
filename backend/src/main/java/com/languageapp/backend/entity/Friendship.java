@@ -1,5 +1,6 @@
 package com.languageapp.backend.entity;
 
+import com.languageapp.backend.enums.FriendshipStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -31,8 +32,9 @@ public class Friendship {
     @JoinColumn(name = "friend_id", nullable = false)
     private User friend;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private String status;
+    private FriendshipStatus status;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

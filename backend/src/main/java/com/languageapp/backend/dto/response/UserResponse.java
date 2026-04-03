@@ -23,4 +23,6 @@ public class UserResponse {
     private int xp;
     private int streak;
     private String preferredDifficulty;
+    private String userTag;
+    private String friendCode;
 }

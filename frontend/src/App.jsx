@@ -7,6 +7,8 @@ import PrivateRoute from './components/PrivateRoute.jsx';
 import GuestRoute from './components/GuestRoute.jsx'; 
 import NotFound from './pages/NotFound.jsx'; 
 import Profile from './pages/Profile.jsx'
+import Friends from './pages/Friends.jsx';
+import NavigationBar from './components/NavigationBar.jsx';
 
 /**
  * Main Application Component
@@ -15,6 +17,7 @@ import Profile from './pages/Profile.jsx'
 function App() {
   return (
     <Router>
+        <NavigationBar />
       <Routes>
         {/* Default route redirects to login */}
         <Route path="/" element={<Navigate to="/login" replace />} />
@@ -61,7 +64,14 @@ function App() {
                         <Profile />
                 </PrivateRoute>
             } 
-/>
+        
+        />
+        <Route 
+            path="/friends" 
+            element={
+                <Friends />
+            } 
+        />
 
         {/* 404 Route: Catch-all for undefined URLs */}
         <Route path="*" element={<NotFound />} />
