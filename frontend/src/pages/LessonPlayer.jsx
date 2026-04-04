@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col, Alert } from 'react-bootstrap';
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -17,6 +17,9 @@ const LessonPlayer = () => {
     const navigate = useNavigate();
     const { user, login } = useAuth(); 
 
+
+    const [searchParams] = useSearchParams();
+    const challengeId = searchParams.get('challengeId');
     // --- STATE MANAGEMENT ---
     const [exercises, setExercises] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -32,11 +35,16 @@ const LessonPlayer = () => {
 
     const [feedback, setFeedback] = useState(null);
     const [isChecking, setIsChecking] = useState(false); 
+   
     // --- PHASE 1: DATA FETCHING ---
     useEffect(() => {
         const fetchExercises = async () => {
             try {
-                const response = await api.get(`/lessons/${lessonId}/exercises`);
+                
+                const endpoint = challengeId 
+                    ? `/lessons/${lessonId}/exercises?challengeId=${challengeId}` 
+                    : `/lessons/${lessonId}/exercises`;
+                const response = await api.get(endpoint);
                 if (response.data.length === 0) {
                     setError("No exercises found for this lesson.");
                 } else {
@@ -52,7 +60,7 @@ const LessonPlayer = () => {
         };
 
         fetchExercises();
-    }, [lessonId]);
+    }, [challengeId, lessonId]);
 
     useEffect(() => {
         let timer;
@@ -142,7 +150,11 @@ const LessonPlayer = () => {
 
        try {
             console.log("Submitting final payload:", payload);
-            const response = await api.post(`/lessons/${lessonId}/submit`, payload);
+            const endpoint = challengeId 
+            ? `/lessons/${lessonId}/submit?challengeId=${challengeId}` 
+            : `/lessons/${lessonId}/submit`;
+            
+            const response = await api.post(endpoint, payload);
             setLessonResult(response.data);
             
             // --- ROBUST STATE SYNCHRONIZATION ---

@@ -2,12 +2,10 @@ package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.response.ExerciseResponse;
 import com.languageapp.backend.dto.response.LessonResponse;
-import com.languageapp.backend.entity.Exercise;
-import com.languageapp.backend.entity.Lesson;
-import com.languageapp.backend.entity.Progress;
-import com.languageapp.backend.entity.User;
+import com.languageapp.backend.entity.*;
 import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
+import com.languageapp.backend.repository.ChallengeRepository;
 import com.languageapp.backend.repository.LessonRepository;
 import com.languageapp.backend.repository.UserRepository;
 import com.languageapp.backend.repository.ProgressRepository;
@@ -35,6 +33,7 @@ public class LessonService {
     private final UserRepository userRepository;
     private final UserDifficultyCalculator userDifficultyCalculator;
     private final ProgressRepository progressRepository;
+    private final ChallengeRepository challengeRepository;
 
     /**
      * Retrieves all lessons filtered by the user's preferred or dynamically calculated difficulty.
@@ -70,7 +69,7 @@ public class LessonService {
      * @return a list of {@link ExerciseResponse}
      */
     @Transactional(readOnly = true)
-    public List<ExerciseResponse> getExercisesByLessonId(UUID lessonId, String userEmail) {
+    public List<ExerciseResponse> getExercisesByLessonId(UUID lessonId, String userEmail, UUID challengeId) {
         log.debug("Fetching safe exercises for lesson ID: {} for user: {}", lessonId, userEmail);
 
         User user = userRepository.findByEmail(userEmail)
@@ -83,18 +82,45 @@ public class LessonService {
                 });
 
         if ("STUDENT".equals(user.getRole())) {
-            String allowedDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
-            boolean hasStarted = progressRepository.findByUserUserIdAndLessonLessonId(user.getUserId(), lessonId).isPresent();
+            // --- BYPASS LOGIKA ---
+            if (challengeId != null) {
+                Challenge challenge = challengeRepository.findById(challengeId)
+                        .orElseThrow(() -> new ForbiddenException("Kihívás nem létezik!"));
 
-            if (!lesson.getDifficulty().equals(allowedDifficulty) && !hasStarted) {
-                log.warn("SECURITY ALERT: User {} attempted to bypass difficulty settings! Requested: {}, Allowed: {}",
-                        userEmail, lesson.getDifficulty(), allowedDifficulty);
-                throw new ForbiddenException("Access denied: lesson difficulty does not match preferred difficulty!.");
+                // Csak a résztvevők mehetnek be
+                if (!challenge.getChallenger().getUserId().equals(user.getUserId()) &&
+                        !challenge.getOpponent().getUserId().equals(user.getUserId())) {
+                    throw new ForbiddenException("Nem vagy tagja ennek a kihívásnak!");
+                }
+
+                // Csak a saját leckéjével
+                if (!challenge.getLesson().getLessonId().equals(lessonId)) {
+                    throw new ForbiddenException("Ez a kihívás egy másik leckére szól!");
+                }
             }
         }
 
         return lesson.getExercises().stream()
                 .map(this::mapToExerciseResponse)
+                .toList();
+    }
+
+    /**
+     * Visszaadja az ÖSSZES leckét (nehézségi szűrő nélkül) a Kihívások Modal legördülő listájához.
+     * Ez biztonságos, mert csak a neveket és ID-kat fedi fel, a lecke tartalmát (exercises) nem!
+     */
+    @Transactional(readOnly = true)
+    public List<LessonResponse> getAllLessonsForChallengeDropdown() {
+        return lessonRepository.findAll().stream()
+                .map(lesson -> new LessonResponse(
+                        lesson.getLessonId(),
+                        lesson.getTopic().getName(),
+                        lesson.getTitle(),
+                        lesson.getDifficulty(),
+                        lesson.getLanguage(),
+                        lesson.getDescription(),
+                        false
+                ))
                 .toList();
     }
 

@@ -40,6 +40,8 @@ public class EvaluationService {
     private final ExerciseRepository exerciseRepository;
     private final AchievementRepository achievementRepository;
     private final AchievementService achievementService;
+    private final ChallengeRepository challengeRepository;
+    private final ChallengeService challengeService;
 
 
     /**
@@ -52,7 +54,7 @@ public class EvaluationService {
      * @return LessonSubmitResponse containing the evaluation results for the frontend.
      */
     @Transactional
-    public LessonSubmitResponse evaluateLesson(UUID userId, UUID lessonId, LessonSubmitRequest request) {
+    public LessonSubmitResponse evaluateLesson(UUID userId, UUID lessonId, UUID challengeId, LessonSubmitRequest request) {
         log.debug("Starting evaluation for user: {} and lesson: {}", userId, lessonId);
 
         User user = userRepository.findById(userId)
@@ -65,8 +67,33 @@ public class EvaluationService {
         var existingProgressOpt = progressRepository.findByUserUserIdAndLessonLessonId(userId, lessonId);
         boolean hasStarted = existingProgressOpt.isPresent();
 
-        // SECURITY: Ensure the user is not trying to hack the adaptive difficulty system
-        validateUserDifficultyAccess(user, lesson, hasStarted);
+        // SECURE CHALLENGE BYPASS LOGIC
+        // If a challengeId is provided, bypass the standard adaptive difficulty restrictions,
+        // but strictly verify that the user is an active participant in this specific challenge
+        // and that the requested lesson matches the challenge's target lesson.
+        if (challengeId != null) {
+            Challenge challenge = challengeRepository.findById(challengeId)
+                    .orElseThrow(() -> new ForbiddenException("Biztonsági hiba: A megadott kihívás nem létezik!"));
+
+            boolean isChallenger = challenge.getChallenger().getUserId().equals(userId);
+            boolean isOpponent = challenge.getOpponent().getUserId().equals(userId);
+
+            if (!isChallenger && !isOpponent) {
+                log.warn("SECURITY ALERT: User {} próbált beküldeni egy idegen kihívást (ID: {})!", user.getEmail(), challengeId);
+                throw new ForbiddenException("Biztonsági hiba: Nem vagy résztvevője ennek a kihívásnak!");
+            }
+
+            if (!challenge.getLesson().getLessonId().equals(lessonId)) {
+                log.warn("SECURITY ALERT: User {} manipulálta a lecke ID-t a beküldésnél!", user.getEmail());
+                throw new ForbiddenException("Biztonsági hiba: Ez a kihívás nem a kért leckéhez tartozik!");
+            }
+
+            log.info("Difficulty check securely BYPASSED for SUBMIT in challenge ID: {}", challengeId);
+        } else {
+            // Standard gameplay: Execute adaptive difficulty validations.
+            validateUserDifficultyAccess(user, lesson, hasStarted);
+        }
+
 
         List<Exercise> exercises = lesson.getExercises();
         int totalQuestions = exercises.size();
@@ -134,9 +161,20 @@ public class EvaluationService {
             userRepository.save(user);
         }
 
+        Challenge challenge = null;
+        if (challengeId != null) {
+            challenge = challengeRepository.findById(challengeId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Challenge nem található."));
+        }
+
         // Save historical result and update ongoing progress
-        Result savedResult = saveResult(user, lesson, request, correctAnswersCount, totalQuestions, score);
+        Result savedResult = saveResult(user, lesson, request, correctAnswersCount, totalQuestions, score, challenge);
         updateProgress(progress, score, passed);
+
+        // --- THE EVALUATION ENGINE TRIGGER ---
+        if (challengeId != null) {
+            challengeService.processChallengeResult(challengeId, userId, score, request.getTimeTakenSeconds());
+        }
 
         String feedback = passed ? "Congratulations! You passed the lesson." : "Keep practicing! You can do better.";
 
@@ -242,7 +280,7 @@ public class EvaluationService {
     }
 
     private Result saveResult(User user, Lesson lesson, LessonSubmitRequest request,
-                              int correctCount, int totalCount, int score) {
+                              int correctCount, int totalCount, int score, Challenge challenge) {
         Result result = new Result();
         result.setUser(user);
         result.setLesson(lesson);
@@ -253,6 +291,8 @@ public class EvaluationService {
         result.setTotalQuestionsCount(totalCount);
         result.setIsTestResult(false);
         result.setIsChallengeResult(false);
+        result.setIsChallengeResult(challenge != null);
+        result.setChallenge(challenge);
 
         return resultRepository.save(result);
     }

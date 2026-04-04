@@ -2,6 +2,8 @@ import { Container, Row, Col, Tabs, Tab, Card } from 'react-bootstrap';
 import FriendSearch from '../components/FriendSearch';
 import PendingRequests from '../components/PendingRequests';
 import FriendList from '../components/FriendList';
+import ActiveChallenges from '../components/ActiveChallenges';
+import ChallengeHistory from '../components/ChallengeHistory';
 
 const Friends = () => {
     return (
@@ -31,6 +33,14 @@ const Friends = () => {
                                 
                                 <Tab eventKey="requests" title="🔔 Kérelmek">
                                     <PendingRequests />
+                                </Tab>
+
+                                <Tab eventKey="active" title="⚔️ Aktív Kihívások">
+                                    <ActiveChallenges />
+                                </Tab>
+
+                                <Tab eventKey="history" title="📜 Előzmények">
+                                    <ChallengeHistory />
                                 </Tab>
                             </Tabs>
                         </Card.Body>

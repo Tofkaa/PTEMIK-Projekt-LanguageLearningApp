@@ -12,30 +12,28 @@ import java.util.UUID;
 @Repository
 public interface ResultRepository extends JpaRepository<Result, UUID> {
     List<Result> findByUserUserId(UUID userId);
+
+    /**
+     * Retrieves all results associated with a specific challenge.
+     */
     List<Result> findByChallengeChallengeId(UUID challengeId);
 
-    /**
-     * Retrieves the absolute total number of lesson attempts for a specific user.
-     * Crucial for pacing the dynamic difficulty progression (e.g., ensuring a user
-     * completes a required number of lessons before being promoted to a higher difficulty).
-     */
     long countByUserUserId(UUID userId);
 
-    /**
-     * Retrieves the 5 most recent lesson results for a specific user to calculate dynamic difficulty.
-     */
     List<Result> findTop5ByUserUserIdOrderBySubmittedAtDesc(UUID userId);
 
-    /**
-     * Retrieves the 3 most recent lesson results for a specific user to show recent results on profile page.
-     */
     @EntityGraph(attributePaths = {"lesson"})
     List<Result> findTop3ByUserUserIdOrderBySubmittedAtDesc(UUID userId);
 
-    /**
-     * Retrieves the absolute latest lesson result submitted by the user.
-     * * CRITICAL FOR GAMIFICATION: Used by the EvaluationService to determine if the user
-     * maintained their daily learning streak (comparing this date to LocalDate.now()).
-     */
     Optional<Result> findFirstByUserUserIdOrderBySubmittedAtDesc(UUID userId);
+
+    /**
+     * Retrieves a specific user's result for a given challenge.
+     * Crucial for the evaluation engine to compare scores between challenger and opponent.
+     *
+     * @param challengeId The UUID of the challenge.
+     * @param userId The UUID of the user.
+     * @return An Optional containing the Result if found.
+     */
+    Optional<Result> findByChallengeChallengeIdAndUserUserId(UUID challengeId, UUID userId);
 }
