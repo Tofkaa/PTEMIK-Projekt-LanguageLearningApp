@@ -8,34 +8,38 @@ import { useState, useEffect } from 'react';
 import { Card, Button, Spinner, Alert, Badge, Row, Col } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-// 1. BEIMPORTÁLJUK AZ AUTH CONTEXT-ET
 import { useAuth } from '../context/AuthContext';
 
 const ActiveChallenges = () => {
     const navigate = useNavigate();
-    // 2. KINYERJÜK A BEJELENTKEZETT FELHASZNÁLÓT
     const { user } = useAuth(); 
     const [challenges, setChallenges] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     useEffect(() => {
-        fetchChallenges();
+        fetchChallenges(true);
+
+        const intervalId = setInterval(() => {
+            fetchChallenges(false);
+        }, 10000);
+        return () => clearInterval(intervalId);
     }, []);
 
-    const fetchChallenges = async () => {
+    const fetchChallenges = async (isInitialLoad = false) => {
+        if(isInitialLoad) setLoading(true);
+        
         try {
             const response = await api.get('/challenges/active');
             setChallenges(response.data || []);
         } catch (err) {
-            setError('Nem sikerült betölteni az aktív kihívásokat.', err);
+           if (isInitialLoad) setError('Nem sikerült betölteni az aktív kihívásokat.', err);
         } finally {
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
         }
     };
 
     const handlePlayChallenge = (challenge) => {
-        // Átirányítás a Bypass móddal!
         navigate(`/lesson/${challenge.lessonId}?challengeId=${challenge.challengeId}`);
     };
 

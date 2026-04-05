@@ -25,18 +25,26 @@ const FriendList = () => {
     const [challengeError, setChallengeError] = useState('');
 
     useEffect(() => {
-        fetchFriends();
+        fetchFriends(true);
         fetchLessons(); // Prepare lessons for selection 
+
+        const intervalId = setInterval(() => {
+            fetchFriends(false);
+        }, 10000);
+        
+        return () => clearInterval(intervalId);
     }, []);
 
-    const fetchFriends = async () => {
+    const fetchFriends = async (isInitialLoad = false) => {
+        if (isInitialLoad) setLoading(true);
+        
         try {
             const response = await api.get('/friendships/accepted');
             setFriends(response.data || []);
         } catch (err) {
-            setError('Nem sikerült betölteni a barátlistát.', err);
+            if (isInitialLoad) setError('Nem sikerült betölteni a barátlistát.', err);
         } finally {
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
         }
     };
 
