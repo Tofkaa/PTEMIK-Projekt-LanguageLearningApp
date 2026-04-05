@@ -12,4 +12,9 @@ import java.util.UUID;
 public interface ChallengeRepository extends JpaRepository<Challenge, UUID> {
     List<Challenge> findByChallengerUserIdOrOpponentUserId(UUID challengerId, UUID opponentId);
     List<Challenge> findByOpponentUserIdAndStatus(UUID opponentId, ChallengeStatus status);
+
+    /**
+     * Looks up expired challenges.
+     */
+    List<Challenge> findByStatusInAndEndTimeBefore(List<ChallengeStatus> statuses, java.time.LocalDateTime time);
 }
