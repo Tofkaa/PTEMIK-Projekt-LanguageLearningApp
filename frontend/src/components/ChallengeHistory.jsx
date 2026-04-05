@@ -16,17 +16,25 @@ const ChallengeHistory = () => {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        fetchHistory();
+        fetchHistory(true);
+
+        const intervalId = setInterval(() => {
+            fetchHistory(false); 
+        }, 10000);
+
+        return () => clearInterval(intervalId);
     }, []);
 
-    const fetchHistory = async () => {
+    const fetchHistory = async (isInitialLoad = false) => {
+        if (isInitialLoad) setLoading(true);       
+        
         try {
             const response = await api.get('/challenges/history');
             setHistory(response.data || []);
         } catch (err) {
-            setError('Nem sikerült betölteni az előzményeket.', err);
+           if (isInitialLoad) setError('Nem sikerült betölteni az előzményeket.', err);
         } finally {
-            setLoading(false);
+           if (isInitialLoad) setLoading(false);
         }
     };
 

@@ -8,18 +8,26 @@ const PendingRequests = () => {
     const [message, setMessage] = useState({ type: '', text: '' });
 
     useEffect(() => {
-        fetchPendingRequests();
+        fetchPendingRequests(true); 
+        
+        const intervalId = setInterval(() => {
+            fetchPendingRequests(false); 
+        }, 10000);
+
+        return () => clearInterval(intervalId);
     }, []);
 
-    const fetchPendingRequests = async () => {
+    const fetchPendingRequests = async (isInitialLoad = false) => {
+        if (isInitialLoad) setLoading(true);
+
         try {
             const response = await api.get('/friendships/requests/pending');
             // Biztosítjuk, hogy ha a backend üreset ad, akkor is tömb legyen
             setRequests(response.data || []);
         } catch (err) {
-            setMessage({ type: 'danger', text: 'Nem sikerült betölteni a kérelmeket.', err });
+            if (isInitialLoad) setMessage({ type: 'danger', text: 'Nem sikerült betölteni a kérelmeket.', err });
         } finally {
-            setLoading(false);
+            if (isInitialLoad) setLoading(false);
         }
     };
 
