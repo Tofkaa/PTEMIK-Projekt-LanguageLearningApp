@@ -8,12 +8,14 @@ import { useState, useEffect } from 'react';
 import { Card, Button, Spinner, Alert, Badge, Row, Col, Modal, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useNotifications } from '../context/NotificationContext';
 
 const FriendList = () => {
     const navigate = useNavigate();
     const [friends, setFriends] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const {notifications} = useNotifications();
 
     // --- KIHÍVÁS MODAL STATE-EK ---
     const [showModal, setShowModal] = useState(false);
@@ -27,13 +29,7 @@ const FriendList = () => {
     useEffect(() => {
         fetchFriends(true);
         fetchLessons(); // Prepare lessons for selection 
-
-        const intervalId = setInterval(() => {
-            fetchFriends(false);
-        }, 10000);
-        
-        return () => clearInterval(intervalId);
-    }, []);
+    }, [notifications.totalFriends]);
 
     const fetchFriends = async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);

@@ -24,6 +24,7 @@ public class FriendshipService {
 
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
+    private final SseService sseService;
 
     /**
      * Sends a friend request using either a Discord-style tag or a Steam-style friend code.
@@ -56,6 +57,8 @@ public class FriendshipService {
 
         friendshipRepository.save(request);
         log.info("Friend request successfully sent from {} to {}", sender.getEmail(), target.getEmail());
+
+        sseService.sendPing(target.getEmail());
     }
 
     /**
@@ -120,6 +123,8 @@ public class FriendshipService {
         friendship.setStatus(FriendshipStatus.ACCEPTED);
         friendshipRepository.save(friendship);
         log.info("Friendship request {} ACCEPTED by user {}", friendshipId, receiverId);
+
+        sseService.sendPing(friendship.getUser().getEmail());
     }
 
     /**

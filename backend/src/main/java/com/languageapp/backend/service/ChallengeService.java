@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.languageapp.backend.service.SseService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,6 +35,7 @@ public class ChallengeService {
     private final LessonRepository lessonRepository;
     private final FriendshipService friendshipService;
     private final ResultRepository resultRepository;
+    private final SseService sseService;
 
     /**
      * Initializes a new challenge in DRAFT mode. Verifies friendship and sets the expiration timer.
@@ -136,6 +138,9 @@ public class ChallengeService {
             log.info("Challenger finished! Changing status to PENDING for challenge: {}", challengeId);
             challenge.setStatus(ChallengeStatus.PENDING);
             challengeRepository.save(challenge);
+
+            sseService.sendPing(challenge.getOpponent().getEmail());
+
             return;
         }
 

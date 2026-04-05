@@ -1,21 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Card, Button, Spinner, Alert } from 'react-bootstrap';
 import api from '../services/api';
+import { useNotifications } from '../context/NotificationContext';
 
 const PendingRequests = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const {notifications} = useNotifications();
 
     useEffect(() => {
         fetchPendingRequests(true); 
-        
-        const intervalId = setInterval(() => {
-            fetchPendingRequests(false); 
-        }, 10000);
-
-        return () => clearInterval(intervalId);
-    }, []);
+    }, [notifications.PendingFriends]);
 
     const fetchPendingRequests = async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);

@@ -8,22 +8,19 @@ import { useState, useEffect } from 'react';
 import { Card, Spinner, Alert, Badge, Row, Col } from 'react-bootstrap';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import {useNotifications} from '../context/NotificationContext'
 
 const ChallengeHistory = () => {
     const { user } = useAuth();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const {notifications} = useNotifications();
 
     useEffect(() => {
         fetchHistory(true);
 
-        const intervalId = setInterval(() => {
-            fetchHistory(false); 
-        }, 10000);
-
-        return () => clearInterval(intervalId);
-    }, []);
+    }, [notifications.totalHistory]); 
 
     const fetchHistory = async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);       

@@ -107,6 +107,7 @@ export const AuthProvider = ({ children }) => {
  * Custom hook for easy consumption of the AuthContext.
  * * @returns {Object} The authentication context (user, login, logout)
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
     return useContext(AuthContext);
 };

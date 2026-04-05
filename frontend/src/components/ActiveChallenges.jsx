@@ -4,11 +4,12 @@
  * Manages the UI state to distinguish between waiting periods and actionable turns.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect} from 'react';
 import { Card, Button, Spinner, Alert, Badge, Row, Col } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const ActiveChallenges = () => {
     const navigate = useNavigate();
@@ -16,15 +17,11 @@ const ActiveChallenges = () => {
     const [challenges, setChallenges] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const {notifications} = useNotifications();
 
     useEffect(() => {
-        fetchChallenges(true);
-
-        const intervalId = setInterval(() => {
-            fetchChallenges(false);
-        }, 10000);
-        return () => clearInterval(intervalId);
-    }, []);
+       fetchChallenges(true); 
+    }, [notifications.pendingChallenges]);
 
     const fetchChallenges = async (isInitialLoad = false) => {
         if(isInitialLoad) setLoading(true);
