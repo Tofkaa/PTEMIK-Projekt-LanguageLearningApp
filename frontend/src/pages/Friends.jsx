@@ -1,3 +1,10 @@
+/**
+ * @file Friends.jsx
+ * @description Main community hub component. Renders a tabbed interface allowing users
+ * to manage friends, search for users, view pending requests, and track challenges.
+ * Handles client-side "read receipt" logic via LocalStorage.
+ */
+
 import { Container, Row, Col, Tabs, Tab, Card, Badge } from 'react-bootstrap';
 import FriendSearch from '../components/FriendSearch';
 import PendingRequests from '../components/PendingRequests';
@@ -7,23 +14,26 @@ import ChallengeHistory from '../components/ChallengeHistory';
 import { useNotifications } from '../context/NotificationContext';
 import { useState, useEffect } from 'react';
 
+/**
+ * @component
+ * @returns {React.ReactElement} The Community/Friends dashboard view.
+ */
 const Friends = () => {
     const {notifications} = useNotifications();
     const [activeTab, setActiveTab] = useState('list');
 
-    // Kiolvassuk, mi volt a "régi" állapot, amit a user már látott
+    
     const seenFriendsCount = parseInt(localStorage.getItem('seenFriendsCount') || '0');
     const seenHistoryCount = parseInt(localStorage.getItem('seenHistoryCount') || '0');
 
-    // Kiszámoljuk, kell-e pöttyöt mutatni (van-e ÚJ dolog)
     const hasNewFriend = notifications.totalFriends > seenFriendsCount;
     const hasNewHistory = notifications.totalHistory > seenHistoryCount;
 
-   // 1. Biztonságos táblaváltás
+
     const handleTabSelect = (key) => {
         setActiveTab(key);
         
-        // Csak akkor mentünk, ha az érték létezik (nem undefined vagy null)
+     
         if (key === 'list' && notifications?.totalFriends != null) {
             localStorage.setItem('seenFriendsCount', notifications.totalFriends.toString());
         }
@@ -32,7 +42,7 @@ const Friends = () => {
         }
     };
 
-    // 2. Biztonságos automatikus frissítés, ha a fülön állunk
+ 
     useEffect(() => {
         if (activeTab === 'list' && notifications?.totalFriends != null) {
             localStorage.setItem('seenFriendsCount', notifications.totalFriends.toString());
@@ -57,7 +67,7 @@ const Friends = () => {
                                 activeKey={activeTab}
                                 onSelect={handleTabSelect}
                             >
-                                {/* BARÁTOK FÜL */}
+                                {/* FRIENDS TAB */}
                                 <Tab eventKey="list" title={
                                     <span>
                                         👥 Barátaim
@@ -69,12 +79,14 @@ const Friends = () => {
                                     <FriendList />
                                 </Tab>
                                 
+                                {/* FRIENDS SEARCH TAB */}
                                 <Tab eventKey="search" title="🔍 Keresés">
                                     <div className="p-4">
                                         <FriendSearch /> 
                                     </div>
                                 </Tab>
                                 
+                                {/* REQUESTS TAB */}
                                 <Tab eventKey="requests" title={
                                         <span>
                                             🔔 Kérelmek
@@ -88,7 +100,8 @@ const Friends = () => {
                                         <PendingRequests />
                                     </div>
                                 </Tab>
-
+                                
+                                {/* CHALLENGES TAB */}
                                 <Tab eventKey="active" title={
                                         <span>
                                             ⚔️ Aktív Kihívások
@@ -103,7 +116,7 @@ const Friends = () => {
                                     </div>
                                 </Tab>
 
-                                {/* ELŐZMÉNYEK FÜL */}
+                                {/* HISTORY TAB */}
                                 <Tab eventKey="history" title={
                                     <span>
                                         📜 Előzmények

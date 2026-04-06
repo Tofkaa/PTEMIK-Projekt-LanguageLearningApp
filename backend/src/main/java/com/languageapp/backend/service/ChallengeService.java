@@ -172,7 +172,7 @@ public class ChallengeService {
             challenge.setStatus(ChallengeStatus.COMPLETED);
 
             if (winner != null) {
-                winner.setXp(winner.getXp() + 50); // Bónusz XP
+                winner.setXp(winner.getXp() + 50);
                 userRepository.save(winner);
             }
             challengeRepository.save(challenge);
@@ -194,7 +194,7 @@ public class ChallengeService {
                         c.getStatus() == ChallengeStatus.DECLINED ||
                         c.getStatus() == ChallengeStatus.EXPIRED)
                 .map(challenge -> {
-                    // Nyertes nevének kinyerése (ha null, akkor Döntetlen)
+                   // Get winner name, null if tie
                     String winnerName = null;
                     if (challenge.getWinner() != null) {
                         winnerName = challenge.getWinner().getName();

@@ -21,6 +21,14 @@ public interface ChallengeRepository extends JpaRepository<Challenge, UUID> {
     List<Challenge> findByStatusInAndEndTimeBefore(List<ChallengeStatus> statuses, java.time.LocalDateTime time);
 
     int countByOpponentUserIdAndStatus(UUID opponentId, ChallengeStatus status);
+
+    /**
+     * Calculates the total number of closed challenges (history) for a specific user.
+     * A challenge is considered 'closed' if the user is a participant and the status is COMPLETED, DECLINED, or EXPIRED.
+     *
+     * @param userId The UUID of the user.
+     * @return The total count of historical challenges.
+     */
     @Query("SELECT COUNT(c) FROM Challenge c WHERE (c.challenger.userId = :userId OR c.opponent.userId = :userId) AND c.status IN (com.languageapp.backend.enums.ChallengeStatus.COMPLETED, com.languageapp.backend.enums.ChallengeStatus.DECLINED, com.languageapp.backend.enums.ChallengeStatus.EXPIRED)")
     int countHistoryForUser(@Param("userId") UUID userId);
 }

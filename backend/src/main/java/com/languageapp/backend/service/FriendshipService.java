@@ -73,7 +73,6 @@ public class FriendshipService {
         String cleanIdentifier = identifier.trim();
 
         if (cleanIdentifier.contains("#")) {
-            // Handle Discord-style format (e.g., JohnDoe#1234)
             String[] parts = cleanIdentifier.split("#");
             if (parts.length != 2) {
                 throw new BadRequestException("Invalid format. Please use the 'Name#1234' format.");

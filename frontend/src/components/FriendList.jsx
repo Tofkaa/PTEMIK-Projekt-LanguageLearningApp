@@ -1,6 +1,6 @@
 /**
- * FriendList Component
- * Displays the user's accepted friends and acts as the entry point for initiating new Challenges.
+ * @file FriendList.jsx
+ * @description Displays the user's accepted friends and acts as the entry point for initiating new Challenges.
  * Manages the modal state and submission logic for Draft Challenge creation.
  */
 
@@ -10,6 +10,10 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
 
+/**
+ * @component
+ * @returns {React.ReactElement} A grid of friend cards with challenge initiation capabilities.
+ */
 const FriendList = () => {
     const navigate = useNavigate();
     const [friends, setFriends] = useState([]);
@@ -17,7 +21,6 @@ const FriendList = () => {
     const [error, setError] = useState('');
     const {notifications} = useNotifications();
 
-    // --- KIHÍVÁS MODAL STATE-EK ---
     const [showModal, setShowModal] = useState(false);
     const [selectedFriend, setSelectedFriend] = useState(null);
     const [lessons, setLessons] = useState([]);
@@ -70,6 +73,9 @@ const FriendList = () => {
     /**
      * Initiates a new challenge by creating a DRAFT state in the backend.
      * Automatically redirects the user to the LessonPlayer upon success, attaching the bypass ID.
+     * * @async
+     * @function handleStartChallenge
+     * @throws Will display an error alert if the API request fails.
      */
     const handleStartChallenge = async () => {
         if (!selectedLesson) {

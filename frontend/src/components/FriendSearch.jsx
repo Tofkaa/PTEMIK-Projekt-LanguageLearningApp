@@ -36,7 +36,7 @@ const FriendSearch = () => {
             {user && (
                 <div className="mb-4 p-3 bg-secondary bg-opacity-25 rounded border border-secondary d-flex justify-content-between align-items-center">
                     <div>
-                        <small className="text-light d-block fw-bold mb-1">A te azonosítóid (oszd meg másokkal):</small>
+                        <small className="text-light d-block fw-bold mb-1">A te azonosítóid (ezt oszd meg másokkal):</small>
                         <div className="fs-5">
                             <span className="text-light fw-bold">{user.name}</span>
                             <span className="text-info">#{user.userTag}</span>
@@ -52,7 +52,7 @@ const FriendSearch = () => {
             )}
             <h5 className="text-light mb-2">Hozzáadás azonosító alapján</h5>
             <p className="text-light small mb-4">
-                Keress Discord-stílusú névvel (pl. <strong className="text-info">János#1234</strong>) vagy barátkóddal (pl. <strong className="text-info">A7B-9X2</strong>).
+                Keress név alapján (pl. <strong className="text-info">Username#1234</strong>) vagy barátkóddal (pl. <strong className="text-info">A7B-9X2</strong>).
             </p>
             
             {/* Visszajelző üzenet (Sikeres küldés vagy Hiba) */}
