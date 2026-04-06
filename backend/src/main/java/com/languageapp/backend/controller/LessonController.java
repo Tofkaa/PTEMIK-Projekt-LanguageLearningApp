@@ -52,20 +52,27 @@ public class LessonController {
 
     /**
      * Retrieves all safe exercises (without answers) for a specific lesson.
+     * Includes an optional challengeId to bypass standard difficulty restrictions if the user is in a duel.
      *
      * @param id the UUID of the requested lesson
+     * @param challengeId (Optional) The UUID of the active challenge.
+     * @param authentication the current authenticated user's security context
      * @return a {@link ResponseEntity} containing a list of {@link ExerciseResponse}
      */
     @GetMapping("/{id}/exercises")
-    public ResponseEntity<List<ExerciseResponse>> getExercisesByLesson(@PathVariable UUID id, Authentication authentication) {
+    public ResponseEntity<List<ExerciseResponse>> getExercisesByLesson(
+            @PathVariable UUID id,
+            @RequestParam(required = false) UUID challengeId,
+            Authentication authentication) {
         log.info("REST request to fetch exercises for lesson ID: {}", id);
-        return ResponseEntity.ok(lessonService.getExercisesByLessonId(id, authentication.getName()));
+        return ResponseEntity.ok(lessonService.getExercisesByLessonId(id, authentication.getName(), challengeId));
     }
 
     /**
      * Submits a completed lesson for evaluation.
      *
      * @param id the UUID of the lesson
+     * @param challengeId (Optional) The UUID of the active challenge, used to trigger the Challenge Engine.
      * @param request the submission payload
      * @param authentication the current authenticated user's security context
      * @return a {@link ResponseEntity} containing the evaluation results
@@ -73,16 +80,27 @@ public class LessonController {
     @PostMapping("/{id}/submit")
     public ResponseEntity<LessonSubmitResponse> submitLesson(
             @PathVariable UUID id,
+            @RequestParam(required = false) UUID challengeId,
             @Valid @RequestBody LessonSubmitRequest request,
             Authentication authentication) {
 
         log.info("REST request to submit answers for lesson ID: {}", id);
-
-        // Get user email from SecurityContext.
         String userEmail = authentication.getName();
         UUID userId = userService.getUserProfile(userEmail).getUserId();
-        LessonSubmitResponse response = evaluationService.evaluateLesson(userId, id, request);
 
+        LessonSubmitResponse response = evaluationService.evaluateLesson(userId, id, challengeId, request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Retrieves basic metadata for all lessons regardless of difficulty.
+     * Safe endpoint designed specifically for populating the Challenge creation dropdown menu.
+     *
+     * @return A list of all available lessons.
+     */
+    @GetMapping("/all-for-challenge")
+    public ResponseEntity<List<LessonResponse>> getAllLessonsForChallenge() {
+        log.info("REST request to get all lessons for challenge dropdown");
+        return ResponseEntity.ok(lessonService.getAllLessonsForChallengeDropdown());
     }
 }

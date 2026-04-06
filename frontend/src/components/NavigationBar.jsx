@@ -1,6 +1,7 @@
 import { Navbar, Container, Nav, Badge, NavDropdown } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '../context/NotificationContext.jsx';
 
 /**
  * NavigationBar Component
@@ -10,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 const NavigationBar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const {notifications} = useNotifications();
 
     /**
      * Handles the user logout process and redirects to the login screen.
@@ -37,10 +39,26 @@ const NavigationBar = () => {
                 {/* Mobile Toggle Button */}
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
                 
-                {/* Navigation Links and User Info */}
+               {/* Navigation Links and User Info */}
                 <Navbar.Collapse id="basic-navbar-nav">
-                    <Nav className="me-auto">
-                        <Nav.Link onClick={() => navigate('/dashboard')}>Dashboard</Nav.Link>
+                    <Nav className="me-auto gap-2">
+                        <Nav.Link onClick={() => navigate('/dashboard')} className="fw-bold">
+                            Dashboard
+                        </Nav.Link>
+                        {/* Community */}
+                        <Nav.Link onClick={() => navigate('/friends')} className="fw-bold position-relative me-3">
+                            🌐 Közösség
+                            {notifications.total > 0 && (
+                                <Badge 
+                                    bg="danger" 
+                                    pill 
+                                    className="position-absolute top-25 start-100 translate-middle"
+                                    style={{ fontSize: '0.65rem' }}
+                                >
+                                    {notifications.total}
+                                </Badge>
+                            )}
+                        </Nav.Link>
                     </Nav>
                     
                     <Nav className="align-items-center">

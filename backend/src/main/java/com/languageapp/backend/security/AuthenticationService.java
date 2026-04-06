@@ -65,6 +65,16 @@ public class AuthenticationService {
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setName(request.getName());
 
+        if (request.getPreferredDifficulty() != null && !request.getPreferredDifficulty().isBlank()) {
+            try {
+                user.setPreferredDifficulty(com.languageapp.backend.enums.DifficultyLevel.valueOf(request.getPreferredDifficulty().toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                user.setPreferredDifficulty(com.languageapp.backend.enums.DifficultyLevel.DYNAMIC);
+            }
+        } else {
+            user.setPreferredDifficulty(com.languageapp.backend.enums.DifficultyLevel.DYNAMIC);
+        }
+
         String requestedRole = request.getRole() != null ? request.getRole().trim().toUpperCase() : "";
 
         if ("TEACHER".equals(requestedRole)) {
@@ -74,6 +84,30 @@ public class AuthenticationService {
             user.setRole("STUDENT");
             log.info("Registering STUDENT user with email: {}...", request.getEmail());
         }
+
+        // 1. Steam-stílusú Barátkód (Globálisan egyedi)
+        String generatedFriendCode;
+        do {
+            generatedFriendCode = generateFriendCode();
+        } while (userRepository.existsByFriendCode(generatedFriendCode)); // Addig pörög, amíg talál egy szabadot
+        user.setFriendCode(generatedFriendCode);
+
+        // 2. Discord-stílusú Tag (Adott néven belül egyedi)
+        String generatedTag;
+        int attempts = 0;
+        do {
+            int randomTag = 1000 + new java.util.Random().nextInt(9000);
+            generatedTag = String.valueOf(randomTag);
+            attempts++;
+
+            // Biztonsági fék: Ha 100 próbálkozásból sem talál szabad taget (pl. 9000 Kovács János van), ne fagyjon ki a szerver.
+            if (attempts > 100) {
+                throw new BadRequestException("Túl sok felhasználó van ezzel a névvel. Kérlek, válassz egy egyedibb nevet!");
+            }
+        } while (userRepository.existsByNameAndUserTag(request.getName(), generatedTag));
+        user.setUserTag(generatedTag);
+
+        // ---------------------------------------------------------
 
         userRepository.save(user);
         log.info("User successfully saved to database with ID: {}", user.getUserId());
@@ -95,7 +129,9 @@ public class AuthenticationService {
                 user.getUserId(),
                 user.getName(),
                 user.getEmail(),
-                user.getRole()
+                user.getRole(),
+                user.getUserTag(),
+                user.getFriendCode()
         );
 
         log.info("Tokens successfully generated for user: {}", user.getEmail());
@@ -140,7 +176,9 @@ public class AuthenticationService {
                 user.getUserId(),
                 user.getName(),
                 user.getEmail(),
-                user.getRole()
+                user.getRole(),
+                user.getUserTag(),
+                user.getFriendCode()
         );
 
         log.info("User successfully authenticated: {}", user.getEmail());
@@ -184,7 +222,9 @@ public class AuthenticationService {
                             user.getUserId(),
                             user.getName(),
                             user.getEmail(),
-                            user.getRole()
+                            user.getRole(),
+                            user.getUserTag(),
+                            user.getFriendCode()
                     );
                 })
                 .orElseThrow(() -> {
@@ -193,4 +233,21 @@ public class AuthenticationService {
                 });
     }
 
+    /**
+     * Segédmetódus egy 7 karakteres barátkód generálásához (pl. "A8X-P9Q").
+     * Csak nagybetűket és számokat használ, kihagyva az összetéveszthetőeket (O, 0, I, 1).
+     */
+    private String generateFriendCode() {
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        java.util.Random rnd = new java.util.Random();
+        StringBuilder sb = new StringBuilder(7);
+        for (int i = 0; i < 6; i++) {
+            if (i == 3) {
+                sb.append('-');
+            } else {
+                sb.append(chars.charAt(rnd.nextInt(chars.length())));
+            }
+        }
+        return sb.toString();
+    }
 }

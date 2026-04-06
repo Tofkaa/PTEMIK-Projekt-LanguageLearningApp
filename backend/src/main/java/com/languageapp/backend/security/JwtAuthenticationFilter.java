@@ -39,7 +39,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @Nonnull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
+        String authHeader = request.getHeader("Authorization"); // Levettük a 'final'-t!
+
+        // --- ÚJ RÉSZ: SSE Stream kivétel (Token olvasása az URL-ből) ---
+        if (authHeader == null && request.getRequestURI().endsWith("/stream")) {
+            String tokenParam = request.getParameter("token");
+            if (tokenParam != null) {
+                authHeader = "Bearer " + tokenParam;
+            }
+        }
+        // ---------------------------------------------------------------
 
         // 1. Skip filtering if the Authorization header is missing or does not start with "Bearer "
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {

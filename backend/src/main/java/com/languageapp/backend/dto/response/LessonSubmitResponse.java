@@ -7,8 +7,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * DTO containing the result of the evaluation.
- * Returns points, XP and statistics.
+ * Data Transfer Object (DTO) containing the comprehensive result of a lesson evaluation.
+ * * Transmits the score, earned XP, specific mistakes, and the updated gamification state (Streak)
+ * back to the client for immediate UI rendering.
  */
 @Data
 @Builder
@@ -21,4 +22,5 @@ public class LessonSubmitResponse {
     private boolean passed;
     private String feedback;
     private List<MistakeDTO> mistakes;
+    private int newStreak;
 }

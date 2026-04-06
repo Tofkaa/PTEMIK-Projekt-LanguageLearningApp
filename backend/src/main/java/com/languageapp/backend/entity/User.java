@@ -60,4 +60,10 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "preferred_difficulty", length = 20, nullable = false)
     private DifficultyLevel preferredDifficulty = DifficultyLevel.DYNAMIC;
+
+    @Column(name = "user_tag", length = 4)
+    private String userTag;
+
+    @Column(name = "friend_code", unique = true, length = 10)
+    private String friendCode;
 }

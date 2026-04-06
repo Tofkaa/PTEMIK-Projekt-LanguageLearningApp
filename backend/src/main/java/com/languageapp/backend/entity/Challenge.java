@@ -1,5 +1,6 @@
 package com.languageapp.backend.entity;
 
+import com.languageapp.backend.enums.ChallengeStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -46,6 +47,7 @@ public class Challenge {
     @Column(name = "end_time")
     private LocalDateTime endTime;
 
-    @Column(length = 50)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private ChallengeStatus status;
 }

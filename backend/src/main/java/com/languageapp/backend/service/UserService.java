@@ -45,6 +45,8 @@ public class UserService {
                 .xp(user.getXp())
                 .streak(user.getStreak())
                 .preferredDifficulty(user.getPreferredDifficulty().name())
+                .userTag(user.getUserTag())
+                .friendCode(user.getFriendCode())
                 .build();
     }
 

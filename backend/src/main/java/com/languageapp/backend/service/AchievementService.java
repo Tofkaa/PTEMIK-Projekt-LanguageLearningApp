@@ -45,7 +45,9 @@ public class AchievementService {
         for (Achievement achievement : allAchievements) {
             // OPTIMIZATION: Check via a highly efficient native query if the user already has this trophy
             if (userAchievementRepository
-                    .existsByUserUserIdAndAchievementAchievementId(user.getUserId(), achievement.getAchievementId())) {
+                    .existsByUserUserIdAndAchievementAchievementId(
+                            user.getUserId(),
+                            achievement.getAchievementId())) {
                 continue; // Skip evaluation if already awarded
             }
 

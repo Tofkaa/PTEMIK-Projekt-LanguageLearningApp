@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col, Alert } from 'react-bootstrap';
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
 import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise.jsx';
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
+import { useNotifications } from '../context/NotificationContext.jsx';
 
 /**
  * LessonPlayer Component
@@ -17,6 +18,9 @@ const LessonPlayer = () => {
     const navigate = useNavigate();
     const { user, login } = useAuth(); 
 
+
+    const [searchParams] = useSearchParams();
+    const challengeId = searchParams.get('challengeId');
     // --- STATE MANAGEMENT ---
     const [exercises, setExercises] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -32,11 +36,18 @@ const LessonPlayer = () => {
 
     const [feedback, setFeedback] = useState(null);
     const [isChecking, setIsChecking] = useState(false); 
+
+    const { refreshNotifications } = useNotifications();
+   
     // --- PHASE 1: DATA FETCHING ---
     useEffect(() => {
         const fetchExercises = async () => {
             try {
-                const response = await api.get(`/lessons/${lessonId}/exercises`);
+                
+                const endpoint = challengeId 
+                    ? `/lessons/${lessonId}/exercises?challengeId=${challengeId}` 
+                    : `/lessons/${lessonId}/exercises`;
+                const response = await api.get(endpoint);
                 if (response.data.length === 0) {
                     setError("No exercises found for this lesson.");
                 } else {
@@ -52,7 +63,7 @@ const LessonPlayer = () => {
         };
 
         fetchExercises();
-    }, [lessonId]);
+    }, [challengeId, lessonId]);
 
     useEffect(() => {
         let timer;
@@ -140,14 +151,35 @@ const LessonPlayer = () => {
             answers: finalAnswers
         };
 
-        try {
+       try {
             console.log("Submitting final payload:", payload);
-            const response = await api.post(`/lessons/${lessonId}/submit`, payload);
-            setLessonResult(response.data);
+            const endpoint = challengeId 
+            ? `/lessons/${lessonId}/submit?challengeId=${challengeId}` 
+            : `/lessons/${lessonId}/submit`;
             
-            const updatedUser = { ...user, xp: user.xp + (response.data.xpEarned || 0) };
-            login(localStorage.getItem('token'), updatedUser); 
+            const response = await api.post(endpoint, payload);
+            setLessonResult(response.data);
 
+            if (refreshNotifications) {
+                refreshNotifications();
+            }
+            
+            // --- ROBUST STATE SYNCHRONIZATION ---
+            // Instead of manually calculating XP and streaks on the client (which can lead to desyncs if the user
+            // navigates away quickly), we fetch the authoritative User Profile directly from the backend.
+            try {
+                const userResponse = await api.get('/users/me'); 
+                login(localStorage.getItem('token'), userResponse.data); // Update global AuthContext
+            } catch (fetchErr) {
+                console.warn("Failed to fetch fresh profile, initiating fallback update:", fetchErr);
+                // Safety net fallback: Apply manual calculations if the profile fetch fails
+                const updatedUser = { 
+                    ...user, 
+                    xp: user.xp + (response.data.xpEarned || 0),
+                    streak: response.data.newStreak !== undefined ? response.data.newStreak : user.streak
+                };
+                login(localStorage.getItem('token'), updatedUser); 
+            }
         } catch (err) {
             console.error("Submission error:", err);
             setError("An error occurred while submitting your answers.");
@@ -155,7 +187,6 @@ const LessonPlayer = () => {
             setIsSubmitting(false);
         }
     };
-
     // --- PHASE 4: RENDER RESULT SCREEN ---
     if (lessonResult) {
         const isPassed = lessonResult.passed;
@@ -266,16 +297,16 @@ const LessonPlayer = () => {
                         {/* 3. Action Buttons */}
                         <div className="d-grid gap-3 mt-4">
                             {isPassed ? (
-                                <Button variant="info" size="lg" className="fw-bold rounded-pill text-dark py-3" onClick={() => navigate('/dashboard')}>
-                                    Vissza a Dashboardra
+                                <Button variant="info" size="lg" className="fw-bold rounded-pill text-dark py-3" onClick={() => navigate(challengeId ? '/friends' : '/dashboard')}>
+                                    Visszatérés
                                 </Button>
                             ) : (
                                 <>
                                     <Button variant="outline-info" size="lg" className="fw-bold rounded-pill py-3" onClick={() => window.location.reload()}>
                                         Újrapróbálom
                                     </Button>
-                                    <Button variant="link" className="text-light opacity-50 text-decoration-none" onClick={() => navigate('/dashboard')}>
-                                        Befejezés később
+                                    <Button variant="outline-secondary" onClick={() => navigate(challengeId ? '/friends' : '/dashboard')}>
+                                        Később folytatom
                                     </Button>
                                 </>
                             )}

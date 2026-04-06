@@ -7,6 +7,10 @@ import PrivateRoute from './components/PrivateRoute.jsx';
 import GuestRoute from './components/GuestRoute.jsx'; 
 import NotFound from './pages/NotFound.jsx'; 
 import Profile from './pages/Profile.jsx'
+import Friends from './pages/Friends.jsx';
+import NavigationBar from './components/NavigationBar.jsx';
+import { AuthProvider } from './context/AuthContext.jsx';
+import { NotificationProvider } from './context/NotificationContext.jsx';
 
 /**
  * Main Application Component
@@ -14,59 +18,71 @@ import Profile from './pages/Profile.jsx'
  */
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Default route redirects to login */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+    <AuthProvider>
+        <NotificationProvider>
+            <Router>
+                <NavigationBar />
+            <Routes>
+                {/* Default route redirects to login */}
+                <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* Guest Routes: Protected from already authenticated users */}
-        <Route 
-            path="/login" 
-            element={
-                <GuestRoute>
-                    <Login />
-                </GuestRoute>
-            } 
-        />
-        <Route 
-            path="/register" 
-            element={
-                <GuestRoute>
-                    <Register />
-                </GuestRoute>
-            } 
-        />
+                {/* Guest Routes: Protected from already authenticated users */}
+                <Route 
+                    path="/login" 
+                    element={
+                        <GuestRoute>
+                            <Login />
+                        </GuestRoute>
+                    } 
+                />
+                <Route 
+                    path="/register" 
+                    element={
+                        <GuestRoute>
+                            <Register />
+                        </GuestRoute>
+                    } 
+                />
 
-        {/* Private Routes: Protected from unauthenticated guests */}
-        <Route 
-            path="/dashboard" 
-            element={
-                <PrivateRoute>
-                    <Dashboard />
-                </PrivateRoute>
-            } 
-        />
-        <Route
-            path="/lesson/:id" 
-            element={
-                <PrivateRoute>
-                    <Lesson />
-                </PrivateRoute>
-            } 
-        />
-        <Route 
-             path="/profile" 
-             element={
-                <PrivateRoute>
-                        <Profile />
-                </PrivateRoute>
-            } 
-/>
+                {/* Private Routes: Protected from unauthenticated guests */}
+                <Route 
+                    path="/dashboard" 
+                    element={
+                        <PrivateRoute>
+                            <Dashboard />
+                        </PrivateRoute>
+                    } 
+                />
+                <Route
+                    path="/lesson/:id" 
+                    element={
+                        <PrivateRoute>
+                            <Lesson />
+                        </PrivateRoute>
+                    } 
+                />
+                <Route 
+                    path="/profile" 
+                    element={
+                        <PrivateRoute>
+                                <Profile />
+                        </PrivateRoute>
+                    } 
+                
+                />
+                <Route 
+                    path="/friends" 
+                    element={
+                        <Friends />
+                    } 
+                />
 
-        {/* 404 Route: Catch-all for undefined URLs */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </Router>
+                {/* 404 Route: Catch-all for undefined URLs */}
+                <Route path="*" element={<NotFound />} />
+            </Routes>
+            </Router>
+        </NotificationProvider>
+    </AuthProvider>
   );
 }
 
