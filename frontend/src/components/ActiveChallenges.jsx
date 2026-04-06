@@ -1,33 +1,42 @@
 /**
- * ActiveChallenges Component
- * Displays the list of ongoing duels for the authenticated user.
+ * @file ActiveChallenges.jsx
+ * @description Displays the list of ongoing duels for the authenticated user.
  * Manages the UI state to distinguish between waiting periods and actionable turns.
  */
 
 import { useState, useEffect} from 'react';
-import { Card, Button, Spinner, Alert, Badge, Row, Col } from 'react-bootstrap';
+import { Card, Button, Spinner, Alert, Row, Col } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 
+/**
+ * @component
+ * @returns {React.ReactElement} Grid of active challenges.
+ */
 const ActiveChallenges = () => {
     const navigate = useNavigate();
     const { user } = useAuth(); 
     const [challenges, setChallenges] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const {notifications} = useNotifications();
+    const { notifications } = useNotifications();
 
     useEffect(() => {
        fetchChallenges(true); 
     }, [notifications.pendingChallenges]);
 
+    /**
+     * Fetches active challenges, bypassing cache.
+     */
     const fetchChallenges = async (isInitialLoad = false) => {
         if(isInitialLoad) setLoading(true);
         
         try {
-            const response = await api.get('/challenges/active');
+            const response = await api.get('/challenges/active', {
+                params: { _t: new Date().getTime() } // Cache-busting
+            });
             setChallenges(response.data || []);
         } catch (err) {
            if (isInitialLoad) setError('Nem sikerült betölteni az aktív kihívásokat.', err);
@@ -52,39 +61,30 @@ const ActiveChallenges = () => {
         );
     }
 
+    // ... Return HTML blokk (a Row és Col rész marad teljesen ugyanaz)
     return (
         <div className="p-3">
             <h5 className="text-light mb-4">Aktív Kihívások ({challenges.length})</h5>
             <Row>
                 {challenges.map((challenge) => {
-                    // Determine if the current user initiated this challenge to render contextual text
                     const iAmChallenger = challenge.challengerName === user?.name;
-
                     return (
                         <Col md={12} key={challenge.challengeId} className="mb-3">
                             <Card className={`bg-dark border-${challenge.isMyTurn ? 'warning' : 'secondary'} shadow-sm`}>
                                 <Card.Body className="d-flex justify-content-between align-items-center">
                                     <div>
-                                        {/* Contextual Header based on roles */}
                                         <h5 className="text-light mb-1 fw-bold">
                                             {iAmChallenger 
                                                 ? `⚔️ Kihívtad: ${challenge.opponentName}` 
                                                 : `🔥 ${challenge.challengerName} kihívott téged!`}
                                         </h5>
-                                        {/* ... lesson info ... */}
                                     </div>
                                     <div className="d-flex flex-column align-items-end gap-2">
                                         <small className="text-danger">
                                             Lejár: {new Date(challenge.expiresAt).toLocaleDateString('hu-HU')}
                                         </small>
-                                        
-                                        {/* Render action button ONLY if the backend flag indicates it is the user's turn */}
                                         {challenge.isMyTurn && (
-                                            <Button 
-                                                variant="warning" 
-                                                className="fw-bold px-4"
-                                                onClick={() => handlePlayChallenge(challenge)} 
-                                            >
+                                            <Button variant="warning" className="fw-bold px-4" onClick={() => handlePlayChallenge(challenge)} >
                                                 Játék! 🚀
                                             </Button>
                                         )}

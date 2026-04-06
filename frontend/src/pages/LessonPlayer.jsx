@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
 import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise.jsx';
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
+import { useNotifications } from '../context/NotificationContext.jsx';
 
 /**
  * LessonPlayer Component
@@ -35,6 +36,8 @@ const LessonPlayer = () => {
 
     const [feedback, setFeedback] = useState(null);
     const [isChecking, setIsChecking] = useState(false); 
+
+    const { refreshNotifications } = useNotifications();
    
     // --- PHASE 1: DATA FETCHING ---
     useEffect(() => {
@@ -156,6 +159,10 @@ const LessonPlayer = () => {
             
             const response = await api.post(endpoint, payload);
             setLessonResult(response.data);
+
+            if (refreshNotifications) {
+                refreshNotifications();
+            }
             
             // --- ROBUST STATE SYNCHRONIZATION ---
             // Instead of manually calculating XP and streaks on the client (which can lead to desyncs if the user
@@ -290,16 +297,16 @@ const LessonPlayer = () => {
                         {/* 3. Action Buttons */}
                         <div className="d-grid gap-3 mt-4">
                             {isPassed ? (
-                                <Button variant="info" size="lg" className="fw-bold rounded-pill text-dark py-3" onClick={() => navigate('/dashboard')}>
-                                    Vissza a Dashboardra
+                                <Button variant="info" size="lg" className="fw-bold rounded-pill text-dark py-3" onClick={() => navigate(challengeId ? '/friends' : '/dashboard')}>
+                                    Visszatérés
                                 </Button>
                             ) : (
                                 <>
                                     <Button variant="outline-info" size="lg" className="fw-bold rounded-pill py-3" onClick={() => window.location.reload()}>
                                         Újrapróbálom
                                     </Button>
-                                    <Button variant="link" className="text-light opacity-50 text-decoration-none" onClick={() => navigate('/dashboard')}>
-                                        Befejezés később
+                                    <Button variant="outline-secondary" onClick={() => navigate(challengeId ? '/friends' : '/dashboard')}>
+                                        Később folytatom
                                     </Button>
                                 </>
                             )}

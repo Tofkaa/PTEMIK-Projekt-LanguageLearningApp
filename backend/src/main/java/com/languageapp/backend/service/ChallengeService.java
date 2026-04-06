@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.languageapp.backend.service.SseService;
+
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -176,6 +176,8 @@ public class ChallengeService {
                 userRepository.save(winner);
             }
             challengeRepository.save(challenge);
+            sseService.sendPing(challenge.getChallenger().getEmail());
+            sseService.sendPing(challenge.getOpponent().getEmail());
         }
     }
 

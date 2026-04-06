@@ -26,7 +26,9 @@ const ChallengeHistory = () => {
         if (isInitialLoad) setLoading(true);       
         
         try {
-            const response = await api.get('/challenges/history');
+            const response = await api.get('/challenges/history', {
+                params: { _t: new Date().getTime() }
+            });
             setHistory(response.data || []);
         } catch (err) {
            if (isInitialLoad) setError('Nem sikerült betölteni az előzményeket.', err);

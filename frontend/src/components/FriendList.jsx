@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { Card, Button, Spinner, Alert, Badge, Row, Col, Modal, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { useNotifications } from '../context/NotificationContext';
+import { useNotifications, refreshNotifications } from '../context/NotificationContext';
 
 /**
  * @component
@@ -38,7 +38,9 @@ const FriendList = () => {
         if (isInitialLoad) setLoading(true);
         
         try {
-            const response = await api.get('/friendships/accepted');
+            const response = await api.get('/friendships/accepted', {
+                params: { _t: new Date().getTime() }
+            });
             setFriends(response.data || []);
         } catch (err) {
             if (isInitialLoad) setError('Nem sikerült betölteni a barátlistát.', err);
@@ -97,6 +99,9 @@ const FriendList = () => {
             const response = await api.post('/challenges/create', payload);
             const challengeId = response.data.challengeId;
 
+            if (refreshNotifications) {
+                refreshNotifications();
+            }
             // 2. Clean up modal state
             setShowModal(false);
 
