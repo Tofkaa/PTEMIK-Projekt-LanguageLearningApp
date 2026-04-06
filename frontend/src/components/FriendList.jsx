@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { Card, Button, Spinner, Alert, Badge, Row, Col, Modal, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { useNotifications, refreshNotifications } from '../context/NotificationContext';
+import { useNotifications } from '../context/NotificationContext';
 
 /**
  * @component
@@ -19,7 +19,7 @@ const FriendList = () => {
     const [friends, setFriends] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const {notifications} = useNotifications();
+    const {notifications, refreshNotifications} = useNotifications();
 
     const [showModal, setShowModal] = useState(false);
     const [selectedFriend, setSelectedFriend] = useState(null);

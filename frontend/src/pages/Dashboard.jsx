@@ -3,6 +3,7 @@ import { Container, Row, Col, Card, Button, Spinner, Alert, ProgressBar, Badge }
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../services/api.jsx';
 import { useNavigate } from 'react-router-dom';
+import Leaderboard from '../components/Leaderboard.jsx';
 
 /**
  * Dashboard Component
@@ -162,7 +163,7 @@ const Dashboard = () => {
 
                 <Row>
                     {/* --- LEFT COLUMN: USER STATISTICS --- */}
-                   <Col md={4} className="mb-4">
+                   <Col lg={3} md={4} className="mb-4">
                        <Card className="shadow-sm border-0 h-100 bg-transparent text-light">
                             <Card.Body>
                                 <h5 className="fw-bold border-bottom border-secondary pb-2">Statisztikák</h5>
@@ -217,7 +218,7 @@ const Dashboard = () => {
                     </Col>
 
                     {/* --- RIGHT COLUMN: LEARNING PATH (LESSONS GRID) --- */}
-                    <Col md={8} className="mb-4">
+                    <Col lg={5} md={8} className="mb-4">
                         <Card className="shadow-sm border-0 h-100 bg-transparent text-light">
                             <Card.Body className="p-0">
                                 <h5 className="fw-bold border-bottom border-secondary pb-2 mb-4">📚 Tanulási Útvonal</h5>
@@ -290,6 +291,13 @@ const Dashboard = () => {
                                 )}
                             </Card.Body>
                         </Card>
+                    </Col>
+                    {/*  LEADERBOARD  */}
+                    <Col lg={4} md={12} className="mb-4">
+
+                        <div className="h-100"> 
+                            <Leaderboard defaultScope="global" />
+                        </div>
                     </Col>
                 </Row>
             </Container>

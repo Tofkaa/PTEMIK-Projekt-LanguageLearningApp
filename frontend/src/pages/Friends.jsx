@@ -5,7 +5,7 @@
  * Handles client-side "read receipt" logic via LocalStorage.
  */
 
-import { Container, Row, Col, Tabs, Tab, Card, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Tabs, Tab, Card, Badge, Button } from 'react-bootstrap';
 import FriendSearch from '../components/FriendSearch';
 import PendingRequests from '../components/PendingRequests';
 import FriendList from '../components/FriendList';
@@ -13,6 +13,7 @@ import ActiveChallenges from '../components/ActiveChallenges';
 import ChallengeHistory from '../components/ChallengeHistory';
 import { useNotifications } from '../context/NotificationContext';
 import { useState, useEffect } from 'react';
+import Leaderboard from '../components/Leaderboard';
 
 /**
  * @component
@@ -126,6 +127,13 @@ const Friends = () => {
                                     </span>
                                 }>
                                     <ChallengeHistory />
+                                </Tab>
+                                
+                                {/* LEADERBOARD TAB */}
+                                <Tab eventKey="leaderboard" title={<span>🏆 Ranglista</span>}>
+                                    <div className="p-4">
+                                        <Leaderboard defaultScope="friends" />
+                                    </div>
                                 </Tab>
                             </Tabs>
                         </Card.Body>
