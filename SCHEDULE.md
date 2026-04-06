@@ -7,7 +7,7 @@
 - 2026-03-15: Frontend Alapok és Bejelentkezés (5. hét) - [KÉSZ]
 - 2026-03-22: Tanulási Felület és Core Loop (6. hét) - [KÉSZ]
 - 2026-03-29: Proof of Concept (PoC) Prezentáció (7. hét) - [KÉSZ]
-- 2026-04-05: Gamifikáció, Dashboard és Aszinkron Kihívások (8. hét) - [FOLYAMATBAN]
+- 2026-04-05: Gamifikáció, Dashboard és Aszinkron Kihívások (8. hét) - [KÉSZ]
 - 2026-04-12: Osztályterem Modul - Backend (9. hét)
 - 2026-04-19: Osztályterem Modul - Frontend (10. hét)
 - 2026-04-26: Admin Panel és Nginx Reverse Proxy (11. hét)
