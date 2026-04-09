@@ -16,8 +16,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByEmail(String email);
 
-    @Query("SELECT u.name AS name, u.xp AS xp, u.streak AS streak " +
-            "FROM User u ORDER BY u.xp DESC")
+
     boolean existsByFriendCode(String friendCode);
     boolean existsByNameAndUserTag(String name, String userTag);
 
