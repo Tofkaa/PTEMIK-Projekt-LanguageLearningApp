@@ -1,6 +1,7 @@
 package com.languageapp.backend.entity;
 
 import com.languageapp.backend.enums.DifficultyLevel;
+import com.languageapp.backend.enums.Role;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,8 +32,9 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    private String role;
+    private Role role = Role.STUDENT;
 
     @Column(nullable = false)
     private Integer xp = 0;

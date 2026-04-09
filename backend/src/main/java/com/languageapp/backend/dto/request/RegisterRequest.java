@@ -1,7 +1,9 @@
 package com.languageapp.backend.dto.request;
 
+import com.languageapp.backend.enums.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -19,5 +21,7 @@ public class RegisterRequest {
     @Size(min = 8, message = "The password has to be at least 8 characters in length!")
     private String password;
     private String preferredDifficulty;
-    private String role;
+
+    @NotNull(message = "Role must be specified")
+    private Role role;
 }

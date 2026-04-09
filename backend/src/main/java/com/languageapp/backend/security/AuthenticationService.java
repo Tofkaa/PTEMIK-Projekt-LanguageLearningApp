@@ -4,6 +4,7 @@ import com.languageapp.backend.dto.request.LoginRequest;
 import com.languageapp.backend.dto.request.RegisterRequest;
 import com.languageapp.backend.dto.response.AuthResponse;
 import com.languageapp.backend.entity.User;
+import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -75,15 +76,13 @@ public class AuthenticationService {
             user.setPreferredDifficulty(com.languageapp.backend.enums.DifficultyLevel.DYNAMIC);
         }
 
-        String requestedRole = request.getRole() != null ? request.getRole().trim().toUpperCase() : "";
-
-        if ("TEACHER".equals(requestedRole)) {
-            user.setRole("TEACHER");
-            log.info("Registering TEACHER user with email: {}...", request.getEmail());
-        } else {
-            user.setRole("STUDENT");
-            log.info("Registering STUDENT user with email: {}...", request.getEmail());
+        if (Role.ADMIN.equals(request.getRole())) {
+            log.warn("Security Alert: Attempted ADMIN registration with email: {}", request.getEmail());
+            throw new BadRequestException("Cannot register as an ADMIN user.");
         }
+
+        user.setRole(request.getRole() != null ? request.getRole() : Role.STUDENT);
+        log.info("Registering {} user with email: {}...", user.getRole(), request.getEmail());
 
         // 1. Steam-stílusú Barátkód (Globálisan egyedi)
         String generatedFriendCode;
@@ -115,7 +114,7 @@ public class AuthenticationService {
         UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
                 .username(user.getEmail())
                 .password(user.getPasswordHash())
-                .authorities(user.getRole())
+                .authorities("ROLE_" + user.getRole().name())
                 .build();
 
         user.setLastLogin(LocalDateTime.now());
@@ -211,7 +210,7 @@ public class AuthenticationService {
                     UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
                             .username(user.getEmail())
                             .password(user.getPasswordHash())
-                            .authorities(user.getRole())
+                            .authorities("ROLE_" + user.getRole().name())
                             .build();
 
                     String newAccessToken = jwtService.generateToken(userDetails);
