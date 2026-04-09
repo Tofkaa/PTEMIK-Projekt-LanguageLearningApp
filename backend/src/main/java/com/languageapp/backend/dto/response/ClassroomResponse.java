@@ -14,6 +14,6 @@ public class ClassroomResponse {
     private String inviteCode;
     private String teacherName;
     private LocalDateTime createdAt;
-    private int activeMemberCount; //Optinal for later
+    private int activeMemberCount;
 
 }

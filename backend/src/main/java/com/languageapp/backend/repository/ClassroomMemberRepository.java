@@ -22,6 +22,8 @@ public interface ClassroomMemberRepository extends JpaRepository<ClassroomMember
 
     Optional<ClassroomMember> findByClassroom_ClassroomIdAndUser_UserId(UUID classroomId, UUID userId);
 
+    int countByClassroom_ClassroomIdAndStatus(UUID classroomId, MembershipStatus status);
+
     List<ClassroomMember> findAllByUser_UserIdAndStatus(UUID userId, MembershipStatus status);
     @Query("SELECT u.name AS studentName, COUNT(p.progressId) AS totalCompletedLessons, AVG(p.highestScore) AS averageScore " +
             "FROM ClassroomMember cm " +
