@@ -1,5 +1,6 @@
 package com.languageapp.backend.dto.response;
 
+import com.languageapp.backend.enums.Role;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,7 +20,7 @@ public class UserResponse {
     private UUID userId;
     private String email;
     private String name;
-    private String role;
+    private Role role;
     private int xp;
     private int streak;
     private String preferredDifficulty;
