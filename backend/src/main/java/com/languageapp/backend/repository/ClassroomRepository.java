@@ -10,6 +10,7 @@ import java.util.UUID;
 
 @Repository
 public interface ClassroomRepository extends JpaRepository<Classroom, UUID> {
-    List<Classroom> findByTeacherUserId(UUID teacherId);
     Optional<Classroom> findByInviteCode(String inviteCode);
+    List<Classroom> findAllByTeacher_UserIdOrderByCreatedAtDesc(UUID teacherId);
+    boolean existsByInviteCode(String inviteCode);
 }
