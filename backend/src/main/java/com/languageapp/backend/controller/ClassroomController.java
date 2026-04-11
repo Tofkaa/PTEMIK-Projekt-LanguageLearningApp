@@ -28,12 +28,9 @@ public class ClassroomController {
 
     private final ClassroomService classroomService;
 
-    // ==========================================
-    // TANÁRI VÉGPONTOK (Csak ROLE_TEACHER)
-    // ==========================================
 
     /**
-     * Új virtuális osztályterem létrehozása.
+     * New classroom creation
      */
     @PostMapping
     @PreAuthorize("hasRole('TEACHER')")
@@ -45,7 +42,7 @@ public class ClassroomController {
     }
 
     /**
-     * A bejelentkezett tanár saját osztályainak listázása.
+     * List classrooms for a logged in teacher user
      */
     @GetMapping("/teacher")
     @PreAuthorize("hasRole('TEACHER')")
@@ -54,7 +51,7 @@ public class ClassroomController {
     }
 
     /**
-     * Egy adott osztály tagjainak lekérése (szűrhető PENDING vagy ACCEPTED státuszra).
+     * Get classroom members
      */
     @GetMapping("/{classroomId}/members")
     @PreAuthorize("hasRole('TEACHER')")
@@ -66,7 +63,7 @@ public class ClassroomController {
     }
 
     /**
-     * Diák csatlakozási kérelmének jóváhagyása vagy elutasítása.
+     * Moderate student join requests
      */
     @PatchMapping("/{classroomId}/members/{studentId}/moderate")
     @PreAuthorize("hasRole('TEACHER')")
@@ -80,7 +77,7 @@ public class ClassroomController {
     }
 
     /**
-     * Osztálytermi statisztikák (diákok haladása) lekérése a Dashboardhoz.
+     * Get student stats for dashboard
      */
     @GetMapping("/{classroomId}/stats")
     @PreAuthorize("hasRole('TEACHER')")
@@ -90,12 +87,21 @@ public class ClassroomController {
         return ResponseEntity.ok(classroomService.getClassroomStats(classroomId, authentication.getName()));
     }
 
-    // ==========================================
-    // DIÁK ÉS KÖZÖS VÉGPONTOK
-    // ==========================================
+    /**
+     * Removes a student from a classroom (Kick functionality).
+     */
+    @DeleteMapping("/{classroomId}/members/{studentId}")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<Void> kickStudent(
+            @PathVariable UUID classroomId,
+            @PathVariable UUID studentId,
+            Authentication authentication) {
+        classroomService.kickStudent(classroomId, studentId, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
 
     /**
-     * Csatlakozás egy osztályhoz meghívókód alapján. (PENDING státuszba kerül)
+     * Join classroom with invite code
      */
     @PostMapping("/join")
     public ResponseEntity<Void> joinClassroom(
@@ -106,7 +112,7 @@ public class ClassroomController {
     }
 
     /**
-     * A bejelentkezett diák saját (elfogadott) osztályainak listázása.
+     * List classrooms for student
      */
     @GetMapping("/student")
     public ResponseEntity<List<ClassroomResponse>> getStudentClassrooms(Authentication authentication) {

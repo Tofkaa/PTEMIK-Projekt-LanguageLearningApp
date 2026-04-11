@@ -40,5 +40,5 @@ public class ClassroomMember {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private MembershipStatus status;
+    private MembershipStatus status = MembershipStatus.PENDING;
 }

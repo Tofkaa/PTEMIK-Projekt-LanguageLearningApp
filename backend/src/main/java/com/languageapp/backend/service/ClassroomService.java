@@ -55,7 +55,6 @@ public class ClassroomService {
         classroom.setDescription(request.getDescription());
         classroom.setTeacher(teacher);
 
-        // Biztonságos és egyedi meghívókód generálása
         String inviteCode;
         do {
             inviteCode = generateInviteCode();
@@ -80,12 +79,10 @@ public class ClassroomService {
         Classroom classroom = classroomRepository.findByInviteCode(inviteCode.toUpperCase())
                 .orElseThrow(() -> new BadRequestException("Invalid invite code."));
 
-        // Ellenőrizzük, hogy a tanár nem akar-e a saját osztályába diákként csatlakozni
         if (classroom.getTeacher().getUserId().equals(student.getUserId())) {
             throw new BadRequestException("You cannot join your own classroom.");
         }
 
-        // Ellenőrizzük a duplikációt (Már tag vagy már küldött kérelmet)
         if (classroomMemberRepository.existsByClassroom_ClassroomIdAndUser_UserId(classroom.getClassroomId(), student.getUserId())) {
             throw new BadRequestException("You are already a member or have a pending request for this classroom.");
         }
@@ -93,7 +90,7 @@ public class ClassroomService {
         ClassroomMember member = new ClassroomMember();
         member.setClassroom(classroom);
         member.setUser(student);
-        member.setStatus(MembershipStatus.PENDING); // A tanárnak jóvá kell hagynia
+        member.setStatus(MembershipStatus.PENDING);
 
         classroomMemberRepository.save(member);
         log.info("Join request created for student {} to classroom {}", student.getEmail(), classroom.getName());
@@ -107,7 +104,6 @@ public class ClassroomService {
         Classroom classroom = classroomRepository.findById(classroomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Classroom not found."));
 
-        // Jogosultság ellenőrzés: Csak az osztály tulajdonosa moderálhat
         if (!classroom.getTeacher().getEmail().equals(teacherEmail)) {
             throw new BadRequestException("You do not have permission to moderate this classroom.");
         }
@@ -120,7 +116,7 @@ public class ClassroomService {
             classroomMemberRepository.save(member);
             log.info("Student {} accepted into classroom {}", studentId, classroomId);
         } else {
-            classroomMemberRepository.delete(member); // Elutasítás esetén töröljük a rekordot, hogy később újra próbálkozhasson
+            classroomMemberRepository.delete(member);
             log.info("Student {} rejected from classroom {}", studentId, classroomId);
         }
     }
@@ -136,7 +132,6 @@ public class ClassroomService {
         return classroomRepository.findAllByTeacher_UserIdOrderByCreatedAtDesc(teacher.getUserId())
                 .stream()
                 .map(classroom -> {
-                    // Dinamikusan lekérjük az aktív diákok számát
                     int activeCount = classroomMemberRepository.countByClassroom_ClassroomIdAndStatus(
                             classroom.getClassroomId(), MembershipStatus.ACCEPTED);
                     return mapToResponse(classroom, activeCount);
@@ -145,7 +140,7 @@ public class ClassroomService {
     }
 
     /**
-     * Visszaadja azokat az osztálytermeket, ahová a diák sikeresen (ACCEPTED) csatlakozott.
+     * Returns classrooms where the student is accepted
      */
     @Transactional(readOnly = true)
     public List<ClassroomResponse> getClassroomsForStudent(String studentEmail) {
@@ -165,8 +160,8 @@ public class ClassroomService {
     }
 
     /**
-     * Visszaadja egy adott osztályterem tagjait (státusz alapján szűrve).
-     * Csak a tulajdonos tanár láthatja.
+     * Gets classroom members filtered by status
+     * Only the owner is allowed to access it.
      */
     @Transactional(readOnly = true)
     public List<ClassroomMemberResponse> getClassroomMembers(UUID classroomId, MembershipStatus status, String teacherEmail) {
@@ -192,7 +187,7 @@ public class ClassroomService {
     }
 
     /**
-     * Lekéri egy adott osztályterem diákjainak statisztikáit (teljesített leckék, átlag pontszám).
+     * Get classroom member statistics.
      */
     @Transactional(readOnly = true)
     public List<com.languageapp.backend.dto.projection.ClassroomMemberStatDTO> getClassroomStats(UUID classroomId, String teacherEmail) {
@@ -206,7 +201,27 @@ public class ClassroomService {
         return classroomMemberRepository.getClassroomStats(classroomId);
     }
 
-    // --- Segédmetódusok ---
+    /**
+     * Removes a student from the classroom (Kick).
+     */
+    @Transactional
+    public void kickStudent(UUID classroomId, UUID studentId, String teacherEmail) {
+        Classroom classroom = classroomRepository.findById(classroomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found."));
+
+
+        if (!classroom.getTeacher().getEmail().equals(teacherEmail)) {
+            throw new BadRequestException("You do not have permission to perform this action.");
+        }
+
+        ClassroomMember member = classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(classroomId, studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student is not a member of this classroom."));
+
+        classroomMemberRepository.delete(member);
+        log.info("Student {} was kicked from classroom {} by teacher {}", studentId, classroomId, teacherEmail);
+    }
+
+    // --- Helper methods ---
 
     private String generateInviteCode() {
         StringBuilder sb = new StringBuilder(INVITE_CODE_LENGTH);

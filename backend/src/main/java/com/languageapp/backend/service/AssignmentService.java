@@ -1,7 +1,11 @@
 package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.request.AssignmentCreateRequest;
+import com.languageapp.backend.dto.request.AssignmentSubmitRequest;
+import com.languageapp.backend.dto.request.LessonSubmitRequest;
 import com.languageapp.backend.dto.response.AssignmentResponse;
+import com.languageapp.backend.dto.response.AssignmentStartResponse;
+import com.languageapp.backend.dto.response.MistakeDTO;
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
@@ -17,29 +21,24 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-
 /**
- * Service handling business logic for classroom assignments, testing, and sessions.
+ * Service orchestrating the lifecycle of classroom assignments.
+ * Handles creation, session tracking, and secure server-side evaluation.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AssigmentService {
+public class AssignmentService {
     private final ClassroomAssignmentRepository assignmentRepository;
     private final ClassroomRepository classroomRepository;
-    private final ExerciseRepository exerciseRepository; // Feltételezve, hogy létezik
+    private final ExerciseRepository exerciseRepository;
     private final UserRepository userRepository;
     private final ClassroomMemberRepository classroomMemberRepository;
     private final AssignmentSessionRepository sessionRepository;
-
+    private final EvaluationService evaluationService;
 
     /**
-     * Creates a new assignment for a classroom.
-     * Validates teacher ownership and existence of selected exercises.
-     *
-     * @param classroomId Target classroom
-     * @param request Data containing assignment rules and exercises
-     * @param teacherEmail Email of the teacher performing the action
+     * Creates a new assignment. Validates teacher authority and existence of exercises.
      */
     @Transactional
     public void createAssignment(UUID classroomId, AssignmentCreateRequest request, String teacherEmail) {
@@ -47,7 +46,7 @@ public class AssigmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Classroom not found."));
 
         if (!classroom.getTeacher().getEmail().equals(teacherEmail)) {
-            throw new BadRequestException("Nincs jogosultságod feladatot kiosztani ebben az osztályban.");
+            throw new BadRequestException("Unauthorized to create assignments in this classroom.");
         }
 
         ClassroomAssignment assignment = new ClassroomAssignment();
@@ -63,7 +62,7 @@ public class AssigmentService {
 
         List<Exercise> exercises = exerciseRepository.findAllById(request.getExerciseIds());
         if (exercises.isEmpty()) {
-            throw new BadRequestException("Legalább egy érvényes feladatot ki kell választani.");
+            throw new BadRequestException("At least one valid exercise must be selected.");
         }
         assignment.setExercises(exercises);
 
@@ -71,7 +70,7 @@ public class AssigmentService {
     }
 
     /**
-     * Retrieves all assignments for a specific classroom.
+     * Retrieves assignment list for teacher dashboard.
      */
     @Transactional(readOnly = true)
     public List<AssignmentResponse> getAssignmentsByClassroom(UUID classroomId) {
@@ -82,7 +81,7 @@ public class AssigmentService {
     }
 
     /**
-     * Retrieves all currently active/available assignments for a student.
+     * Retrieves currently open assignments for a student's active classrooms.
      */
     @Transactional(readOnly = true)
     public List<AssignmentResponse> getActiveAssignmentsForStudent(String email) {
@@ -94,50 +93,41 @@ public class AssigmentService {
     }
 
     /**
-     * Initiates or resumes an assignment session for a student.
-     * Handles timer initialization and randomized exercise selection.
-     *
-     * @param assignmentId The assignment to start
-     * @param email The student's email
-     * @return Shuffled list of exercises for the student to solve
+     * Starts or resumes an assignment session. Initializes start time for the timer.
+     * @return Shuffled exercise list and session metadata.
      */
     @Transactional
-    public List<Exercise> startAssignment(UUID assignmentId, String email) {
+    public AssignmentStartResponse startAssignment(UUID assignmentId, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
         ClassroomAssignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
 
-        // Verify student membership in the classroom
         boolean isMember = classroomMemberRepository.existsByClassroom_ClassroomIdAndUser_UserId(
                 assignment.getClassroom().getClassroomId(), user.getUserId());
 
         if (!isMember) {
-            throw new BadRequestException("Nem vagy tagja ennek az osztálynak.");
+            throw new BadRequestException("Access denied: Not a member of this classroom.");
         }
 
-        // Check for an existing session to prevent timer reset or unauthorized retries
+        AssignmentSession session;
         Optional<AssignmentSession> existingSession = sessionRepository
                 .findByAssignment_AssignmentIdAndUser_UserId(assignmentId, user.getUserId());
 
         if (existingSession.isPresent()) {
-            AssignmentSession session = existingSession.get();
-
+            session = existingSession.get();
             if (session.getFinishedAt() != null && !assignment.isAllowRetries()) {
-                throw new BadRequestException("Ezt a tesztet már kitöltötted, és nincs lehetőség javításra.");
+                throw new BadRequestException("Submission locked: Retries are not allowed.");
             }
-
             log.info("Student {} is resuming assignment {}", email, assignmentId);
         } else {
-            // Initialize new session (start timer)
-            AssignmentSession newSession = new AssignmentSession();
-            newSession.setAssignment(assignment);
-            newSession.setUser(user);
-            newSession.setStartedAt(LocalDateTime.now());
-
-            sessionRepository.save(newSession);
-            log.info("Student {} started assignment {} at {}", email, assignmentId, newSession.getStartedAt());
+            session = new AssignmentSession();
+            session.setAssignment(assignment);
+            session.setUser(user);
+            session.setStartedAt(LocalDateTime.now());
+            session = sessionRepository.save(session);
+            log.info("Student {} started assignment {} at {}", email, assignmentId, session.getStartedAt());
         }
 
         List<Exercise> exercises = new ArrayList<>(assignment.getExercises());
@@ -145,12 +135,68 @@ public class AssigmentService {
             java.util.Collections.shuffle(exercises);
         }
 
-        return exercises;
+        return new AssignmentStartResponse(
+                session.getSessionId(),
+                session.getStartedAt(),
+                assignment.getTimeLimitMinutes(),
+                assignment.isAllowRetries(),
+                exercises
+        );
     }
 
     /**
-     * Internal helper to map Entity to Response DTO.
+     * Evaluates a student's assignment submission.
+     * Enforces time limit validation and uses the core evaluation engine via a dummy request wrapper.
      */
+    @Transactional
+    public void submitAssignment(UUID sessionId, AssignmentSubmitRequest request, String email) {
+        AssignmentSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+
+        if (!session.getUser().getEmail().equals(email)) {
+            throw new BadRequestException("Unauthorized access to session.");
+        }
+
+        if (session.getFinishedAt() != null) {
+            throw new BadRequestException("Assignment already submitted.");
+        }
+
+        // Enforce server-side time limit validation
+        Integer limit = session.getAssignment().getTimeLimitMinutes();
+        if (limit != null && limit > 0) {
+            LocalDateTime deadline = session.getStartedAt().plusMinutes(limit + 2);
+            if (LocalDateTime.now().isAfter(deadline)) {
+                log.error("Late submission blocked for user {}.", email);
+                throw new BadRequestException("Time limit exceeded! Submission failed.");
+            }
+        }
+
+        List<Exercise> assignmentExercises = session.getAssignment().getExercises();
+        List<MistakeDTO> mistakes = new ArrayList<>();
+
+        // Create a virtual LessonSubmitRequest to reuse the existing core evaluation logic
+        LessonSubmitRequest dummyRequest = new LessonSubmitRequest();
+        dummyRequest.setAnswers(request.getAnswers());
+        dummyRequest.setTimeTakenSeconds(0);
+
+        EvaluationService.EvaluationDetails details = evaluationService.calculateEvaluationDetails(
+                assignmentExercises,
+                dummyRequest,
+                mistakes
+        );
+
+        int totalExercises = assignmentExercises.size();
+        int correctCount = details.getCorrectCount();
+        int finalScore = totalExercises == 0 ? 0 : (int) Math.round(((double) correctCount / totalExercises) * 100);
+
+        session.setFinishedAt(LocalDateTime.now());
+        session.setFinalScore(finalScore);
+        sessionRepository.save(session);
+
+        log.info("Student {} successfully submitted assignment '{}'. Score: {}%",
+                email, session.getAssignment().getTitle(), finalScore);
+    }
+
     private AssignmentResponse mapToResponse(ClassroomAssignment a) {
         return new AssignmentResponse(
                 a.getAssignmentId(),

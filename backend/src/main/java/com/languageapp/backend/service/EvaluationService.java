@@ -42,6 +42,7 @@ public class EvaluationService {
     private final AchievementService achievementService;
     private final ChallengeRepository challengeRepository;
     private final ChallengeService challengeService;
+    private final AssignmentSessionRepository sessionRepository;
 
 
     /**
@@ -89,7 +90,8 @@ public class EvaluationService {
             }
 
             log.info("Difficulty check securely BYPASSED for SUBMIT in challenge ID: {}", challengeId);
-        } else {
+        }
+         else {
             // Standard gameplay: Execute adaptive difficulty validations.
             validateUserDifficultyAccess(user, lesson, hasStarted);
         }
@@ -216,7 +218,7 @@ public class EvaluationService {
      * @param mistakes  A list to be populated with the user's initial mistakes for the summary screen.
      * @return EvaluationDetails containing the correct answer count and the dynamically calculated XP.
      */
-    private EvaluationDetails calculateEvaluationDetails(List<Exercise> exercises, LessonSubmitRequest request, List<MistakeDTO> mistakes) {
+    public EvaluationDetails calculateEvaluationDetails(List<Exercise> exercises, LessonSubmitRequest request, List<MistakeDTO> mistakes) {
         int correctCount = 0;
         int potentialXp = 0;
 
@@ -274,7 +276,7 @@ public class EvaluationService {
      */
     @lombok.Data
     @lombok.AllArgsConstructor
-    private static class EvaluationDetails {
+    public static class EvaluationDetails {
         private int correctCount;
         private int potentialXp;
     }

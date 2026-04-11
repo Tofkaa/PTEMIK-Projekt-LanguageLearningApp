@@ -1,5 +1,6 @@
 package com.languageapp.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -45,6 +46,7 @@ public class Result {
     @JoinColumn(name = "challenge_id")
     private Challenge challenge;
 
+    @JsonProperty("isTest")
     @Column(name = "is_test_result")
     private Boolean isTestResult = false;
 
