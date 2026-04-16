@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { classroomApi } from '../services/classroomApi';
 import { Card, Button, Form, Row, Col, InputGroup } from 'react-bootstrap';
+import StudentAssignmentList from './StudentAssignmentList';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Dashboard component for users with the STUDENT role.
@@ -11,6 +13,7 @@ const StudentClassrooms = () => {
     const [inviteCode, setInviteCode] = useState('');
     const [statusMessage, setStatusMessage] = useState({ text: '', type: '' });
     const [isLoading, setIsLoading] = useState(true);
+    const navigate = useNavigate();
 
     useEffect(() => {
         fetchClassrooms();
@@ -92,18 +95,26 @@ const StudentClassrooms = () => {
                 </Card.Body>
             </Card>
 
+            <StudentAssignmentList />
+
+            <hr className="my-5 border-secondary" />
+
             <h4 className="fw-bold mb-4 text-light">Saját osztályaim</h4>
             <Row className="g-4">
                 {classrooms.length === 0 ? (
                     <Col>
-                        <div className="p-5 text-center border border-secondary rounded bg-dark text-muted">
+                        <div className="p-5 text-center border border-secondary rounded bg-dark text-light">
                             Még nem vagy tagja egyetlen osztálynak sem.
                         </div>
                     </Col>
                 ) : (
                     classrooms.map(room => (
                         <Col md={6} lg={4} key={room.classroomId}>
-                            <Card className="h-100 bg-dark text-light border-secondary shadow-sm">
+                            <Card 
+                                    className="h-100 bg-dark text-light border-secondary shadow-sm"
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => navigate(`/classrooms/${room.classroomId}`, { state: { className: room.name, isOwner: false } })}
+                                >
                                 <Card.Body className="d-flex flex-column">
                                     <Card.Title className="fw-bold text-primary">{room.name}</Card.Title>
                                     <Card.Text className="text-secondary flex-grow-1" style={{ fontSize: '0.9rem' }}>

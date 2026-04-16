@@ -9,6 +9,7 @@ import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.MembershipStatus;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.BadRequestException;
+import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.ClassroomMemberRepository;
 import com.languageapp.backend.repository.ClassroomRepository;
@@ -160,16 +161,29 @@ public class ClassroomService {
     }
 
     /**
-     * Gets classroom members filtered by status
-     * Only the owner is allowed to access it.
+     * Gets classroom members filtered by status.
+     * Both the owner (teacher) and accepted students can access the ACCEPTED list.
+     * Only the owner can access the PENDING list.
      */
     @Transactional(readOnly = true)
-    public List<ClassroomMemberResponse> getClassroomMembers(UUID classroomId, MembershipStatus status, String teacherEmail) {
+    public List<ClassroomMemberResponse> getClassroomMembers(UUID classroomId, MembershipStatus status, String userEmail) {
         Classroom classroom = classroomRepository.findById(classroomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Classroom not found."));
 
-        if (!classroom.getTeacher().getEmail().equals(teacherEmail)) {
-            throw new BadRequestException("You do not have permission to view this classroom's members.");
+        User requestingUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+
+        boolean isTeacher = classroom.getTeacher().getUserId().equals(requestingUser.getUserId());
+
+        if (!isTeacher) {
+
+            ClassroomMember member = classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(classroomId, requestingUser.getUserId())
+                    .orElse(null);
+
+
+            if (member == null || member.getStatus() != MembershipStatus.ACCEPTED || status == MembershipStatus.PENDING) {
+                throw new ForbiddenException("Nincs jogosultságod a tagok megtekintéséhez.");
+            }
         }
 
         return classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, status)

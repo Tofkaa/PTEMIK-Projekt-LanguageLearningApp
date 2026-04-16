@@ -71,7 +71,7 @@ const TeacherClassrooms = () => {
                     classrooms.map(room => (
                         <Col md={6} lg={4} key={room.classroomId}>
                             <Card className="h-100 bg-dark text-light border-secondary shadow-sm" style={{ cursor: 'pointer' }}
-                                onClick={() => navigate(`/classrooms/${room.classroomId}`, { state: { className: room.name } })}>
+                                onClick={() => navigate(`/classrooms/${room.classroomId}`, { state: { className: room.name, isOwner: true } })}>
                                 <Card.Body className="d-flex flex-column">
                                     <Card.Title className="fw-bold">{room.name}</Card.Title>
                                     <Card.Text className="text-secondary flex-grow-1" style={{ fontSize: '0.9rem' }}>

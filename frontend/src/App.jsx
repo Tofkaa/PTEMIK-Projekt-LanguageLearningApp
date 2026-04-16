@@ -12,7 +12,7 @@ import ClassroomsPage from './pages/ClassroomsPage.jsx';
 import NavigationBar from './components/NavigationBar.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
-import ClassroomDetail from './pages/ClassroomDetail.jsx';
+import ClassroomDetail from './pages/ClassroomDetail.jsx'
 
 /**
  * Main Application Component

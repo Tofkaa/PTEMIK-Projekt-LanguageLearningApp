@@ -54,7 +54,6 @@ public class ClassroomController {
      * Get classroom members
      */
     @GetMapping("/{classroomId}/members")
-    @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<List<ClassroomMemberResponse>> getClassroomMembers(
             @PathVariable UUID classroomId,
             @RequestParam MembershipStatus status,

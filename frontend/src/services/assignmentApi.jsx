@@ -5,5 +5,6 @@ import api from './api';
  */
 export const assignmentApi = {
     createAssignment: (classroomId, data) => api.post(`/assignments/classroom/${classroomId}`, data),
-    getClassroomAssignments: (classroomId) => api.get(`/assignments/classroom/${classroomId}`)
+    getClassroomAssignments: (classroomId) => api.get(`/assignments/classroom/${classroomId}`),
+    getStudentActiveAssignments: () => api.get('/assignments/active')
 };

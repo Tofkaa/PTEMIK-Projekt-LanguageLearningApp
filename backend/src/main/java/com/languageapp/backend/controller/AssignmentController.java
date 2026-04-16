@@ -39,7 +39,6 @@ public class AssignmentController {
      * Teacher retrieves all assignments created for their classroom.
      */
     @GetMapping("/classroom/{classroomId}")
-    @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<List<AssignmentResponse>> getClassroomAssignments(
             @PathVariable UUID classroomId,
             Authentication auth) {
