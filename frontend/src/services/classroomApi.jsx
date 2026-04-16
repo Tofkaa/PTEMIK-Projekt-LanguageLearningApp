@@ -11,5 +11,14 @@ export const classroomApi = {
     
     getStudentClassrooms: () => api.get('/classrooms/student'),
     
-    joinClassroom: (inviteCode) => api.post('/classrooms/join', { inviteCode })
+    joinClassroom: (inviteCode) => api.post('/classrooms/join', { inviteCode }),
+    
+    getMembers: (classroomId, status) => api.get(`/classrooms/${classroomId}/members?status=${status}`),
+
+    moderateMember: (classroomId, studentId, approve) => api.patch(`/classrooms/${classroomId}/members/${studentId}/moderate?approve=${approve}`),
+
+    kickMember: (classroomId, studentId) => api.delete(`/classrooms/${classroomId}/members/${studentId}`),
+
+    getStats: (classroomId) => api.get(`/classrooms/${classroomId}/stats`)
+    
 };

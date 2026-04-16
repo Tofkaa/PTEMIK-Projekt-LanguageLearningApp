@@ -8,10 +8,11 @@ import GuestRoute from './components/GuestRoute.jsx';
 import NotFound from './pages/NotFound.jsx'; 
 import Profile from './pages/Profile.jsx'
 import Friends from './pages/Friends.jsx';
-import ClassroomsPage from './pages/ClassroomsPage.jsx'; // ÚJ IMPORT!
+import ClassroomsPage from './pages/ClassroomsPage.jsx';
 import NavigationBar from './components/NavigationBar.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
+import ClassroomDetail from './pages/ClassroomDetail.jsx';
 
 /**
  * Main Application Component
@@ -63,6 +64,22 @@ function App() {
                             <ClassroomsPage />
                         </PrivateRoute>
                     } 
+                />
+
+                <Route 
+                    path="/classrooms" 
+                    element={
+                    <PrivateRoute>
+                        <ClassroomsPage />
+                    </PrivateRoute>} 
+                />
+                
+                <Route 
+                    path="/classrooms/:id" 
+                    element={
+                    <PrivateRoute>
+                        <ClassroomDetail />
+                    </PrivateRoute>} 
                 />
 
                 <Route
