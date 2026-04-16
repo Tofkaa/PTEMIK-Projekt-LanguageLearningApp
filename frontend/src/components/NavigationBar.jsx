@@ -45,6 +45,12 @@ const NavigationBar = () => {
                         <Nav.Link onClick={() => navigate('/dashboard')} className="fw-bold">
                             Dashboard
                         </Nav.Link>
+
+                        {/* Classrooms */}
+                        <Nav.Link onClick={() => navigate('/classrooms')} className="fw-bold">
+                            🏫 Osztálytermek
+                        </Nav.Link>
+
                         {/* Community */}
                         <Nav.Link onClick={() => navigate('/friends')} className="fw-bold position-relative me-3">
                             🌐 Közösség

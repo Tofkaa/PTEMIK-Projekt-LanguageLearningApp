@@ -8,6 +8,7 @@ import GuestRoute from './components/GuestRoute.jsx';
 import NotFound from './pages/NotFound.jsx'; 
 import Profile from './pages/Profile.jsx'
 import Friends from './pages/Friends.jsx';
+import ClassroomsPage from './pages/ClassroomsPage.jsx'; // ÚJ IMPORT!
 import NavigationBar from './components/NavigationBar.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
@@ -53,6 +54,17 @@ function App() {
                         </PrivateRoute>
                     } 
                 />
+                
+                {/* Classrooms main page */}
+                <Route 
+                    path="/classrooms" 
+                    element={
+                        <PrivateRoute>
+                            <ClassroomsPage />
+                        </PrivateRoute>
+                    } 
+                />
+
                 <Route
                     path="/lesson/:id" 
                     element={
@@ -73,7 +85,9 @@ function App() {
                 <Route 
                     path="/friends" 
                     element={
-                        <Friends />
+                        <PrivateRoute>
+                            <Friends />
+                        </PrivateRoute>
                     } 
                 />
 
