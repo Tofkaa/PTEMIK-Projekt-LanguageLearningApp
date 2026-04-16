@@ -1,5 +1,6 @@
 package com.languageapp.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 import org.hibernate.annotations.JdbcTypeCode;
@@ -23,6 +24,7 @@ public class Exercise {
     @Column(name = "exercise_id", updatable = false, nullable = false)
     private UUID exerciseId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
@@ -34,6 +36,7 @@ public class Exercise {
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> content;
 
+    @JsonIgnore
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "correct_answer", columnDefinition = "jsonb")
     private Map<String, Object> correctAnswer;

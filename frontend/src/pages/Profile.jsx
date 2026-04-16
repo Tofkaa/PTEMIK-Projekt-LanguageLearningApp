@@ -18,6 +18,12 @@ const Profile = () => {
     const [isUpdating, setIsUpdating] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
     
+    // Translate roles
+    const roleLabels = {
+        ADMIN: 'Rendszergazda',
+        TEACHER: 'Tanár',
+        STUDENT: 'Diák'
+    };
 
     // --- EVENT HANDLERS ---
     
@@ -90,7 +96,7 @@ const Profile = () => {
                                     </Badge>
                                 </div>
                                 <Badge bg="info" text="dark" className="px-3 py-2 rounded-pill mb-4 fw-bold">
-                                    {user.role === 'ADMIN' ? 'Rendszergazda' : 'Diák'}
+                                    {roleLabels[user.role] || 'Diák'}
                                 </Badge>
 
                               <div className="d-flex flex-column gap-3 w-100 mb-2"> 

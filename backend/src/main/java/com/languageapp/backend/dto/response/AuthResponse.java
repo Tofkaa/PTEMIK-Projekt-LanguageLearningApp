@@ -1,5 +1,6 @@
 package com.languageapp.backend.dto.response;
 
+import com.languageapp.backend.enums.Role;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import java.util.UUID;
@@ -12,7 +13,7 @@ public class AuthResponse {
     private UUID userId;
     private String name;
     private String email;
-    private String role;
+    private Role role;
     private String userTag;
     private String friendCode;
 }

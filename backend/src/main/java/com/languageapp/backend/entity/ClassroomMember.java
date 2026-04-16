@@ -1,5 +1,6 @@
 package com.languageapp.backend.entity;
 
+import com.languageapp.backend.enums.MembershipStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,7 +13,9 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "classroom_members")
+@Table(name = "classroom_members", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"classroom_id", "user_id"})
+})
 
 public class ClassroomMember {
 
@@ -34,4 +37,8 @@ public class ClassroomMember {
     @CreationTimestamp
     @Column(name = "joined_at", nullable = false, updatable = false)
     private LocalDateTime joinedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private MembershipStatus status = MembershipStatus.PENDING;
 }

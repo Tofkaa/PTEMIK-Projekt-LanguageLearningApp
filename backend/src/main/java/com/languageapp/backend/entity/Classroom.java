@@ -31,7 +31,7 @@ public class Classroom {
     @JoinColumn(name = "teacher_id", nullable = false)
     private User teacher;
 
-    @Column(name = "invite_code", length = 10)
+    @Column(name = "invite_code", length = 10, unique = true, nullable = false)
     private String inviteCode;
 
     @CreationTimestamp

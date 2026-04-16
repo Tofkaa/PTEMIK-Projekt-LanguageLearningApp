@@ -2,6 +2,7 @@
 package com.languageapp.backend.repository;
 
 import com.languageapp.backend.entity.ClassroomMember;
+import com.languageapp.backend.enums.MembershipStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -12,10 +13,18 @@ import java.util.UUID;
 
 @Repository
 public interface ClassroomMemberRepository extends JpaRepository<ClassroomMember, UUID> {
-    List<ClassroomMember> findByClassroomClassroomId(UUID classroomId);
-    List<ClassroomMember> findByUserUserId(UUID userId);
-    Optional<ClassroomMember> findByClassroomClassroomIdAndUserUserId(UUID classroomId, UUID userId);
 
+    boolean existsByClassroom_ClassroomIdAndUser_UserId(UUID classroomId, UUID userId);
+
+    List<ClassroomMember> findAllByClassroom_ClassroomIdOrderByJoinedAtDesc(UUID classroomId);
+
+    List<ClassroomMember> findAllByClassroom_ClassroomIdAndStatus(UUID classroomId, MembershipStatus status);
+
+    Optional<ClassroomMember> findByClassroom_ClassroomIdAndUser_UserId(UUID classroomId, UUID userId);
+
+    int countByClassroom_ClassroomIdAndStatus(UUID classroomId, MembershipStatus status);
+
+    List<ClassroomMember> findAllByUser_UserIdAndStatus(UUID userId, MembershipStatus status);
     @Query("SELECT u.name AS studentName, COUNT(p.progressId) AS totalCompletedLessons, AVG(p.highestScore) AS averageScore " +
             "FROM ClassroomMember cm " +
             "JOIN cm.user u " +
