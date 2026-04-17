@@ -42,6 +42,9 @@ public class ClassroomAssignment {
     @Column(name = "allow_retries", nullable = false)
     private boolean allowRetries = false;
 
+    @Column(name = "has_feedback", nullable = false)
+    private boolean hasFeedback;
+
     @Column(name = "available_from")
     private LocalDateTime availableFrom;
 
@@ -51,7 +54,6 @@ public class ClassroomAssignment {
     @Column(name = "time_limit_minutes")
     private Integer timeLimitMinutes;
 
-    // Leckék helyett most már konkrét feladatokat tárolunk
     @ManyToMany
     @JoinTable(
             name = "assignment_exercises",

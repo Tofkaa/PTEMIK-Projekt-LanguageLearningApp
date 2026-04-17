@@ -27,6 +27,7 @@ const TeacherClassroomDetail = () => {
     const [assignmentForm, setAssignmentForm] = useState({
         title: '',
         description: '',
+        hasFeedback: false,
         isTest: false,
         isRandomized: true,
         allowRetries: false,
@@ -149,14 +150,20 @@ const TeacherClassroomDetail = () => {
     const handleAssignmentSubmit = async (e) => {
         e.preventDefault();
         const payload = {
-            ...assignmentForm,
-            isTest: assignmentMode === 'TEST' ? assignmentForm.isTest : false,
-            allowRetries: assignmentMode === 'TEST' ? assignmentForm.allowRetries : true,
-            timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
-            availableFrom: assignmentForm.availableFrom ? new Date(assignmentForm.availableFrom).toISOString() : null,
-            availableUntil: assignmentForm.availableUntil ? new Date(assignmentForm.availableUntil).toISOString() : null
-        };
-
+        title: assignmentForm.title,
+        description: assignmentForm.description,
+        isTest: assignmentMode === 'TEST', 
+        
+        
+        hasFeedback: assignmentMode === 'TEST' ? assignmentForm.hasFeedback : true,
+        randomized: assignmentForm.isRandomized, 
+        allowRetries: assignmentMode === 'TEST' ? assignmentForm.allowRetries : true,
+        
+        timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
+        availableFrom: assignmentForm.availableFrom ? new Date(assignmentForm.availableFrom).toISOString() : null,
+        availableUntil: assignmentForm.availableUntil ? new Date(assignmentForm.availableUntil).toISOString() : null,
+        exerciseIds: assignmentForm.exerciseIds
+    };
         try {
             await assignmentApi.createAssignment(classroomId, payload);
             setIsAssignmentModalOpen(false);
@@ -274,9 +281,17 @@ const TeacherClassroomDetail = () => {
                                     
                                     {assignmentMode === 'TEST' && (
                                         <div className="small border-top border-secondary pt-2">
-                                            <Form.Check type="switch" label="Azonnali visszajelzés" className="mb-1" checked={assignmentForm.isTest} onChange={e => setAssignmentForm({...assignmentForm, isTest: e.target.checked})} />
-                                            <Form.Check type="switch" label="Kevert sorrend" className="mb-1" checked={assignmentForm.isRandomized} onChange={e => setAssignmentForm({...assignmentForm, isRandomized: e.target.checked})} />
-                                            <Form.Check type="switch" label="Második esély a hibás válaszoknál" checked={assignmentForm.allowRetries} onChange={e => setAssignmentForm({...assignmentForm, allowRetries: e.target.checked})} />
+                                            <Form.Check type="switch" label="Azonnali visszajelzés" className="mb-1" 
+                                                checked={assignmentForm.hasFeedback} 
+                                                onChange={e => setAssignmentForm({...assignmentForm, hasFeedback: e.target.checked})} />
+                                                
+                                            <Form.Check type="switch" label="Kevert sorrend" className="mb-1" 
+                                                checked={assignmentForm.isRandomized} 
+                                                onChange={e => setAssignmentForm({...assignmentForm, isRandomized: e.target.checked})} />
+                                                
+                                            <Form.Check type="switch" label="Második esély a hibás válaszoknál" 
+                                                checked={assignmentForm.allowRetries} 
+                                                onChange={e => setAssignmentForm({...assignmentForm, allowRetries: e.target.checked})} />
                                         </div>
                                     )}
                                 </div>

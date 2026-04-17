@@ -63,7 +63,7 @@ const TeacherClassrooms = () => {
             <Row className="g-4">
                 {classrooms.length === 0 ? (
                     <Col>
-                        <div className="p-5 text-center border border-secondary rounded bg-dark text-muted">
+                        <div className="p-5 text-center border border-secondary rounded bg-dark text-light">
                             Még nem hoztál létre egyetlen osztálytermet sem.
                         </div>
                     </Col>

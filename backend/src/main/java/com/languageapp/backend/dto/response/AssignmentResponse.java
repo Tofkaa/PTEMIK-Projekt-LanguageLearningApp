@@ -22,4 +22,5 @@ public class AssignmentResponse {
     private int exerciseCount;
     private boolean isRandomized;
     private boolean allowRetries;
+    private boolean hasFeedback;
 }

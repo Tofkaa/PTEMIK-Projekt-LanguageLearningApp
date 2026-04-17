@@ -56,6 +56,7 @@ public class AssignmentService {
         assignment.setTest(request.isTest());
         assignment.setRandomized(request.isRandomized());
         assignment.setAllowRetries(request.isAllowRetries());
+        assignment.setHasFeedback(request.isHasFeedback());
         assignment.setAvailableFrom(request.getAvailableFrom());
         assignment.setAvailableUntil(request.getAvailableUntil());
         assignment.setTimeLimitMinutes(request.getTimeLimitMinutes());
@@ -140,6 +141,7 @@ public class AssignmentService {
                 session.getStartedAt(),
                 assignment.getTimeLimitMinutes(),
                 assignment.isAllowRetries(),
+                assignment.isHasFeedback(),
                 exercises
         );
     }
@@ -208,7 +210,8 @@ public class AssignmentService {
                 a.getAvailableUntil(),
                 a.getExercises().size(),
                 a.isRandomized(),
-                a.isAllowRetries()
+                a.isAllowRetries(),
+                a.isHasFeedback()
         );
     }
 }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Card, Button, Row, Col, Alert, Spinner } from 'react-bootstrap';
+import { assignmentApi } from '../services/assignmentApi';
 
 const AssignmentStart = () => {
     const { id: assignmentId } = useParams();
@@ -15,17 +16,22 @@ const AssignmentStart = () => {
     const startTest = async () => {
         setIsStarting(true);
         try {
-            // IDE JÖN MAJD A BACKEND HÍVÁS A SESSION INDÍTÁSÁHOZ
-            // await assignmentApi.startAssignment(assignmentId);
+            // Éles backend hívás: Létrehozza a Sessiont és letölti a feladatokat
+            const res = await assignmentApi.startAssignment(assignmentId);
             
-            // Átirányítás a tényleges feladatmegoldó nézetbe
-            navigate(`/assignment/${assignmentId}/play`);
+            // A backendtől kapott session adatokkal megyünk tovább a lejátszóba
+            navigate(`/assignment/session/${res.data.sessionId}/play`, { 
+                state: { 
+                    sessionData: res.data, 
+                    assignmentDetails: details 
+                } 
+            });
         } catch (error) {
             console.error("Nem sikerült elindítani a tesztet", error);
+            alert("Hiba történt a teszt indításakor. Lehet, hogy már kitöltötted, vagy lejárt az idő.");
             setIsStarting(false);
         }
     };
-
     // Ha valaki frissít (F5) és elvész a memória-state, vagy rossz a link
     if (!details) {
         return (

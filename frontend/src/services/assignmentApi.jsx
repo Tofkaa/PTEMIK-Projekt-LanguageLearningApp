@@ -8,5 +8,6 @@ export const assignmentApi = {
     getClassroomAssignments: (classroomId) => api.get(`/assignments/classroom/${classroomId}`),
     getStudentActiveAssignments: () => api.get('/assignments/active'),
     getAssignmentDetails: (assignmentId) => api.get(`/assignments/${assignmentId}`),
-    startAssignment: (assignmentId) => api.post(`/assignments/${assignmentId}/start`)
+    startAssignment: (assignmentId) => api.post(`/assignments/${assignmentId}/start`),
+    submitAssignment: (sessionId, answers) => api.post(`/assignments/sessions/${sessionId}/submit`, { answers })
 };
