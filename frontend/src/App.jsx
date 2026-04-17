@@ -13,6 +13,7 @@ import NavigationBar from './components/NavigationBar.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import ClassroomDetail from './pages/ClassroomDetail.jsx'
+import AssignmentStart from './pages/AssignmentStart.jsx';
 
 /**
  * Main Application Component
@@ -79,6 +80,14 @@ function App() {
                     element={
                     <PrivateRoute>
                         <ClassroomDetail />
+                    </PrivateRoute>} 
+                />
+
+                <Route 
+                    path="/assignment/:id/start" 
+                    element={
+                    <PrivateRoute>
+                        <AssignmentStart />
                     </PrivateRoute>} 
                 />
 

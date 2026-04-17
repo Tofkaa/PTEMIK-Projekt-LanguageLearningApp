@@ -90,7 +90,7 @@ const StudentClassroomDetail = () => {
                                             <Button 
                                                 variant="primary" 
                                                 className="w-100 fw-bold"
-                                                onClick={() => navigate(`/assignment/${a.assignmentId}/start`)}
+                                                onClick={() => navigate(`/assignment/${a.assignmentId}/start`, { state: { assignmentDetails: a } })}
                                             >
                                                 Indítás
                                             </Button>

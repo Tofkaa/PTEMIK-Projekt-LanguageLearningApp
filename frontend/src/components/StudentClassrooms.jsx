@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { classroomApi } from '../services/classroomApi';
 import { Card, Button, Form, Row, Col, InputGroup } from 'react-bootstrap';
-import StudentAssignmentList from './StudentAssignmentList';
 import { useNavigate } from 'react-router-dom';
 
 /**
@@ -94,10 +93,6 @@ const StudentClassrooms = () => {
                     )}
                 </Card.Body>
             </Card>
-
-            <StudentAssignmentList />
-
-            <hr className="my-5 border-secondary" />
 
             <h4 className="fw-bold mb-4 text-light">Saját osztályaim</h4>
             <Row className="g-4">
