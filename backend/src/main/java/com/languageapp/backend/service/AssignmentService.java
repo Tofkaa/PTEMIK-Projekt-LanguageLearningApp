@@ -57,6 +57,7 @@ public class AssignmentService {
         assignment.setRandomized(request.isRandomized());
         assignment.setAllowRetries(request.isAllowRetries());
         assignment.setHasFeedback(request.isHasFeedback());
+        assignment.setMaxAttempts(request.getMaxAttempts());
         assignment.setAvailableFrom(request.getAvailableFrom());
         assignment.setAvailableUntil(request.getAvailableUntil());
         assignment.setTimeLimitMinutes(request.getTimeLimitMinutes());
@@ -211,7 +212,8 @@ public class AssignmentService {
                 a.getExercises().size(),
                 a.isRandomized(),
                 a.isAllowRetries(),
-                a.isHasFeedback()
+                a.isHasFeedback(),
+                a.getMaxAttempts()
         );
     }
 }

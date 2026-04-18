@@ -45,6 +45,9 @@ public class ClassroomAssignment {
     @Column(name = "has_feedback", nullable = false)
     private boolean hasFeedback;
 
+    @Column(name = "max_attempts")
+    private Integer maxAttempts;
+
     @Column(name = "available_from")
     private LocalDateTime availableFrom;
 

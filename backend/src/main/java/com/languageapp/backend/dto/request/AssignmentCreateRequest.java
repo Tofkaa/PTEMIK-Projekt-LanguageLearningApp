@@ -27,6 +27,8 @@ public class AssignmentCreateRequest {
     @JsonProperty("hasFeedback")
     private boolean hasFeedback;
 
+    private Integer maxAttempts;
+
     private LocalDateTime availableFrom;
     private LocalDateTime availableUntil;
     private Integer timeLimitMinutes;

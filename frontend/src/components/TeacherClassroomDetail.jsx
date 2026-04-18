@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, Form } from 'react-bootstrap';
+import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, Form, Spinner } from 'react-bootstrap';
 import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 import { lessonApi } from '../services/lessonApi';
@@ -31,6 +31,7 @@ const TeacherClassroomDetail = () => {
         isTest: false,
         isRandomized: true,
         allowRetries: false,
+        maxAttempts: '',
         timeLimitMinutes: '',
         availableFrom: '',
         availableUntil: '',
@@ -38,6 +39,7 @@ const TeacherClassroomDetail = () => {
     });
 
     const [previewExerciseId, setPreviewExerciseId] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchDashboardData = useCallback(async () => {
@@ -149,6 +151,10 @@ const TeacherClassroomDetail = () => {
 
     const handleAssignmentSubmit = async (e) => {
         e.preventDefault();
+
+        if (isSubmitting) return; 
+        setIsSubmitting(true);
+
         const payload = {
         title: assignmentForm.title,
         description: assignmentForm.description,
@@ -158,18 +164,19 @@ const TeacherClassroomDetail = () => {
         hasFeedback: assignmentMode === 'TEST' ? assignmentForm.hasFeedback : true,
         randomized: assignmentForm.isRandomized, 
         allowRetries: assignmentMode === 'TEST' ? assignmentForm.allowRetries : true,
-        
+        maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
+
         timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
         availableFrom: assignmentForm.availableFrom ? new Date(assignmentForm.availableFrom).toISOString() : null,
         availableUntil: assignmentForm.availableUntil ? new Date(assignmentForm.availableUntil).toISOString() : null,
         exerciseIds: assignmentForm.exerciseIds
     };
-        try {
+       try {
             await assignmentApi.createAssignment(classroomId, payload);
             setIsAssignmentModalOpen(false);
             setAssignmentForm({
-                title: '', description: '', isTest: false, isRandomized: true,
-                allowRetries: false, timeLimitMinutes: '', availableFrom: '', availableUntil: '', exerciseIds: []
+                title: '', description: '', hasFeedback: false, isTest: false, isRandomized: true,
+                allowRetries: false, maxAttempts: '', timeLimitMinutes: '', availableFrom: '', availableUntil: '', exerciseIds: []
             });
             setSelectedExercisesData([]);
             setAssignmentMode('TEST');
@@ -179,6 +186,8 @@ const TeacherClassroomDetail = () => {
         } catch (error) {
             console.error("Hiba a feladat kiosztásakor:", error);
             alert(error.response?.data?.message || "Hiba történt a mentés során.");
+        } finally {
+            setIsSubmitting(false); 
         }
     };
 
@@ -277,7 +286,31 @@ const TeacherClassroomDetail = () => {
                                     
                                     <Form.Group className="mb-3"><Form.Label className="small text-secondary fw-bold">Cím</Form.Label><Form.Control type="text" required className="bg-dark text-light border-secondary" value={assignmentForm.title} onChange={e => setAssignmentForm({...assignmentForm, title: e.target.value})} /></Form.Group>
                                     <Form.Group className="mb-3"><Form.Label className="small text-secondary fw-bold">Leírás</Form.Label><Form.Control as="textarea" rows={2} className="bg-dark text-light border-secondary" value={assignmentForm.description} onChange={e => setAssignmentForm({...assignmentForm, description: e.target.value})} /></Form.Group>
-                                    <Form.Group className="mb-3"><Form.Label className="small text-secondary fw-bold">Idő (perc)</Form.Label><Form.Control type="number" className="bg-dark text-light border-secondary" value={assignmentForm.timeLimitMinutes} onChange={e => setAssignmentForm({...assignmentForm, timeLimitMinutes: e.target.value})} /></Form.Group>
+                                    <Form.Group className="mb-3"><Form.Label className="small text-secondary fw-bold">Idő (perc)</Form.Label><Form.Control type="number" 
+                                            min="1" 
+                                            className="bg-dark text-light border-secondary" 
+                                            value={assignmentForm.timeLimitMinutes} 
+                                            onChange={e => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                setAssignmentForm({...assignmentForm, timeLimitMinutes: val});
+                                            }} /></Form.Group>
+                                    
+                                    {assignmentMode === 'TEST' && (
+                                        <Form.Group className="mb-3">
+                                            <Form.Label className="small text-warning fw-bold">Maximum próbálkozás (Újraírás)</Form.Label>
+                                            <Form.Control 
+                                              type="number" 
+                                                min="1"
+                                                placeholder="Üresen hagyva korlátlan" 
+                                                className="bg-dark text-light border-warning" 
+                                                value={assignmentForm.maxAttempts || ''} 
+                                                onChange={e => {
+                                                    const val = e.target.value.replace(/\D/g, '');
+                                                    setAssignmentForm({...assignmentForm, maxAttempts: val});
+                                                }}
+                                            />
+                                        </Form.Group>
+                                    )}
                                     
                                     {assignmentMode === 'TEST' && (
                                         <div className="small border-top border-secondary pt-2">
@@ -352,8 +385,16 @@ const TeacherClassroomDetail = () => {
                     </Modal.Body>
                     <Modal.Footer className="border-secondary">
                         <Button variant="outline-light" onClick={() => setIsAssignmentModalOpen(false)}>Mégse</Button>
-                        <Button variant="primary" type="submit" className="fw-bold px-4" disabled={assignmentForm.exerciseIds.length === 0}>
-                            {assignmentMode === 'TEST' ? 'Dolgozat Kiosztása' : 'Tananyag Publikálása'}
+                        <Button variant="primary" 
+                            type="submit" 
+                            className="fw-bold px-4" 
+                            disabled={assignmentForm.exerciseIds.length === 0 || isSubmitting}
+                            >
+                            {isSubmitting ? (
+                                <><Spinner size="sm" animation="border" className="me-2" /> Mentés...</>
+                            ) : (
+                                assignmentMode === 'TEST' ? 'Dolgozat Kiosztása' : 'Tananyag Publikálása'
+                            )}
                         </Button>
                     </Modal.Footer>
                 </Form>

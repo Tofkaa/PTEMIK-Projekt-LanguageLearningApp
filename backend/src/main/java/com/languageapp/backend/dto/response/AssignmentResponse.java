@@ -23,4 +23,5 @@ public class AssignmentResponse {
     private boolean isRandomized;
     private boolean allowRetries;
     private boolean hasFeedback;
+    private Integer maxAttempts;
 }
