@@ -232,19 +232,32 @@ const TeacherClassroomDetail = () => {
                             assignments.map(a => (
                                 <Col md={6} lg={4} key={a.assignmentId}>
                                     <Card className="h-100 bg-dark text-light border-secondary shadow-sm">
-                                        <Card.Body>
+                                        <Card.Body className="d-flex flex-column">
                                             <div className="d-flex justify-content-between align-items-start mb-2">
                                                 <Card.Title className="fw-bold text-primary m-0">{a.title}</Card.Title>
-                                                {a.test ? <Badge bg="danger">Tesztmód</Badge> : <Badge bg="success">Gyakorló</Badge>}
-                                                <Button variant="outline-danger" size="sm" className="border-0 py-0 fs-5" onClick={() => handleDeleteAssignment(a.assignmentId)} title="Feladat törlése">
-                                                    törlés🗑️
-                                                </Button>
+                                                <div>
+                                                    {a.test ? <Badge bg="danger" className="me-2">Tesztmód</Badge> : <Badge bg="success" className="me-2">Gyakorló</Badge>}
+                                                    <Button variant="outline-danger" size="sm" className="border-0 py-0 fs-5" onClick={() => handleDeleteAssignment(a.assignmentId)} title="Feladat törlése">
+                                                        törlés🗑️
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <Card.Text className="text-secondary mb-3" style={{ fontSize: '0.9rem' }}>{a.description}</Card.Text>
-                                            <ListGroup variant="flush" className="bg-transparent border-top border-secondary pt-2">
+                                            <Card.Text className="text-secondary mb-3 flex-grow-1" style={{ fontSize: '0.9rem' }}>{a.description}</Card.Text>
+                                            
+                                            <ListGroup variant="flush" className="bg-transparent border-top border-secondary pt-2 mb-3">
                                                 <ListGroup.Item className="bg-transparent text-light border-0 p-1" style={{ fontSize: '0.85rem' }}><strong>Feladatok:</strong> {a.exerciseCount} db</ListGroup.Item>
                                                 <ListGroup.Item className="bg-transparent text-light border-0 p-1" style={{ fontSize: '0.85rem' }}><strong>Idő:</strong> {a.timeLimitMinutes ? `${a.timeLimitMinutes} perc` : 'Nincs'}</ListGroup.Item>
                                             </ListGroup>
+                            
+                                            <div className="mt-auto pt-2 border-top border-secondary">
+                                                <Button 
+                                                    variant="outline-info" 
+                                                    className="w-100 fw-bold shadow-sm mt-2"
+                                                    onClick={() => navigate(`/assignment/${a.assignmentId}/submissions`, { state: { assignmentTitle: a.title, classroomName: classroomName } })}
+                                                >
+                                                    👨‍🏫 Beadott munkák értékelése
+                                                </Button>
+                                            </div>
                                         </Card.Body>
                                     </Card>
                                 </Col>

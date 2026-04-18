@@ -1,9 +1,8 @@
 package com.languageapp.backend.service;
 
-import com.languageapp.backend.dto.request.AssignmentCreateRequest;
-import com.languageapp.backend.dto.request.AssignmentSubmitRequest;
-import com.languageapp.backend.dto.request.LessonSubmitRequest;
+import com.languageapp.backend.dto.request.*;
 import com.languageapp.backend.dto.response.AssignmentResponse;
+import com.languageapp.backend.dto.response.AssignmentSessionResponse;
 import com.languageapp.backend.dto.response.AssignmentStartResponse;
 import com.languageapp.backend.dto.response.MistakeDTO;
 import com.languageapp.backend.entity.*;
@@ -14,6 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.languageapp.backend.dto.request.ExerciseSubmission;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -36,6 +38,7 @@ public class AssignmentService {
     private final ClassroomMemberRepository classroomMemberRepository;
     private final AssignmentSessionRepository sessionRepository;
     private final EvaluationService evaluationService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Creates a new assignment. Validates teacher authority and existence of exercises.
@@ -211,6 +214,14 @@ public class AssignmentService {
 
         session.setFinishedAt(LocalDateTime.now());
         session.setFinalScore(finalScore);
+
+        try {
+            session.setRawAnswers(objectMapper.writeValueAsString(request.getAnswers()));
+        } catch (Exception e) {
+            log.error("Hiba a válaszok JSON-re alakításakor", e);
+            // Nem dobunk hibát, hogy a pontszám mentése legalább sikerüljön
+        }
+
         sessionRepository.save(session);
 
         log.info("Student {} successfully submitted assignment '{}'. Score: {}%",
@@ -227,6 +238,69 @@ public class AssignmentService {
         }
 
         assignmentRepository.delete(assignment);
+    }
+
+    /**
+     * Lekéri egy adott feladat beadott munkáit a tanár számára.
+     */
+    @Transactional(readOnly = true)
+    public List<AssignmentSessionResponse> getSessionsForAssignment(UUID assignmentId, String teacherEmail) {
+        ClassroomAssignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
+
+        // Csak a feladatot kiíró tanár láthatja a beadott munkákat
+        if (!assignment.getClassroom().getTeacher().getEmail().equals(teacherEmail)) {
+            throw new BadRequestException("Unauthorized access to these sessions.");
+        }
+
+        return sessionRepository.findAllByAssignment_AssignmentIdOrderByStartedAtDesc(assignmentId)
+                .stream()
+                .filter(session -> session.getFinishedAt() != null)
+                .map(s -> {
+                    List<ExerciseSubmission> answersList = new ArrayList<>();
+                    try {
+                        if (s.getRawAnswers() != null) {
+                            // JAVÍTVA: A letisztult TypeReference beolvasás
+                            answersList = objectMapper.readValue(s.getRawAnswers(), new TypeReference<List<ExerciseSubmission>>() {});
+                        }
+                    } catch (Exception e) {
+                        log.error("Hiba a válaszok visszaolvasásakor", e);
+                    }
+
+                    return new AssignmentSessionResponse(
+                            s.getSessionId(),
+                            s.getUser().getName(),
+                            s.getUser().getEmail(),
+                            s.getStartedAt(),
+                            s.getFinishedAt(),
+                            s.getFinalScore(),
+                            s.getTeacherScore(),
+                            s.getTeacherComment(),
+                            s.isGraded(),
+                            answersList
+                    );
+                }).toList();
+    }
+
+    /**
+     * Tanári értékelés elmentése és publikálása
+     */
+    @Transactional
+    public void gradeSession(UUID sessionId, TeacherGradeRequest request, String teacherEmail) {
+        AssignmentSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+
+        // Csak a tanár értékelhet
+        if (!session.getAssignment().getClassroom().getTeacher().getEmail().equals(teacherEmail)) {
+            throw new BadRequestException("Unauthorized to grade this session.");
+        }
+
+        session.setTeacherScore(request.getTeacherScore());
+        session.setTeacherComment(request.getTeacherComment());
+        session.setGraded(true); // Ez a flag engedélyezi majd a diáknál az "Eredmény megtekintése" gombot!
+
+        sessionRepository.save(session);
+        log.info("Teacher {} graded session {}. Published: true", teacherEmail, sessionId);
     }
 
     private AssignmentResponse mapToResponse(ClassroomAssignment a, String email) {

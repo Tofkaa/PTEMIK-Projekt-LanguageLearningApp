@@ -2,7 +2,9 @@ package com.languageapp.backend.controller;
 
 import com.languageapp.backend.dto.request.AssignmentCreateRequest;
 import com.languageapp.backend.dto.request.AssignmentSubmitRequest;
+import com.languageapp.backend.dto.request.TeacherGradeRequest;
 import com.languageapp.backend.dto.response.AssignmentResponse;
+import com.languageapp.backend.dto.response.AssignmentSessionResponse;
 import com.languageapp.backend.dto.response.AssignmentStartResponse;
 import com.languageapp.backend.service.AssignmentService;
 import jakarta.validation.Valid;
@@ -81,6 +83,30 @@ public class AssignmentController {
             @PathVariable UUID id,
             Authentication auth) {
         assignmentService.deleteAssignment(id, auth.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Tanár lekéri egy adott feladat összes beadott munkáját.
+     */
+    @GetMapping("/{id}/sessions")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<List<AssignmentSessionResponse>> getAssignmentSessions(
+            @PathVariable UUID id,
+            Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getSessionsForAssignment(id, auth.getName()));
+    }
+
+    /**
+     * Tanár beküldi a felülbírált pontszámot és az értékelést (Publikálás).
+     */
+    @PostMapping("/sessions/{sessionId}/grade")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<Void> gradeAssignmentSession(
+            @PathVariable UUID sessionId,
+            @RequestBody TeacherGradeRequest request,
+            Authentication auth) {
+        assignmentService.gradeSession(sessionId, request, auth.getName());
         return ResponseEntity.ok().build();
     }
 }

@@ -15,6 +15,7 @@ import { NotificationProvider } from './context/NotificationContext.jsx';
 import ClassroomDetail from './pages/ClassroomDetail.jsx';
 import AssignmentStart from './pages/AssignmentStart.jsx';
 import AssignmentPlayer from './pages/AssignmentPlayer.jsx';
+import AssignmentSubmissions from './pages/AssignmentSubmissions.jsx';
 
 /**
  * Main Application Component
@@ -40,10 +41,11 @@ function App() {
                     {/* Classrooms pages */}
                     <Route path="/classrooms" element={<PrivateRoute><ClassroomsPage /></PrivateRoute>} />
                     <Route path="/classrooms/:id" element={<PrivateRoute><ClassroomDetail /></PrivateRoute>} />
-
+                    
                     {/* Assignment Engine */}
                     <Route path="/assignment/:id/start" element={<PrivateRoute><AssignmentStart /></PrivateRoute>} />
                     <Route path="/assignment/session/:sessionId/play" element={<PrivateRoute><AssignmentPlayer /></PrivateRoute>} />
+                    <Route path="/assignment/:id/submissions" element={<AssignmentSubmissions />} />
 
                     {/* Other pages */}
                     <Route path="/lesson/:id" element={<PrivateRoute><Lesson /></PrivateRoute>} />

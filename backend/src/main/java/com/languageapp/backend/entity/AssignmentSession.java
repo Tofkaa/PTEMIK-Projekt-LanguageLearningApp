@@ -34,4 +34,17 @@ public class AssignmentSession {
 
     @Column(name = "final_score")
     private Integer finalScore;
+
+    @Column(name = "teacher_score")
+    private Integer teacherScore;
+
+    @Column(name = "teacher_comment", columnDefinition = "TEXT")
+    private String teacherComment;
+
+    @Column(name = "is_graded", columnDefinition = "boolean default false")
+    private boolean isGraded = false;
+
+    @Column(name = "raw_answers", columnDefinition = "TEXT")
+    private String rawAnswers;
+
 }

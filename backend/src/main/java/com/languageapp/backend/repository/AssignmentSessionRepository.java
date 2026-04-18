@@ -20,4 +20,10 @@ public interface AssignmentSessionRepository extends JpaRepository<AssignmentSes
      * Used to prevent multiple start attempts and to resume existing timers.
      */
     List<AssignmentSession> findAllByAssignment_AssignmentIdAndUser_UserId(UUID assignmentId, UUID userId);
+
+    /**
+     * Lekéri egy adott feladat összes próbálkozását, a legújabb kezdéssel legelöl.
+     */
+    List<AssignmentSession> findAllByAssignment_AssignmentIdOrderByStartedAtDesc(UUID assignmentId);
+
 }

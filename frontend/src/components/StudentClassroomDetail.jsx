@@ -96,7 +96,7 @@ const StudentClassroomDetail = () => {
                         <Tab eventKey="active" title={<span className="fw-bold">🔥 Aktív Teendők</span>}>
                             <Row className="g-4 mt-1">
                                 {activeAssignments.length === 0 ? (
-                                    <Col><div className="p-5 text-center border border-secondary rounded bg-dark text-muted">Nincs aktív feladatod. 🎉</div></Col>
+                                    <Col><div className="p-5 text-center border border-secondary rounded bg-dark text-light">Nincs aktív feladatod. 🎉</div></Col>
                                 ) : (
                                     activeAssignments.map(a => (
                                         <Col md={6} lg={4} key={a.assignmentId}>
