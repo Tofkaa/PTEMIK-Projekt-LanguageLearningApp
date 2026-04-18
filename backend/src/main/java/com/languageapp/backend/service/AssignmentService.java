@@ -215,11 +215,47 @@ public class AssignmentService {
         session.setFinishedAt(LocalDateTime.now());
         session.setFinalScore(finalScore);
 
+        List<AssignmentSessionResponse.AnswerDetail> detailedAnswers = new ArrayList<>();
+
+        for (ExerciseSubmission sub : request.getAnswers()) {
+            // Kikeresjük az eredeti feladatot
+            Exercise ex = assignmentExercises.stream()
+                    .filter(e -> e.getExerciseId().equals(sub.getExerciseId()))
+                    .findFirst().orElse(null);
+
+            // Kinyerjük a kérdés szövegét
+            String questionText = "Ismeretlen kérdés";
+            if (ex != null && ex.getContent() != null) {
+                if (ex.getContent().containsKey("question")) {
+                    questionText = ex.getContent().get("question").toString();
+                } else {
+                    questionText = ex.getType().toString();
+                }
+            }
+
+            // Megnézzük, hogy az értékelő motor szerint ez a válasz hibás volt-e (benne van-e a mistakes listában)
+            boolean isCorrect = true;
+            for (MistakeDTO m : mistakes) {
+                if (m.getQuestion() != null && m.getQuestion().equals(questionText)) {
+                    isCorrect = false;
+                    break;
+                }
+            }
+
+            detailedAnswers.add(new AssignmentSessionResponse.AnswerDetail(
+                    questionText,
+                    sub.getAnswer() != null ? sub.getAnswer().toString() : "Nincs válasz",
+                    isCorrect,
+                    sub.isRetried(),
+                    ex
+            ));
+        }
+
         try {
-            session.setRawAnswers(objectMapper.writeValueAsString(request.getAnswers()));
+            // Az új gazdag listát mentjük el a nyers ExerciseSubmission helyett!
+            session.setRawAnswers(objectMapper.writeValueAsString(detailedAnswers));
         } catch (Exception e) {
             log.error("Hiba a válaszok JSON-re alakításakor", e);
-            // Nem dobunk hibát, hogy a pontszám mentése legalább sikerüljön
         }
 
         sessionRepository.save(session);
@@ -257,11 +293,11 @@ public class AssignmentService {
                 .stream()
                 .filter(session -> session.getFinishedAt() != null)
                 .map(s -> {
-                    List<ExerciseSubmission> answersList = new ArrayList<>();
+                    List<AssignmentSessionResponse.AnswerDetail> answersList = new ArrayList<>();
                     try {
                         if (s.getRawAnswers() != null) {
                             // JAVÍTVA: A letisztult TypeReference beolvasás
-                            answersList = objectMapper.readValue(s.getRawAnswers(), new TypeReference<List<ExerciseSubmission>>() {});
+                            answersList = objectMapper.readValue(s.getRawAnswers(), new TypeReference<List<AssignmentSessionResponse.AnswerDetail>>() {});
                         }
                     } catch (Exception e) {
                         log.error("Hiba a válaszok visszaolvasásakor", e);

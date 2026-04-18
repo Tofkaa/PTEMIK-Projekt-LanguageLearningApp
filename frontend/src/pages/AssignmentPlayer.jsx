@@ -132,24 +132,36 @@ const AssignmentPlayer = () => {
     };
 
     // A paraméter biztosítja, hogy az utolsó kérdés klónozásánál se küldje be véletlenül a tesztet!
-    const finalizeAnswerAndMove = (wasJustCloned = false) => {
-        const finalAnswers = [
-            ...collectedAnswers, 
-            {
+   const finalizeAnswerAndMove = (wasJustCloned = false) => {
+        // Megkeressük, hogy van-e már válasz ehhez a feladathoz
+        const existingIndex = collectedAnswers.findIndex(a => a.exerciseId === currentExercise.exerciseId);
+        let finalAnswers = [...collectedAnswers];
+
+        if (existingIndex >= 0) {
+            // HA MÁR VOLT: Felülírjuk a legújabb (jó) válasszal, és beállítjuk a javítva flget!
+            finalAnswers[existingIndex] = {
+                ...finalAnswers[existingIndex],
+                answer: currentAnswer.trim(),
+                retried: true
+            };
+        } else {
+            // HA MÉG NEM VOLT: Első próbálkozás
+            finalAnswers.push({
                 exerciseId: currentExercise.exerciseId,
                 answer: currentAnswer.trim(),
-                isRetry: !!currentExercise.isRetry 
-            }
-        ];
-        
+                retried: false
+            });
+        }
+
         setCollectedAnswers(finalAnswers);
         setCurrentAnswer('');
         setFeedback(null);
 
-        // Itt a varázslat: vagy van még kérdés, vagy épp most klónoztunk egyet a sor végére!
+        // Lapozás vagy Beküldés
         if (currentIndex < exercises.length - 1 || wasJustCloned) {
             setCurrentIndex(prev => prev + 1);
         } else {
+            // A legvégén ezt a felokosított tömböt küldjük a backendnek
             submitAssignment(finalAnswers);
         }
     };
