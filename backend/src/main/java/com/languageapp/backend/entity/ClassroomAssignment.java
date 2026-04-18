@@ -57,6 +57,9 @@ public class ClassroomAssignment {
     @Column(name = "time_limit_minutes")
     private Integer timeLimitMinutes;
 
+    @OneToMany(mappedBy = "assignment", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<AssignmentSession> sessions = new ArrayList<>();
+
     @ManyToMany
     @JoinTable(
             name = "assignment_exercises",

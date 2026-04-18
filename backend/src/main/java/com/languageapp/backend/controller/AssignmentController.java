@@ -42,7 +42,7 @@ public class AssignmentController {
     public ResponseEntity<List<AssignmentResponse>> getClassroomAssignments(
             @PathVariable UUID classroomId,
             Authentication auth) {
-        return ResponseEntity.ok(assignmentService.getAssignmentsByClassroom(classroomId));
+        return ResponseEntity.ok(assignmentService.getAssignmentsByClassroom(classroomId, auth.getName()));
     }
 
     /**
@@ -72,6 +72,15 @@ public class AssignmentController {
             @Valid @RequestBody AssignmentSubmitRequest request,
             Authentication auth) {
         assignmentService.submitAssignment(sessionId, request, auth.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<Void> deleteAssignment(
+            @PathVariable UUID id,
+            Authentication auth) {
+        assignmentService.deleteAssignment(id, auth.getName());
         return ResponseEntity.ok().build();
     }
 }

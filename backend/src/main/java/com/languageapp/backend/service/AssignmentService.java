@@ -75,10 +75,10 @@ public class AssignmentService {
      * Retrieves assignment list for teacher dashboard.
      */
     @Transactional(readOnly = true)
-    public List<AssignmentResponse> getAssignmentsByClassroom(UUID classroomId) {
+    public List<AssignmentResponse> getAssignmentsByClassroom(UUID classroomId, String email) {
         return assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(classroomId)
                 .stream()
-                .map(this::mapToResponse)
+                .map(a -> mapToResponse(a, email))
                 .toList();
     }
 
@@ -90,7 +90,7 @@ public class AssignmentService {
         User student = userRepository.findByEmail(email).orElseThrow();
         return assignmentRepository.findActiveAssignmentsForStudent(student.getUserId())
                 .stream()
-                .map(this::mapToResponse)
+                .map(a -> mapToResponse(a, email))
                 .toList();
     }
 
@@ -113,23 +113,40 @@ public class AssignmentService {
             throw new BadRequestException("Access denied: Not a member of this classroom.");
         }
 
-        AssignmentSession session;
-        Optional<AssignmentSession> existingSession = sessionRepository
-                .findByAssignment_AssignmentIdAndUser_UserId(assignmentId, user.getUserId());
+        // --- 1. ÜTEMEZÉS VÉDELME ---
+        if (assignment.getAvailableFrom() != null && LocalDateTime.now().isBefore(assignment.getAvailableFrom())) {
+            throw new BadRequestException("Ez a feladat még nem elérhető!");
+        }
 
-        if (existingSession.isPresent()) {
-            session = existingSession.get();
-            if (session.getFinishedAt() != null && !assignment.isAllowRetries()) {
-                throw new BadRequestException("Submission locked: Retries are not allowed.");
-            }
+        // --- 2. TÖBBSZÖRÖS PRÓBÁLKOZÁSOK KEZELÉSE ---
+        List<AssignmentSession> userSessions = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(assignmentId, user.getUserId());
+
+        // Keresünk egy folyamatban lévő (nem befejezett) munkamenetet
+        Optional<AssignmentSession> ongoingSession = userSessions.stream()
+                .filter(s -> s.getFinishedAt() == null)
+                .findFirst();
+
+        AssignmentSession session;
+        if (ongoingSession.isPresent()) {
+            // Ha van folyamatban lévő, azt folytatja
+            session = ongoingSession.get();
             log.info("Student {} is resuming assignment {}", email, assignmentId);
         } else {
+            // Ha nincs folyamatban lévő, megnézzük, hányszor adta már be
+            long completedCount = userSessions.stream().filter(s -> s.getFinishedAt() != null).count();
+
+            // Ha van limit, és elérte, nem engedjük elindítani
+            if (assignment.getMaxAttempts() != null && completedCount >= assignment.getMaxAttempts()) {
+                throw new BadRequestException("Maximum próbálkozások száma elérve!");
+            }
+
+            // Új munkamenet indítása
             session = new AssignmentSession();
             session.setAssignment(assignment);
             session.setUser(user);
             session.setStartedAt(LocalDateTime.now());
             session = sessionRepository.save(session);
-            log.info("Student {} started assignment {} at {}", email, assignmentId, session.getStartedAt());
+            log.info("Student {} started attempt {} for assignment {}", email, completedCount + 1, assignmentId);
         }
 
         List<Exercise> exercises = new ArrayList<>(assignment.getExercises());
@@ -200,7 +217,36 @@ public class AssignmentService {
                 email, session.getAssignment().getTitle(), finalScore);
     }
 
-    private AssignmentResponse mapToResponse(ClassroomAssignment a) {
+    @Transactional
+    public void deleteAssignment(UUID assignmentId, String teacherEmail) {
+        ClassroomAssignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
+
+        if (!assignment.getClassroom().getTeacher().getEmail().equals(teacherEmail)) {
+            throw new BadRequestException("Unauthorized to delete this assignment.");
+        }
+
+        assignmentRepository.delete(assignment);
+    }
+
+    private AssignmentResponse mapToResponse(ClassroomAssignment a, String email) {
+        boolean isCompleted = false;
+        int attemptsUsed = 0; // Új változó a próbálkozások nyomon követésére
+
+        if (email != null) {
+            Optional<User> userOpt = userRepository.findByEmail(email);
+            if (userOpt.isPresent()) {
+                // Lekérjük az összes eddigi munkamenetet (listát kapunk vissza)
+                List<AssignmentSession> sessions = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userOpt.get().getUserId());
+
+                // Megszámoljuk, hányat fejezett be sikeresen
+                attemptsUsed = (int) sessions.stream().filter(session -> session.getFinishedAt() != null).count();
+
+                // Ha legalább egyszer beadta, a státusz befejezett lesz
+                isCompleted = attemptsUsed > 0;
+            }
+        }
+
         return new AssignmentResponse(
                 a.getAssignmentId(),
                 a.getTitle(),
@@ -213,7 +259,9 @@ public class AssignmentService {
                 a.isRandomized(),
                 a.isAllowRetries(),
                 a.isHasFeedback(),
-                a.getMaxAttempts()
+                isCompleted,
+                a.getMaxAttempts(),
+                attemptsUsed // Az új adat beillesztése a konstruktor végére
         );
     }
 }

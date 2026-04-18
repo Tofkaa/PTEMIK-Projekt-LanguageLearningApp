@@ -102,6 +102,18 @@ const TeacherClassroomDetail = () => {
         }
     };
 
+    const handleDeleteAssignment = async (assignmentId) => {
+        if (window.confirm("Biztosan törölni szeretnéd ezt a feladatot? Figyelem: Ha már vannak diákok, akik elkezdték vagy beküldték, az ő eredményeik is véglegesen elvesznek!")) {
+            try {
+                await assignmentApi.deleteAssignment(assignmentId);
+                fetchDashboardData();
+            } catch (error) {
+                console.error("Hiba a feladat törlésekor:", error);
+                alert("Nem sikerült törölni a feladatot.");
+            }
+        }
+    };
+
     /**
      * Toggles the selection of a specific exercise for the assignment.
      */
@@ -151,26 +163,30 @@ const TeacherClassroomDetail = () => {
 
     const handleAssignmentSubmit = async (e) => {
         e.preventDefault();
-
         if (isSubmitting) return; 
         setIsSubmitting(true);
 
-        const payload = {
-        title: assignmentForm.title,
-        description: assignmentForm.description,
-        isTest: assignmentMode === 'TEST', 
-        
-        
-        hasFeedback: assignmentMode === 'TEST' ? assignmentForm.hasFeedback : true,
-        randomized: assignmentForm.isRandomized, 
-        allowRetries: assignmentMode === 'TEST' ? assignmentForm.allowRetries : true,
-        maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
+        const formatLocalTime = (dateStr) => {
+            if (!dateStr) return null;
+            return dateStr.length === 16 ? dateStr + ':00' : dateStr;
+        };
 
-        timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
-        availableFrom: assignmentForm.availableFrom ? new Date(assignmentForm.availableFrom).toISOString() : null,
-        availableUntil: assignmentForm.availableUntil ? new Date(assignmentForm.availableUntil).toISOString() : null,
-        exerciseIds: assignmentForm.exerciseIds
-    };
+        const payload = {
+            title: assignmentForm.title,
+            description: assignmentForm.description,
+            isTest: assignmentMode === 'TEST',
+            hasFeedback: assignmentMode === 'TEST' ? assignmentForm.hasFeedback : true,
+            randomized: assignmentForm.isRandomized,
+            allowRetries: assignmentMode === 'TEST' ? assignmentForm.allowRetries : true,
+            maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
+            timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
+            
+            availableFrom: formatLocalTime(assignmentForm.availableFrom),
+            availableUntil: formatLocalTime(assignmentForm.availableUntil),
+            
+            exerciseIds: assignmentForm.exerciseIds
+        };
+
        try {
             await assignmentApi.createAssignment(classroomId, payload);
             setIsAssignmentModalOpen(false);
@@ -220,6 +236,9 @@ const TeacherClassroomDetail = () => {
                                             <div className="d-flex justify-content-between align-items-start mb-2">
                                                 <Card.Title className="fw-bold text-primary m-0">{a.title}</Card.Title>
                                                 {a.test ? <Badge bg="danger">Tesztmód</Badge> : <Badge bg="success">Gyakorló</Badge>}
+                                                <Button variant="outline-danger" size="sm" className="border-0 py-0 fs-5" onClick={() => handleDeleteAssignment(a.assignmentId)} title="Feladat törlése">
+                                                    törlés🗑️
+                                                </Button>
                                             </div>
                                             <Card.Text className="text-secondary mb-3" style={{ fontSize: '0.9rem' }}>{a.description}</Card.Text>
                                             <ListGroup variant="flush" className="bg-transparent border-top border-secondary pt-2">

@@ -13,6 +13,13 @@ const AssignmentStart = () => {
     
     const [isStarting, setIsStarting] = useState(false);
 
+    // ÚJ DÁTUM KONVERTER
+    const parseDate = (d) => {
+        if (!d) return null;
+        if (Array.isArray(d)) return new Date(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0);
+        return new Date(d);
+    };
+
     const startTest = async () => {
         setIsStarting(true);
         try {
@@ -71,18 +78,27 @@ const AssignmentStart = () => {
                                 <strong>Időkeret:</strong> {details.timeLimitMinutes ? `${details.timeLimitMinutes} perc` : 'Nincs időkorlát'}
                             </p>
                             <p className="mb-0"><strong>Kérdések száma:</strong> {details.exerciseCount} db</p>
+                            
+                            <p className="mb-0 text-info mt-2 border-top border-secondary pt-2">
+                                <strong>Felhasznált próbálkozások:</strong> {details.attemptsUsed || 0} / {details.maxAttempts ? details.maxAttempts : 'Végtelen'}
+                            </p>
                         </div>
 
                         <div className="d-grid gap-3">
-                            <Button 
-                                variant="primary" 
-                                size="lg" 
-                                className="fw-bold" 
-                                onClick={startTest}
-                                disabled={isStarting}
-                            >
-                                {isStarting ? <Spinner size="sm" /> : (details.test ? 'Teszt Megkezdése' : 'Gyakorlás Indítása')}
-                            </Button>
+                            {(() => {
+                                const isFuture = details.availableFrom && parseDate(details.availableFrom) > new Date();
+                                return (
+                                    <Button 
+                                        variant="primary" 
+                                        size="lg" 
+                                        className="fw-bold" 
+                                        onClick={startTest}
+                                        disabled={isStarting || isFuture}
+                                    >
+                                        {isStarting ? <Spinner size="sm" /> : (isFuture ? 'Még nem elérhető' : (details.test ? 'Teszt Megkezdése' : 'Gyakorlás Indítása'))}
+                                    </Button>
+                                );
+                            })()}
                             <Button variant="outline-secondary" onClick={() => navigate(-1)} disabled={isStarting}>
                                 Mégse, vissza
                             </Button>
