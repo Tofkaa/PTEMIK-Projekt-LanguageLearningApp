@@ -2,91 +2,88 @@ import { Navbar, Container, Nav, Badge, NavDropdown } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import { useEffect, useState } from 'react'; 
 
-/**
- * NavigationBar Component
- * Renders the top navigation bar containing the app branding, 
- * user statistics (XP), and a profile dropdown menu.
- */
 const NavigationBar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const {notifications} = useNotifications();
+    const { notifications } = useNotifications();
+    
+    const [, setLocalUpdate] = useState(0);
 
-    /**
-     * Handles the user logout process and redirects to the login screen.
-     */
+    // Kiterjesztett eseményfigyelő: Reagál a saját ablakban történő kattintásokra is!
+    useEffect(() => {
+        const handleStorage = () => setLocalUpdate(prev => prev + 1);
+        window.addEventListener('storage', handleStorage);
+        window.addEventListener('local-storage-update', handleStorage); 
+        return () => {
+            window.removeEventListener('storage', handleStorage);
+            window.removeEventListener('local-storage-update', handleStorage);
+        };
+    }, []);
+
     const handleLogout = () => {
+        localStorage.removeItem('viewedAssignments');
+        localStorage.removeItem('viewedResults');
         logout();
         navigate('/login');
     };
 
-    // If there is no authenticated user, do not render the navbar
     if (!user) return null;
 
+    const viewedAssignments = JSON.parse(localStorage.getItem('viewedAssignments') || '[]');
+    const viewedResults = JSON.parse(localStorage.getItem('viewedResults') || '[]');
+
+    const unseenAssignments = (notifications?.studentActiveAssignmentIds || []).filter(id => !viewedAssignments.includes(id)).length;
+    const unseenResults = (notifications?.studentGradedSessionIds || []).filter(id => !viewedResults.includes(id)).length;
+
+    const classroomPings = unseenAssignments + unseenResults + 
+                           (notifications?.teacherPendingJoinRequests || 0) + 
+                           (notifications?.teacherUngradedSubmissions || 0);
+
+    const communityPings = (notifications?.pendingFriendRequests || 0) + 
+                           (notifications?.pendingChallenges || 0);
+                           
     return (
         <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm mb-4 border-bottom border-secondary">
             <Container>
-                {/* Brand / Logo Area */}
-                <Navbar.Brand 
-                    className="fw-bold" 
-                    style={{ cursor: 'pointer', color: 'var(--primary-cyan)' }} 
-                    onClick={() => navigate('/dashboard')}
-                >
-                    🚀 LanguageLearning APP
+                <Navbar.Brand className="fw-bold" style={{ cursor: 'pointer', color: 'var(--primary-cyan)' }} onClick={() => navigate('/dashboard')}>
+                    🚀 LanguageApp
                 </Navbar.Brand>
                 
-                {/* Mobile Toggle Button */}
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
-                
-               {/* Navigation Links and User Info */}
                 <Navbar.Collapse id="basic-navbar-nav">
                     <Nav className="me-auto gap-2">
-                        <Nav.Link onClick={() => navigate('/dashboard')} className="fw-bold">
-                            Dashboard
-                        </Nav.Link>
+                        <Nav.Link onClick={() => navigate('/dashboard')} className="fw-bold">Dashboard</Nav.Link>
 
-                        {/* Classrooms */}
-                        <Nav.Link onClick={() => navigate('/classrooms')} className="fw-bold">
+                        <Nav.Link onClick={() => navigate('/classrooms')} className="fw-bold position-relative me-3">
                             🏫 Osztálytermek
+                            {classroomPings > 0 && (
+                                <Badge bg="danger" pill className="position-absolute top-25 start-100 translate-middle shadow-sm" style={{ fontSize: '0.65rem' }}>
+                                    {classroomPings}
+                                </Badge>
+                            )}
                         </Nav.Link>
 
-                        {/* Community */}
                         <Nav.Link onClick={() => navigate('/friends')} className="fw-bold position-relative me-3">
                             🌐 Közösség
-                            {notifications.total > 0 && (
-                                <Badge 
-                                    bg="danger" 
-                                    pill 
-                                    className="position-absolute top-25 start-100 translate-middle"
-                                    style={{ fontSize: '0.65rem' }}
-                                >
-                                    {notifications.total}
+                            {communityPings > 0 && (
+                                <Badge bg="danger" pill className="position-absolute top-25 start-100 translate-middle shadow-sm" style={{ fontSize: '0.65rem' }}>
+                                    {communityPings}
                                 </Badge>
                             )}
                         </Nav.Link>
                     </Nav>
                     
                     <Nav className="align-items-center">
-                        {/* Gamified XP Badge */}
                         <Badge bg="warning" text="dark" className="me-3 rounded-pill px-3 py-2 shadow-sm">
                             ⭐ {user.xp || 0} XP
                         </Badge>
                         
-                        {/* Profile Dropdown Menu */}
-                        <NavDropdown 
-                            title={<span className="text-light fw-bold">👤 {user.name}</span>} 
-                            id="basic-nav-dropdown" 
-                            align="end" 
-                            menuVariant="dark" /* Keeps the dropdown menu dark! */
-                        >
-                            <NavDropdown.Item onClick={() => navigate('/profile')} className="text-light">
-                                Profilom
-                            </NavDropdown.Item>
+                        <NavDropdown title={<span className="text-light fw-bold">👤 {user.name}</span>} id="basic-nav-dropdown" align="end" menuVariant="dark">
+                            <NavDropdown.Item onClick={() => navigate('/profile')} className="text-light">Profilom</NavDropdown.Item>
                             <NavDropdown.Divider />
-                            <NavDropdown.Item onClick={handleLogout} className="text-danger fw-bold">
-                                Kijelentkezés
-                            </NavDropdown.Item>
+                            <NavDropdown.Item onClick={handleLogout} className="text-danger fw-bold">Kijelentkezés</NavDropdown.Item>
                         </NavDropdown>
                     </Nav>
                 </Navbar.Collapse>

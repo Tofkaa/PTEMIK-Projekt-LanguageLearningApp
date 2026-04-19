@@ -4,6 +4,7 @@ import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, 
 import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 import { lessonApi } from '../services/lessonApi';
+import { useNotifications } from '../context/NotificationContext';
 
 const TeacherClassroomDetail = () => {
     const { id: classroomId } = useParams();
@@ -25,6 +26,8 @@ const TeacherClassroomDetail = () => {
     const [assignmentMode, setAssignmentMode] = useState('TEST'); 
 
     const [stats, setStats] = useState(null);
+
+    const { notifications } = useNotifications();
 
     const [assignmentForm, setAssignmentForm] = useState({
         title: '',
@@ -81,9 +84,11 @@ const TeacherClassroomDetail = () => {
         }
     }, [classroomId]);
 
+    const pingTrigger = (notifications?.teacherUngradedSubmissions || 0) + (notifications?.teacherPendingJoinRequests || 0);
+
     useEffect(() => {
         fetchDashboardData();
-    }, [fetchDashboardData]); 
+    }, [fetchDashboardData, pingTrigger]);
 
     // --- MEMBER MANAGEMENT ---
     const handleModerate = async (studentId, approve) => {
@@ -308,42 +313,60 @@ const TeacherClassroomDetail = () => {
             </div>
 
             <Tabs defaultActiveKey="assignments" className="mb-4 custom-dark-tabs">
-                <Tab eventKey="assignments" title={<span className="fw-bold">📝 Feladatok & Tesztek</span>}>
-    <div className="mb-4 mt-3">
-        <Button variant="primary" className="fw-bold px-4 shadow-sm" onClick={openAssignmentModal}>+ Új Feladat / Teszt Kiírása</Button>
-    </div>
+                <Tab eventKey="assignments" title={
+                    <span className="fw-bold">
+                        📝 Feladatok & Tesztek
+                        {notifications.teacherUngradedSubmissions > 0 && (
+                            <Badge bg="danger" pill className="ms-2 animate-pulse">{notifications.teacherUngradedSubmissions}</Badge>
+                        )}
+                    </span>}>
+                    
+                    <div className="mb-4 mt-3">
+                        <Button variant="primary" className="fw-bold px-4 shadow-sm" onClick={openAssignmentModal}>+ Új Feladat / Teszt Kiírása</Button>
+                    </div>
 
-    <Tabs defaultActiveKey="active" className="mb-3 border-secondary custom-dark-tabs">
-        
-        {/* 1. AKTUÁLISAN FUTÓ FELADATOK */}
-        <Tab eventKey="active" title={<span className="fw-bold text-info">🔥 Aktív ({activeAssignments.length})</span>}>
-            <Row className="g-4 mt-1">
-                {activeAssignments.map(a => renderAssignmentCard(a, 'active'))}
-            </Row>
+            <Tabs defaultActiveKey="active" className="mb-3 border-secondary custom-dark-tabs">
+                
+                {/* 1. AKTUÁLISAN FUTÓ FELADATOK */}
+                <Tab eventKey="active" title={<span className="fw-bold text-info">🔥 Aktív ({activeAssignments.length})</span>}>
+                    <Row className="g-4 mt-1">
+                        {activeAssignments.map(a => renderAssignmentCard(a, 'active'))}
+                    </Row>
+                </Tab>
+
+                {/* 2. JÖVŐBEN INDULÓ FELADATOK */}
+                <Tab eventKey="scheduled" title={<span className="fw-bold text-warning">📅 Ütemezett ({scheduledAssignments.length})</span>}>
+                    <Row className="g-4 mt-1">
+                        {scheduledAssignments.map(a => renderAssignmentCard(a, 'scheduled'))}
+                    </Row>
+                </Tab>
+
+                {/* 3. ARCHÍVUM */}
+                <Tab eventKey="expired" title={<span className="fw-bold text-secondary">⏳ Lejárt ({expiredAssignments.length})</span>}>
+                    <Row className="g-4 mt-1">
+                        {expiredAssignments.map(a => renderAssignmentCard(a, 'expired'))}
+                    </Row>
+                </Tab>
+            </Tabs>
         </Tab>
 
-        {/* 2. JÖVŐBEN INDULÓ FELADATOK */}
-        <Tab eventKey="scheduled" title={<span className="fw-bold text-warning">📅 Ütemezett ({scheduledAssignments.length})</span>}>
-            <Row className="g-4 mt-1">
-                {scheduledAssignments.map(a => renderAssignmentCard(a, 'scheduled'))}
-            </Row>
-        </Tab>
+                <Tab eventKey="members" title={
+                    
+                    <span className="fw-bold">
+                        👥 Tagság kezelése
+                        {pendingMembers.length > 0 && (
+                            <Badge bg="danger" pill className="ms-2 animate-pulse">{pendingMembers.length}</Badge>
+                        )}
+                    </span>}>
 
-        {/* 3. ARCHÍVUM */}
-        <Tab eventKey="expired" title={<span className="fw-bold text-secondary">⏳ Lejárt ({expiredAssignments.length})</span>}>
-            <Row className="g-4 mt-1">
-                {expiredAssignments.map(a => renderAssignmentCard(a, 'expired'))}
-            </Row>
-        </Tab>
-    </Tabs>
-</Tab>
-
-                <Tab eventKey="members" title={<span className="fw-bold">👥 Tagság kezelése</span>}>
                     <Row className="g-4 mt-1">
                         <Col md={6}>
                             <Card className="bg-dark border-secondary h-100">
                                 <Card.Header className="bg-dark border-secondary d-flex justify-content-between">
-                                    <h5 className="m-0 text-warning">Várakozó</h5><Badge bg="warning" text="dark">{pendingMembers.length}</Badge>
+                                    <h5 className="m-0 text-warning">Várakozó</h5>
+                                        <Badge bg={pendingMembers.length > 0 ? "danger" : "warning"} text={pendingMembers.length > 0 ? "light" : "dark"} className={pendingMembers.length > 0 ? "shadow animate-pulse" : ""}>
+                                            {pendingMembers.length}
+                                        </Badge>
                                 </Card.Header>
                                 <ListGroup variant="flush">
                                     {pendingMembers.map(member => (

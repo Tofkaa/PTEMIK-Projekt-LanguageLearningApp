@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, ProgressBar } from 'react-bootstrap';
 import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
+import { useNotifications } from '../context/NotificationContext';
 
 const StudentClassroomDetail = () => {
     const { id: classroomId } = useParams();
@@ -21,12 +22,39 @@ const StudentClassroomDetail = () => {
 
     const [expandedPreviewId, setExpandedPreviewId] = useState(null);
 
+    const { notifications } = useNotifications();
+
+    const [viewedResults, setViewedResults] = useState(() => {
+        const saved = localStorage.getItem('viewedResults');
+        return saved ? JSON.parse(saved) : [];
+    });
+
     const [stats, setStats] = useState(null);
     
+    const markAsViewed = (storageKey, idsToMark) => {
+        if (!idsToMark || idsToMark.length === 0) return;
+        const seen = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        const updated = [...new Set([...seen, ...idsToMark])];
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        
+
+        window.dispatchEvent(new Event('local-storage-update'));
+    };
+
+   const pingTrigger = (notifications?.studentActiveAssignmentIds?.length || 0) + (notifications?.studentGradedSessionIds?.length || 0);
+
     useEffect(() => {
         fetchClassroomData();
-    }, [classroomId]);
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [classroomId, pingTrigger]);
+    
+    useEffect(() => {
+        if (activeAssignments && activeAssignments.length > 0) {
+            markAsViewed('viewedAssignments', activeAssignments.map(a => a.assignmentId));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [assignments]);
+    
     const fetchClassroomData = async () => {
         setIsLoading(true);
         try {
@@ -77,6 +105,15 @@ const StudentClassroomDetail = () => {
         return false;
     });
 
+    const handleViewResult = (assignment) => {
+        if (!viewedResults.includes(assignment.assignmentId)) {
+            const updated = [...viewedResults, assignment.assignmentId];
+            setViewedResults(updated);
+            localStorage.setItem('viewedResults', JSON.stringify(updated));
+        }
+        openStudentResultModal(assignment);
+    };
+
     const openStudentResultModal = async (assignment) => {
         try {
             const res = await assignmentApi.getMyAssignmentSessions(assignment.assignmentId);
@@ -101,7 +138,7 @@ const StudentClassroomDetail = () => {
         );
     }
 
-    return (
+   return (
         <Container className="py-4 text-light">
             <div className="mb-4">
                 <Button variant="outline-secondary" size="sm" onClick={() => navigate('/classrooms')} className="mb-2">
@@ -116,10 +153,26 @@ const StudentClassroomDetail = () => {
                 <Tab eventKey="assignments" title={<span className="fw-bold">📝 Feladatok</span>}>
                     
                     {/* BELSŐ FÜLEK AZ AKTÍV ÉS BEFEJEZETT FELADATOKNAK */}
-                    <Tabs defaultActiveKey="active" className="mt-3 mb-3 border-secondary">
+                   <Tabs defaultActiveKey="active" className="mt-3 mb-3 border-secondary" 
+                          onSelect={(key) => {
+                              if (key === 'active') {
+                                  markAsViewed('viewedAssignments', activeAssignments.map(a => a.assignmentId));
+                              } else if (key === 'completed') {
+                                  markAsViewed('viewedResults', completedAssignments.filter(a => a.hasGradedSession).map(a => a.assignmentId));
+                              }
+                          }}>
                         
-                       {/* 1. AKTÍV TEENDŐK */}
-                        <Tab eventKey="active" title={<span className="fw-bold">🔥 Aktív Teendők</span>}>
+                        {/* 1. AKTÍV TEENDŐK */}
+                        <Tab eventKey="active" title={
+                            <span className="fw-bold">
+                                🔥 Aktív Teendők
+                                {activeAssignments.filter(a => a.attemptsUsed === 0).length > 0 && (
+                                    <Badge bg="danger" pill className="ms-2 shadow-sm animate-pulse">
+                                        {activeAssignments.filter(a => a.attemptsUsed === 0).length}
+                                    </Badge>
+                                )}
+                            </span>
+                        }>
                             <Row className="g-4 mt-1">
                                 {activeAssignments.length === 0 ? (
                                     <Col><div className="p-5 text-center border border-secondary rounded bg-dark text-light">Nincs aktív feladatod. 🎉</div></Col>
@@ -130,7 +183,18 @@ const StudentClassroomDetail = () => {
                                                 <Card.Body className="d-flex flex-column">
                                                     <div className="d-flex justify-content-between align-items-start mb-2">
                                                         <Card.Title className="fw-bold m-0">{a.title}</Card.Title>
-                                                        {a.test ? <Badge bg="danger">Teszt</Badge> : <Badge bg="success">Gyakorló</Badge>}
+                                                        <div>
+                                                            {/* CSAK AKKOR ÚJ, HA MÉG SOHA NEM PRÓBÁLTA (attemptsUsed === 0) */}
+                                                            {a.attemptsUsed === 0 ? (
+                                                                a.test ? (
+                                                                    <Badge bg="danger" className="shadow-sm border border-light animate-pulse" style={{ letterSpacing: '1px' }}>🔴 ÚJ TESZT</Badge>
+                                                                ) : (
+                                                                    <Badge bg="info" text="dark" className="shadow-sm border border-dark animate-pulse">🔵 Új Gyakorló</Badge>
+                                                                )
+                                                            ) : (
+                                                                a.test ? <Badge bg="danger">Teszt</Badge> : <Badge bg="success">Gyakorló</Badge>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <Card.Text className="text-secondary flex-grow-1 small">{a.description}</Card.Text>
                                                     
@@ -165,15 +229,30 @@ const StudentClassroomDetail = () => {
                         </Tab>
 
                         {/* 2. BEFEJEZETT VAGY LEJÁRT */}
-                        <Tab eventKey="completed" title={<span className="fw-bold">✅ Befejezett / Lejárt</span>}>
-                            <Row className="g-4 mt-1">
+                        <Tab eventKey="completed" title={
+                            <span className="fw-bold">
+                                ✅ Befejezett / Lejárt
+                                {completedAssignments.filter(a => a.hasGradedSession && !viewedResults.includes(a.assignmentId)).length > 0 && (
+                                    <Badge bg="success" pill className="ms-2 shadow-sm animate-pulse">
+                                        {completedAssignments.filter(a => a.hasGradedSession && !viewedResults.includes(a.assignmentId)).length}
+                                    </Badge>
+                                )}
+                            </span>
+                        }>
+                           <Row className="g-4 mt-1">
                                 {completedAssignments.map(a => (
                                     <Col md={6} lg={4} key={a.assignmentId}>
                                         <Card className="h-100 bg-dark text-secondary border-secondary shadow-sm" style={{ opacity: 0.85 }}>
                                             <Card.Body className="d-flex flex-column">
                                                 <div className="d-flex justify-content-between align-items-start mb-2">
                                                     <Card.Title className="fw-bold m-0 text-light">{a.title}</Card.Title>
-                                                    {a.completed ? <Badge bg="secondary">Befejezve</Badge> : <Badge bg="secondary">Lejárt</Badge>}
+                                                    {a.hasGradedSession ? (
+                                                        <Badge bg="success" className={!viewedResults.includes(a.assignmentId) ? "animate-pulse shadow-sm" : "shadow-sm"}>
+                                                            {!viewedResults.includes(a.assignmentId) ? '✉️ Új Értékelés!' : '✅ Értékelve'}
+                                                        </Badge>
+                                                    ) : (
+                                                        a.completed ? <Badge bg="secondary">Befejezve</Badge> : <Badge bg="secondary">Lejárt</Badge>
+                                                    )}
                                                 </div>
                                                 
                                                 <div className="mb-3 bg-black bg-opacity-25 p-2 rounded small">
@@ -182,12 +261,13 @@ const StudentClassroomDetail = () => {
                                                     <div><span className="fw-bold">🕒 Határidő:</span> {formatDeadline(a.availableUntil)}</div>
                                                 </div>
                                                 
-                                                <div className="mt-auto d-grid gap-2">
+                                               <div className="mt-auto d-grid gap-2">
                                                     {a.hasGradedSession ? (
                                                         <Button 
                                                             variant="success" 
                                                             className="fw-bold"
-                                                            onClick={() => openStudentResultModal(a)}
+                                                            // GOMB ESEMÉNY CSERÉJE:
+                                                            onClick={() => handleViewResult(a)}
                                                         >
                                                             Eredmény megtekintése
                                                         </Button>
@@ -196,6 +276,7 @@ const StudentClassroomDetail = () => {
                                                             Eredmény (Hamarosan)
                                                         </Button>
                                                     )}
+
                                                     {/* ÚJRAÍRÁS: Csak ha van még lehetőség és nincs lejárat */}
                                                     {(!a.availableUntil || parseDate(a.availableUntil) > now) && 
                                                      (!a.maxAttempts || a.attemptsUsed < a.maxAttempts) && (
@@ -309,13 +390,11 @@ const StudentClassroomDetail = () => {
                                 <div className="text-secondary fw-bold mb-3">Válaszaid:</div>
                                 <ul className="list-unstyled">
                                     {session.answers?.map((ans, i) => {
-                                        // Egyedi azonosító a munkamenet és a kérdés indexe alapján
                                         const previewId = `${session.sessionId}-${i}`;
                                         
                                         return (
                                             <li key={i} className="mb-3 p-3 bg-dark rounded border border-secondary shadow-sm">
                                                 
-                                                {/* Fejléc a szem ikonnal */}
                                                 <div className="small text-info fw-bold mb-2 pb-1 border-bottom border-secondary d-flex justify-content-between align-items-center">
                                                     <div>{i + 1}. Kérdés: <span className="text-light fw-normal">{ans.question}</span></div>
                                                     
@@ -326,7 +405,6 @@ const StudentClassroomDetail = () => {
                                                     )}
                                                 </div>
 
-                                                {/* AZ INLINE ELŐNÉZET */}
                                                 {expandedPreviewId === previewId && ans.exercise && (
                                                     <div className="mt-1 mb-3 p-2 bg-black bg-opacity-25 rounded border border-info small text-light">
                                                         <strong>Típus:</strong> {ans.exercise.type}<br/>
@@ -345,7 +423,6 @@ const StudentClassroomDetail = () => {
                                                     </div>
                                                 )}
 
-                                                {/* Diák válasza és értékelés */}
                                                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                                     <div>
                                                         <span className="text-secondary fw-bold">Válaszod: </span>

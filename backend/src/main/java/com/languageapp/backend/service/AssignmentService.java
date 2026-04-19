@@ -36,6 +36,8 @@ public class AssignmentService {
     private final ClassroomMemberRepository classroomMemberRepository;
     private final AssignmentSessionRepository sessionRepository;
     private final EvaluationService evaluationService;
+
+    private final SseService sseService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -70,6 +72,11 @@ public class AssignmentService {
         assignment.setExercises(exercises);
 
         assignmentRepository.save(assignment);
+
+        assignmentRepository.save(assignment);
+
+        classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
+                .forEach(member -> sseService.sendPing(member.getUser().getEmail()));
     }
 
     /**
@@ -259,6 +266,8 @@ public class AssignmentService {
 
         sessionRepository.save(session);
 
+        sseService.sendPing(session.getAssignment().getClassroom().getTeacher().getEmail());
+
         log.info("Student {} successfully submitted assignment '{}'. Score: {}%",
                 email, session.getAssignment().getTitle(), finalScore);
     }
@@ -367,6 +376,9 @@ public class AssignmentService {
         session.setGraded(true); // Ez a flag engedélyezi majd a diáknál az "Eredmény megtekintése" gombot!
 
         sessionRepository.save(session);
+
+        sseService.sendPing(session.getUser().getEmail());
+
         log.info("Teacher {} graded session {}. Published: true", teacherEmail, sessionId);
     }
 

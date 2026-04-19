@@ -32,4 +32,6 @@ public interface ClassroomMemberRepository extends JpaRepository<ClassroomMember
             "WHERE cm.classroom.classroomId = :classroomId " +
             "GROUP BY u.userId, u.name")
     List<com.languageapp.backend.dto.projection.ClassroomMemberStatDTO> getClassroomStats(@org.springframework.data.repository.query.Param("classroomId") UUID classroomId);
+
+    int countByClassroom_Teacher_UserIdAndStatus(UUID userId, MembershipStatus membershipStatus);
 }

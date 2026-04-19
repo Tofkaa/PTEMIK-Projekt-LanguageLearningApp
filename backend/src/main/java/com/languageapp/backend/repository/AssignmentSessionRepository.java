@@ -26,4 +26,5 @@ public interface AssignmentSessionRepository extends JpaRepository<AssignmentSes
      */
     List<AssignmentSession> findAllByAssignment_AssignmentIdOrderByStartedAtDesc(UUID assignmentId);
 
+    int countByAssignment_Classroom_Teacher_UserIdAndIsGradedFalseAndFinishedAtIsNotNull(UUID userId);
 }
