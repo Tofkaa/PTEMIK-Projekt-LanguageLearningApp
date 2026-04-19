@@ -163,7 +163,8 @@ public class AssignmentService {
                 assignment.getTimeLimitMinutes(),
                 assignment.isAllowRetries(),
                 assignment.isHasFeedback(),
-                exercises
+                exercises,
+                assignment.getClassroom().getClassroomId()
         );
     }
 
@@ -296,11 +297,43 @@ public class AssignmentService {
                     List<AssignmentSessionResponse.AnswerDetail> answersList = new ArrayList<>();
                     try {
                         if (s.getRawAnswers() != null) {
-                            // JAVÍTVA: A letisztult TypeReference beolvasás
                             answersList = objectMapper.readValue(s.getRawAnswers(), new TypeReference<List<AssignmentSessionResponse.AnswerDetail>>() {});
                         }
                     } catch (Exception e) {
                         log.error("Hiba a válaszok visszaolvasásakor", e);
+                    }
+
+                    return new AssignmentSessionResponse(
+                            s.getSessionId(),
+                            s.getUser().getName(),
+                            s.getUser().getEmail(),
+                            s.getStartedAt(),
+                            s.getFinishedAt(),
+                            s.getFinalScore(),
+                            s.getTeacherScore(),
+                            s.getTeacherComment(),
+                            s.isGraded(),
+                            answersList
+                    );
+                }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AssignmentSessionResponse> getMySessionsForAssignment(UUID assignmentId, String email) {
+        User student = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+
+        return sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(assignmentId, student.getUserId())
+                .stream()
+                .filter(session -> session.getFinishedAt() != null)
+                .map(s -> {
+                    List<AssignmentSessionResponse.AnswerDetail> answersList = new ArrayList<>();
+                    try {
+                        if (s.getRawAnswers() != null) {
+                            answersList = objectMapper.readValue(s.getRawAnswers(), new TypeReference<List<AssignmentSessionResponse.AnswerDetail>>() {});
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to parse answers", e);
                     }
 
                     return new AssignmentSessionResponse(
@@ -341,19 +374,21 @@ public class AssignmentService {
 
     private AssignmentResponse mapToResponse(ClassroomAssignment a, String email) {
         boolean isCompleted = false;
-        int attemptsUsed = 0; // Új változó a próbálkozások nyomon követésére
+        int attemptsUsed = 0;
+        boolean hasGradedSession = false;
 
         if (email != null) {
             Optional<User> userOpt = userRepository.findByEmail(email);
             if (userOpt.isPresent()) {
-                // Lekérjük az összes eddigi munkamenetet (listát kapunk vissza)
+
                 List<AssignmentSession> sessions = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userOpt.get().getUserId());
 
-                // Megszámoljuk, hányat fejezett be sikeresen
                 attemptsUsed = (int) sessions.stream().filter(session -> session.getFinishedAt() != null).count();
 
-                // Ha legalább egyszer beadta, a státusz befejezett lesz
                 isCompleted = attemptsUsed > 0;
+
+                hasGradedSession = sessions.stream()
+                        .anyMatch(AssignmentSession::isGraded);
             }
         }
 
@@ -371,7 +406,8 @@ public class AssignmentService {
                 a.isHasFeedback(),
                 isCompleted,
                 a.getMaxAttempts(),
-                attemptsUsed // Az új adat beillesztése a konstruktor végére
+                attemptsUsed,
+                hasGradedSession
         );
     }
 }

@@ -20,4 +20,5 @@ public class AssignmentStartResponse {
     private boolean allowRetries;
     private boolean hasFeedback;
     private List<Exercise> exercises;
+    private UUID classroomId;
 }

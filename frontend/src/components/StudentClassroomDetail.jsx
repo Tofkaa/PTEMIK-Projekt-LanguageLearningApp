@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup } from 'react-bootstrap';
+import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal } from 'react-bootstrap';
 import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 
@@ -15,6 +15,13 @@ const StudentClassroomDetail = () => {
     const [classmates, setClassmates] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    const [studentSessions, setStudentSessions] = useState([]);
+    const [isResultModalOpen, setIsResultModalOpen] = useState(false);
+    const [selectedAssignmentTitle, setSelectedAssignmentTitle] = useState('');
+
+    const [expandedPreviewId, setExpandedPreviewId] = useState(null);
+
+    
     useEffect(() => {
         fetchClassroomData();
     }, [classroomId]);
@@ -67,6 +74,22 @@ const StudentClassroomDetail = () => {
         return false;
     });
 
+    const openStudentResultModal = async (assignment) => {
+        try {
+            const res = await assignmentApi.getMyAssignmentSessions(assignment.assignmentId);
+            setStudentSessions(res.data);
+            setSelectedAssignmentTitle(assignment.title);
+            setIsResultModalOpen(true);
+        } catch (error) {
+            console.error("Hiba az eredmények lekérésekor:", error);
+        }
+    };
+
+    const togglePreview = (id) => {
+        setExpandedPreviewId(prev => prev === id ? null : id);
+    };
+
+
     if (isLoading) {
         return (
             <Container className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}>
@@ -108,7 +131,6 @@ const StudentClassroomDetail = () => {
                                                     </div>
                                                     <Card.Text className="text-secondary flex-grow-1 small">{a.description}</Card.Text>
                                                     
-                                                    {/* JAVÍTOTT INFÓ PANEL: Próbálkozások és dátumok kijelzése */}
                                                     <div className="mb-3 text-secondary bg-black bg-opacity-25 p-2 rounded" style={{ fontSize: '0.85rem' }}>
                                                         <div className="mb-1 text-info"><span className="fw-bold">📝 Próbálkozás:</span> {a.attemptsUsed} / {a.maxAttempts || '∞'}</div>
                                                         {a.availableFrom && (
@@ -158,8 +180,19 @@ const StudentClassroomDetail = () => {
                                                 </div>
                                                 
                                                 <div className="mt-auto d-grid gap-2">
-                                                    <Button variant="outline-secondary" className="fw-bold" disabled>Eredmény (Hamarosan)</Button>
-                                                    
+                                                    {a.hasGradedSession ? (
+                                                        <Button 
+                                                            variant="success" 
+                                                            className="fw-bold"
+                                                            onClick={() => openStudentResultModal(a)}
+                                                        >
+                                                            Eredmény megtekintése
+                                                        </Button>
+                                                    ) : (
+                                                        <Button variant="outline-secondary" className="fw-bold" disabled>
+                                                            Eredmény (Hamarosan)
+                                                        </Button>
+                                                    )}
                                                     {/* ÚJRAÍRÁS: Csak ha van még lehetőség és nincs lejárat */}
                                                     {(!a.availableUntil || parseDate(a.availableUntil) > now) && 
                                                      (!a.maxAttempts || a.attemptsUsed < a.maxAttempts) && (
@@ -198,6 +231,98 @@ const StudentClassroomDetail = () => {
                     </Card>
                 </Tab>
             </Tabs>
+
+            {/* DIÁK EREDMÉNY MODAL */}
+            <Modal show={isResultModalOpen} onHide={() => setIsResultModalOpen(false)} size="lg" centered contentClassName="bg-dark text-light border-secondary">
+                <Modal.Header closeButton closeVariant="white" className="border-secondary">
+                    <Modal.Title className="text-info fw-bold">Eredmények: {selectedAssignmentTitle}</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="p-4 custom-scrollbar" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                    {studentSessions.length === 0 ? (
+                        <p className="text-muted">Nincs elérhető értékelés.</p>
+                    ) : (
+                        studentSessions.map((session, idx) => (
+                            <div key={session.sessionId} className="mb-5 bg-black bg-opacity-25 p-3 rounded border border-secondary">
+                                <div className="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+                                    <h5 className="fw-bold m-0 text-primary">{idx + 1}. Próbálkozás</h5>
+                                    <div>
+                                        <Badge bg="secondary" className="fs-6 me-2 shadow-sm">Gép: {session.finalScore}%</Badge>
+                                        <Badge bg={session.teacherScore >= 50 ? "success" : "danger"} className="fs-6 shadow-sm">Tanár: {session.teacherScore}%</Badge>
+                                    </div>
+                                </div>
+                                
+                                {session.teacherComment && (
+                                    <div className="mb-4 p-3 bg-darker rounded border border-info border-start border-4 shadow-sm">
+                                        <div className="text-info small fw-bold mb-1">Tanári megjegyzés:</div>
+                                        <div>{session.teacherComment}</div>
+                                    </div>
+                                )}
+
+                                <div className="text-secondary fw-bold mb-3">Válaszaid:</div>
+                                <ul className="list-unstyled">
+                                    {session.answers?.map((ans, i) => {
+                                        // Egyedi azonosító a munkamenet és a kérdés indexe alapján
+                                        const previewId = `${session.sessionId}-${i}`;
+                                        
+                                        return (
+                                            <li key={i} className="mb-3 p-3 bg-dark rounded border border-secondary shadow-sm">
+                                                
+                                                {/* Fejléc a szem ikonnal */}
+                                                <div className="small text-info fw-bold mb-2 pb-1 border-bottom border-secondary d-flex justify-content-between align-items-center">
+                                                    <div>{i + 1}. Kérdés: <span className="text-light fw-normal">{ans.question}</span></div>
+                                                    
+                                                    {ans.exercise && (
+                                                        <Button variant="link" size="sm" className="text-info p-0 text-decoration-none" title="Feladat előnézete" onClick={() => togglePreview(previewId)}>
+                                                            részletek👁️
+                                                        </Button>
+                                                    )}
+                                                </div>
+
+                                                {/* AZ INLINE ELŐNÉZET */}
+                                                {expandedPreviewId === previewId && ans.exercise && (
+                                                    <div className="mt-1 mb-3 p-2 bg-black bg-opacity-25 rounded border border-info small text-light">
+                                                        <strong>Típus:</strong> {ans.exercise.type}<br/>
+                                                        {ans.exercise.content?.options && (
+                                                            <div>
+                                                                <strong>Opciók:</strong> {
+                                                                    Array.isArray(ans.exercise.content.options) && typeof ans.exercise.content.options[0] === 'object' 
+                                                                    ? ans.exercise.content.options.map(o => o.text).join(", ") 
+                                                                    : ans.exercise.content.options.join(", ")
+                                                                }
+                                                            </div>
+                                                        )}
+                                                        {ans.exercise.content?.words && <div><strong>Szavak:</strong> {ans.exercise.content.words.join(", ")}</div>}
+                                                        {ans.exercise.content?.correctTranslation && <div><strong>Helyes fordítás:</strong> {ans.exercise.content.correctTranslation}</div>}
+                                                        {ans.exercise.content?.correctAnswer && <div><strong>Helyes válasz:</strong> {ans.exercise.content.correctAnswer}</div>}
+                                                    </div>
+                                                )}
+
+                                                {/* Diák válasza és értékelés */}
+                                                <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                                    <div>
+                                                        <span className="text-secondary fw-bold">Válaszod: </span>
+                                                        <span className="text-light">
+                                                            {typeof ans.studentAnswer === 'object' ? JSON.stringify(ans.studentAnswer) : ans.studentAnswer}
+                                                        </span>
+                                                    </div>
+                                                    <div className="d-flex gap-2">
+                                                        {ans.correct ? <Badge bg="success">Helyes</Badge> : <Badge bg="danger">Hibás</Badge>}
+                                                        {ans.retried && <Badge bg="warning" text="dark">Javítva</Badge>}
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        ))
+                    )}
+                </Modal.Body>
+                <Modal.Footer className="border-secondary">
+                    <Button variant="outline-light" onClick={() => setIsResultModalOpen(false)}>Bezárás</Button>
+                </Modal.Footer>
+            </Modal>
+
         </Container>
     );
 };

@@ -211,6 +211,10 @@ const TeacherClassroomDetail = () => {
         return <Container className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}><div className="spinner-border text-primary"></div></Container>;
     }
 
+    const now = new Date();
+    const activeAssignments = assignments.filter(a => !a.availableUntil || new Date(a.availableUntil) > now);
+    const expiredAssignments = assignments.filter(a => a.availableUntil && new Date(a.availableUntil) <= now);
+
     return (
         <Container className="py-4 text-light">
             <div className="d-flex justify-content-between align-items-center mb-4">
@@ -225,45 +229,79 @@ const TeacherClassroomDetail = () => {
                     <div className="mb-4 mt-3">
                         <Button variant="primary" className="fw-bold px-4" onClick={openAssignmentModal}>+ Új Feladat / Teszt Kiírása</Button>
                     </div>
-                    <Row className="g-4">
-                        {assignments.length === 0 ? (
-                            <Col><div className="p-5 text-center border border-secondary rounded bg-dark text-light">Nincs még kiírt feladat.</div></Col>
-                        ) : (
-                            assignments.map(a => (
-                                <Col md={6} lg={4} key={a.assignmentId}>
-                                    <Card className="h-100 bg-dark text-light border-secondary shadow-sm">
-                                        <Card.Body className="d-flex flex-column">
-                                            <div className="d-flex justify-content-between align-items-start mb-2">
-                                                <Card.Title className="fw-bold text-primary m-0">{a.title}</Card.Title>
-                                                <div>
-                                                    {a.test ? <Badge bg="danger" className="me-2">Tesztmód</Badge> : <Badge bg="success" className="me-2">Gyakorló</Badge>}
-                                                    <Button variant="outline-danger" size="sm" className="border-0 py-0 fs-5" onClick={() => handleDeleteAssignment(a.assignmentId)} title="Feladat törlése">
-                                                        törlés🗑️
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                            <Card.Text className="text-secondary mb-3 flex-grow-1" style={{ fontSize: '0.9rem' }}>{a.description}</Card.Text>
-                                            
-                                            <ListGroup variant="flush" className="bg-transparent border-top border-secondary pt-2 mb-3">
-                                                <ListGroup.Item className="bg-transparent text-light border-0 p-1" style={{ fontSize: '0.85rem' }}><strong>Feladatok:</strong> {a.exerciseCount} db</ListGroup.Item>
-                                                <ListGroup.Item className="bg-transparent text-light border-0 p-1" style={{ fontSize: '0.85rem' }}><strong>Idő:</strong> {a.timeLimitMinutes ? `${a.timeLimitMinutes} perc` : 'Nincs'}</ListGroup.Item>
-                                            </ListGroup>
-                            
-                                            <div className="mt-auto pt-2 border-top border-secondary">
-                                                <Button 
-                                                    variant="outline-info" 
-                                                    className="w-100 fw-bold shadow-sm mt-2"
-                                                    onClick={() => navigate(`/assignment/${a.assignmentId}/submissions`, { state: { assignmentTitle: a.title, classroomName: classroomName } })}
-                                                >
-                                                    👨‍🏫 Beadott munkák értékelése
-                                                </Button>
-                                            </div>
-                                        </Card.Body>
-                                    </Card>
-                                </Col>
-                            ))
-                        )}
-                    </Row>
+                    
+                    {/* BELSŐ FÜLEK AZ AKTÍV ÉS LEJÁRT FELADATOKNAK */}
+                    <Tabs defaultActiveKey="active" className="mb-3 border-secondary custom-dark-tabs">
+                        
+                        {/* 1. AKTÍV FELADATOK */}
+                        <Tab eventKey="active" title={<span className="fw-bold text-info">🔥 Aktív Feladatok ({activeAssignments.length})</span>}>
+                            <Row className="g-4 mt-1">
+                                {activeAssignments.length === 0 ? (
+                                    <Col><div className="p-5 text-center border border-secondary rounded bg-dark text-light">Nincs aktív feladat.</div></Col>
+                                ) : (
+                                    activeAssignments.map(a => (
+                                        <Col md={6} lg={4} key={a.assignmentId}>
+                                            <Card className="h-100 bg-dark text-light border-info shadow-sm hover-border-primary transition-all">
+                                                <Card.Body className="d-flex flex-column">
+                                                    <div className="d-flex justify-content-between align-items-start mb-2">
+                                                        <Card.Title className="fw-bold text-info m-0">{a.title}</Card.Title>
+                                                        <div>
+                                                            {a.test ? <Badge bg="danger" className="me-2">Tesztmód</Badge> : <Badge bg="success" className="me-2">Gyakorló</Badge>}
+                                                            <Button variant="outline-danger" size="sm" className="border-0 py-0 fs-5" onClick={() => handleDeleteAssignment(a.assignmentId)} title="Feladat törlése">🗑️</Button>
+                                                        </div>
+                                                    </div>
+                                                    <Card.Text className="text-secondary mb-3 flex-grow-1" style={{ fontSize: '0.9rem' }}>{a.description}</Card.Text>
+                                                    
+                                                    <ListGroup variant="flush" className="bg-transparent border-top border-secondary pt-2 mb-3">
+                                                        <ListGroup.Item className="bg-transparent text-light border-0 p-1" style={{ fontSize: '0.85rem' }}><strong>Feladatok:</strong> {a.exerciseCount} db</ListGroup.Item>
+                                                        <ListGroup.Item className="bg-transparent text-light border-0 p-1" style={{ fontSize: '0.85rem' }}><strong>Idő:</strong> {a.timeLimitMinutes ? `${a.timeLimitMinutes} perc` : 'Nincs'}</ListGroup.Item>
+                                                    </ListGroup>
+                                    
+                                                    <div className="mt-auto pt-2 border-top border-secondary">
+                                                        <Button variant="outline-info" className="w-100 fw-bold shadow-sm mt-2" onClick={() => navigate(`/assignment/${a.assignmentId}/submissions`, { state: { assignmentTitle: a.title, classroomName: classroomName } })}>
+                                                            👨‍🏫 Beadott munkák értékelése
+                                                        </Button>
+                                                    </div>
+                                                </Card.Body>
+                                            </Card>
+                                        </Col>
+                                    ))
+                                )}
+                            </Row>
+                        </Tab>
+
+                        {/* 2. LEJÁRT FELADATOK */}
+                        <Tab eventKey="expired" title={<span className="fw-bold text-secondary">⏳ Lejárt / Archív ({expiredAssignments.length})</span>}>
+                            <Row className="g-4 mt-1">
+                                {expiredAssignments.length === 0 ? (
+                                    <Col><div className="p-5 text-center border border-secondary rounded bg-dark text-muted">Nincs lejárt feladat.</div></Col>
+                                ) : (
+                                    expiredAssignments.map(a => (
+                                        <Col md={6} lg={4} key={a.assignmentId}>
+                                            <Card className="h-100 bg-dark text-secondary border-secondary shadow-sm" style={{ opacity: 0.85 }}>
+                                                <Card.Body className="d-flex flex-column">
+                                                    <div className="d-flex justify-content-between align-items-start mb-2">
+                                                        <Card.Title className="fw-bold m-0">{a.title}</Card.Title>
+                                                        <div>
+                                                            <Badge bg="secondary" className="me-2">Lejárt</Badge>
+                                                            <Button variant="outline-secondary" size="sm" className="border-0 py-0 fs-5" onClick={() => handleDeleteAssignment(a.assignmentId)}>🗑️</Button>
+                                                        </div>
+                                                    </div>
+                                                    <Card.Text className="mb-3 flex-grow-1 small">{a.description}</Card.Text>
+                                    
+                                                    <div className="mt-auto pt-2 border-top border-secondary">
+                                                        <Button variant="outline-secondary" className="w-100 fw-bold mt-2" onClick={() => navigate(`/assignment/${a.assignmentId}/submissions`, { state: { assignmentTitle: a.title, classroomName: classroomName } })}>
+                                                            📁 Eredmények megtekintése
+                                                        </Button>
+                                                    </div>
+                                                </Card.Body>
+                                            </Card>
+                                        </Col>
+                                    ))
+                                )}
+                            </Row>
+                        </Tab>
+                    </Tabs>
                 </Tab>
 
                 <Tab eventKey="members" title={<span className="fw-bold">👥 Tagság kezelése</span>}>

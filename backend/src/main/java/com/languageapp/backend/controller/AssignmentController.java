@@ -109,4 +109,11 @@ public class AssignmentController {
         assignmentService.gradeSession(sessionId, request, auth.getName());
         return ResponseEntity.ok().build();
     }
+
+    @GetMapping("/{id}/my-sessions")
+    public ResponseEntity<List<AssignmentSessionResponse>> getMyAssignmentSessions(
+            @PathVariable UUID id,
+            Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getMySessionsForAssignment(id, auth.getName()));
+    }
 }

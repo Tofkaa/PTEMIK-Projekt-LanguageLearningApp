@@ -27,6 +27,7 @@ const AssignmentPlayer = () => {
     const [collectedAnswers, setCollectedAnswers] = useState([]);
     
     const [timeLeft, setTimeLeft] = useState(null);
+    const [showSummary, setShowSummary] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [feedback, setFeedback] = useState(null);
@@ -177,13 +178,17 @@ const AssignmentPlayer = () => {
             const payload = answersToSubmit.map(ans => ({
                 exerciseId: ans.exerciseId,
                 answer: ans.answer,
-                isRetry: ans.isRetry
+                isRetry: ans.isRetry,
+                retried: ans.retried
             }));
 
             await assignmentApi.submitAssignment(sessionId, payload);
-            navigate(`/classrooms`); 
-        } catch (error) {
+
+            setShowSummary(true);
+            
+           } catch (error) {
             alert("Nem sikerült beküldeni a tesztet. Kérlek, ellenőrizd a kapcsolatod!", error);
+        } finally {
             setIsSubmitting(false);
         }
     };
@@ -220,6 +225,32 @@ const AssignmentPlayer = () => {
             buttonText = 'Teszt Beküldése';
             buttonVariant = 'success';
         }
+    }
+
+
+    // --- SIKER KÉPERNYŐ (SUMMARY SCREEN) ---
+    if (showSummary) {
+        return (
+            <div className="min-vh-100 pb-5 text-light d-flex align-items-center bg-darker animate-fade-in">
+                <Container>
+                    <Card className="text-center p-5 bg-dark text-light border-success shadow-lg" style={{ maxWidth: '600px', margin: '0 auto' }}>
+                        <div className="display-1 mb-4">🎉</div>
+                        <h2 className="fw-bold text-success mb-3">Sikeres Beküldés!</h2>
+                        <p className="fs-5 text-secondary mb-4">
+                            A válaszaidat rögzítettük. Az eredményedet a tanári értékelés után tekintheted meg az osztályteremben!
+                        </p>
+                        <Button 
+                            variant="success" 
+                            size="lg" 
+                            className="fw-bold px-5"
+                            onClick={() => navigate(sessionData?.classroomId ? `/classrooms/${sessionData.classroomId}` : `/classrooms`)}
+                        >
+                            Vissza az osztályterembe
+                        </Button>
+                    </Card>
+                </Container>
+            </div>
+        );
     }
 
     return (

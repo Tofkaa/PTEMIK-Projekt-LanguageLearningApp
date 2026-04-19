@@ -13,6 +13,7 @@ export const assignmentApi = {
     submitAssignment: (sessionId, answers) => api.post(`/assignments/sessions/${sessionId}/submit`, { answers }),
     deleteAssignment: (assignmentId) => api.delete(`/assignments/${assignmentId}`),
     getAssignmentSessions: (assignmentId) => api.get(`/assignments/${assignmentId}/sessions`),
-    gradeSession: (sessionId, data) => api.post(`/assignments/sessions/${sessionId}/grade`, data)
-
+    gradeSession: (sessionId, data) => api.post(`/assignments/sessions/${sessionId}/grade`, data),
+    getMyAssignmentSessions: (assignmentId) => api.get(`/assignments/${assignmentId}/my-sessions`)
+    
 };

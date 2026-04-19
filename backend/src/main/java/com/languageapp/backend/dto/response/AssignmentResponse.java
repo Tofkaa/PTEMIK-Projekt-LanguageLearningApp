@@ -1,5 +1,6 @@
 package com.languageapp.backend.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -26,4 +27,7 @@ public class AssignmentResponse {
     private boolean isCompleted;
     private Integer maxAttempts;
     private int attemptsUsed;
+
+    @JsonProperty("hasGradedSession")
+    private boolean hasGradedSession;
 }
