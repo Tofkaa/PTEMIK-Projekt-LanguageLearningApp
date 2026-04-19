@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal } from 'react-bootstrap';
+import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, ProgressBar } from 'react-bootstrap';
 import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 
@@ -21,6 +21,7 @@ const StudentClassroomDetail = () => {
 
     const [expandedPreviewId, setExpandedPreviewId] = useState(null);
 
+    const [stats, setStats] = useState(null);
     
     useEffect(() => {
         fetchClassroomData();
@@ -29,12 +30,14 @@ const StudentClassroomDetail = () => {
     const fetchClassroomData = async () => {
         setIsLoading(true);
         try {
-            const [assignmentsRes, membersRes] = await Promise.all([
+            const [assignmentsRes, membersRes, statsRes] = await Promise.all([
                 assignmentApi.getClassroomAssignments(classroomId),
-                classroomApi.getMembers(classroomId, 'ACCEPTED')
+                classroomApi.getMembers(classroomId, 'ACCEPTED'),
+                assignmentApi.getStudentClassroomStatistics(classroomId)
             ]);
             setAssignments(assignmentsRes.data);
             setClassmates(membersRes.data);
+            setStats(statsRes.data);
         } catch (error) {
             console.error("Hiba az adatok lekérésekor:", error);
         } finally {
@@ -229,6 +232,51 @@ const StudentClassroomDetail = () => {
                             ))}
                         </ListGroup>
                     </Card>
+                </Tab>
+
+                {/* DIÁK STATISZTIKA FÜL */}
+                <Tab eventKey="statistics" title={<span className="fw-bold">📊 Saját Statisztikám</span>}>
+                    {stats && (
+                        <div className="mt-4">
+                            <Row className="g-4 mb-4 text-center">
+                                <Col md={4}>
+                                    <Card className="bg-dark border-info p-3 h-100 shadow-sm d-flex flex-column justify-content-center">
+                                        <h6 className="text-secondary">Saját Átlagom</h6>
+                                        <h2 className={`fw-bold m-0 ${stats.myAverage >= stats.classAverage ? 'text-success' : 'text-warning'}`}>
+                                            {stats.myAverage}%
+                                        </h2>
+                                    </Card>
+                                </Col>
+                                <Col md={4}>
+                                    <Card className="bg-dark border-secondary p-3 h-100 shadow-sm d-flex flex-column justify-content-center">
+                                        <h6 className="text-secondary">Osztályátlag</h6>
+                                        <h2 className="text-light fw-bold m-0">{stats.classAverage}%</h2>
+                                    </Card>
+                                </Col>
+                                <Col md={4}>
+                                    <Card className="bg-dark border-primary p-3 h-100 shadow-sm d-flex flex-column justify-content-center">
+                                        <h6 className="text-secondary">Elvégzett feladatok</h6>
+                                        <h2 className="text-primary fw-bold m-0">{stats.completedCount} / {stats.totalAssignments}</h2>
+                                    </Card>
+                                </Col>
+                            </Row>
+
+                            <Card className="bg-dark text-light border-secondary p-4 shadow-sm text-center">
+                                <h5 className="text-info fw-bold mb-3">Haladási Állapot</h5>
+                                <ProgressBar 
+                                    now={stats.totalAssignments > 0 ? (stats.completedCount / stats.totalAssignments) * 100 : 0} 
+                                    variant="success" 
+                                    style={{ height: '20px' }} 
+                                    className="border border-secondary bg-black"
+                                />
+                                <div className="mt-2 text-secondary small">
+                                    {stats.totalAssignments - stats.completedCount > 0 
+                                        ? `Még ${stats.totalAssignments - stats.completedCount} feladat vár rád!` 
+                                        : "Minden feladattal végeztél ebben az osztályban! 🌟"}
+                                </div>
+                            </Card>
+                        </div>
+                    )}
                 </Tab>
             </Tabs>
 

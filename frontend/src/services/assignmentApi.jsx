@@ -14,6 +14,8 @@ export const assignmentApi = {
     deleteAssignment: (assignmentId) => api.delete(`/assignments/${assignmentId}`),
     getAssignmentSessions: (assignmentId) => api.get(`/assignments/${assignmentId}/sessions`),
     gradeSession: (sessionId, data) => api.post(`/assignments/sessions/${sessionId}/grade`, data),
-    getMyAssignmentSessions: (assignmentId) => api.get(`/assignments/${assignmentId}/my-sessions`)
+    getMyAssignmentSessions: (assignmentId) => api.get(`/assignments/${assignmentId}/my-sessions`),
+    getClassroomStatistics: (classroomId) => api.get(`/assignments/classroom/${classroomId}/statistics`),
+    getStudentClassroomStatistics: (classroomId) => api.get(`/assignments/classroom/${classroomId}/my-statistics`)
     
 };

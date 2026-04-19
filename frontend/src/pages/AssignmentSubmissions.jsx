@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Container, Card, Button, Badge, Table, Modal, Form, Spinner } from 'react-bootstrap';
+import { Container, Card, Button, Badge, Table, Modal, Form, Spinner, Row, Col } from 'react-bootstrap';
 import { assignmentApi } from '../services/assignmentApi';
 
 
@@ -40,7 +40,12 @@ const AssignmentSubmissions = () => {
     }, [assignmentId]);
 
     useEffect(() => {
-        fetchSessions();
+        let isMounted = true;
+        const load = async () => {
+            if (isMounted) await fetchSessions();
+        };
+        load();
+        return () => { isMounted = false; }; 
     }, [fetchSessions]);
 
     // Értékelő ablak megnyitása
@@ -75,6 +80,36 @@ const AssignmentSubmissions = () => {
         }
     };
 
+    const getHardestQuestion = () => {
+        if (!sessions || sessions.length === 0) return "Nincs elég adat";
+        
+        const mistakeCounts = {};
+        let totalMistakes = 0;
+
+        sessions.forEach(session => {
+            if (session.answers) {
+                session.answers.forEach(ans => {
+                    if (!ans.correct) {
+                        mistakeCounts[ans.question] = (mistakeCounts[ans.question] || 0) + 1;
+                        totalMistakes++;
+                    }
+                });
+            }
+        });
+
+        if (totalMistakes === 0) return "Mindenki hibátlan!";
+
+        // Sorrendbe rakjuk a hibákat csökkenő sorrendben
+        const sortedMistakes = Object.entries(mistakeCounts).sort((a, b) => b[1] - a[1]);
+        
+        return {
+            question: sortedMistakes[0][0],
+            count: sortedMistakes[0][1]
+        };
+    };
+
+    const hardest = getHardestQuestion();
+
     if (isLoading) {
         return <Container className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}><Spinner animation="border" variant="info" /></Container>;
     }
@@ -88,6 +123,38 @@ const AssignmentSubmissions = () => {
                 <h4 className="text-secondary">{classroomName}</h4>
                 <h2 className="fw-bold m-0 text-info">Beadott munkák: {assignmentTitle}</h2>
             </div>
+
+            <Row className="mb-4 g-3">
+                <Col md={4}>
+                    <div className="p-3 bg-dark border border-secondary rounded text-center shadow-sm h-100 d-flex flex-column justify-content-center">
+                        <div className="small text-secondary mb-1">Beadási arány</div>
+                        <div className="fs-4 fw-bold text-light">{sessions.length} db</div>
+                    </div>
+                </Col>
+                <Col md={4}>
+                    <div className="p-3 bg-dark border border-info rounded text-center shadow-sm h-100 d-flex flex-column justify-content-center">
+                        <div className="small text-secondary mb-1">Teszt Átlagpontszám</div>
+                        <div className="fs-4 fw-bold text-info">
+                            {sessions.length > 0 ? Math.round(sessions.reduce((acc, s) => acc + (s.teacherScore !== null ? s.teacherScore : s.finalScore), 0) / sessions.length) : 0}%
+                        </div>
+                    </div>
+                </Col>
+                <Col md={4}>
+                    <div className="p-3 bg-dark border border-warning rounded text-center shadow-sm h-100 d-flex flex-column justify-content-center">
+                        <div className="small text-secondary mb-1">Legnehezebb kérdés</div>
+                        {typeof hardest === 'string' ? (
+                            <div className="fw-bold text-success">{hardest}</div>
+                        ) : (
+                            <>
+                                <div className="small fw-bold text-warning text-truncate px-2" title={hardest.question}>
+                                    {hardest.question}
+                                </div>
+                                <div className="text-muted small mt-1">({hardest.count} rontott válasz)</div>
+                            </>
+                        )}
+                    </div>
+                </Col>
+            </Row>
 
             <Card className="bg-dark text-light border-secondary shadow-lg">
                 <Card.Body className="p-0">

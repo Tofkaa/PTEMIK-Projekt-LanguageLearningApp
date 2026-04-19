@@ -1,10 +1,7 @@
 package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.request.*;
-import com.languageapp.backend.dto.response.AssignmentResponse;
-import com.languageapp.backend.dto.response.AssignmentSessionResponse;
-import com.languageapp.backend.dto.response.AssignmentStartResponse;
-import com.languageapp.backend.dto.response.MistakeDTO;
+import com.languageapp.backend.dto.response.*;
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
@@ -16,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.languageapp.backend.dto.request.ExerciseSubmission;
+import com.languageapp.backend.enums.MembershipStatus;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -408,6 +406,83 @@ public class AssignmentService {
                 a.getMaxAttempts(),
                 attemptsUsed,
                 hasGradedSession
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public ClassroomStatisticsResponse getClassroomStatistics(UUID classroomId) {
+        // 1. Lekérjük a teremhez tartozó összes feladatot
+        List<ClassroomAssignment> assignments = assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(classroomId);
+
+        // 2. Lekérjük az elfogadott diákokat
+        List<User> students = classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
+                .stream().map(ClassroomMember::getUser).toList();
+
+        List<ClassroomStatisticsResponse.StudentProgressDTO> progressList = new ArrayList<>();
+
+        // 3. Végigmegyünk a diákokon és összesítjük az eredményeiket
+        for (User student : students) {
+            List<AssignmentSession> studentSessions = new ArrayList<>();
+            for (ClassroomAssignment assignment : assignments) {
+                List<AssignmentSession> sessionsForAssignment = sessionRepository
+                        .findAllByAssignment_AssignmentIdAndUser_UserId(assignment.getAssignmentId(), student.getUserId());
+                studentSessions.addAll(sessionsForAssignment.stream().filter(s -> s.getFinishedAt() != null).toList());
+            }
+
+            // JAVÍTÁS: Az egyedi feladatok számát számoljuk, nem az összes próbálkozást!
+            long uniqueCompletedCount = studentSessions.stream()
+                    .map(s -> s.getAssignment().getAssignmentId())
+                    .distinct()
+                    .count();
+
+            double avg = studentSessions.stream()
+                    .mapToInt(s -> s.getTeacherScore() != null ? s.getTeacherScore() : s.getFinalScore())
+                    .average().orElse(0.0);
+
+            String lastAct = studentSessions.stream()
+                    .map(s -> s.getFinishedAt().toString())
+                    .max(String::compareTo).orElse("Nincs adat");
+
+            progressList.add(new ClassroomStatisticsResponse.StudentProgressDTO(
+                    student.getName(), student.getEmail(), (int)uniqueCompletedCount, Math.round(avg * 10.0) / 10.0, lastAct
+            ));
+        }
+
+        // 4. Osztályátlag számítása (csak azokból, akiknek van >0 eredménye)
+        double totalAvg = progressList.stream()
+                .mapToDouble(ClassroomStatisticsResponse.StudentProgressDTO::getAverageScore)
+                .filter(a -> a > 0).average().orElse(0.0);
+
+
+        return new ClassroomStatisticsResponse(
+                Math.round(totalAvg * 10.0) / 10.0,
+                assignments.size(),
+                progressList
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getStudentClassroomStats(UUID classroomId, String email) {
+
+        // 1. Lefuttatjuk a már tökéletesen működő tanári statisztikát
+        ClassroomStatisticsResponse allStats = getClassroomStatistics(classroomId);
+
+        // 2. Kikeresjük belőle a kérdéses diák saját haladását az email címe alapján
+        ClassroomStatisticsResponse.StudentProgressDTO myProgress = allStats.getStudentProgress().stream()
+                .filter(p -> p.getStudentEmail().equals(email))
+                .findFirst()
+                .orElse(null);
+
+        // 3. Változók kinyerése (ha még nem csinált semmit, akkor 0)
+        int completedCount = myProgress != null ? myProgress.getCompletedCount() : 0;
+        double myAvg = myProgress != null ? myProgress.getAverageScore() : 0.0;
+
+        // 4. Visszaadjuk a frontendnek a 4 darab kulcsfontosságú számot
+        return java.util.Map.of(
+                "completedCount", completedCount,
+                "totalAssignments", allStats.getTotalAssignments(),
+                "myAverage", myAvg,
+                "classAverage", allStats.getClassAverage()
         );
     }
 }

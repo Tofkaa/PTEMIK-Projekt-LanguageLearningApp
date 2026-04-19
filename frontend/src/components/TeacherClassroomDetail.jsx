@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, Form, Spinner } from 'react-bootstrap';
+import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, Form, Spinner, Table, ProgressBar } from 'react-bootstrap';
 import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 import { lessonApi } from '../services/lessonApi';
@@ -24,6 +24,8 @@ const TeacherClassroomDetail = () => {
     const [selectedExercisesData, setSelectedExercisesData] = useState([]);
     const [assignmentMode, setAssignmentMode] = useState('TEST'); 
 
+    const [stats, setStats] = useState(null);
+
     const [assignmentForm, setAssignmentForm] = useState({
         title: '',
         description: '',
@@ -42,6 +44,21 @@ const TeacherClassroomDetail = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
+
+    const parseDate = (d) => {
+        if (!d) return null;
+        if (Array.isArray(d)) {
+            return new Date(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0);
+        }
+        return new Date(d);
+    };
+
+    const formatTime = (dateData) => {
+        const date = parseDate(dateData);
+        if (!date) return "Nincs megadva";
+        return date.toLocaleString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+
     const fetchDashboardData = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -53,6 +70,10 @@ const TeacherClassroomDetail = () => {
             setPendingMembers(pendingRes.data);
             setAcceptedMembers(acceptedRes.data);
             setAssignments(assignmentsRes.data);
+
+            const statsRes = await assignmentApi.getClassroomStatistics(classroomId);
+            setStats(statsRes.data);
+
         } catch (error) {
             console.error("Hiba az adatok lekérésekor:", error);
         } finally {
@@ -212,8 +233,70 @@ const TeacherClassroomDetail = () => {
     }
 
     const now = new Date();
-    const activeAssignments = assignments.filter(a => !a.availableUntil || new Date(a.availableUntil) > now);
-    const expiredAssignments = assignments.filter(a => a.availableUntil && new Date(a.availableUntil) <= now);
+    
+    // 1. Aktív: Már elkezdődött (vagy nincs kezdete) ÉS még nincs vége (vagy nincs vége)
+    const activeAssignments = assignments.filter(a => {
+        const from = parseDate(a.availableFrom);
+        const until = parseDate(a.availableUntil);
+        return (!from || from <= now) && (!until || until > now);
+    });
+
+    // 2. Ütemezett: Még nem kezdődött el
+    const scheduledAssignments = assignments.filter(a => {
+        const from = parseDate(a.availableFrom);
+        return from && from > now;
+    });
+
+    // 3. Lejárt: Már elmúlt a határideje
+    const expiredAssignments = assignments.filter(a => {
+        const until = parseDate(a.availableUntil);
+        return until && until <= now;
+    });
+
+    const renderAssignmentCard = (a, status) => (
+    <Col md={6} lg={4} key={a.assignmentId}>
+        <Card className={`h-100 bg-dark text-light border-secondary shadow-sm ${status === 'expired' ? 'opacity-75' : ''}`}>
+            <Card.Body className="d-flex flex-column">
+                <div className="d-flex justify-content-between align-items-start mb-2">
+                    <Card.Title className="fw-bold text-primary m-0">{a.title}</Card.Title>
+                    <div>
+                        {status === 'scheduled' && <Badge bg="warning" text="dark" className="me-2">Ütemezett</Badge>}
+                        {a.test ? <Badge bg="danger">Teszt</Badge> : <Badge bg="success">Gyakorló</Badge>}
+                    </div>
+                </div>
+                
+                <Card.Text className="text-secondary mb-3 small flex-grow-1">{a.description}</Card.Text>
+
+                {/* IDŐPONTOK MEGJELENÍTÉSE */}
+                <div className="mb-3 p-2 bg-black bg-opacity-25 rounded border border-secondary" style={{ fontSize: '0.8rem' }}>
+                    <div className="d-flex justify-content-between mb-1">
+                        <span className="text-secondary">📅 Elérhető:</span>
+                        <span className="text-info fw-bold">{formatTime(a.availableFrom)}</span>
+                    </div>
+                    <div className="d-flex justify-content-between">
+                        <span className="text-secondary">🕒 Határidő:</span>
+                        <span className={`fw-bold ${status === 'expired' ? 'text-danger' : 'text-warning'}`}>
+                            {formatTime(a.availableUntil)}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="mt-auto pt-2 border-top border-secondary d-flex gap-2">
+                    <Button 
+                        variant="outline-info" 
+                        size="sm" 
+                        className="flex-grow-1 fw-bold"
+                        onClick={() => navigate(`/assignment/${a.assignmentId}/submissions`, { state: { assignmentTitle: a.title, classroomName: classroomName } })}
+                    >
+                        📊 Eredmények
+                    </Button>
+                    <Button variant="outline-danger" size="sm" onClick={() => handleDeleteAssignment(a.assignmentId)}>törlés🗑️</Button>
+                </div>
+            </Card.Body>
+        </Card>
+    </Col>
+);
+
 
     return (
         <Container className="py-4 text-light">
@@ -226,83 +309,34 @@ const TeacherClassroomDetail = () => {
 
             <Tabs defaultActiveKey="assignments" className="mb-4 custom-dark-tabs">
                 <Tab eventKey="assignments" title={<span className="fw-bold">📝 Feladatok & Tesztek</span>}>
-                    <div className="mb-4 mt-3">
-                        <Button variant="primary" className="fw-bold px-4" onClick={openAssignmentModal}>+ Új Feladat / Teszt Kiírása</Button>
-                    </div>
-                    
-                    {/* BELSŐ FÜLEK AZ AKTÍV ÉS LEJÁRT FELADATOKNAK */}
-                    <Tabs defaultActiveKey="active" className="mb-3 border-secondary custom-dark-tabs">
-                        
-                        {/* 1. AKTÍV FELADATOK */}
-                        <Tab eventKey="active" title={<span className="fw-bold text-info">🔥 Aktív Feladatok ({activeAssignments.length})</span>}>
-                            <Row className="g-4 mt-1">
-                                {activeAssignments.length === 0 ? (
-                                    <Col><div className="p-5 text-center border border-secondary rounded bg-dark text-light">Nincs aktív feladat.</div></Col>
-                                ) : (
-                                    activeAssignments.map(a => (
-                                        <Col md={6} lg={4} key={a.assignmentId}>
-                                            <Card className="h-100 bg-dark text-light border-info shadow-sm hover-border-primary transition-all">
-                                                <Card.Body className="d-flex flex-column">
-                                                    <div className="d-flex justify-content-between align-items-start mb-2">
-                                                        <Card.Title className="fw-bold text-info m-0">{a.title}</Card.Title>
-                                                        <div>
-                                                            {a.test ? <Badge bg="danger" className="me-2">Tesztmód</Badge> : <Badge bg="success" className="me-2">Gyakorló</Badge>}
-                                                            <Button variant="outline-danger" size="sm" className="border-0 py-0 fs-5" onClick={() => handleDeleteAssignment(a.assignmentId)} title="Feladat törlése">🗑️</Button>
-                                                        </div>
-                                                    </div>
-                                                    <Card.Text className="text-secondary mb-3 flex-grow-1" style={{ fontSize: '0.9rem' }}>{a.description}</Card.Text>
-                                                    
-                                                    <ListGroup variant="flush" className="bg-transparent border-top border-secondary pt-2 mb-3">
-                                                        <ListGroup.Item className="bg-transparent text-light border-0 p-1" style={{ fontSize: '0.85rem' }}><strong>Feladatok:</strong> {a.exerciseCount} db</ListGroup.Item>
-                                                        <ListGroup.Item className="bg-transparent text-light border-0 p-1" style={{ fontSize: '0.85rem' }}><strong>Idő:</strong> {a.timeLimitMinutes ? `${a.timeLimitMinutes} perc` : 'Nincs'}</ListGroup.Item>
-                                                    </ListGroup>
-                                    
-                                                    <div className="mt-auto pt-2 border-top border-secondary">
-                                                        <Button variant="outline-info" className="w-100 fw-bold shadow-sm mt-2" onClick={() => navigate(`/assignment/${a.assignmentId}/submissions`, { state: { assignmentTitle: a.title, classroomName: classroomName } })}>
-                                                            👨‍🏫 Beadott munkák értékelése
-                                                        </Button>
-                                                    </div>
-                                                </Card.Body>
-                                            </Card>
-                                        </Col>
-                                    ))
-                                )}
-                            </Row>
-                        </Tab>
+    <div className="mb-4 mt-3">
+        <Button variant="primary" className="fw-bold px-4 shadow-sm" onClick={openAssignmentModal}>+ Új Feladat / Teszt Kiírása</Button>
+    </div>
 
-                        {/* 2. LEJÁRT FELADATOK */}
-                        <Tab eventKey="expired" title={<span className="fw-bold text-secondary">⏳ Lejárt / Archív ({expiredAssignments.length})</span>}>
-                            <Row className="g-4 mt-1">
-                                {expiredAssignments.length === 0 ? (
-                                    <Col><div className="p-5 text-center border border-secondary rounded bg-dark text-muted">Nincs lejárt feladat.</div></Col>
-                                ) : (
-                                    expiredAssignments.map(a => (
-                                        <Col md={6} lg={4} key={a.assignmentId}>
-                                            <Card className="h-100 bg-dark text-secondary border-secondary shadow-sm" style={{ opacity: 0.85 }}>
-                                                <Card.Body className="d-flex flex-column">
-                                                    <div className="d-flex justify-content-between align-items-start mb-2">
-                                                        <Card.Title className="fw-bold m-0">{a.title}</Card.Title>
-                                                        <div>
-                                                            <Badge bg="secondary" className="me-2">Lejárt</Badge>
-                                                            <Button variant="outline-secondary" size="sm" className="border-0 py-0 fs-5" onClick={() => handleDeleteAssignment(a.assignmentId)}>🗑️</Button>
-                                                        </div>
-                                                    </div>
-                                                    <Card.Text className="mb-3 flex-grow-1 small">{a.description}</Card.Text>
-                                    
-                                                    <div className="mt-auto pt-2 border-top border-secondary">
-                                                        <Button variant="outline-secondary" className="w-100 fw-bold mt-2" onClick={() => navigate(`/assignment/${a.assignmentId}/submissions`, { state: { assignmentTitle: a.title, classroomName: classroomName } })}>
-                                                            📁 Eredmények megtekintése
-                                                        </Button>
-                                                    </div>
-                                                </Card.Body>
-                                            </Card>
-                                        </Col>
-                                    ))
-                                )}
-                            </Row>
-                        </Tab>
-                    </Tabs>
-                </Tab>
+    <Tabs defaultActiveKey="active" className="mb-3 border-secondary custom-dark-tabs">
+        
+        {/* 1. AKTUÁLISAN FUTÓ FELADATOK */}
+        <Tab eventKey="active" title={<span className="fw-bold text-info">🔥 Aktív ({activeAssignments.length})</span>}>
+            <Row className="g-4 mt-1">
+                {activeAssignments.map(a => renderAssignmentCard(a, 'active'))}
+            </Row>
+        </Tab>
+
+        {/* 2. JÖVŐBEN INDULÓ FELADATOK */}
+        <Tab eventKey="scheduled" title={<span className="fw-bold text-warning">📅 Ütemezett ({scheduledAssignments.length})</span>}>
+            <Row className="g-4 mt-1">
+                {scheduledAssignments.map(a => renderAssignmentCard(a, 'scheduled'))}
+            </Row>
+        </Tab>
+
+        {/* 3. ARCHÍVUM */}
+        <Tab eventKey="expired" title={<span className="fw-bold text-secondary">⏳ Lejárt ({expiredAssignments.length})</span>}>
+            <Row className="g-4 mt-1">
+                {expiredAssignments.map(a => renderAssignmentCard(a, 'expired'))}
+            </Row>
+        </Tab>
+    </Tabs>
+</Tab>
 
                 <Tab eventKey="members" title={<span className="fw-bold">👥 Tagság kezelése</span>}>
                     <Row className="g-4 mt-1">
@@ -337,6 +371,70 @@ const TeacherClassroomDetail = () => {
                             </Card>
                         </Col>
                     </Row>
+                </Tab>
+
+                <Tab eventKey="statistics" title={<span className="fw-bold">📊 Statisztika & Haladás</span>}>
+                    {stats && (
+                            <div className="mt-4">
+                                <Row className="mb-4 text-center">
+                                    <Col md={6}>
+                                        <Card className="bg-dark border-info p-3">
+                                            <h6 className="text-secondary">Osztályterem Átlag</h6>
+                                            <h2 className="text-info fw-bold">{stats.classAverage}%</h2>
+                                        </Card>
+                                    </Col>
+                                    <Col md={6}>
+                                        <Card className="bg-dark border-success p-3">
+                                            <h6 className="text-secondary">Kiadott feladatok</h6>
+                                            <h2 className="text-success fw-bold">{stats.totalAssignments} db</h2>
+                                        </Card>
+                                    </Col>
+                                </Row>
+
+                                <Card className="bg-dark text-light border-secondary shadow-lg">
+                                    <Card.Header className="bg-dark border-secondary fw-bold text-primary">
+                                        Diákok Aggregált Teljesítménye
+                                    </Card.Header>
+                                    <Table hover variant="dark" responsive className="m-0">
+                                        <thead>
+                                            <tr className="text-secondary">
+                                                <th>Diák Neve</th>
+                                                <th className="text-center">Befejezett</th>
+                                                <th className="text-center">Haladás</th>
+                                                <th className="text-center">Átlagpont</th>
+                                                <th>Utolsó Aktivitás</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {stats.studentProgress.map((s, idx) => (
+                                                <tr key={idx} className="align-middle">
+                                                    <td>
+                                                        <div className="fw-bold">{s.studentName}</div>
+                                                        <div className="small text-secondary">{s.studentEmail}</div>
+                                                    </td>
+                                                    <td className="text-center">{s.completedCount} / {stats.totalAssignments}</td>
+                                                    <td className="text-center" style={{ width: '150px' }}>
+                                                        <ProgressBar 
+                                                            now={(s.completedCount / stats.totalAssignments) * 100} 
+                                                            variant="info" 
+                                                            style={{ height: '8px' }} 
+                                                        />
+                                                    </td>
+                                                    <td className="text-center">
+                                                        <Badge bg={s.averageScore >= 80 ? "success" : s.averageScore >= 50 ? "warning" : "danger"} className="fs-6">
+                                                            {s.averageScore}%
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="text-secondary small">
+                                                        {s.lastActivity !== "Nincs adat" ? new Date(s.lastActivity).toLocaleString('hu-HU') : "Még nem kezdte el"}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </Table>
+                                </Card>
+                            </div>
+                        )}
                 </Tab>
             </Tabs>
 
