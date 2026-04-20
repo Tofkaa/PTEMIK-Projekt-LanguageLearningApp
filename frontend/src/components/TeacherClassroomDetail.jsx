@@ -90,6 +90,29 @@ const TeacherClassroomDetail = () => {
         fetchDashboardData();
     }, [fetchDashboardData, pingTrigger]);
 
+    // A memória kezelő
+    const viewedTeacherPending = JSON.parse(localStorage.getItem('viewedTeacherPending') || '[]');
+    const viewedTeacherUngraded = JSON.parse(localStorage.getItem('viewedTeacherUngraded') || '[]');
+
+    const markAsViewed = (storageKey, idsToMark) => {
+        if (!idsToMark || idsToMark.length === 0) return;
+        const stringIds = idsToMark.map(id => String(id));
+        const seen = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        const updated = [...new Set([...seen, ...stringIds])];
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        window.dispatchEvent(new Event('local-storage-update'));
+    };
+
+    // Kiszámoljuk, mik az aktuális teremből jövő, olvasatlan pingek
+    const unseenPendingList = (notifications?.teacherPendingJoinRequestIds || []).filter(id => id.startsWith(classroomId) && !viewedTeacherPending.includes(id));
+    const unseenUngradedList = (notifications?.teacherUngradedSubmissionIds || []).filter(id => id.startsWith(classroomId) && !viewedTeacherUngraded.includes(id));
+
+    // Amikor kattint az eredményekre, levesszük a pinget:
+    const handleViewSubmissions = (assignment) => {
+        markAsViewed('viewedTeacherUngraded', [`${classroomId}:${assignment.assignmentId}`]);
+        navigate(`/assignment/${assignment.assignmentId}/submissions`, { state: { assignmentTitle: assignment.title, classroomName: classroomName } });
+    };
+
     // --- MEMBER MANAGEMENT ---
     const handleModerate = async (studentId, approve) => {
         try { await classroomApi.moderateMember(classroomId, studentId, approve); fetchDashboardData(); }
@@ -258,50 +281,64 @@ const TeacherClassroomDetail = () => {
         return until && until <= now;
     });
 
+    // 1. Segédfüggvény a biztonságos (kisbetű/nagybetű független) egyezéshez
+    const hasUngradedSubmission = (assignmentId) => {
+        const targetId = `${classroomId}:${assignmentId}`.toLowerCase();
+        return unseenUngradedList.some(id => id.toLowerCase() === targetId);
+    };
+
+    // 2. Kiszámoljuk, melyik belső fülön mennyi új beadás van, hogy oda is tegyünk pöttyöt!
+    const activeUngradedCount = activeAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
+    const scheduledUngradedCount = scheduledAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
+    const expiredUngradedCount = expiredAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
+
     const renderAssignmentCard = (a, status) => (
-    <Col md={6} lg={4} key={a.assignmentId}>
-        <Card className={`h-100 bg-dark text-light border-secondary shadow-sm ${status === 'expired' ? 'opacity-75' : ''}`}>
-            <Card.Body className="d-flex flex-column">
-                <div className="d-flex justify-content-between align-items-start mb-2">
-                    <Card.Title className="fw-bold text-primary m-0">{a.title}</Card.Title>
-                    <div>
-                        {status === 'scheduled' && <Badge bg="warning" text="dark" className="me-2">Ütemezett</Badge>}
-                        {a.test ? <Badge bg="danger">Teszt</Badge> : <Badge bg="success">Gyakorló</Badge>}
+        <Col md={6} lg={4} key={a.assignmentId}>
+            <Card className={`h-100 bg-dark text-light border-secondary shadow-sm ${status === 'expired' ? 'opacity-75' : ''}`}>
+                <Card.Body className="d-flex flex-column">
+                    <div className="d-flex justify-content-between align-items-start mb-2">
+                        <Card.Title className="fw-bold text-primary m-0">{a.title}</Card.Title>
+                        <div>
+                            {/* A BIZTOS PING ELLENŐRZÉS */}
+                            {hasUngradedSubmission(a.assignmentId) && (
+                                <Badge bg="danger" className="animate-pulse shadow-sm me-2 border border-light">🔴 ÚJ BEKÜLDÉS</Badge>
+                            )}
+                            {status === 'scheduled' && <Badge bg="warning" text="dark" className="me-2">Ütemezett</Badge>}
+                            {a.test ? <Badge bg="danger">Teszt</Badge> : <Badge bg="success">Gyakorló</Badge>}
+                        </div>
                     </div>
-                </div>
-                
-                <Card.Text className="text-secondary mb-3 small flex-grow-1">{a.description}</Card.Text>
+                    
+                    <Card.Text className="text-secondary mb-3 small flex-grow-1">{a.description}</Card.Text>
 
-                {/* IDŐPONTOK MEGJELENÍTÉSE */}
-                <div className="mb-3 p-2 bg-black bg-opacity-25 rounded border border-secondary" style={{ fontSize: '0.8rem' }}>
-                    <div className="d-flex justify-content-between mb-1">
-                        <span className="text-secondary">📅 Elérhető:</span>
-                        <span className="text-info fw-bold">{formatTime(a.availableFrom)}</span>
+                    {/* IDŐPONTOK MEGJELENÍTÉSE */}
+                    <div className="mb-3 p-2 bg-black bg-opacity-25 rounded border border-secondary" style={{ fontSize: '0.8rem' }}>
+                        <div className="d-flex justify-content-between mb-1">
+                            <span className="text-secondary">📅 Elérhető:</span>
+                            <span className="text-info fw-bold">{formatTime(a.availableFrom)}</span>
+                        </div>
+                        <div className="d-flex justify-content-between">
+                            <span className="text-secondary">🕒 Határidő:</span>
+                            <span className={`fw-bold ${status === 'expired' ? 'text-danger' : 'text-warning'}`}>
+                                {formatTime(a.availableUntil)}
+                            </span>
+                        </div>
                     </div>
-                    <div className="d-flex justify-content-between">
-                        <span className="text-secondary">🕒 Határidő:</span>
-                        <span className={`fw-bold ${status === 'expired' ? 'text-danger' : 'text-warning'}`}>
-                            {formatTime(a.availableUntil)}
-                        </span>
+
+                    <div className="mt-auto pt-2 border-top border-secondary d-flex gap-2">
+                        <Button 
+                            variant="outline-info" 
+                            size="sm" 
+                            className="flex-grow-1 fw-bold"
+                           onClick={() => handleViewSubmissions(a)}
+                        >
+                            📊 Eredmények
+                        </Button>
+                        <Button variant="outline-danger" size="sm" onClick={() => handleDeleteAssignment(a.assignmentId)}>törlés🗑️</Button>
                     </div>
-                </div>
-
-                <div className="mt-auto pt-2 border-top border-secondary d-flex gap-2">
-                    <Button 
-                        variant="outline-info" 
-                        size="sm" 
-                        className="flex-grow-1 fw-bold"
-                        onClick={() => navigate(`/assignment/${a.assignmentId}/submissions`, { state: { assignmentTitle: a.title, classroomName: classroomName } })}
-                    >
-                        📊 Eredmények
-                    </Button>
-                    <Button variant="outline-danger" size="sm" onClick={() => handleDeleteAssignment(a.assignmentId)}>törlés🗑️</Button>
-                </div>
-            </Card.Body>
-        </Card>
-    </Col>
-);
-
+                </Card.Body>
+            </Card>
+        </Col>
+    );
 
     return (
         <Container className="py-4 text-light">
@@ -312,13 +349,17 @@ const TeacherClassroomDetail = () => {
                 </div>
             </div>
 
-            <Tabs defaultActiveKey="assignments" className="mb-4 custom-dark-tabs">
+            <Tabs defaultActiveKey="assignments" className="mb-4 custom-dark-tabs"
+                  onSelect={(key) => {
+                      if (key === 'members' && unseenPendingList.length > 0) {
+                          markAsViewed('viewedTeacherPending', pendingMembers.map(m => `${classroomId}:${m.userId}`));
+                      }
+                  }}>
+
                 <Tab eventKey="assignments" title={
                     <span className="fw-bold">
                         📝 Feladatok & Tesztek
-                        {notifications.teacherUngradedSubmissions > 0 && (
-                            <Badge bg="danger" pill className="ms-2 animate-pulse">{notifications.teacherUngradedSubmissions}</Badge>
-                        )}
+                        {unseenUngradedList.length > 0 && <Badge bg="danger" pill className="ms-2 animate-pulse">{unseenUngradedList.length}</Badge>}
                     </span>}>
                     
                     <div className="mb-4 mt-3">
@@ -328,21 +369,36 @@ const TeacherClassroomDetail = () => {
             <Tabs defaultActiveKey="active" className="mb-3 border-secondary custom-dark-tabs">
                 
                 {/* 1. AKTUÁLISAN FUTÓ FELADATOK */}
-                <Tab eventKey="active" title={<span className="fw-bold text-info">🔥 Aktív ({activeAssignments.length})</span>}>
+                <Tab eventKey="active" title={
+                    <span className="fw-bold text-info">
+                        🔥 Aktív ({activeAssignments.length})
+                        {activeUngradedCount > 0 && <Badge bg="danger" pill className="ms-2 animate-pulse shadow-sm">{activeUngradedCount}</Badge>}
+                    </span>
+                }>
                     <Row className="g-4 mt-1">
                         {activeAssignments.map(a => renderAssignmentCard(a, 'active'))}
                     </Row>
                 </Tab>
 
                 {/* 2. JÖVŐBEN INDULÓ FELADATOK */}
-                <Tab eventKey="scheduled" title={<span className="fw-bold text-warning">📅 Ütemezett ({scheduledAssignments.length})</span>}>
+                <Tab eventKey="scheduled" title={
+                    <span className="fw-bold text-warning">
+                        📅 Ütemezett ({scheduledAssignments.length})
+                        {scheduledUngradedCount > 0 && <Badge bg="danger" pill className="ms-2 animate-pulse shadow-sm">{scheduledUngradedCount}</Badge>}
+                    </span>
+                }>
                     <Row className="g-4 mt-1">
                         {scheduledAssignments.map(a => renderAssignmentCard(a, 'scheduled'))}
                     </Row>
                 </Tab>
 
                 {/* 3. ARCHÍVUM */}
-                <Tab eventKey="expired" title={<span className="fw-bold text-secondary">⏳ Lejárt ({expiredAssignments.length})</span>}>
+                <Tab eventKey="expired" title={
+                    <span className="fw-bold text-secondary">
+                        ⏳ Lejárt ({expiredAssignments.length})
+                        {expiredUngradedCount > 0 && <Badge bg="danger" pill className="ms-2 animate-pulse shadow-sm">{expiredUngradedCount}</Badge>}
+                    </span>
+                }>
                     <Row className="g-4 mt-1">
                         {expiredAssignments.map(a => renderAssignmentCard(a, 'expired'))}
                     </Row>
@@ -354,9 +410,7 @@ const TeacherClassroomDetail = () => {
                     
                     <span className="fw-bold">
                         👥 Tagság kezelése
-                        {pendingMembers.length > 0 && (
-                            <Badge bg="danger" pill className="ms-2 animate-pulse">{pendingMembers.length}</Badge>
-                        )}
+                        {unseenPendingList.length > 0 && <Badge bg="danger" pill className="ms-2 animate-pulse">{unseenPendingList.length}</Badge>}
                     </span>}>
 
                     <Row className="g-4 mt-1">

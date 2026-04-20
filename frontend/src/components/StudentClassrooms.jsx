@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { classroomApi } from '../services/classroomApi';
-import { Card, Button, Form, Row, Col, InputGroup } from 'react-bootstrap';
+import { Card, Button, Form, Row, Col, Badge, InputGroup } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '../context/NotificationContext';
 
 /**
  * Dashboard component for users with the STUDENT role.
@@ -13,6 +14,7 @@ const StudentClassrooms = () => {
     const [statusMessage, setStatusMessage] = useState({ text: '', type: '' });
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
+    const { notifications } = useNotifications(); 
 
     useEffect(() => {
         fetchClassrooms();
@@ -103,18 +105,34 @@ const StudentClassrooms = () => {
                         </div>
                     </Col>
                 ) : (
-                    classrooms.map(room => (
-                        <Col md={6} lg={4} key={room.classroomId}>
-                            <Card 
+                   classrooms.map(room => {
+                       
+                        const viewedAssignments = JSON.parse(localStorage.getItem('viewedAssignments') || '[]');
+                        const viewedResults = JSON.parse(localStorage.getItem('viewedResults') || '[]');
+
+                        const unseenAssignments = (notifications?.studentActiveAssignmentIds || []).filter(id => id.startsWith(room.classroomId) && !viewedAssignments.includes(id)).length;
+                        const unseenResults = (notifications?.studentGradedSessionIds || []).filter(id => id.startsWith(room.classroomId) && !viewedResults.includes(id)).length;
+                        const totalClassroomPings = unseenAssignments + unseenResults;
+
+                        return (
+                            <Col md={6} lg={4} key={room.classroomId}>
+                                <Card 
                                     className="h-100 bg-dark text-light border-secondary shadow-sm"
                                     style={{ cursor: 'pointer' }}
                                     onClick={() => navigate(`/classrooms/${room.classroomId}`, { state: { className: room.name, isOwner: false } })}
                                 >
-                                <Card.Body className="d-flex flex-column">
-                                    <Card.Title className="fw-bold text-primary">{room.name}</Card.Title>
-                                    <Card.Text className="text-secondary flex-grow-1" style={{ fontSize: '0.9rem' }}>
-                                        {room.description}
-                                    </Card.Text>
+                                    <Card.Body className="d-flex flex-column">
+                                        <Card.Title className="fw-bold text-primary d-flex justify-content-between align-items-start">
+                                            {room.name}
+                                            {totalClassroomPings > 0 && (
+                                                <Badge bg="danger" pill className="animate-pulse shadow-sm fs-6">
+                                                    {totalClassroomPings}
+                                                </Badge>
+                                            )}
+                                        </Card.Title>
+                                        <Card.Text className="text-secondary flex-grow-1" style={{ fontSize: '0.9rem' }}>
+                                            {room.description}
+                                        </Card.Text>
                                     <div className="mt-3 pt-3 border-top border-secondary">
                                         <span className="text-secondary" style={{ fontSize: '0.85rem' }}>Tanár: </span>
                                         <span className="fw-bold text-light">{room.teacherName}</span>
@@ -122,7 +140,7 @@ const StudentClassrooms = () => {
                                 </Card.Body>
                             </Card>
                         </Col>
-                    ))
+                   )})
                 )}
             </Row>
         </div>

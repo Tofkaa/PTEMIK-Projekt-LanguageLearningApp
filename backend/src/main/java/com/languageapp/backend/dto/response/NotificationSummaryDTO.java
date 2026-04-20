@@ -13,9 +13,8 @@ public class NotificationSummaryDTO {
     private int totalAcceptedFriends;
     private int totalHistoryItems;
 
-    private int teacherPendingJoinRequests;
-    private int teacherUngradedSubmissions;
-
+    private List<String> teacherPendingJoinRequestIds;
+    private List<String> teacherUngradedSubmissionIds;
 
     private List<String> studentActiveAssignmentIds;
     private List<String> studentGradedSessionIds;
@@ -23,6 +22,8 @@ public class NotificationSummaryDTO {
     private long lastPingTime;
 
     public int getTotal() {
-        return pendingFriendRequests + pendingChallenges + teacherPendingJoinRequests + teacherUngradedSubmissions;
+        return pendingFriendRequests + pendingChallenges +
+                (teacherPendingJoinRequestIds != null ? teacherPendingJoinRequestIds.size() : 0) +
+                (teacherUngradedSubmissionIds != null ? teacherUngradedSubmissionIds.size() : 0);
     }
 }

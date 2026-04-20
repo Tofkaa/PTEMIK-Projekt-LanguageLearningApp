@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { classroomApi } from '../services/classroomApi';
 import { Card, Button, Modal, Form, Row, Col, Badge } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '../context/NotificationContext';
 
 /**
  * Dashboard component for users with the TEACHER role.
@@ -13,7 +14,7 @@ const TeacherClassrooms = () => {
     const [formData, setFormData] = useState({ name: '', description: '' });
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
-
+    const { notifications } = useNotifications();
     useEffect(() => {
         fetchClassrooms();
     }, []);
@@ -68,15 +69,31 @@ const TeacherClassrooms = () => {
                         </div>
                     </Col>
                 ) : (
-                    classrooms.map(room => (
-                        <Col md={6} lg={4} key={room.classroomId}>
-                            <Card className="h-100 bg-dark text-light border-secondary shadow-sm" style={{ cursor: 'pointer' }}
-                                onClick={() => navigate(`/classrooms/${room.classroomId}`, { state: { className: room.name, isOwner: true } })}>
-                                <Card.Body className="d-flex flex-column">
-                                    <Card.Title className="fw-bold">{room.name}</Card.Title>
-                                    <Card.Text className="text-secondary flex-grow-1" style={{ fontSize: '0.9rem' }}>
-                                        {room.description}
-                                    </Card.Text>
+                    classrooms.map(room => {
+                        const viewedTeacherPending = JSON.parse(localStorage.getItem('viewedTeacherPending') || '[]');
+                        const viewedTeacherUngraded = JSON.parse(localStorage.getItem('viewedTeacherUngraded') || '[]');
+
+                        const unseenPending = (notifications?.teacherPendingJoinRequestIds || []).filter(id => id.startsWith(room.classroomId) && !viewedTeacherPending.includes(id)).length;
+                        const unseenUngraded = (notifications?.teacherUngradedSubmissionIds || []).filter(id => id.startsWith(room.classroomId) && !viewedTeacherUngraded.includes(id)).length;
+                        const totalClassroomPings = unseenPending + unseenUngraded;
+
+                        return (
+                            <Col md={6} lg={4} key={room.classroomId}>
+                                <Card className="h-100 bg-dark text-light border-secondary shadow-sm" style={{ cursor: 'pointer' }}
+                                    onClick={() => navigate(`/classrooms/${room.classroomId}`, { state: { className: room.name, isOwner: true } })}>
+                                    <Card.Body className="d-flex flex-column">
+                                        <Card.Title className="fw-bold d-flex justify-content-between align-items-start">
+                                            {room.name}
+                                         
+                                            {totalClassroomPings > 0 && (
+                                                <Badge bg="danger" pill className="animate-pulse shadow-sm fs-6">
+                                                    {totalClassroomPings}
+                                                </Badge>
+                                            )}
+                                        </Card.Title>
+                                        <Card.Text className="text-secondary flex-grow-1" style={{ fontSize: '0.9rem' }}>
+                                            {room.description}
+                                        </Card.Text>
                                     <div className="mt-3 pt-3 border-top border-secondary d-flex justify-content-between align-items-center">
                                         <div>
                                             <span className="text-secondary me-2" style={{ fontSize: '0.85rem' }}>Kód:</span>
@@ -91,7 +108,7 @@ const TeacherClassrooms = () => {
                                 </Card.Body>
                             </Card>
                         </Col>
-                    ))
+                    )})
                 )}
             </Row>
 

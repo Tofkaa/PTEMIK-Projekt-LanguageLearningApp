@@ -24,33 +24,41 @@ const StudentClassroomDetail = () => {
 
     const { notifications } = useNotifications();
 
-    const [viewedResults, setViewedResults] = useState(() => {
+    /*const [viewedResults, setViewedResults] = useState(() => {
         const saved = localStorage.getItem('viewedResults');
         return saved ? JSON.parse(saved) : [];
-    });
+    });*/
 
     const [stats, setStats] = useState(null);
     
     const markAsViewed = (storageKey, idsToMark) => {
         if (!idsToMark || idsToMark.length === 0) return;
+        const stringIds = idsToMark.map(id => String(id)); // Biztosra megyünk a típusokkal
         const seen = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        const updated = [...new Set([...seen, ...idsToMark])];
+        const updated = [...new Set([...seen, ...stringIds])];
         localStorage.setItem(storageKey, JSON.stringify(updated));
         
-
         window.dispatchEvent(new Event('local-storage-update'));
     };
 
+    const viewedAssignments = JSON.parse(localStorage.getItem('viewedAssignments') || '[]');
+    const viewedResults = JSON.parse(localStorage.getItem('viewedResults') || '[]');
+
+    const unseenAssignmentsList = (notifications?.studentActiveAssignmentIds || []).filter(id => id.startsWith(classroomId) && !viewedAssignments.includes(id));
+    const unseenResultsList = (notifications?.studentGradedSessionIds || []).filter(id => id.startsWith(classroomId) && !viewedResults.includes(id));
+
    const pingTrigger = (notifications?.studentActiveAssignmentIds?.length || 0) + (notifications?.studentGradedSessionIds?.length || 0);
 
+    // 1. Hook: Ha ping jön, újra letölti az adatokat a backendről
     useEffect(() => {
         fetchClassroomData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [classroomId, pingTrigger]);
-    
+
+    // 2. Hook: Ha betöltöttek a feladatok, az "Aktív" fülön lévőket azonnal olvasottnak jelöli a KOMBINAÁLT ID-val!
     useEffect(() => {
-        if (activeAssignments && activeAssignments.length > 0) {
-            markAsViewed('viewedAssignments', activeAssignments.map(a => a.assignmentId));
+        if (activeAssignments && activeAssignments.length > 0 && unseenAssignmentsList.length > 0) {
+            markAsViewed('viewedAssignments', activeAssignments.map(a => `${classroomId}:${a.assignmentId}`));
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [assignments]);
@@ -98,7 +106,7 @@ const StudentClassroomDetail = () => {
         return true;
     });
 
-   const completedAssignments = assignments.filter(a => {
+    const completedAssignments = assignments.filter(a => {
         if (a.completed) return true; 
         const availableUntil = parseDate(a.availableUntil);
         if (availableUntil && availableUntil <= now) return true; 
@@ -106,11 +114,8 @@ const StudentClassroomDetail = () => {
     });
 
     const handleViewResult = (assignment) => {
-        if (!viewedResults.includes(assignment.assignmentId)) {
-            const updated = [...viewedResults, assignment.assignmentId];
-            setViewedResults(updated);
-            localStorage.setItem('viewedResults', JSON.stringify(updated));
-        }
+        const combinedId = `${classroomId}:${assignment.assignmentId}`;
+        markAsViewed('viewedResults', [combinedId]);
         openStudentResultModal(assignment);
     };
 
@@ -156,9 +161,11 @@ const StudentClassroomDetail = () => {
                    <Tabs defaultActiveKey="active" className="mt-3 mb-3 border-secondary" 
                           onSelect={(key) => {
                               if (key === 'active') {
-                                  markAsViewed('viewedAssignments', activeAssignments.map(a => a.assignmentId));
+                                  // Kombinált ID mentése!
+                                  markAsViewed('viewedAssignments', activeAssignments.map(a => `${classroomId}:${a.assignmentId}`));
                               } else if (key === 'completed') {
-                                  markAsViewed('viewedResults', completedAssignments.filter(a => a.hasGradedSession).map(a => a.assignmentId));
+                                  // Kombinált ID mentése!
+                                  markAsViewed('viewedResults', completedAssignments.filter(a => a.hasGradedSession).map(a => `${classroomId}:${a.assignmentId}`));
                               }
                           }}>
                         
@@ -166,9 +173,10 @@ const StudentClassroomDetail = () => {
                         <Tab eventKey="active" title={
                             <span className="fw-bold">
                                 🔥 Aktív Teendők
-                                {activeAssignments.filter(a => a.attemptsUsed === 0).length > 0 && (
+                                {/* AZ ÚJ PING LOGIKA */}
+                                {unseenAssignmentsList.length > 0 && (
                                     <Badge bg="danger" pill className="ms-2 shadow-sm animate-pulse">
-                                        {activeAssignments.filter(a => a.attemptsUsed === 0).length}
+                                        {unseenAssignmentsList.length}
                                     </Badge>
                                 )}
                             </span>
@@ -184,7 +192,7 @@ const StudentClassroomDetail = () => {
                                                     <div className="d-flex justify-content-between align-items-start mb-2">
                                                         <Card.Title className="fw-bold m-0">{a.title}</Card.Title>
                                                         <div>
-                                                            {/* CSAK AKKOR ÚJ, HA MÉG SOHA NEM PRÓBÁLTA (attemptsUsed === 0) */}
+                                                            {/* A kártyán a szöveg marad, amíg el nem kezdi */}
                                                             {a.attemptsUsed === 0 ? (
                                                                 a.test ? (
                                                                     <Badge bg="danger" className="shadow-sm border border-light animate-pulse" style={{ letterSpacing: '1px' }}>🔴 ÚJ TESZT</Badge>
@@ -232,9 +240,10 @@ const StudentClassroomDetail = () => {
                         <Tab eventKey="completed" title={
                             <span className="fw-bold">
                                 ✅ Befejezett / Lejárt
-                                {completedAssignments.filter(a => a.hasGradedSession && !viewedResults.includes(a.assignmentId)).length > 0 && (
+                                {/* AZ ÚJ PING LOGIKA */}
+                                {unseenResultsList.length > 0 && (
                                     <Badge bg="success" pill className="ms-2 shadow-sm animate-pulse">
-                                        {completedAssignments.filter(a => a.hasGradedSession && !viewedResults.includes(a.assignmentId)).length}
+                                        {unseenResultsList.length}
                                     </Badge>
                                 )}
                             </span>
@@ -246,10 +255,10 @@ const StudentClassroomDetail = () => {
                                             <Card.Body className="d-flex flex-column">
                                                 <div className="d-flex justify-content-between align-items-start mb-2">
                                                     <Card.Title className="fw-bold m-0 text-light">{a.title}</Card.Title>
-                                                    {a.hasGradedSession ? (
-                                                        <Badge bg="success" className={!viewedResults.includes(a.assignmentId) ? "animate-pulse shadow-sm" : "shadow-sm"}>
-                                                            {!viewedResults.includes(a.assignmentId) ? '✉️ Új Értékelés!' : '✅ Értékelve'}
-                                                        </Badge>
+                                                    
+                                                    {/* KÁRTYA FEJLÉC PING - Kombinált ID vizsgálat! */}
+                                                    {unseenResultsList.includes(`${classroomId}:${a.assignmentId}`) ? (
+                                                        <Badge bg="success" className="animate-pulse shadow-sm border border-light">✉️ Új Értékelés!</Badge>
                                                     ) : (
                                                         a.completed ? <Badge bg="secondary">Befejezve</Badge> : <Badge bg="secondary">Lejárt</Badge>
                                                     )}
@@ -266,7 +275,6 @@ const StudentClassroomDetail = () => {
                                                         <Button 
                                                             variant="success" 
                                                             className="fw-bold"
-                                                            // GOMB ESEMÉNY CSERÉJE:
                                                             onClick={() => handleViewResult(a)}
                                                         >
                                                             Eredmény megtekintése
@@ -277,7 +285,6 @@ const StudentClassroomDetail = () => {
                                                         </Button>
                                                     )}
 
-                                                    {/* ÚJRAÍRÁS: Csak ha van még lehetőség és nincs lejárat */}
                                                     {(!a.availableUntil || parseDate(a.availableUntil) > now) && 
                                                      (!a.maxAttempts || a.attemptsUsed < a.maxAttempts) && (
                                                         <Button 

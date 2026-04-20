@@ -29,20 +29,20 @@ const NavigationBar = () => {
         navigate('/login');
     };
 
-    if (!user) return null;
+   if (!user) return null;
 
     const viewedAssignments = JSON.parse(localStorage.getItem('viewedAssignments') || '[]');
     const viewedResults = JSON.parse(localStorage.getItem('viewedResults') || '[]');
+    const viewedTeacherPending = JSON.parse(localStorage.getItem('viewedTeacherPending') || '[]');
+    const viewedTeacherUngraded = JSON.parse(localStorage.getItem('viewedTeacherUngraded') || '[]');
 
     const unseenAssignments = (notifications?.studentActiveAssignmentIds || []).filter(id => !viewedAssignments.includes(id)).length;
     const unseenResults = (notifications?.studentGradedSessionIds || []).filter(id => !viewedResults.includes(id)).length;
+    const unseenTeacherPending = (notifications?.teacherPendingJoinRequestIds || []).filter(id => !viewedTeacherPending.includes(id)).length;
+    const unseenTeacherUngraded = (notifications?.teacherUngradedSubmissionIds || []).filter(id => !viewedTeacherUngraded.includes(id)).length;
 
-    const classroomPings = unseenAssignments + unseenResults + 
-                           (notifications?.teacherPendingJoinRequests || 0) + 
-                           (notifications?.teacherUngradedSubmissions || 0);
-
-    const communityPings = (notifications?.pendingFriendRequests || 0) + 
-                           (notifications?.pendingChallenges || 0);
+    const classroomPings = unseenAssignments + unseenResults + unseenTeacherPending + unseenTeacherUngraded;
+    const communityPings = (notifications?.pendingFriendRequests || 0) + (notifications?.pendingChallenges || 0);
                            
     return (
         <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm mb-4 border-bottom border-secondary">

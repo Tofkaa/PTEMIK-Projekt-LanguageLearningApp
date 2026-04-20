@@ -54,35 +54,39 @@ public class NotificationController {
                 + friendshipRepository.countByUserUserIdAndStatus(userId, com.languageapp.backend.enums.FriendshipStatus.ACCEPTED);
         int totalHistory = challengeRepository.countHistoryForUser(userId);
 
-        int tPending = 0;
-        int tUngraded = 0;
+        java.util.List<String> tPendingIds = new java.util.ArrayList<>();
+        java.util.List<String> tUngradedIds = new java.util.ArrayList<>();
         java.util.List<String> sActiveIds = new java.util.ArrayList<>();
         java.util.List<String> sGradedIds = new java.util.ArrayList<>();
 
         try {
-            tPending = classroomMemberRepository.countByClassroom_Teacher_UserIdAndStatus(userId, com.languageapp.backend.enums.MembershipStatus.PENDING);
-            tUngraded = sessionRepository.countByAssignment_Classroom_Teacher_UserIdAndIsGradedFalseAndFinishedAtIsNotNull(userId);
+            // TANÁR 1: Várakozó diákok (classroomId:userId)
+            classroomMemberRepository.findAll().stream()
+                    .filter(m -> m.getClassroom().getTeacher().getUserId().equals(userId) && m.getStatus() == com.languageapp.backend.enums.MembershipStatus.PENDING)
+                    .forEach(m -> tPendingIds.add(m.getClassroom().getClassroomId() + ":" + m.getUser().getUserId()));
 
-            // DIÁK 1: Új értékelések
+            // TANÁR 2: Értékeletlen feladatok (classroomId:assignmentId)
+            sessionRepository.findAll().stream()
+                    .filter(s -> s.getAssignment().getClassroom().getTeacher().getUserId().equals(userId) && !s.isGraded() && s.getFinishedAt() != null)
+                    .forEach(s -> tUngradedIds.add(s.getAssignment().getClassroom().getClassroomId() + ":" + s.getAssignment().getAssignmentId()));
+
+            // DIÁK 1: Új értékelések (classroomId:assignmentId)
             sessionRepository.findAll().stream()
                     .filter(s -> s.getUser().getUserId().equals(userId) && s.isGraded())
-                    .forEach(s -> sGradedIds.add(s.getSessionId().toString()));
+                    .forEach(s -> sGradedIds.add(s.getAssignment().getClassroom().getClassroomId() + ":" + s.getAssignment().getAssignmentId()));
 
-            // DIÁK 2: Aktív feladatok (CSAK AZT KÜLDI, AMIT MÉG NEM CSINÁLT MEG, ÉS NEM JÁRT LE!)
+            // DIÁK 2: Aktív feladatok (classroomId:assignmentId)
             classroomMemberRepository.findAllByUser_UserIdAndStatus(userId, com.languageapp.backend.enums.MembershipStatus.ACCEPTED)
                     .forEach(m -> {
                         assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(m.getClassroom().getClassroomId())
                                 .forEach(a -> {
-                                    // Megnézzük, befejezte-e már a diák ezt a feladatot
                                     boolean hasFinished = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userId)
                                             .stream().anyMatch(session -> session.getFinishedAt() != null);
 
-                                    // Megnézzük, lejárt-e a határidő
                                     boolean isExpired = a.getAvailableUntil() != null && a.getAvailableUntil().isBefore(java.time.LocalDateTime.now());
 
-                                    // CSAK AKKOR kap pinget, ha még aktív és teendője van vele
                                     if (!hasFinished && !isExpired) {
-                                        sActiveIds.add(a.getAssignmentId().toString());
+                                        sActiveIds.add(a.getClassroom().getClassroomId() + ":" + a.getAssignmentId());
                                     }
                                 });
                     });
@@ -90,12 +94,13 @@ public class NotificationController {
         } catch (Exception e) {
             System.err.println("Notification Summary Error: " + e.getMessage());
         }
-        
+
         return ResponseEntity.ok(new NotificationSummaryDTO(
                 pendingFriends, pendingChallenges, totalFriends, totalHistory,
-                tPending, tUngraded, sActiveIds, sGradedIds, 1L
+                tPendingIds, tUngradedIds, sActiveIds, sGradedIds, 1L
         ));
     }
+
     /**
      * Establishes a unidirectional Server-Sent Events (SSE) stream for the authenticated user.
      *

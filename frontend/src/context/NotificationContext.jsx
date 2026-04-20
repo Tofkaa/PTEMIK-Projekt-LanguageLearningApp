@@ -20,8 +20,8 @@ export const NotificationProvider = ({ children }) => {
         pendingChallenges: 0,
         totalFriends: 0,
         totalHistory: 0,
-        teacherPendingJoinRequests: 0,
-        teacherUngradedSubmissions: 0,
+        teacherPendingJoinRequestIds: [],
+        teacherUngradedSubmissionIds: [],
         studentActiveAssignmentIds: [],
         studentGradedSessionIds: [],
         lastPingTime: 0
