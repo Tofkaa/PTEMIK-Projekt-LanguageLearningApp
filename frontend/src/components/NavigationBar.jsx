@@ -74,6 +74,13 @@ const NavigationBar = () => {
                             )}
                         </Nav.Link>
                     </Nav>
+                    {/* Csak az adminok látják ezt a gombot a lenyíló menüben */}
+                        {(user.role === 'ADMIN' || user.role === 'ROLE_ADMIN') && (
+                            <>
+                                <NavDropdown.Item onClick={() => navigate('/admin')} className="text-danger fw-bold">🛡️ Admin Panel</NavDropdown.Item>
+                                <NavDropdown.Divider />
+                            </>
+                        )}
                     
                     <Nav className="align-items-center">
                         <Badge bg="warning" text="dark" className="me-3 rounded-pill px-3 py-2 shadow-sm">
