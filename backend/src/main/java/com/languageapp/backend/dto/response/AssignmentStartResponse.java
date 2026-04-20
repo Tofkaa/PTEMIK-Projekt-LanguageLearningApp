@@ -18,5 +18,7 @@ public class AssignmentStartResponse {
     private LocalDateTime startedAt;
     private Integer timeLimitMinutes;
     private boolean allowRetries;
+    private boolean hasFeedback;
     private List<Exercise> exercises;
+    private UUID classroomId;
 }

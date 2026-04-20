@@ -18,8 +18,16 @@ public class AssignmentCreateRequest {
     @JsonProperty("isTest")
     private boolean isTest;
 
+    @JsonProperty("randomized")
     private boolean isRandomized;
+
+    @JsonProperty("allowRetries")
     private boolean allowRetries;
+
+    @JsonProperty("hasFeedback")
+    private boolean hasFeedback;
+
+    private Integer maxAttempts;
 
     private LocalDateTime availableFrom;
     private LocalDateTime availableUntil;

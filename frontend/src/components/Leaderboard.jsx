@@ -127,7 +127,7 @@ const Leaderboard = ({defaultScope = 'global'}) => {
 
                 {!loading && !error && players.length > 0 && (
                     <div className="table-responsive">
-                        <Table table-sm hover variant="dark" className="mb-0 text-center align-middle">
+                        <Table size="sm" hover variant="dark" className="mb-0 text-center align-middle">
                             <thead className="text-uppercase text-secondary" style={{ fontSize: '0.85rem' }}>
                                 <tr>
                                     <th className="py-3 border-secondary">Hely.</th>

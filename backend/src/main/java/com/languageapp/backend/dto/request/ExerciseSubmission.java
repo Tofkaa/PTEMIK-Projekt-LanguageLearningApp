@@ -20,4 +20,6 @@ public class ExerciseSubmission {
 
     @JsonProperty("isRetry")
     private boolean isRetry;
+
+    private boolean retried;
 }

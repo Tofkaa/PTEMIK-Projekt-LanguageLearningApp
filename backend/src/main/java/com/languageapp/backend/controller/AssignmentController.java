@@ -2,8 +2,11 @@ package com.languageapp.backend.controller;
 
 import com.languageapp.backend.dto.request.AssignmentCreateRequest;
 import com.languageapp.backend.dto.request.AssignmentSubmitRequest;
+import com.languageapp.backend.dto.request.TeacherGradeRequest;
 import com.languageapp.backend.dto.response.AssignmentResponse;
+import com.languageapp.backend.dto.response.AssignmentSessionResponse;
 import com.languageapp.backend.dto.response.AssignmentStartResponse;
+import com.languageapp.backend.dto.response.ClassroomStatisticsResponse;
 import com.languageapp.backend.service.AssignmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,11 +42,10 @@ public class AssignmentController {
      * Teacher retrieves all assignments created for their classroom.
      */
     @GetMapping("/classroom/{classroomId}")
-    @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<List<AssignmentResponse>> getClassroomAssignments(
             @PathVariable UUID classroomId,
             Authentication auth) {
-        return ResponseEntity.ok(assignmentService.getAssignmentsByClassroom(classroomId));
+        return ResponseEntity.ok(assignmentService.getAssignmentsByClassroom(classroomId, auth.getName()));
     }
 
     /**
@@ -74,5 +76,59 @@ public class AssignmentController {
             Authentication auth) {
         assignmentService.submitAssignment(sessionId, request, auth.getName());
         return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<Void> deleteAssignment(
+            @PathVariable UUID id,
+            Authentication auth) {
+        assignmentService.deleteAssignment(id, auth.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Tanár lekéri egy adott feladat összes beadott munkáját.
+     */
+    @GetMapping("/{id}/sessions")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<List<AssignmentSessionResponse>> getAssignmentSessions(
+            @PathVariable UUID id,
+            Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getSessionsForAssignment(id, auth.getName()));
+    }
+
+    /**
+     * Tanár beküldi a felülbírált pontszámot és az értékelést (Publikálás).
+     */
+    @PostMapping("/sessions/{sessionId}/grade")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<Void> gradeAssignmentSession(
+            @PathVariable UUID sessionId,
+            @RequestBody TeacherGradeRequest request,
+            Authentication auth) {
+        assignmentService.gradeSession(sessionId, request, auth.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{id}/my-sessions")
+    public ResponseEntity<List<AssignmentSessionResponse>> getMyAssignmentSessions(
+            @PathVariable UUID id,
+            Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getMySessionsForAssignment(id, auth.getName()));
+    }
+
+    // Tanári statisztika
+    @GetMapping("/classroom/{classroomId}/statistics")
+    public ResponseEntity<ClassroomStatisticsResponse> getClassroomStatistics(@PathVariable UUID classroomId) {
+        return ResponseEntity.ok(assignmentService.getClassroomStatistics(classroomId));
+    }
+
+    // Diák saját statisztikája
+    @GetMapping("/classroom/{classroomId}/my-statistics")
+    public ResponseEntity<java.util.Map<String, Object>> getMyClassroomStatistics(
+            @PathVariable UUID classroomId,
+            Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getStudentClassroomStats(classroomId, auth.getName()));
     }
 }

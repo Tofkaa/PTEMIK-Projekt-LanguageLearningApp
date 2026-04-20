@@ -4,6 +4,7 @@ import com.languageapp.backend.entity.AssignmentSession;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,5 +19,12 @@ public interface AssignmentSessionRepository extends JpaRepository<AssignmentSes
      * Finds a session for a specific user and assignment.
      * Used to prevent multiple start attempts and to resume existing timers.
      */
-    Optional<AssignmentSession> findByAssignment_AssignmentIdAndUser_UserId(UUID assignmentId, UUID userId);
+    List<AssignmentSession> findAllByAssignment_AssignmentIdAndUser_UserId(UUID assignmentId, UUID userId);
+
+    /**
+     * Lekéri egy adott feladat összes próbálkozását, a legújabb kezdéssel legelöl.
+     */
+    List<AssignmentSession> findAllByAssignment_AssignmentIdOrderByStartedAtDesc(UUID assignmentId);
+
+    int countByAssignment_Classroom_Teacher_UserIdAndIsGradedFalseAndFinishedAtIsNotNull(UUID userId);
 }

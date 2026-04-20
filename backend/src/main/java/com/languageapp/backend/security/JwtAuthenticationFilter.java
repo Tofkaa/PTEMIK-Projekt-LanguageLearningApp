@@ -39,9 +39,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @Nonnull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String authHeader = request.getHeader("Authorization"); // Levettük a 'final'-t!
+        String authHeader = request.getHeader("Authorization");
 
-        // --- ÚJ RÉSZ: SSE Stream kivétel (Token olvasása az URL-ből) ---
+
         if (authHeader == null && request.getRequestURI().endsWith("/stream")) {
             String tokenParam = request.getParameter("token");
             if (tokenParam != null) {
