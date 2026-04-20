@@ -1,0 +1,68 @@
+[
+  {
+    "name": "Első lépések",
+    "description": "Befejezted életed legelső leckéjét. Csak így tovább!",
+    "criteria": { "type": "FIRST_LESSON" },
+    "iconUrl": "🌱"
+  },
+  {
+    "name": "Szorgalmas Diák I.",
+    "description": "Befejeztél 10 leckét! A kitartásod lenyűgöző.",
+    "criteria": { "type": "LESSON_COUNT", "target": 10 },
+    "iconUrl": "📖"
+  },
+  {
+    "name": "Tudás Szivacsa II.",
+    "description": "Befejeztél 50 leckét! Egyre magabiztosabb a tudásod.",
+    "criteria": { "type": "LESSON_COUNT", "target": 50 },
+    "iconUrl": "🧠"
+  },
+  {
+    "name": "Nyelvmester III.",
+    "description": "Befejeztél 100 leckét! Ezt már kevesen mondhatják el magukról.",
+    "criteria": { "type": "LESSON_COUNT", "target": 100 },
+    "iconUrl": "👑"
+  },
+  {
+    "name": "Tökéletes Teszt",
+    "description": "Hiba nélkül, 100%-os pontossággal teljesítettél egy tesztet!",
+    "criteria": { "type": "PERFECT_SCORE" },
+    "iconUrl": "🎯"
+  },
+  {
+    "name": "Tapasztalat Gyűjtő I.",
+    "description": "Összegyűjtöttél 500 XP-t az alkalmazásban.",
+    "criteria": { "type": "XP_MILESTONE", "target": 500 },
+    "iconUrl": "⭐"
+  },
+  {
+    "name": "Haladó Kalandor II.",
+    "description": "Elérted az 5,000 XP-t! Remek munka.",
+    "criteria": { "type": "XP_MILESTONE", "target": 5000 },
+    "iconUrl": "🌟"
+  },
+  {
+    "name": "Legenda III.",
+    "description": "Elérted a lenyűgöző 25,000 XP-t. Te vagy a csúcsragadozó!",
+    "criteria": { "type": "XP_MILESTONE", "target": 25000 },
+    "iconUrl": "🏆"
+  },
+  {
+    "name": "Közösségi Motor",
+    "description": "Sikeresen felvettél 5 barátot (Későbbi funkcióhoz előkészítve)",
+    "criteria": { "type": "SOCIAL_FRIENDS", "target": 5 },
+    "iconUrl": "🤝"
+  },
+  {
+    "name": "Kihívó",
+    "description": "Nyertél 3 baráti párbajt. (Későbbi funkcióhoz előkészítve)",
+    "criteria": { "type": "SOCIAL_DUELS", "target": 3 },
+    "iconUrl": "⚔️"
+  },
+  {
+    "name": "Hetes Széria",
+    "description": "Egy egész héten át, minden nap tanultál. (Későbbi funkcióhoz előkészítve)",
+    "criteria": { "type": "STREAK_DAYS", "target": 7 },
+    "iconUrl": "🔥"
+  }
+]
