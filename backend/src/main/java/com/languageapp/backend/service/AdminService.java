@@ -26,9 +26,25 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminLog> getSystemLogs() {
+    public List<com.languageapp.backend.dto.response.AdminLogResponse> getSystemLogs() {
+        return adminLogRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "loggedAt"))
+                .stream()
+                .map(log -> {
+                    com.languageapp.backend.dto.response.AdminLogResponse dto = new com.languageapp.backend.dto.response.AdminLogResponse();
+                    dto.setLogId(log.getLogId());
+                    dto.setActionType(log.getActionType());
+                    dto.setDetails(log.getDetails());
+                    dto.setLoggedAt(log.getLoggedAt());
 
-        return adminLogRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "loggedAt"));
+                    // Itt "erőszakoljuk" ki a Lazy betöltést a tranzakción belül!
+                    dto.setAdmin(new com.languageapp.backend.dto.response.AdminLogResponse.AdminUserDto(
+                            log.getAdmin().getName(),
+                            log.getAdmin().getEmail()
+                    ));
+
+                    return dto;
+                })
+                .collect(java.util.stream.Collectors.toList());
     }
 
     @Transactional

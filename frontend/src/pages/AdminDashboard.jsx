@@ -1,8 +1,7 @@
 import React from 'react';
 import { Container, Row, Col, Nav, Tab } from 'react-bootstrap';
-// Ezeket a komponenseket fogjuk ma/holnap megírni:
 import UserManagement from '../components/admin/UserManagement';
-// import SystemLogs from '../components/admin/SystemLogs';
+import SystemLogs from '../components/admin/SystemLogs';
 
 const AdminDashboard = () => {
     return (
@@ -75,8 +74,8 @@ const AdminDashboard = () => {
                             <Tab.Pane eventKey="logs">
                                 <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
                                     <h4 className="text-danger fw-bold mb-4">Rendszernaplók (Audit Trail)</h4>
-                                    {/* <SystemLogs /> */}
-                                    <p className="text-secondary">Az eseménynapló hamarosan érkezik...</p>
+                                    <SystemLogs /> 
+                                    
                                 </div>
                             </Tab.Pane>
 

@@ -59,7 +59,7 @@ public class AdminController {
 
     // --- SYSTEM LOGS ---
     @GetMapping("/logs")
-    public ResponseEntity<List<AdminLog>> getSystemLogs() {
+    public ResponseEntity<List<com.languageapp.backend.dto.response.AdminLogResponse>> getSystemLogs() {
         return ResponseEntity.ok(adminService.getSystemLogs());
     }
 }
