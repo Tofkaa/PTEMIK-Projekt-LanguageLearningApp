@@ -1,9 +1,11 @@
 package com.languageapp.backend.service;
 
+import com.languageapp.backend.entity.Achievement;
 import com.languageapp.backend.entity.AdminLog;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.ResourceNotFoundException;
+import com.languageapp.backend.repository.AchievementRepository;
 import com.languageapp.backend.repository.AdminLogRepository;
 import com.languageapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class AdminService {
 
     private final UserRepository userRepository;
     private final AdminLogRepository adminLogRepository;
+    private final AchievementRepository achievementRepository;
 
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
@@ -78,5 +81,10 @@ public class AdminService {
         log.setTargetUserId(targetUserId);
         log.setDetails(details);
         adminLogRepository.save(log);
+    }
+
+    @Transactional
+    public void importAchievements(List<Achievement> achievements) {
+        achievementRepository.saveAll(achievements);
     }
 }
