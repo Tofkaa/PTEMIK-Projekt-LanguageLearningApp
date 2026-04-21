@@ -2,6 +2,7 @@ import React from 'react';
 import { Container, Row, Col, Nav, Tab } from 'react-bootstrap';
 import UserManagement from '../components/admin/UserManagement';
 import SystemLogs from '../components/admin/SystemLogs';
+import CurriculumManager from '../components/admin/CurriculumManager';
 
 const AdminDashboard = () => {
     return (
@@ -50,7 +51,7 @@ const AdminDashboard = () => {
                             <Tab.Pane eventKey="content">
                                  <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
                                     <h4 className="text-warning fw-bold mb-4">Tananyag Kezelő (CMS)</h4>
-                                    <p className="text-secondary">Ide jön a JSON importáló és a leckék listája (3. nap feladata).</p>
+                                   <CurriculumManager />
                                 </div>
                             </Tab.Pane>
 
