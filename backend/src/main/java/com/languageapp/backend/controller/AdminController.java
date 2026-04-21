@@ -61,6 +61,13 @@ public class AdminController {
         return ResponseEntity.ok("User status updated successfully.");
     }
 
+    // --- ACHIEVEMENT MANAGEMENT ---
+    @PostMapping("/achievements/import")
+    public ResponseEntity<String> importAchievements(@RequestBody java.util.List<com.languageapp.backend.entity.Achievement> achievements) {
+        adminService.importAchievements(achievements);
+        return ResponseEntity.ok("Achievements imported successfully!");
+    }
+
     // --- SYSTEM LOGS ---
     @GetMapping("/logs")
     public ResponseEntity<List<com.languageapp.backend.dto.response.AdminLogResponse>> getSystemLogs() {

@@ -9,6 +9,9 @@ export const adminApi = {
     updateUserRole: (userId, newRole) => api.put(`/admin/users/${userId}/role?newRole=${newRole}`),
     toggleUserStatus: (userId, isActive) => api.put(`/admin/users/${userId}/status?isActive=${isActive}`),
     
+    // Kitüntetések
+    importAchievements: (data) => api.post('/admin/achievements/import', data),
+    
     // Logok
     getSystemLogs: () => api.get('/admin/logs')
 };

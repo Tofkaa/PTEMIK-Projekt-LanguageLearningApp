@@ -3,6 +3,7 @@ import { Container, Row, Col, Nav, Tab } from 'react-bootstrap';
 import UserManagement from '../components/admin/UserManagement';
 import SystemLogs from '../components/admin/SystemLogs';
 import CurriculumManager from '../components/admin/CurriculumManager';
+import AchievementManager from '../components/admin/AchievementManager';
 
 const AdminDashboard = () => {
     return (
@@ -59,7 +60,7 @@ const AdminDashboard = () => {
                             <Tab.Pane eventKey="achievements">
                                  <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
                                     <h4 className="text-success fw-bold mb-4">Kitüntetés Kezelő</h4>
-                                    <p className="text-secondary">Ide jön az új kitüntetések felvétele (3. nap feladata).</p>
+                                   <AchievementManager />
                                 </div>
                             </Tab.Pane>
 
