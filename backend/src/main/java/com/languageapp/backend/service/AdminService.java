@@ -5,9 +5,7 @@ import com.languageapp.backend.entity.AdminLog;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.ResourceNotFoundException;
-import com.languageapp.backend.repository.AchievementRepository;
-import com.languageapp.backend.repository.AdminLogRepository;
-import com.languageapp.backend.repository.UserRepository;
+import com.languageapp.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +20,9 @@ public class AdminService {
     private final UserRepository userRepository;
     private final AdminLogRepository adminLogRepository;
     private final AchievementRepository achievementRepository;
+    private final LessonTopicRepository topicRepository;
+    private final LessonRepository lessonRepository;
+    private final ExerciseRepository exerciseRepository;
 
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
@@ -86,5 +87,33 @@ public class AdminService {
     @Transactional
     public void importAchievements(List<Achievement> achievements) {
         achievementRepository.saveAll(achievements);
+    }
+
+    @Transactional
+    public void deleteTopic(UUID topicId, String adminEmail) {
+        User admin = userRepository.findByEmail(adminEmail).orElseThrow();
+        topicRepository.deleteById(topicId);
+        logAdminAction(admin, "TOPIC_DELETED", null, "Topic deleted: " + topicId);
+    }
+
+    @Transactional
+    public void deleteLesson(UUID lessonId, String adminEmail) {
+        User admin = userRepository.findByEmail(adminEmail).orElseThrow();
+        lessonRepository.deleteById(lessonId);
+        logAdminAction(admin, "LESSON_DELETED", null, "Lesson deleted: " + lessonId);
+    }
+
+    @Transactional
+    public void deleteExercise(UUID exerciseId, String adminEmail) {
+        User admin = userRepository.findByEmail(adminEmail).orElseThrow();
+        exerciseRepository.deleteById(exerciseId);
+        logAdminAction(admin, "EXERCISE_DELETED", null, "Exercise deleted: " + exerciseId);
+    }
+
+    @Transactional
+    public void deleteAchievement(UUID achievementId, String adminEmail) {
+        User admin = userRepository.findByEmail(adminEmail).orElseThrow();
+        achievementRepository.deleteById(achievementId);
+        logAdminAction(admin, "ACHIEVEMENT_DELETED", null, "Achievement deleted: " + achievementId);
     }
 }

@@ -17,6 +17,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "exercises")
 
+@SQLDelete(sql = "UPDATE exercises SET is_active = false WHERE exercise_id=?")
+@SQLRestriction("is_active = true")
 public class Exercise {
 
     @Id
@@ -46,4 +48,7 @@ public class Exercise {
 
     @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
 }

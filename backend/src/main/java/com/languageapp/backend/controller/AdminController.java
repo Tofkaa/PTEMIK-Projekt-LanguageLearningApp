@@ -35,6 +35,24 @@ public class AdminController {
         return ResponseEntity.ok("Curriculum imported successfully!");
     }
 
+    @DeleteMapping("/curriculum/topic/{id}")
+    public ResponseEntity<Void> deleteTopic(@PathVariable UUID id, Authentication auth) {
+        adminService.deleteTopic(id, auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/curriculum/lesson/{id}")
+    public ResponseEntity<Void> deleteLesson(@PathVariable UUID id, Authentication auth) {
+        adminService.deleteLesson(id, auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/curriculum/exercise/{id}")
+    public ResponseEntity<Void> deleteExercise(@PathVariable UUID id, Authentication auth) {
+        adminService.deleteExercise(id, auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     // --- USER MANAGEMENT ---
     @GetMapping("/users")
     public ResponseEntity<List<User>> getAllUsers() {
@@ -66,6 +84,12 @@ public class AdminController {
     public ResponseEntity<String> importAchievements(@RequestBody java.util.List<com.languageapp.backend.entity.Achievement> achievements) {
         adminService.importAchievements(achievements);
         return ResponseEntity.ok("Achievements imported successfully!");
+    }
+
+    @DeleteMapping("/achievements/{id}")
+    public ResponseEntity<Void> deleteAchievement(@PathVariable UUID id, Authentication auth) {
+        adminService.deleteAchievement(id, auth.getName());
+        return ResponseEntity.noContent().build();
     }
 
     // --- SYSTEM LOGS ---
