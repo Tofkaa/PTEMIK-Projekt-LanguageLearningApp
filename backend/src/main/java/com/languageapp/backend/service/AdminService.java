@@ -23,6 +23,7 @@ public class AdminService {
     private final LessonTopicRepository topicRepository;
     private final LessonRepository lessonRepository;
     private final ExerciseRepository exerciseRepository;
+    private final ClassroomRepository classroomRepository;
 
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
@@ -115,5 +116,30 @@ public class AdminService {
         User admin = userRepository.findByEmail(adminEmail).orElseThrow();
         achievementRepository.deleteById(achievementId);
         logAdminAction(admin, "ACHIEVEMENT_DELETED", null, "Achievement deleted: " + achievementId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.languageapp.backend.dto.response.ClassroomAdminResponse> getAllClassrooms() {
+        return classroomRepository.findAllClassroomsIncludingDeleted().stream().map(c ->
+                com.languageapp.backend.dto.response.ClassroomAdminResponse.builder()
+                        .classroomId(c.getClassroomId())
+                        .name(c.getName())
+                        .description(c.getDescription())
+                        .inviteCode(c.getInviteCode())
+                        .createdAt(c.getCreatedAt())
+                        .isActive(c.isActive())
+                        .teacherName(c.getTeacher().getName())
+                        .teacherEmail(c.getTeacher().getEmail())
+                        .build()
+        ).collect(java.util.stream.Collectors.toList());
+    }
+
+    @Transactional
+    public void toggleClassroomStatus(UUID classroomId, boolean isActive, String adminEmail) {
+        User admin = userRepository.findByEmail(adminEmail).orElseThrow();
+        classroomRepository.updateClassroomStatus(classroomId, isActive);
+
+        String action = isActive ? "CLASSROOM_RESTORED" : "CLASSROOM_BANNED";
+        logAdminAction(admin, action, null, "Classroom status set to active=" + isActive + " for ID: " + classroomId);
     }
 }

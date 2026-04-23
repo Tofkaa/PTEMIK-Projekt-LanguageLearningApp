@@ -92,6 +92,21 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
+    // --- CLASSROOM MANAGEMENT ---
+    @GetMapping("/classrooms")
+    public ResponseEntity<List<com.languageapp.backend.dto.response.ClassroomAdminResponse>> getAllClassrooms() {
+        return ResponseEntity.ok(adminService.getAllClassrooms());
+    }
+
+    @PutMapping("/classrooms/{id}/status")
+    public ResponseEntity<String> toggleClassroomStatus(
+            @PathVariable UUID id,
+            @RequestParam boolean isActive,
+            Authentication auth) {
+        adminService.toggleClassroomStatus(id, isActive, auth.getName());
+        return ResponseEntity.ok("Classroom status updated.");
+    }
+
     // --- SYSTEM LOGS ---
     @GetMapping("/logs")
     public ResponseEntity<List<com.languageapp.backend.dto.response.AdminLogResponse>> getSystemLogs() {
