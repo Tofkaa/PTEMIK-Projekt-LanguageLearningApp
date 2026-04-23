@@ -4,6 +4,7 @@ import UserManagement from '../components/admin/UserManagement';
 import SystemLogs from '../components/admin/SystemLogs';
 import CurriculumManager from '../components/admin/CurriculumManager';
 import AchievementManager from '../components/admin/AchievementManager';
+import ClassroomManager from '../components/admin/ClassroomManager';
 
 const AdminDashboard = () => {
     return (
@@ -68,7 +69,7 @@ const AdminDashboard = () => {
                             <Tab.Pane eventKey="classrooms">
                                  <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
                                     <h4 className="text-primary fw-bold mb-4">Osztálytermek Moderációja</h4>
-                                    <p className="text-secondary">Ide jön a globális osztályterem moderátor (4. nap feladata).</p>
+                                    <ClassroomManager />
                                 </div>
                             </Tab.Pane>
 

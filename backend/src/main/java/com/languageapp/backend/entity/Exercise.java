@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.type.SqlTypes;
 import lombok.Getter;
 import lombok.Setter;
