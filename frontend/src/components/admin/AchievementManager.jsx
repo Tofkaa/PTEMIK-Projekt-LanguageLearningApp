@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Button, Alert, Spinner, Table } from 'react-bootstrap';
+import { Card, Form, Button, Alert, Spinner, Table, Badge } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi';
 
 const AchievementManager = () => {
@@ -17,9 +17,10 @@ const AchievementManager = () => {
         setIsLoadingAch(true);
         try {
             const response = await adminApi.getAllAchievements();
-            setAchievements(response.data);
+            setAchievements(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
             console.error("Hiba a kitüntetések lekérésekor:", error);
+            setAchievements([]);
         } finally {
             setIsLoadingAch(false);
         }
@@ -47,7 +48,7 @@ const AchievementManager = () => {
                 document.getElementById('achievement-upload-input').value = '';
                 fetchAchievements(); 
             } catch (error) {
-                setMessage({ text: 'Hiba az importálás során.', type: 'danger' });
+                setMessage({ text: 'Hiba az importálás során.', type: 'danger' , error});
             } finally { setIsLoading(false); }
         };
         reader.readAsText(selectedFile);
@@ -60,7 +61,7 @@ const AchievementManager = () => {
                 setMessage({ text: 'Kitüntetés sikeresen eltávolítva!', type: 'success' });
                 fetchAchievements();
             } catch (error) {
-                setMessage({ text: 'Hiba a törlés során.', type: 'danger' });
+                setMessage({ text: 'Hiba a törlés során.', type: 'danger' , error});
             }
         }
     };

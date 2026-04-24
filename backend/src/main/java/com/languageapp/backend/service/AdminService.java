@@ -142,4 +142,34 @@ public class AdminService {
         String action = isActive ? "CLASSROOM_RESTORED" : "CLASSROOM_BANNED";
         logAdminAction(admin, action, null, "Classroom status set to active=" + isActive + " for ID: " + classroomId);
     }
+
+    @Transactional(readOnly = true)
+    public List<com.languageapp.backend.dto.response.TopicAdminResponse> getAllTopics() {
+        return topicRepository.findAll().stream().map(topic ->
+                com.languageapp.backend.dto.response.TopicAdminResponse.builder()
+                        .topicId(topic.getTopicId())
+                        .topicName(topic.getName())
+                        .lessons(topic.getLessons().stream().map(lesson ->
+                                com.languageapp.backend.dto.response.TopicAdminResponse.LessonDto.builder()
+                                        .lessonId(lesson.getLessonId())
+                                        .title(lesson.getTitle())
+                                        .difficulty(lesson.getDifficulty())
+                                        .exercises(lesson.getExercises().stream().map(exercise ->
+                                                com.languageapp.backend.dto.response.TopicAdminResponse.ExerciseDto.builder()
+                                                        .exerciseId(exercise.getExerciseId())
+                                                        .type(exercise.getType())
+                                                        .content(exercise.getContent())
+                                                        .correctAnswer(exercise.getCorrectAnswer())
+                                                        .build()
+                                        ).collect(java.util.stream.Collectors.toList()))
+                                        .build()
+                        ).collect(java.util.stream.Collectors.toList()))
+                        .build()
+        ).collect(java.util.stream.Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<Achievement> getAllAchievements() {
+        return achievementRepository.findAll();
+    }
 }

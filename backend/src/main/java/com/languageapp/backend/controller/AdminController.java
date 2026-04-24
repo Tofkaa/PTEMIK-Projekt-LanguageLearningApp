@@ -53,6 +53,11 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/curriculum/topics")
+    public ResponseEntity<List<com.languageapp.backend.dto.response.TopicAdminResponse>> getAllTopics() {
+        return ResponseEntity.ok(adminService.getAllTopics());
+    }
+
     // --- USER MANAGEMENT ---
     @GetMapping("/users")
     public ResponseEntity<List<User>> getAllUsers() {
@@ -90,6 +95,11 @@ public class AdminController {
     public ResponseEntity<Void> deleteAchievement(@PathVariable UUID id, Authentication auth) {
         adminService.deleteAchievement(id, auth.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/achievements")
+    public ResponseEntity<List<com.languageapp.backend.entity.Achievement>> getAllAchievements() {
+        return ResponseEntity.ok(adminService.getAllAchievements());
     }
 
     // --- CLASSROOM MANAGEMENT ---
