@@ -14,5 +14,30 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  backend:
+    build: ./backend
+    image: languageapp-backend
+    container_name: languageapp-backend
+    depends_on:
+      - db
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/language_learning_db
+      - SPRING_DATASOURCE_USERNAME=app_user
+      - SPRING_DATASOURCE_PASSWORD=app_password
+    ports:
+      - "8080:8080"
+    restart: always
+
+  frontend:
+    build: ./frontend
+    image: languageapp-frontend
+    container_name: languageapp-frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"     # HTTP -> HTTPS átirányításhoz
+      - "443:443"   # A tényleges HTTPS forgalomhoz
+    restart: always
+
 volumes:
   postgres_data:
