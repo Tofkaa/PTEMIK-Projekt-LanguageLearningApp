@@ -145,6 +145,28 @@ public class FriendshipService {
     }
 
     /**
+     * Removes an established friendship connection.
+     * Ensures that only the participants of the friendship can delete it.
+     *
+     * @param friendshipId the unique ID of the friendship to remove
+     * @param currentUserId the ID of the user requesting the removal
+     */
+    @Transactional
+    public void removeFriend(UUID friendshipId, UUID currentUserId) {
+        Friendship friendship = friendshipRepository.findById(friendshipId)
+                .orElseThrow(() -> new BadRequestException("Friendship connection not found."));
+
+        // Security check: Only participants can delete the friendship
+        if (!friendship.getUser().getUserId().equals(currentUserId) &&
+                !friendship.getFriend().getUserId().equals(currentUserId)) {
+            throw new BadRequestException("You are not authorized to remove this friendship.");
+        }
+
+        friendshipRepository.delete(friendship);
+        log.info("Friendship {} REMOVED by user {}", friendshipId, currentUserId);
+    }
+
+    /**
      * Retrieves a list of all accepted friends for the specified user.
      */
     @Transactional(readOnly = true)
