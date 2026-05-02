@@ -1,13 +1,12 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Unauthorized from '../pages/Unauthorized';
 
 const AdminRoute = ({ children }) => {
     const { user } = useAuth();
 
-    // Ha nincs bejelentkezve, vagy a role nem ADMIN, kidobjuk a dashboardra
+    // Ha nincs bejelentkezve, vagy a role nem ADMIN, megmutatjuk a 403-as oldalt
     if (!user || (user.role !== 'ADMIN' && user.role !== 'ROLE_ADMIN')) {
-        return <Navigate to="/dashboard" replace />;
+        return <Unauthorized />;
     }
 
     return children;

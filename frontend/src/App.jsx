@@ -18,6 +18,7 @@ import AssignmentPlayer from './pages/AssignmentPlayer.jsx';
 import AssignmentSubmissions from './pages/AssignmentSubmissions.jsx';
 import AdminRoute from './components/AdminRoute.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import GlobalErrorToast from './components/GlobalErrorToast.jsx';
 
 /**
  * Main Application Component
@@ -29,6 +30,7 @@ function App() {
         <NotificationProvider>
             <Router>
                 <NavigationBar />
+                <GlobalErrorToast />
                 <Routes>
                     {/* Default route redirects to login */}
                     <Route path="/" element={<Navigate to="/login" replace />} />
