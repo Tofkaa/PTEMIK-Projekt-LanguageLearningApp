@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.type.SqlTypes;
 import lombok.Getter;
 import lombok.Setter;
@@ -17,6 +19,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "exercises")
 
+@SQLDelete(sql = "UPDATE exercises SET is_active = false WHERE exercise_id=?")
+@SQLRestriction("is_active = true")
 public class Exercise {
 
     @Id
@@ -46,4 +50,7 @@ public class Exercise {
 
     @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
 }

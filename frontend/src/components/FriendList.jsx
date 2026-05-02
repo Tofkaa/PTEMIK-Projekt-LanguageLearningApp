@@ -114,6 +114,25 @@ const FriendList = () => {
             setChallengeLoading(false);
         }
     };
+
+    /**
+     * Handles the removal of a friend connection.
+     * Prompts the user for confirmation before sending the DELETE request.
+     * * @async
+     * @param {string} friendshipId 
+     * @param {string} friendName 
+     */
+    const handleRemoveFriend = async (friendshipId, friendName) => {
+        if (window.confirm(`Biztosan törlöd ${friendName} felhasználót a barátaid közül?`)) {
+            try {
+                await api.delete(`/friendships/${friendshipId}`);
+                fetchFriends();
+            } catch (err) {
+                console.error("Hiba a barát törlésekor:", err);
+                setChallengeError('Nem sikerült törölni a barátot.');
+            }
+        }
+    };
     
     if (loading) return <div className="text-center p-4"><Spinner animation="border" variant="info" /></div>;
     if (error) return <Alert variant="danger">{error}</Alert>;
@@ -150,7 +169,6 @@ const FriendList = () => {
                                 </div>
                                 
                                 <div className="d-flex gap-2 mt-auto">
-                                    {/* MOST MÁR AKTÍV A GOMB! */}
                                     <Button 
                                         variant="outline-info" 
                                         size="sm" 
@@ -163,7 +181,7 @@ const FriendList = () => {
                                         variant="outline-danger" 
                                         size="sm"
                                         title="Barát törlése"
-                                        onClick={() => console.log('Törlés...', friend.friendshipId)}
+                                        onClick={() => handleRemoveFriend(friend.friendshipId, friend.name)}
                                     >
                                         ✖
                                     </Button>

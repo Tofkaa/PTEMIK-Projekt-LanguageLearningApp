@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -16,6 +18,9 @@ import java.util.UUID;
 @NoArgsConstructor
 @Entity
 @Table(name = "classroom_assignments")
+
+@SQLDelete(sql = "UPDATE classroom_assignments SET is_active = false WHERE assignment_id=?")
+@SQLRestriction("is_active = true")
 public class ClassroomAssignment {
 
     @Id
@@ -71,4 +76,7 @@ public class ClassroomAssignment {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
 }

@@ -16,6 +16,8 @@ import ClassroomDetail from './pages/ClassroomDetail.jsx';
 import AssignmentStart from './pages/AssignmentStart.jsx';
 import AssignmentPlayer from './pages/AssignmentPlayer.jsx';
 import AssignmentSubmissions from './pages/AssignmentSubmissions.jsx';
+import AdminRoute from './components/AdminRoute.jsx';
+import AdminDashboard from './pages/AdminDashboard.jsx';
 
 /**
  * Main Application Component
@@ -51,6 +53,9 @@ function App() {
                     <Route path="/lesson/:id" element={<PrivateRoute><Lesson /></PrivateRoute>} />
                     <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                     <Route path="/friends" element={<PrivateRoute><Friends /></PrivateRoute>} />
+
+                    {/* Admin pages */}
+                    <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
                     {/* 404 Route: Catch-all for undefined URLs */}
                     <Route path="*" element={<NotFound />} />

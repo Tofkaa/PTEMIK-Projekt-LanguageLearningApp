@@ -78,6 +78,18 @@ public class FriendshipController {
     }
 
     /**
+     * Endpoint to remove an accepted friend connection.
+     */
+    @DeleteMapping("/{friendshipId}")
+    public ResponseEntity<?> removeFriend(@PathVariable UUID friendshipId, Authentication authentication) {
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new BadRequestException("Authenticated user not found."));
+
+        friendshipService.removeFriend(friendshipId, user.getUserId());
+        return ResponseEntity.ok(Map.of("message", "Barát sikeresen törölve."));
+    }
+    
+    /**
      * Endpoint to retrieve the authenticated user's accepted friends list.
      */
     @GetMapping("/accepted")

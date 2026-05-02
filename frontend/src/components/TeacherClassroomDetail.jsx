@@ -440,7 +440,7 @@ const TeacherClassroomDetail = () => {
                                 <ListGroup variant="flush">
                                     {acceptedMembers.map(member => (
                                         <ListGroup.Item key={member.memberId} className="bg-dark text-light border-secondary d-flex justify-content-between">
-                                            <div><div className="fw-bold">{member.studentName || member.name} <span className="text-muted small">#{member.userTag}</span></div><div className="text-secondary small">Belépett: {new Date(member.joinedAt).toLocaleDateString()}</div></div>
+                                            <div><div className="fw-bold">{member.studentName || member.name} <span className="text-light small">#{member.userTag}</span></div><div className="text-secondary small">Belépett: {new Date(member.joinedAt).toLocaleDateString()}</div></div>
                                             <Button variant="outline-danger" size="sm" onClick={() => handleKick(member.userId)}>Kirúgás</Button>
                                         </ListGroup.Item>
                                     ))}
@@ -609,7 +609,7 @@ const TeacherClassroomDetail = () => {
                             <Col lg={4} className="border-start border-secondary">
                                 <h6 className="fw-bold text-success mb-3">Kiválasztott tartalom ({selectedExercisesData.length} db)</h6>
                                 <div style={{ maxHeight: '450px', overflowY: 'auto' }} className="pe-2 custom-scrollbar">
-                                    {selectedExercisesData.length === 0 ? <p className="text-muted small">Még nem választottál feladatot.</p> : (
+                                    {selectedExercisesData.length === 0 ? <p className="text-light small">Még nem választottál feladatot.</p> : (
                                         <ListGroup variant="flush">
                                             {selectedExercisesData.map((ex, index) => (
                                                 <ListGroup.Item key={ex.id} className="bg-dark text-light border-secondary d-flex justify-content-between align-items-center p-2">

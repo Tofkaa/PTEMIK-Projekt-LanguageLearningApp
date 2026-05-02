@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -14,6 +17,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "lessons")
 
+@SQLDelete(sql = "UPDATE lessons SET is_active = false WHERE lesson_id=?")
+@SQLRestriction("is_active = true")
 public class Lesson {
 
     @Id
@@ -38,4 +43,7 @@ public class Lesson {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
 }
