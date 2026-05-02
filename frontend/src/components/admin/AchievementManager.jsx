@@ -68,15 +68,15 @@ const AchievementManager = () => {
 
     return (
         <div>
-            {message.text && <Alert variant={message.type} className="shadow-sm">{message.text}</Alert>}
+            {message.text && <Alert variant={message.type} className="shadow-sm rounded-4">{message.text}</Alert>}
 
-            <Card className="bg-dark border-secondary shadow-lg mb-4">
+            <Card className="bg-dark border-secondary shadow-lg mb-4 rounded-4">
                 <Card.Body className="p-4">
-                    <h5 className="text-success fw-bold mb-3">Kitüntetések JSON Importálása</h5>
+                    <h5 className="text-info fw-bold mb-3">Kitüntetések JSON Importálása</h5>
                     <Form.Group className="mb-4">
-                        <Form.Control id="achievement-upload-input" type="file" accept=".json" onChange={handleFileChange} className="bg-dark text-light border-secondary" />
+                        <Form.Control id="achievement-upload-input" type="file" accept=".json" onChange={handleFileChange} className="bg-dark text-light border-secondary rounded-3" />
                     </Form.Group>
-                    <Button variant="success" className="fw-bold px-4" onClick={handleUpload} disabled={!selectedFile || isLoading}>
+                    <Button variant="info" className="fw-bold px-4 text-dark rounded-pill" onClick={handleUpload} disabled={!selectedFile || isLoading}>
                         {isLoading ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : 'Kitüntetések Feltöltése 🏆'}
                     </Button>
                 </Card.Body>
@@ -84,37 +84,39 @@ const AchievementManager = () => {
 
             <h5 className="text-light fw-bold mb-3">Menedzselt Kitüntetések</h5>
             {isLoadingAch ? (
-                <div className="text-center py-4"><Spinner animation="border" variant="success" /></div>
+                <div className="text-center py-4"><Spinner animation="border" variant="info" /></div>
             ) : achievements.length === 0 ? (
-                <p className="text-secondary">Még nincsenek kitüntetések a rendszerben.</p>
+                <p className="text-secondary fst-italic">Még nincsenek kitüntetések a rendszerben.</p>
             ) : (
-                <Table hover variant="dark" className="border-secondary align-middle">
-                    <thead>
-                        <tr className="text-secondary">
-                            <th>Ikon & Név</th>
-                            <th>Leírás</th>
-                            <th>Szabály (Criteria)</th>
-                            <th className="text-end">Művelet</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {achievements.map(ach => (
-                            <tr key={ach.achievementId}>
-                                <td>
-                                    <span className="fs-4 me-2">{ach.iconUrl}</span>
-                                    <span className="fw-bold text-light">{ach.name}</span>
-                                </td>
-                                <td className="text-secondary small">{ach.description}</td>
-                                <td><Badge bg="secondary">{ach.criteria?.type}</Badge></td>
-                                <td className="text-end">
-                                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(ach.achievementId, ach.name)}>
-                                        Törlés 🗑️
-                                    </Button>
-                                </td>
+                <div className="table-responsive rounded-4 border border-secondary">
+                    <Table hover variant="dark" className="m-0 align-middle">
+                        <thead className="bg-black bg-opacity-25">
+                            <tr className="text-secondary">
+                                <th className="py-3 px-4">Ikon & Név</th>
+                                <th className="py-3">Leírás</th>
+                                <th className="py-3">Szabály (Criteria)</th>
+                                <th className="text-end py-3 px-4">Művelet</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </Table>
+                        </thead>
+                        <tbody>
+                            {achievements.map(ach => (
+                                <tr key={ach.achievementId}>
+                                    <td className="px-4">
+                                        <span className="fs-4 me-3">{ach.iconUrl}</span>
+                                        <span className="fw-bold text-light">{ach.name}</span>
+                                    </td>
+                                    <td className="text-secondary small">{ach.description}</td>
+                                    <td><Badge bg="secondary" pill className="px-3 py-2">{ach.criteria?.type}</Badge></td>
+                                    <td className="text-end px-4">
+                                        <Button variant="outline-danger" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" onClick={() => handleDelete(ach.achievementId, ach.name)}>
+                                            <span>🗑️</span> Törlés
+                                        </Button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </Table>
+                </div>
             )}
         </div>
     );

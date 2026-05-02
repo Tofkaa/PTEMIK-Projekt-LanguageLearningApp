@@ -29,7 +29,7 @@ const NavigationBar = () => {
         navigate('/login');
     };
 
-   if (!user) return null;
+    if (!user) return null;
 
     const viewedAssignments = JSON.parse(localStorage.getItem('viewedAssignments') || '[]');
     const viewedResults = JSON.parse(localStorage.getItem('viewedResults') || '[]');
@@ -47,52 +47,61 @@ const NavigationBar = () => {
     return (
         <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm mb-4 border-bottom border-secondary">
             <Container>
-                <Navbar.Brand className="fw-bold" style={{ cursor: 'pointer', color: 'var(--primary-cyan)' }} onClick={() => navigate('/dashboard')}>
-                    🚀 LanguageApp
+                {/* Brand Logo */}
+                <Navbar.Brand className="fw-bold d-flex align-items-center gap-2" style={{ cursor: 'pointer', color: 'var(--primary-cyan)' }} onClick={() => navigate('/dashboard')}>
+                    <span>🚀</span> LanguageApp
                 </Navbar.Brand>
                 
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
                 <Navbar.Collapse id="basic-navbar-nav">
-                    <Nav className="me-auto gap-2">
-                        <Nav.Link onClick={() => navigate('/dashboard')} className="fw-bold">Dashboard</Nav.Link>
+                    
+                    {/* Fő Navigációs Linkek  */}
+                    <Nav className="me-auto align-items-lg-center gap-3 mt-3 mt-lg-0">
+                        
+                        <Nav.Link onClick={() => navigate('/dashboard')} className="fw-bold d-flex align-items-center gap-2">
+                            <span>📊</span> Dashboard
+                        </Nav.Link>
 
-                        <Nav.Link onClick={() => navigate('/classrooms')} className="fw-bold position-relative me-3">
-                            🏫 Osztálytermek
+                        <Nav.Link onClick={() => navigate('/classrooms')} className="fw-bold position-relative d-flex align-items-center gap-2">
+                            <span>🏫</span> Osztálytermek
                             {classroomPings > 0 && (
-                                <Badge bg="danger" pill className="position-absolute top-25 start-100 translate-middle shadow-sm" style={{ fontSize: '0.65rem' }}>
+                                <Badge bg="danger" pill className="position-absolute top-0 start-100 translate-middle shadow-sm" style={{ fontSize: '0.65rem' }}>
                                     {classroomPings}
                                 </Badge>
                             )}
                         </Nav.Link>
 
-                        <Nav.Link onClick={() => navigate('/friends')} className="fw-bold position-relative me-3">
-                            🌐 Közösség
+                        <Nav.Link onClick={() => navigate('/friends')} className="fw-bold position-relative d-flex align-items-center gap-2">
+                            <span>🌐</span> Közösség
                             {communityPings > 0 && (
-                                <Badge bg="danger" pill className="position-absolute top-25 start-100 translate-middle shadow-sm" style={{ fontSize: '0.65rem' }}>
+                                <Badge bg="danger" pill className="position-absolute top-0 start-100 translate-middle shadow-sm" style={{ fontSize: '0.65rem' }}>
                                     {communityPings}
                                 </Badge>
                             )}
                         </Nav.Link>
-                    </Nav>
-                    {/* Csak az adminok látják ezt a gombot a lenyíló menüben */}
+
+                        {/* Admin Link */}
                         {(user.role === 'ADMIN' || user.role === 'ROLE_ADMIN') && (
-                            <>
-                                <NavDropdown.Item onClick={() => navigate('/admin')} className="text-danger fw-bold">🛡️ Admin Panel</NavDropdown.Item>
-                                <NavDropdown.Divider />
-                            </>
+                            <Nav.Link onClick={() => navigate('/admin')} className="text-danger fw-bold d-flex align-items-center gap-2 ms-lg-3 border-start border-secondary ps-lg-4">
+                                <span>🛡️</span> Admin Panel
+                            </Nav.Link>
                         )}
+
+                    </Nav>
                     
-                    <Nav className="align-items-center">
-                        <Badge bg="warning" text="dark" className="me-3 rounded-pill px-3 py-2 shadow-sm">
-                            ⭐ {user.xp || 0} XP
+                    {/* Jobb oldali szekció (XP és Profil) */}
+                    <Nav className="align-items-lg-center gap-3 mt-3 mt-lg-0">
+                        <Badge bg="warning" text="dark" className="rounded-pill px-3 py-2 shadow-sm fs-6 d-flex align-items-center gap-1">
+                            <span>⭐</span> {user.xp || 0} XP
                         </Badge>
                         
-                        <NavDropdown title={<span className="text-light fw-bold">👤 {user.name}</span>} id="basic-nav-dropdown" align="end" menuVariant="dark">
+                        <NavDropdown title={<span className="text-light fw-bold d-inline-flex align-items-center gap-2"><span>👤</span> {user.name}</span>} id="basic-nav-dropdown" align="end" menuVariant="dark">
                             <NavDropdown.Item onClick={() => navigate('/profile')} className="text-light">Profilom</NavDropdown.Item>
                             <NavDropdown.Divider />
                             <NavDropdown.Item onClick={handleLogout} className="text-danger fw-bold">Kijelentkezés</NavDropdown.Item>
                         </NavDropdown>
                     </Nav>
+
                 </Navbar.Collapse>
             </Container>
         </Navbar>

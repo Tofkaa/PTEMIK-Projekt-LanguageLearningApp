@@ -41,7 +41,6 @@ const AdminDashboard = () => {
                     <Col md={9} lg={10}>
                         <Tab.Content>
                             
-                            {/* 1. Felhasználók Modul */}
                             <Tab.Pane eventKey="users">
                                 <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
                                     <h4 className="text-info fw-bold mb-4">Felhasználók Moderációja</h4>
@@ -49,36 +48,31 @@ const AdminDashboard = () => {
                                 </div>
                             </Tab.Pane>
                             
-                            {/* 2. Tananyag Modul (Holnap) */}
                             <Tab.Pane eventKey="content">
                                  <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
-                                    <h4 className="text-warning fw-bold mb-4">Tananyag Kezelő (CMS)</h4>
+                                    <h4 className="text-info fw-bold mb-4">Tananyag Kezelő (CMS)</h4>
                                    <CurriculumManager />
                                 </div>
                             </Tab.Pane>
 
-                            {/* 3. Kitüntetések Modul (Holnap) */}
                             <Tab.Pane eventKey="achievements">
                                  <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
-                                    <h4 className="text-success fw-bold mb-4">Kitüntetés Kezelő</h4>
+                                    <h4 className="text-info fw-bold mb-4">Kitüntetés Kezelő</h4>
                                    <AchievementManager />
                                 </div>
                             </Tab.Pane>
 
-                            {/* 4. Osztályterem Modul (4. nap) */}
                             <Tab.Pane eventKey="classrooms">
                                  <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
-                                    <h4 className="text-primary fw-bold mb-4">Osztálytermek Moderációja</h4>
+                                    <h4 className="text-info fw-bold mb-4">Osztálytermek Moderációja</h4>
                                     <ClassroomManager />
                                 </div>
                             </Tab.Pane>
 
-                            {/* 5. Napló Modul */}
                             <Tab.Pane eventKey="logs">
                                 <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
                                     <h4 className="text-danger fw-bold mb-4">Rendszernaplók (Audit Trail)</h4>
                                     <SystemLogs /> 
-                                    
                                 </div>
                             </Tab.Pane>
 
@@ -86,7 +80,6 @@ const AdminDashboard = () => {
                     </Col>
                 </Row>
             </Tab.Container>
-
 
             <style>{`
                 .custom-admin-nav .nav-link { border-radius: 8px; transition: all 0.2s; }
