@@ -2,14 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Card, Form, Button, Alert, Spinner, Accordion, Badge, ListGroup, Modal } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi';
 
+// --- DELETE BUTTON ---
+const AdminDeleteButton = ({ onClick, label }) => (
+    <Button 
+        variant="outline-danger" 
+        size="sm" 
+        className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 transition-all hover-scale"
+        onClick={onClick}
+    >
+        <span>🗑️Törlés</span> {label}
+    </Button>
+);
+
 const CurriculumManager = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
     const [topics, setTopics] = useState([]);
     const [isLoadingTopics, setIsLoadingTopics] = useState(true);
-    
-    // Új state az előnézeti ablakhoz
     const [previewModal, setPreviewModal] = useState({ show: false, exercise: null });
 
     useEffect(() => {
@@ -81,28 +91,27 @@ const CurriculumManager = () => {
     const getDifficultyBadge = (diff) => {
         switch(diff) {
             case 'EASY': return 'success';
-            case 'MEDIUM': return 'warning';
+            case 'MEDIUM': return 'warning text-dark';
             case 'HARD': return 'danger';
             default: return 'secondary';
         }
     };
 
-    // Modal nyitó függvény
     const handleShowPreview = (exercise) => {
         setPreviewModal({ show: true, exercise });
     };
 
     return (
         <div>
-            {message.text && <Alert variant={message.type} className="shadow-sm">{message.text}</Alert>}
+            {message.text && <Alert variant={message.type} className="shadow-sm rounded-4">{message.text}</Alert>}
 
-            <Card className="bg-dark border-secondary shadow-lg mb-4">
+            <Card className="bg-dark border-secondary shadow-lg mb-4 rounded-4">
                 <Card.Body className="p-4">
-                    <h5 className="text-warning fw-bold mb-3">Tananyag JSON Importálása</h5>
+                    <h5 className="text-info fw-bold mb-3">Tananyag JSON Importálása</h5>
                     <Form.Group className="mb-4">
-                        <Form.Control id="json-upload-input" type="file" accept=".json" onChange={handleFileChange} className="bg-dark text-light border-secondary" />
+                        <Form.Control id="json-upload-input" type="file" accept=".json" onChange={handleFileChange} className="bg-dark text-light border-secondary rounded-3" />
                     </Form.Group>
-                    <Button variant="warning" className="fw-bold px-4 text-dark" onClick={handleUpload} disabled={!selectedFile || isLoading}>
+                    <Button variant="info" className="fw-bold px-4 text-dark rounded-pill" onClick={handleUpload} disabled={!selectedFile || isLoading}>
                         {isLoading ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : 'Feltöltés és Importálás 🚀'}
                     </Button>
                 </Card.Body>
@@ -110,43 +119,39 @@ const CurriculumManager = () => {
 
             <h5 className="text-light fw-bold mb-3">Meglévő Tananyagok (Kezelés)</h5>
             {isLoadingTopics ? (
-                <div className="text-center py-4"><Spinner animation="border" variant="warning" /></div>
+                <div className="text-center py-4"><Spinner animation="border" variant="info" /></div>
             ) : topics.length === 0 ? (
                 <p className="text-secondary">Nincs még elérhető tananyag az adatbázisban.</p>
             ) : (
                 <Accordion className="border-secondary custom-dark-accordion">
                     {topics.map((topic, index) => (
-                        <Accordion.Item eventKey={index.toString()} key={topic.topicId} className="bg-dark border-secondary mb-3 rounded overflow-hidden shadow-sm">
+                        <Accordion.Item eventKey={index.toString()} key={topic.topicId} className="bg-dark border-secondary mb-3 rounded-4 overflow-hidden shadow-sm">
                             <Accordion.Header>
                                 <span className="text-light fw-bold fs-5">📘 {topic.topicName}</span>
                             </Accordion.Header>
                             <Accordion.Body className="bg-dark text-light border-top border-secondary p-4">
                                 
                                 <div className="d-flex justify-content-end mb-4 border-bottom border-secondary pb-3">
-                                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(topic.topicId, 'Témakör', topic.topicName)}>
-                                        🗑️ Teljes Témakör Törlése
-                                    </Button>
+                                    <AdminDeleteButton onClick={() => handleDelete(topic.topicId, 'Témakör', topic.topicName)} label="Teljes Témakör Törlése" />
                                 </div>
 
                                 {topic.lessons && topic.lessons.length > 0 ? (
-                                    <div className="d-flex flex-column gap-3">
+                                    <div className="d-flex flex-column gap-4">
                                         {topic.lessons.map(lesson => (
-                                            <Card key={lesson.lessonId} className="bg-transparent border border-secondary shadow-sm">
-                                                <Card.Header className="d-flex justify-content-between align-items-center bg-dark border-secondary py-3">
+                                            <Card key={lesson.lessonId} className="bg-transparent border border-secondary shadow-sm rounded-4">
+                                                <Card.Header className="d-flex justify-content-between align-items-center bg-black bg-opacity-25 border-bottom border-secondary py-3 px-4">
                                                     <div>
-                                                        <span className="fw-bold text-warning fs-5 me-3">📄 {lesson.title}</span>
-                                                        <Badge bg={getDifficultyBadge(lesson.difficulty)}>{lesson.difficulty}</Badge>
+                                                        <span className="fw-bold text-info fs-5 me-3">📄 {lesson.title}</span>
+                                                        <Badge bg={getDifficultyBadge(lesson.difficulty)} pill>{lesson.difficulty}</Badge>
                                                     </div>
-                                                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(lesson.lessonId, 'Lecke', lesson.title)}>
-                                                        Lecke Törlése 🗑️
-                                                    </Button>
+                                                    <AdminDeleteButton onClick={() => handleDelete(lesson.lessonId, 'Lecke', lesson.title)} label="Lecke Törlése" />
                                                 </Card.Header>
                                                 <Card.Body className="p-0">
                                                     <ListGroup variant="flush">
                                                         {lesson.exercises?.map(exercise => (
-                                                            <ListGroup.Item key={exercise.exerciseId} className="bg-dark border-secondary text-light d-flex justify-content-between align-items-center py-3 px-4">
-                                                                <div className="d-flex align-items-center text-truncate pe-3">
-                                                                    <Badge bg="info" text="dark" className="me-3" style={{ minWidth: '130px' }}>
+                                                            <ListGroup.Item key={exercise.exerciseId} className="bg-transparent border-bottom border-secondary border-opacity-50 text-light d-flex flex-wrap justify-content-between align-items-center py-3 px-4">
+                                                                <div className="d-flex align-items-center text-truncate pe-3 mb-2 mb-md-0">
+                                                                    <Badge bg="info" text="dark" pill className="me-3 px-3 py-2 fw-bold" style={{ minWidth: '130px' }}>
                                                                         🧩 {exercise.type}
                                                                     </Badge>
                                                                     <span className="text-secondary text-truncate" title={getPreview(exercise.content)}>
@@ -154,19 +159,16 @@ const CurriculumManager = () => {
                                                                     </span>
                                                                 </div>
                                                                 
-                                                                {/* Gombok: Előnézet és Törlés egymás mellett */}
-                                                                <div className="d-flex gap-3 flex-shrink-0">
-                                                                    <Button variant="link" className="text-info p-0 text-decoration-none" onClick={() => handleShowPreview(exercise)}>
-                                                                        👁️ Megtekintés
+                                                                <div className="d-flex align-items-center gap-3 flex-shrink-0">
+                                                                    <Button variant="outline-info" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" onClick={() => handleShowPreview(exercise)}>
+                                                                        <span>👁️</span> Megtekintés
                                                                     </Button>
-                                                                    <Button variant="link" className="text-danger p-0 text-decoration-none" onClick={() => handleDelete(exercise.exerciseId, 'Feladat', exercise.type)}>
-                                                                        🗑️ Törlés
-                                                                    </Button>
+                                                                    <AdminDeleteButton onClick={() => handleDelete(exercise.exerciseId, 'Feladat', exercise.type)} label="Feladat Törlése" />
                                                                 </div>
                                                             </ListGroup.Item>
                                                         ))}
                                                         {(!lesson.exercises || lesson.exercises.length === 0) && (
-                                                            <ListGroup.Item className="bg-dark border-secondary text-secondary text-center py-3">
+                                                            <ListGroup.Item className="bg-transparent border-0 text-secondary text-center py-4 fst-italic">
                                                                 Nincsenek feladatok a leckében.
                                                             </ListGroup.Item>
                                                         )}
@@ -176,7 +178,7 @@ const CurriculumManager = () => {
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-secondary text-center mb-0">Nincsenek leckék ebben a témakörben.</p>
+                                    <p className="text-secondary text-center mb-0 fst-italic">Nincsenek leckék ebben a témakörben.</p>
                                 )}
                             </Accordion.Body>
                         </Accordion.Item>
@@ -185,31 +187,25 @@ const CurriculumManager = () => {
             )}
 
             {/* FELADAT ELŐNÉZET MODAL */}
-            <Modal 
-                show={previewModal.show} 
-                onHide={() => setPreviewModal({ show: false, exercise: null })} 
-                centered 
-                size="lg"
-            >
+            <Modal show={previewModal.show} onHide={() => setPreviewModal({ show: false, exercise: null })} centered size="lg">
                 <Modal.Header closeButton className="bg-dark border-secondary" variant="dark">
                     <Modal.Title className="text-info fw-bold">
                         🧩 {previewModal.exercise?.type} - Előnézet
                     </Modal.Title>
                 </Modal.Header>
-                <Modal.Body className="bg-dark text-light">
+                <Modal.Body className="bg-dark text-light p-4">
                     {previewModal.exercise && (
                         <div>
-                            <h4 className="text-warning mb-4">
+                            <h4 className="text-info mb-4">
                                 {previewModal.exercise.content?.question || 'Nincs megadva szöveges kérdés'}
                             </h4>
                             
-                            {/* Válaszlehetőségek (ha vannak) */}
                             {previewModal.exercise.content?.options && (
                                 <div className="mb-4">
                                     <strong className="text-secondary text-uppercase small tracking-wide">Válaszlehetőségek:</strong>
                                     <div className="d-flex flex-wrap gap-2 mt-2">
                                         {previewModal.exercise.content.options.map((opt, i) => (
-                                            <Badge key={i} bg="secondary" className="fs-6 py-2 px-3 fw-normal">
+                                            <Badge key={i} bg="secondary" className="fs-6 py-2 px-3 fw-normal rounded-pill">
                                                 {opt}
                                             </Badge>
                                         ))}
@@ -217,63 +213,24 @@ const CurriculumManager = () => {
                                 </div>
                             )}
 
-                            {/* Kép URL előnézet (ha van) */}
-                            {previewModal.exercise.content?.imageUrl && (
-                                <div className="mb-4">
-                                    <strong className="text-secondary text-uppercase small">Kép előnézet:</strong>
-                                    <div className="mt-2">
-                                        <img src={previewModal.exercise.content.imageUrl} alt="Feladat kép" style={{ maxHeight: '150px', borderRadius: '8px' }} />
-                                    </div>
+                            {previewModal.exercise.correctAnswer && (
+                                <div className="mt-4 p-3 border border-success rounded-4 bg-success bg-opacity-10 shadow-sm">
+                                    <strong className="text-success text-uppercase small d-block mb-1">Helyes válasz:</strong>
+                                    <span className="fs-5 fw-bold text-light">
+                                        {previewModal.exercise.correctAnswer?.answer || JSON.stringify(previewModal.exercise.correctAnswer)}
+                                    </span>
                                 </div>
                             )}
-
-                            {/* Hint / Segítség */}
-                            {previewModal.exercise.content?.hint && (
-                                <div className="mb-4 text-info">
-                                    <strong className="text-secondary text-uppercase small">Segítség (Hint):</strong><br />
-                                    💡 {previewModal.exercise.content.hint}
-                                </div>
-                            )}
-
-                            {/* HELYES VÁLASZ (Kiemelve) */}
-                            <div className="mt-4 p-3 border border-success rounded bg-success bg-opacity-10 shadow-sm">
-                                <strong className="text-success text-uppercase small d-block mb-1">Helyes válasz:</strong>
-                                <span className="fs-5 fw-bold text-light">
-                                    {previewModal.exercise.correctAnswer?.answer || JSON.stringify(previewModal.exercise.correctAnswer)}
-                                </span>
-                            </div>
-
-                            {/* Nyers JSON Fejlesztőknek */}
-                            <div className="mt-5 pt-3 border-top border-secondary">
-                                <strong className="text-secondary small mb-2 d-block">Nyers adatstruktúra (Admin):</strong>
-                                <pre className="bg-black text-secondary p-3 rounded small custom-scrollbar" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                                    {JSON.stringify(previewModal.exercise.content, null, 2)}
-                                </pre>
-                            </div>
                         </div>
                     )}
                 </Modal.Body>
-                <Modal.Footer className="bg-dark border-secondary">
-                    <Button variant="outline-light" onClick={() => setPreviewModal({ show: false, exercise: null })}>
-                        Bezárás
-                    </Button>
-                </Modal.Footer>
             </Modal>
 
             <style>{`
-                .custom-dark-accordion .accordion-button {
-                    background-color: var(--bs-dark);
-                    color: white;
-                }
-                .custom-dark-accordion .accordion-button:not(.collapsed) {
-                    background-color: #2b3035;
-                    color: var(--bs-warning);
-                    box-shadow: inset 0 -1px 0 rgba(255,255,255,0.1);
-                }
-                .custom-dark-accordion .accordion-button::after {
-                    filter: invert(1) grayscale(100%) brightness(200%);
-                }
-                .tracking-wide { letter-spacing: 1px; }
+                .custom-dark-accordion .accordion-button { background-color: var(--bs-dark); color: white; border-radius: 12px; }
+                .custom-dark-accordion .accordion-button:not(.collapsed) { background-color: #2b3035; color: var(--bs-info); box-shadow: inset 0 -1px 0 rgba(255,255,255,0.1); }
+                .custom-dark-accordion .accordion-button::after { filter: invert(1) grayscale(100%) brightness(200%); }
+                .hover-scale:hover { transform: scale(1.02); }
             `}</style>
         </div>
     );

@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-    withCredentials: true, // Szükséges a HttpOnly cookie-khoz
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -57,15 +57,11 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // VÉDELEM: Ne csináljunk semmit, ha maga a login vagy a refresh végpont hibázik! (Ez okozta a kidobást)
         if (originalRequest.url.includes('/auth/login') || originalRequest.url.includes('/auth/refresh')) {
             return Promise.reject(error);
         }
 
-        // Ha 401 vagy 403 a hiba, és még nem próbáltuk újra
         if (error.response && (error.response.status === 401 || error.response.status === 403) && !originalRequest._retry) {
-            
-            // Ha épp folyamatban van egy frissítés, akkor a többi kérést VÁRÓLISTÁRA tesszük
             if (isRefreshing) {
                 return new Promise(function(resolve, reject) {
                     failedQueue.push({ resolve, reject });
@@ -81,36 +77,44 @@ api.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                console.log('Access token expired or unauthorized. Attempting silent refresh...');
                 const refreshResponse = await api.post('/auth/refresh');
                 const newToken = refreshResponse.data.accessToken;
-                
-                // Mentsük le az új tokent a megfelelő helyre
                 setToken(newToken);
-                
-                // Frissítsük az aktuális elakadt kérés fejlécét
                 originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-                
-                // Engedjük el a várólistán lévő többi kérést is az új tokennel!
                 processQueue(null, newToken);
-                
-                // Indítsuk újra az eredeti kérést
                 return api(originalRequest);
 
             } catch (refreshError) {
-                console.warn('Refresh token expired or invalid. Forcing logout...');
                 processQueue(refreshError, null);
                 clearTokens();
-                
-                // Csak akkor dobjuk ki a usert, ha tényleg lejárt a refresh token is
                 window.location.href = '/login'; 
                 return Promise.reject(refreshError);
             } finally {
-                // Engedjük fel a zárat
                 isRefreshing = false;
             }
         }
         
+        // --- GLOBÁLIS HIBAKEZELÉS ---
+        if (!originalRequest.url.includes('/auth/login')) {
+            let errorMsg = 'Ismeretlen hiba történt.';
+            
+            if (!error.response) {
+                errorMsg = 'Hálózati hiba! Kérlek ellenőrizd az internetkapcsolatot.';
+            } else if (error.response.status >= 500) {
+                errorMsg = 'Váratlan szerverhiba (500). Kérlek próbáld újra később!';
+            } else if (error.response.status === 404) {
+                errorMsg = 'A keresett adat vagy végpont nem található (404).';
+            } else if (error.response.status === 403) {
+                errorMsg = 'Nincs megfelelő jogosultságod ehhez a művelethez! (403)';
+            } else if (error.response.status === 400) {
+                const backendMsg = error.response.data?.message || error.response.data;
+                errorMsg = typeof backendMsg === 'string' ? backendMsg : 'Hibás vagy érvénytelen kérés (400).';
+            }
+
+            // Kilőjük az egyedi eseményt a React felé
+            window.dispatchEvent(new CustomEvent('api-error', { detail: errorMsg }));
+        }
+
         return Promise.reject(error);
     }
 );

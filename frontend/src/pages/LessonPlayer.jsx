@@ -18,9 +18,9 @@ const LessonPlayer = () => {
     const navigate = useNavigate();
     const { user, login } = useAuth(); 
 
-
     const [searchParams] = useSearchParams();
     const challengeId = searchParams.get('challengeId');
+    
     // --- STATE MANAGEMENT ---
     const [exercises, setExercises] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +43,6 @@ const LessonPlayer = () => {
     useEffect(() => {
         const fetchExercises = async () => {
             try {
-                
                 const endpoint = challengeId 
                     ? `/lessons/${lessonId}/exercises?challengeId=${challengeId}` 
                     : `/lessons/${lessonId}/exercises`;
@@ -88,7 +87,6 @@ const LessonPlayer = () => {
 
     // --- PHASE 2: IMMEDIATE FEEDBACK & NEXT QUESTION ---
     const handleCheckOrNext = async () => {
-        
         if (!feedback || feedback.type === 'warning') {
             setIsChecking(true);
             try {
@@ -105,7 +103,6 @@ const LessonPlayer = () => {
                 } else {
                     setFeedback({ type: 'danger', msg: feedbackMessage });
                     
-                    // CLONE the lesson if it has not been retried yet, and the user failed it
                     if (!currentExercise.isRetry) {
                         setExercises(prev => [...prev, { ...currentExercise, isRetry: true }]);
                     }
@@ -152,7 +149,6 @@ const LessonPlayer = () => {
         };
 
        try {
-            console.log("Submitting final payload:", payload);
             const endpoint = challengeId 
             ? `/lessons/${lessonId}/submit?challengeId=${challengeId}` 
             : `/lessons/${lessonId}/submit`;
@@ -164,15 +160,11 @@ const LessonPlayer = () => {
                 refreshNotifications();
             }
             
-            // --- ROBUST STATE SYNCHRONIZATION ---
-            // Instead of manually calculating XP and streaks on the client (which can lead to desyncs if the user
-            // navigates away quickly), we fetch the authoritative User Profile directly from the backend.
             try {
                 const userResponse = await api.get('/users/me'); 
-                login(localStorage.getItem('token'), userResponse.data); // Update global AuthContext
+                login(localStorage.getItem('token'), userResponse.data); 
             } catch (fetchErr) {
                 console.warn("Failed to fetch fresh profile, initiating fallback update:", fetchErr);
-                // Safety net fallback: Apply manual calculations if the profile fetch fails
                 const updatedUser = { 
                     ...user, 
                     xp: user.xp + (response.data.xpEarned || 0),
@@ -187,6 +179,7 @@ const LessonPlayer = () => {
             setIsSubmitting(false);
         }
     };
+
     // --- PHASE 4: RENDER RESULT SCREEN ---
     if (lessonResult) {
         const isPassed = lessonResult.passed;
@@ -196,13 +189,11 @@ const LessonPlayer = () => {
         const totalCorrectAnswers = lessonResult.correctAnswersCount; 
         const displayAccuracy = Math.round((totalCorrectAnswers / totalAttempts) * 100);
         const isAlreadyCompleted = isPassed && lessonResult.xpEarned === 0;
-
         const maxPotentialXp = originalTotalQ * 10;
         const lostXp = maxPotentialXp - lessonResult.xpEarned;
+
         return (
             <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-light pb-5 pt-5">
-                
-                {/* 1. Header / Icon Area */}
                 <div className="text-center mb-4">
                     <div 
                         className="mb-3 d-inline-flex justify-content-center align-items-center rounded-circle shadow-lg"
@@ -218,11 +209,9 @@ const LessonPlayer = () => {
                     <p className="text-light opacity-75 fs-5 fst-italic">"{lessonResult.feedback}"</p>
                 </div>
 
-                {/* 2. Stats Card */}
                 <Card className="shadow-lg border-0 bg-dark text-light p-3 rounded-4 w-100 mb-4" style={{ maxWidth: '600px' }}>
                     <Card.Body>
                         <Row className="text-center mb-4 g-3">
-                            {/* Accuracy Stat */}
                             <Col xs={4}>
                                 <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
                                     <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Pontosság</h6>
@@ -231,7 +220,6 @@ const LessonPlayer = () => {
                                     </h3>
                                 </div>
                             </Col>
-                            {/* Time Taken */}
                             <Col xs={4}>
                                 <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
                                     <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Idő</h6>
@@ -240,35 +228,24 @@ const LessonPlayer = () => {
                                     </h3>
                                 </div>
                             </Col>
-                            {/* XP Stat - with lost XP displayed */}
                             <Col xs={4}>
                                 <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
                                     <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>XP</h6>
-                                    
                                     {isAlreadyCompleted ? (
                                         <>
                                             <h4 className="text-secondary fw-bold mb-0">0⭐</h4>
-                                            <span className="text-info mt-1 d-block" style={{ fontSize: '0.70rem', fontWeight: 'bold' }}>
-                                                Már teljesítve
-                                            </span>
+                                            <span className="text-info mt-1 d-block" style={{ fontSize: '0.70rem', fontWeight: 'bold' }}>Már teljesítve</span>
                                         </>
                                     ) : (
                                         <>
-                                            <h3 className="text-warning fw-bold mb-0">
-                                                +{lessonResult.xpEarned}⭐
-                                            </h3>
-                                            {lostXp > 0 && (
-                                                <span className="text-danger mt-1 d-block" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                                    -{lostXp} XP (hibák)
-                                                </span>
-                                            )}
+                                            <h3 className="text-warning fw-bold mb-0">+{lessonResult.xpEarned}⭐</h3>
+                                            {lostXp > 0 && <span className="text-danger mt-1 d-block" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>-{lostXp} XP (hibák)</span>}
                                         </>
                                     )}
                                 </div>
                             </Col>
                         </Row>
 
-                        {/* Detailed Breakdown */}
                         <div className="d-flex justify-content-between align-items-center p-3 mb-4 bg-black bg-opacity-25 rounded-3 border border-secondary">
                             <span className="text-light fw-bold">Helyes válaszok (próbálkozásokkal)</span>
                             <span className="fs-5 fw-bold text-info">
@@ -276,7 +253,6 @@ const LessonPlayer = () => {
                             </span>
                         </div>
 
-                        {/* Mistakes List */}
                         {lessonResult.mistakes && lessonResult.mistakes.length > 0 && (
                             <div className="mt-4 text-start">
                                 <h5 className="text-warning fw-bold mb-3 border-bottom border-secondary pb-2">Hibák áttekintése:</h5>
@@ -294,7 +270,6 @@ const LessonPlayer = () => {
                             </div>
                         )}
 
-                        {/* 3. Action Buttons */}
                         <div className="d-grid gap-3 mt-4">
                             {isPassed ? (
                                 <Button variant="info" size="lg" className="fw-bold rounded-pill text-dark py-3" onClick={() => navigate(challengeId ? '/friends' : '/dashboard')}>
@@ -302,12 +277,8 @@ const LessonPlayer = () => {
                                 </Button>
                             ) : (
                                 <>
-                                    <Button variant="outline-info" size="lg" className="fw-bold rounded-pill py-3" onClick={() => window.location.reload()}>
-                                        Újrapróbálom
-                                    </Button>
-                                    <Button variant="outline-secondary" onClick={() => navigate(challengeId ? '/friends' : '/dashboard')}>
-                                        Később folytatom
-                                    </Button>
+                                    <Button variant="outline-info" size="lg" className="fw-bold rounded-pill py-3" onClick={() => window.location.reload()}>Újrapróbálom</Button>
+                                    <Button variant="outline-secondary" onClick={() => navigate(challengeId ? '/friends' : '/dashboard')}>Később folytatom</Button>
                                 </>
                             )}
                         </div>
@@ -317,7 +288,6 @@ const LessonPlayer = () => {
         );
     }
 
-    // --- PHASE 5: RENDER LOADING STATE ---
     if (isLoading || isSubmitting) {
         return (
             <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-light">
@@ -327,7 +297,6 @@ const LessonPlayer = () => {
         );
     }
 
-    // --- PHASE 6: RENDER ERROR STATE ---
     if (error) { 
         return (
             <Container className="mt-5 text-center text-light">
@@ -342,81 +311,81 @@ const LessonPlayer = () => {
         if (!currentExercise) return null;
 
         const { type, content } = currentExercise;
-        
-        // Clean up the question text (if there are any unnecessary prefixes left in the database)
         const questionText = content?.question?.replace('Translate: ', '').replace('Translate to English: ', '') || '';
 
-        // Dynamic header depending on task type
         const getTitle = () => {
             switch (type) {
-                case 'TRANSLATION': return '📝 Fordítási feladat';
-                case 'MULTIPLE_CHOICE': return '✅ Feleletválasztós kérdés';
-                case 'WORD_BANK': return '🧩 Szókirakó';
-                case 'IMAGE_CHOICE': return '🖼️ Képes feladat';
+                case 'TRANSLATION': return 'Írd be a fordítást';
+                case 'MULTIPLE_CHOICE': return 'Válaszd ki a helyes opciót';
+                case 'WORD_BANK': return 'Rakd sorba a szavakat';
+                case 'IMAGE_CHOICE': return 'Válaszd ki a megfelelő képet';
                 default: return 'Feladat';
             }
         };
 
         return (
-            <>
-                {/* Dynamic, task-specific title */}
-                <h4 className="mb-4 text-info fw-bold">{getTitle()}</h4>
+            <div className="d-flex flex-column align-items-center w-100">
                 
-                {/* Display the question/instruction (if it exists) */}
+                {/* 1. Demoted Task Type */}
+                <span className="text-secondary fw-bold text-uppercase mb-3 d-block" style={{ letterSpacing: '2px', fontSize: '0.8rem' }}>
+                    {getTitle()}
+                </span>
+                
+                {/* 2. Promoted Question Text with Cyan Glow and Border */}
                 {questionText && (
-                    <p className="fs-4 mb-4 border border-secondary rounded p-3 bg-black bg-opacity-25">
-                        {questionText}
-                    </p>
+                    <div 
+                        className="mb-5 p-4 rounded-4 border border-info border-opacity-50 text-center w-100"
+                        style={{ 
+                            maxWidth: '800px', 
+                            backgroundColor: 'rgba(13, 202, 240, 0.05)',
+                            borderWidth: '2px',
+                            boxShadow: '0 0 20px rgba(13, 202, 240, 0.15)' // Kék ragyogás
+                        }}
+                    >
+                        <h2 className="fw-bold text-light mb-0" style={{ lineHeight: '1.4', fontSize: '1.8rem' }}>
+                            {questionText}
+                        </h2>
+                    </div>
                 )}
 
-                {/* --- DYNAMIC LOADING OF COMPONENTS BY TYPE --- */}
-                
-                {type === 'IMAGE_CHOICE' && (
-                    <ImageChoiceExercise 
-                        exercise={currentExercise} 
-                        currentAnswer={currentAnswer} 
-                        onAnswer={setCurrentAnswer} 
-                        disabled={isInputDisabled}
-                    />
-                )}
+                {/* 3. Sub-components container */}
+                <div className="w-100" style={{ maxWidth: '700px' }}>
+                    {type === 'IMAGE_CHOICE' && (
+                        <ImageChoiceExercise exercise={currentExercise} currentAnswer={currentAnswer} onAnswer={setCurrentAnswer} disabled={isInputDisabled} />
+                    )}
 
-                {type === 'WORD_BANK' && (
-                    <WordBankExercise 
-                        data={content} 
-                        onAnswer={setCurrentAnswer} 
-                        currentAnswer={currentAnswer}
-                        disabled={isInputDisabled}
-                    />
-                )}
+                    {type === 'WORD_BANK' && (
+                        <WordBankExercise data={content} onAnswer={setCurrentAnswer} currentAnswer={currentAnswer} disabled={isInputDisabled} />
+                    )}
 
-                {type === 'MULTIPLE_CHOICE' && (
-                    <MultipleChoiceExercise 
-                        data={content} 
-                        currentAnswer={currentAnswer} 
-                        onAnswer={setCurrentAnswer} 
-                        disabled={isInputDisabled}
-                    />
-                )}
+                    {type === 'MULTIPLE_CHOICE' && (
+                        <MultipleChoiceExercise data={content} currentAnswer={currentAnswer} onAnswer={setCurrentAnswer} disabled={isInputDisabled} />
+                    )}
 
-                {type === 'TRANSLATION' && (
-                    <Form.Group className="mb-5 text-start">
-                        <Form.Control 
-                            as="textarea" 
-                            rows={3} 
-                            placeholder="Írd ide a fordítást angolul..." 
-                            value={currentAnswer} 
-                            onChange={(e) => setCurrentAnswer(e.target.value)} 
-                            className="fs-5 bg-dark text-light border-secondary shadow-none" 
-                            autoFocus 
-                            disabled={isInputDisabled}
-                        />
-                    </Form.Group>
-                )}
-            </>
+                    {type === 'TRANSLATION' && (
+                        <Form.Group className="mb-4 text-start">
+                            <Form.Control 
+                                as="textarea" 
+                                rows={3} 
+                                placeholder="A fordítás helye..." 
+                                value={currentAnswer} 
+                                onChange={(e) => setCurrentAnswer(e.target.value)} 
+                                className="fs-4 p-4 rounded-4 shadow-none text-info fw-bold" 
+                                style={{
+                                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                                    border: '2px solid rgba(13, 202, 240, 0.2)',
+                                    resize: 'none'
+                                }}
+                                autoFocus 
+                                disabled={isInputDisabled}
+                            />
+                        </Form.Group>
+                    )}
+                </div>
+            </div>
         );
     };
 
-    // --- DYNAMICALLY PAINT AND LABEL BUTTONS ---
     let buttonText = 'Ellenőrzés';
     let buttonVariant = 'info';
 
@@ -433,7 +402,6 @@ const LessonPlayer = () => {
         }
     }
 
-    // If this is the last exercise and it has already been checked
     if (currentIndex === exercises.length - 1 && feedback && feedback.type !== 'warning') {
         buttonText = 'Befejezés és Értékelés';
     }
@@ -456,24 +424,27 @@ const LessonPlayer = () => {
                 </div>
 
                 {/* Quiz Card */}
-                <Card className="shadow-lg border-0 bg-dark text-light">
-                    <Card.Body className="p-4 p-md-5 text-center">
+                <Card className="shadow-lg border-0 bg-dark text-light rounded-4">
+                    <Card.Body className="p-4 p-md-5 text-center d-flex flex-column align-items-center">
                         
                         {renderExercise()}
 
                         {/* IMMEDIATE FEEDBACK BOX */}
                         {feedback && (
-                            <Alert variant={feedback.type} className="mt-4 fw-bold text-start fs-5 border-0 shadow-sm transition-all">
+                            <Alert variant={feedback.type} className="mt-4 fw-bold text-start fs-5 border-0 shadow-sm transition-all w-100 rounded-4" style={{ maxWidth: '700px' }}>
                                 {feedback.msg}
                             </Alert>
                         )}
                         
-                        <div className="d-flex justify-content-between mt-4">
-                            <Button variant="outline-secondary" onClick={() => navigate('/dashboard')}>Finish Later</Button>
+                        <div className="d-flex justify-content-between mt-5 w-100" style={{ maxWidth: '700px' }}>
+                            <Button variant="outline-secondary" className="rounded-pill px-4" onClick={() => navigate('/dashboard')}>
+                                Később folytatom
+                            </Button>
                             
                             <Button 
                                 variant={buttonVariant} 
-                                className="px-5 fw-bold text-dark" 
+                                size="lg"
+                                className="px-5 fw-bold text-dark rounded-pill shadow-sm" 
                                 onClick={handleCheckOrNext} 
                                 disabled={currentAnswer.trim().length === 0 || isChecking}
                             >
