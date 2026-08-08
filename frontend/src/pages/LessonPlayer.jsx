@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col, Alert } from 'react-bootstrap';
+import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col, Alert, Toast, ToastContainer } from 'react-bootstrap';
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
@@ -209,6 +209,43 @@ const LessonPlayer = () => {
                     <p className="text-light opacity-75 fs-5 fst-italic">"{lessonResult.feedback}"</p>
                 </div>
 
+                {(lessonResult.isLevelUp || lessonResult.levelUp) && (
+                    <div 
+                        className="mb-4 p-3 rounded-4 border border-warning w-100 d-flex align-items-center justify-content-center gap-3 shadow-lg"
+                        style={{ 
+                            maxWidth: '600px', 
+                            backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                            animation: 'pulse 2s infinite' 
+                        }}
+                    >
+                        <span className="fs-1">🔥</span>
+                        <div className="text-start">
+                            <h4 className="text-warning fw-bold mb-1">Szintet léptél!</h4>
+                            <p className="text-light opacity-75 mb-0 small">
+                                Kiválóan teljesítesz! A rendszer <strong className="text-warning">{lessonResult.newDifficulty}</strong> szintre kapcsolt.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {(lessonResult.isLevelDown || lessonResult.levelDown) && (
+                    <div 
+                        className="mb-4 p-3 rounded-4 border border-secondary w-100 d-flex align-items-center justify-content-center gap-3 shadow-sm"
+                        style={{ 
+                            maxWidth: '600px', 
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                        }}
+                    >
+                        <span className="fs-1">📉</span>
+                        <div className="text-start">
+                            <h4 className="text-secondary fw-bold mb-1">Kicsit visszavettünk a tempóból</h4>
+                            <p className="text-light opacity-75 mb-0 small">
+                                A rendszer <strong className="text-light">{lessonResult.newDifficulty}</strong> szintre állított, hogy nyugodtan gyakorolhass.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 <Card className="shadow-lg border-0 bg-dark text-light p-3 rounded-4 w-100 mb-4" style={{ maxWidth: '600px' }}>
                     <Card.Body>
                         <Row className="text-center mb-4 g-3">
@@ -284,10 +321,16 @@ const LessonPlayer = () => {
                         </div>
                     </Card.Body>
                 </Card>
+            <style>{`
+                    @keyframes pulse {
+                        0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+                        70% { box-shadow: 0 0 0 15px rgba(255, 193, 7, 0); }
+                        100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+                    }
+                `}</style>
             </div>
         );
     }
-
     if (isLoading || isSubmitting) {
         return (
             <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-light">

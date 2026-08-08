@@ -169,9 +169,19 @@ public class EvaluationService {
                     .orElseThrow(() -> new ResourceNotFoundException("Challenge nem található."));
         }
 
+        // --- 3. DYNAMIC DIFFICULTY EVALUATION ---
+        // 1. Save the old difficulty BEFORE saving the Result
+        String oldDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+
         // Save historical result and update ongoing progress
         Result savedResult = saveResult(user, lesson, request, correctAnswersCount, totalQuestions, score, challenge);
         updateProgress(progress, score, passed);
+
+        // 2. Calculate the new difficulty AFTER saving the Result
+        String newDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+
+        boolean isLevelUp = checkLevelUp(oldDifficulty, newDifficulty);
+        boolean isLevelDown = checkLevelDown(oldDifficulty, newDifficulty);
 
         // --- THE EVALUATION ENGINE TRIGGER ---
         if (challengeId != null) {
@@ -192,6 +202,9 @@ public class EvaluationService {
                 .feedback(feedback)
                 .mistakes(mistakes)
                 .newStreak(user.getStreak() != null ? user.getStreak() : 0) // Attach final streak for the frontend
+                .newDifficulty(newDifficulty)
+                .isLevelUp(isLevelUp)
+                .isLevelDown(isLevelDown)
                 .build();
     }
 
@@ -297,6 +310,27 @@ public class EvaluationService {
         result.setChallenge(challenge);
 
         return resultRepository.save(result);
+    }
+    private int getDifficultyRank(String difficulty) {
+        if (difficulty == null) return 0;
+        return switch (difficulty) {
+            case "EASY" -> 1;
+            case "MEDIUM" -> 2;
+            case "HARD" -> 3;
+            default -> 0;
+        };
+    }
+
+    private boolean checkLevelUp(String oldDifficulty, String newDifficulty) {
+        int oldRank = getDifficultyRank(oldDifficulty);
+        int newRank = getDifficultyRank(newDifficulty);
+        return oldRank != 0 && newRank > oldRank;
+    }
+
+    private boolean checkLevelDown(String oldDifficulty, String newDifficulty) {
+        int oldRank = getDifficultyRank(oldDifficulty);
+        int newRank = getDifficultyRank(newDifficulty);
+        return oldRank != 0 && newRank < oldRank;
     }
 
     private void updateProgress(Progress progress, int score, boolean passed) {
