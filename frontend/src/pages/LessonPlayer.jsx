@@ -211,11 +211,10 @@ const LessonPlayer = () => {
 
                 {(lessonResult.isLevelUp || lessonResult.levelUp) && (
                     <div 
-                        className="mb-4 p-3 rounded-4 border border-warning w-100 d-flex align-items-center justify-content-center gap-3 shadow-lg"
+                        className="mb-4 p-3 rounded-4 border border-warning w-100 d-flex align-items-center justify-content-center gap-3 pulse-warning-banner"
                         style={{ 
                             maxWidth: '600px', 
-                            backgroundColor: 'rgba(255, 193, 7, 0.15)',
-                            animation: 'pulse 2s infinite' 
+                            backgroundColor: 'rgba(255, 193, 7, 0.15)'
                         }}
                     >
                         <span className="fs-1">🔥</span>
@@ -230,7 +229,7 @@ const LessonPlayer = () => {
 
                 {(lessonResult.isLevelDown || lessonResult.levelDown) && (
                     <div 
-                        className="mb-4 p-3 rounded-4 border border-secondary w-100 d-flex align-items-center justify-content-center gap-3 shadow-sm"
+                        className="mb-4 p-3 rounded-4 w-100 d-flex align-items-center justify-content-center gap-3 breathing-demote-banner"
                         style={{ 
                             maxWidth: '600px', 
                             backgroundColor: 'rgba(255, 255, 255, 0.05)'
@@ -321,13 +320,6 @@ const LessonPlayer = () => {
                         </div>
                     </Card.Body>
                 </Card>
-            <style>{`
-                    @keyframes pulse {
-                        0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
-                        70% { box-shadow: 0 0 0 15px rgba(255, 193, 7, 0); }
-                        100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
-                    }
-                `}</style>
             </div>
         );
     }
