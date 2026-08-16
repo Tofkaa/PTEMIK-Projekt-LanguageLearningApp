@@ -7,7 +7,21 @@ import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
 import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise.jsx';
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import CryptoJS from 'crypto-js';
 
+
+const SALT = import.meta.env.VITE_APP_SECURITY_EXERCISE_SALT;
+const generateHash = (input) => {
+    if (!input) return "";
+   
+    const normalized = input
+        .replace(/[!"#$%&'()*+,\-./:;<=>?@[\]^_`{|}~]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+   
+    return CryptoJS.SHA256(normalized + SALT).toString(CryptoJS.enc.Hex);
+};
 /**
  * LessonPlayer Component
  * Manages the interactive learning experience (Quiz Engine).
@@ -85,33 +99,59 @@ const LessonPlayer = () => {
     
     const isInputDisabled = feedback && feedback.type !== 'warning';
 
-    // --- PHASE 2: IMMEDIATE FEEDBACK & NEXT QUESTION ---
+   // --- PHASE 2: IMMEDIATE FEEDBACK & NEXT QUESTION ---
     const handleCheckOrNext = async () => {
         if (!feedback || feedback.type === 'warning') {
             setIsChecking(true);
-            try {
-                const response = await api.post(`/exercises/${currentExercise.exerciseId}/check`, {
-                    answer: currentAnswer.trim()
-                });
+            
+            // EXERCISE TYPE?
+            if (currentExercise.type === 'TRANSLATION') {
+                // CASE #1: Translation (typing!!) -> Call backend (typo handling ect.)
+                try {
+                    const response = await api.post(`/exercises/${currentExercise.exerciseId}/check`, {
+                        answer: currentAnswer.trim()
+                    });
 
-                const { correct, almostCorrect, feedbackMessage } = response.data;
+                    const { correct, almostCorrect, feedbackMessage } = response.data;
 
-                if (correct) {
-                    setFeedback({ type: 'success', msg: feedbackMessage });
-                } else if (almostCorrect) {
-                    setFeedback({ type: 'warning', msg: feedbackMessage });
-                } else {
-                    setFeedback({ type: 'danger', msg: feedbackMessage });
-                    
-                    if (!currentExercise.isRetry) {
-                        setExercises(prev => [...prev, { ...currentExercise, isRetry: true }]);
+                    if (correct) {
+                        setFeedback({ type: 'success', msg: feedbackMessage });
+                    } else if (almostCorrect) {
+                        setFeedback({ type: 'warning', msg: feedbackMessage });
+                    } else {
+                        setFeedback({ type: 'danger', msg: feedbackMessage });
+                        
+                        if (!currentExercise.isRetry) {
+                            setExercises(prev => [...prev, { ...currentExercise, isRetry: true }]);
+                        }
                     }
+                } catch (err) {
+                    console.error("Hiba a backend ellenőrzés során:", err);
+                    finalizeAnswerAndMove();
+                } finally {
+                    setIsChecking(false);
                 }
-            } catch (err) {
-                console.error("Hiba az ellenőrzés során:", err);
-                finalizeAnswerAndMove();
-            } finally {
-                setIsChecking(false);
+            } else {
+                // CASE #2: Everything else (Multiple choice, Images, Wordbank) -> Client side Hash validating
+                try {
+                    const localHash = generateHash(currentAnswer);
+                    if (localHash === currentExercise.answerHash) {
+                        // Perfect match
+                        setFeedback({ type: 'success', msg: 'Tökéletes! ✅' });
+                    } else {
+                        // Faulty answer
+                        setFeedback({ type: 'danger', msg: 'Helytelen! Semmi baj, menjünk tovább. ❌' });
+                        
+                        if (!currentExercise.isRetry) {
+                            setExercises(prev => [...prev, { ...currentExercise, isRetry: true }]);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Hiba a lokális hash ellenőrzés során:", err);
+                    finalizeAnswerAndMove();
+                } finally {
+                    setIsChecking(false);
+                }
             }
         } 
         else {

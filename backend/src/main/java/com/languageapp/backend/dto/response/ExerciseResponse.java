@@ -25,4 +25,6 @@ public class ExerciseResponse {
 
     private String audioUrl;
     private String imageUrl;
+
+    private String answerHash;
 }

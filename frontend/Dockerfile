@@ -8,6 +8,8 @@ RUN npm ci
 
 # Forráskód másolása és buildelés
 COPY . .
+ARG VITE_APP_SECURITY_EXERCISE_SALT
+ENV VITE_APP_SECURITY_EXERCISE_SALT=$VITE_APP_SECURITY_EXERCISE_SALT
 RUN npm run build
 
 # Stage 2: Serve with Nginx
