@@ -20,7 +20,7 @@ const AssignmentSubmissions = () => {
     const [isGradingModalOpen, setIsGradingModalOpen] = useState(false);
     const [gradeForm, setGradeForm] = useState({ teacherScore: '', teacherComment: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
-   const [expandedPreviewIndex, setExpandedPreviewIndex] = useState(null);
+    const [expandedPreviewIndex, setExpandedPreviewIndex] = useState(null);
 
     const togglePreview = (index) => {
         setExpandedPreviewIndex(prev => prev === index ? null : index);
@@ -110,6 +110,13 @@ const AssignmentSubmissions = () => {
 
     const hardest = getHardestQuestion();
 
+    const parseDate = (d) => {
+    if (!d) return null;
+    if (Array.isArray(d)) return new Date(Date.UTC(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0));
+    const str = String(d);
+    return new Date(str.endsWith('Z') ? str : str + 'Z'); 
+    };
+
     if (isLoading) {
         return <Container className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}><Spinner animation="border" variant="info" /></Container>;
     }
@@ -179,7 +186,7 @@ const AssignmentSubmissions = () => {
                                             <div className="fw-bold">{session.studentName}</div>
                                             <div className="small text-secondary">{session.studentEmail}</div>
                                         </td>
-                                        <td>{new Date(session.finishedAt).toLocaleString('hu-HU')}</td>
+                                        <td>{parseDate(session.finishedAt).toLocaleString('hu-HU')}</td>
                                         <td className="text-center"><Badge bg="secondary" className="fs-6">{session.finalScore}%</Badge></td>
                                         <td className="text-center">
                                             {session.teacherScore !== null ? (

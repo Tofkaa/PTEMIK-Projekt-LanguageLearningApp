@@ -31,12 +31,21 @@ const StudentAssignmentList = () => {
         }
     };
 
+    const parseDate = (d) => {
+        if (!d) return null;
+        if (Array.isArray(d)) {
+            return new Date(Date.UTC(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0));
+        }
+        const str = String(d);
+        return new Date(str.endsWith('Z') ? str : str + 'Z'); 
+    };
+
     /**
      * Formats the deadline date to a readable Hungarian format.
      */
-    const formatDeadline = (dateString) => {
-        if (!dateString) return "Nincs határidő";
-        const date = new Date(dateString);
+    const formatDeadline = (dateData) => {
+        if (!dateData) return "Nincs határidő";
+        const date = parseDate(dateData);
         return date.toLocaleString('hu-HU', { 
             month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
         });

@@ -13,11 +13,13 @@ const AssignmentStart = () => {
     
     const [isStarting, setIsStarting] = useState(false);
 
-    // ÚJ DÁTUM KONVERTER
     const parseDate = (d) => {
         if (!d) return null;
-        if (Array.isArray(d)) return new Date(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0);
-        return new Date(d);
+        if (Array.isArray(d)) {
+            return new Date(Date.UTC(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0));
+        }
+        const str = String(d);
+        return new Date(str.endsWith('Z') ? str : str + 'Z'); 
     };
 
     const startTest = async () => {

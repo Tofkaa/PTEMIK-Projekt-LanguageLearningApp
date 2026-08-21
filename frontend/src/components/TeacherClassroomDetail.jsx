@@ -6,6 +6,13 @@ import { assignmentApi } from '../services/assignmentApi';
 import { lessonApi } from '../services/lessonApi';
 import { useNotifications } from '../context/NotificationContext';
 
+/**
+ * Dashboard component for teachers to manage a specific classroom.
+ * Provides functionalities to monitor student progress, grade submissions,
+ * manage members, and create dynamic/fixed assignments.
+ * 
+ * @component
+ */
 const TeacherClassroomDetail = () => {
     const { id: classroomId } = useParams();
     const navigate = useNavigate();
@@ -13,6 +20,7 @@ const TeacherClassroomDetail = () => {
     
     const classroomName = location.state?.className || 'Osztályterem Kezelése';
 
+    // State definitions
     const [pendingMembers, setPendingMembers] = useState([]);
     const [acceptedMembers, setAcceptedMembers] = useState([]);
     const [assignments, setAssignments] = useState([]);
@@ -29,6 +37,10 @@ const TeacherClassroomDetail = () => {
 
     const { notifications } = useNotifications();
 
+    /**
+     * @typedef {Object} AssignmentFormState
+     * Represents the configuration payload for creating a new assignment.
+     */
     const [assignmentForm, setAssignmentForm] = useState({
         title: '',
         description: '',
@@ -40,28 +52,47 @@ const TeacherClassroomDetail = () => {
         timeLimitMinutes: '',
         availableFrom: '',
         availableUntil: '',
-        exerciseIds: []
+        exerciseIds: [],
+        generationMode: 'FIXED', 
+        questionCount: ''        
     });
 
     const [previewExerciseId, setPreviewExerciseId] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-
+    /**
+     * Parses a date object/array retrieved from the backend, 
+     * enforcing UTC interpretation to prevent timezone misalignment.
+     * 
+     * @param {Array|string} d - The date data from the API.
+     * @returns {Date|null} A standard JavaScript Date object.
+     */
     const parseDate = (d) => {
         if (!d) return null;
         if (Array.isArray(d)) {
-            return new Date(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0);
+            // Treat the incoming backend array specifically as UTC
+            return new Date(Date.UTC(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0));
         }
-        return new Date(d);
+        const str = String(d);
+        return new Date(str.endsWith('Z') ? str : str + 'Z'); 
     };
 
+    /**
+     * Formats a parsed date into a localized Hungarian string representation.
+     * 
+     * @param {Array|string} dateData - The raw date data.
+     * @returns {string} Formatted date string (e.g., "aug. 21. 11:12").
+     */
     const formatTime = (dateData) => {
         const date = parseDate(dateData);
         if (!date) return "Nincs megadva";
         return date.toLocaleString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
 
+    /**
+     * Fetches core classroom data including members, assignments, and statistics.
+     */
     const fetchDashboardData = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -90,10 +121,16 @@ const TeacherClassroomDetail = () => {
         fetchDashboardData();
     }, [fetchDashboardData, pingTrigger]);
 
-    // A memória kezelő
+    // LocalStorage handlers for notification states
     const viewedTeacherPending = JSON.parse(localStorage.getItem('viewedTeacherPending') || '[]');
     const viewedTeacherUngraded = JSON.parse(localStorage.getItem('viewedTeacherUngraded') || '[]');
 
+    /**
+     * Marks specific notification IDs as viewed within the browser's local storage.
+     * 
+     * @param {string} storageKey - The key to access in localStorage.
+     * @param {Array<string>} idsToMark - Array of IDs to append to the viewed list.
+     */
     const markAsViewed = (storageKey, idsToMark) => {
         if (!idsToMark || idsToMark.length === 0) return;
         const stringIds = idsToMark.map(id => String(id));
@@ -103,22 +140,32 @@ const TeacherClassroomDetail = () => {
         window.dispatchEvent(new Event('local-storage-update'));
     };
 
-    // Kiszámoljuk, mik az aktuális teremből jövő, olvasatlan pingek
     const unseenPendingList = (notifications?.teacherPendingJoinRequestIds || []).filter(id => id.startsWith(classroomId) && !viewedTeacherPending.includes(id));
     const unseenUngradedList = (notifications?.teacherUngradedSubmissionIds || []).filter(id => id.startsWith(classroomId) && !viewedTeacherUngraded.includes(id));
 
-    // Amikor kattint az eredményekre, levesszük a pinget:
+    /**
+     * Navigates the teacher to the grading interface and clears the related notification ping.
+     * 
+     * @param {Object} assignment - The selected assignment object.
+     */
     const handleViewSubmissions = (assignment) => {
         markAsViewed('viewedTeacherUngraded', [`${classroomId}:${assignment.assignmentId}`]);
         navigate(`/assignment/${assignment.assignmentId}/submissions`, { state: { assignmentTitle: assignment.title, classroomName: classroomName } });
     };
 
     // --- MEMBER MANAGEMENT ---
+    
+    /**
+     * Accepts or rejects a pending join request.
+     */
     const handleModerate = async (studentId, approve) => {
         try { await classroomApi.moderateMember(classroomId, studentId, approve); fetchDashboardData(); }
         catch (error) { console.error("Hiba a moderálás során:", error); }
     };
 
+    /**
+     * Removes an accepted student from the classroom.
+     */
     const handleKick = async (studentId) => {
         if (window.confirm("Biztosan el akarod távolítani ezt a diákot az osztályból?")) {
             try { await classroomApi.kickMember(classroomId, studentId); fetchDashboardData(); }
@@ -164,7 +211,9 @@ const TeacherClassroomDetail = () => {
     };
 
     /**
-     * Toggles the selection of a specific exercise for the assignment.
+     * Toggles the selection state of a specific exercise within the creation modal.
+     * 
+     * @param {Object} exercise - The exercise data object.
      */
     const toggleExerciseSelection = (exercise) => {
         const exerciseId = exercise.exerciseId;
@@ -180,8 +229,7 @@ const TeacherClassroomDetail = () => {
     };
 
     /**
-     * Selects all exercises in a lesson, without 
-     * deleting previos selections from other lessons.
+     * Selects all exercises available in the currently selected lesson.
      */
     const handleSelectAllExercises = () => {
         const newIds = [];
@@ -200,7 +248,6 @@ const TeacherClassroomDetail = () => {
         }
     };
 
-  
     const removeFromSummary = (id) => {
         setAssignmentForm(prev => ({ ...prev, exerciseIds: prev.exerciseIds.filter(exId => exId !== id) }));
         setSelectedExercisesData(prev => prev.filter(ex => ex.id !== id));
@@ -210,14 +257,20 @@ const TeacherClassroomDetail = () => {
         setPreviewExerciseId(prev => prev === exerciseId ? null : exerciseId);
     };
 
+    /**
+     * Constructs the payload and submits the new assignment to the backend API.
+     * Formats local dates to UTC to prevent cross-timezone execution blocks.
+     */
     const handleAssignmentSubmit = async (e) => {
         e.preventDefault();
         if (isSubmitting) return; 
         setIsSubmitting(true);
 
-        const formatLocalTime = (dateStr) => {
+        // Convert the local input value (datetime-local) into UTC representation
+        const formatLocalTimeToUTC = (dateStr) => {
             if (!dateStr) return null;
-            return dateStr.length === 16 ? dateStr + ':00' : dateStr;
+            const localDate = new Date(dateStr);
+            return localDate.toISOString().substring(0, 19);
         };
 
         const payload = {
@@ -230,10 +283,15 @@ const TeacherClassroomDetail = () => {
             maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
             timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
             
-            availableFrom: formatLocalTime(assignmentForm.availableFrom),
-            availableUntil: formatLocalTime(assignmentForm.availableUntil),
+            availableFrom: formatLocalTimeToUTC(assignmentForm.availableFrom),
+            availableUntil: formatLocalTimeToUTC(assignmentForm.availableUntil),
             
-            exerciseIds: assignmentForm.exerciseIds
+            exerciseIds: assignmentForm.exerciseIds,
+
+            generationMode: assignmentForm.generationMode,
+            questionCount: assignmentForm.generationMode === 'RANDOM_SUBSET' && assignmentForm.questionCount 
+                            ? parseInt(assignmentForm.questionCount) 
+                            : null
         };
 
        try {
@@ -241,7 +299,8 @@ const TeacherClassroomDetail = () => {
             setIsAssignmentModalOpen(false);
             setAssignmentForm({
                 title: '', description: '', hasFeedback: false, isTest: false, isRandomized: true,
-                allowRetries: false, maxAttempts: '', timeLimitMinutes: '', availableFrom: '', availableUntil: '', exerciseIds: []
+                allowRetries: false, maxAttempts: '', timeLimitMinutes: '', availableFrom: '', availableUntil: '', exerciseIds: [],
+                generationMode: 'FIXED', questionCount: ''
             });
             setSelectedExercisesData([]);
             setAssignmentMode('TEST');
@@ -262,36 +321,38 @@ const TeacherClassroomDetail = () => {
 
     const now = new Date();
     
-    // 1. Aktív: Már elkezdődött (vagy nincs kezdete) ÉS még nincs vége (vagy nincs vége)
+    // Assignment categorization based on parsed (UTC-adjusted) dates
     const activeAssignments = assignments.filter(a => {
         const from = parseDate(a.availableFrom);
         const until = parseDate(a.availableUntil);
         return (!from || from <= now) && (!until || until > now);
     });
 
-    // 2. Ütemezett: Még nem kezdődött el
     const scheduledAssignments = assignments.filter(a => {
         const from = parseDate(a.availableFrom);
         return from && from > now;
     });
 
-    // 3. Lejárt: Már elmúlt a határideje
     const expiredAssignments = assignments.filter(a => {
         const until = parseDate(a.availableUntil);
         return until && until <= now;
     });
 
-    // 1. Segédfüggvény a biztonságos (kisbetű/nagybetű független) egyezéshez
     const hasUngradedSubmission = (assignmentId) => {
         const targetId = `${classroomId}:${assignmentId}`.toLowerCase();
         return unseenUngradedList.some(id => id.toLowerCase() === targetId);
     };
 
-    // 2. Kiszámoljuk, melyik belső fülön mennyi új beadás van, hogy oda is tegyünk pöttyöt!
     const activeUngradedCount = activeAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
     const scheduledUngradedCount = scheduledAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
     const expiredUngradedCount = expiredAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
 
+    /**
+     * Renders an individual assignment card with dynamic badges based on status and metadata.
+     * 
+     * @param {Object} a - The assignment object.
+     * @param {string} status - Enum-like string ('active', 'scheduled', 'expired').
+     */
     const renderAssignmentCard = (a, status) => (
         <Col md={6} lg={4} key={a.assignmentId}>
             <Card className={`h-100 bg-dark text-light border-secondary shadow-sm ${status === 'expired' ? 'opacity-75' : ''}`}>
@@ -299,7 +360,6 @@ const TeacherClassroomDetail = () => {
                     <div className="d-flex justify-content-between align-items-start mb-2">
                         <Card.Title className="fw-bold text-primary m-0">{a.title}</Card.Title>
                         <div>
-                            {/* A BIZTOS PING ELLENŐRZÉS */}
                             {hasUngradedSubmission(a.assignmentId) && (
                                 <Badge bg="danger" className="animate-pulse shadow-sm me-2 border border-light">🔴 ÚJ BEKÜLDÉS</Badge>
                             )}
@@ -310,7 +370,6 @@ const TeacherClassroomDetail = () => {
                     
                     <Card.Text className="text-secondary mb-3 small flex-grow-1">{a.description}</Card.Text>
 
-                    {/* IDŐPONTOK MEGJELENÍTÉSE */}
                     <div className="mb-3 p-2 bg-black bg-opacity-25 rounded border border-secondary" style={{ fontSize: '0.8rem' }}>
                         <div className="d-flex justify-content-between mb-1">
                             <span className="text-secondary">📅 Elérhető:</span>
@@ -367,8 +426,6 @@ const TeacherClassroomDetail = () => {
                     </div>
 
             <Tabs defaultActiveKey="active" className="mb-3 border-secondary custom-dark-tabs">
-                
-                {/* 1. AKTUÁLISAN FUTÓ FELADATOK */}
                 <Tab eventKey="active" title={
                     <span className="fw-bold text-info">
                         🔥 Aktív ({activeAssignments.length})
@@ -380,7 +437,6 @@ const TeacherClassroomDetail = () => {
                     </Row>
                 </Tab>
 
-                {/* 2. JÖVŐBEN INDULÓ FELADATOK */}
                 <Tab eventKey="scheduled" title={
                     <span className="fw-bold text-warning">
                         📅 Ütemezett ({scheduledAssignments.length})
@@ -392,7 +448,6 @@ const TeacherClassroomDetail = () => {
                     </Row>
                 </Tab>
 
-                {/* 3. ARCHÍVUM */}
                 <Tab eventKey="expired" title={
                     <span className="fw-bold text-secondary">
                         ⏳ Lejárt ({expiredAssignments.length})
@@ -407,7 +462,6 @@ const TeacherClassroomDetail = () => {
         </Tab>
 
                 <Tab eventKey="members" title={
-                    
                     <span className="fw-bold">
                         👥 Tagság kezelése
                         {unseenPendingList.length > 0 && <Badge bg="danger" pill className="ms-2 animate-pulse">{unseenPendingList.length}</Badge>}
@@ -557,6 +611,49 @@ const TeacherClassroomDetail = () => {
                                         </Form.Group>
                                     )}
                                     
+                                    <div className="small border-top border-secondary pt-2 mt-2 mb-2">
+                                        <Form.Label className="text-warning fw-bold mb-2">Kérdések kiosztása a diákoknak:</Form.Label>
+                                        
+                                        <Form.Check 
+                                            type="radio" 
+                                            label="Minden kijelölt feladatot megkapnak" 
+                                            name="genMode" 
+                                            checked={assignmentForm.generationMode === 'FIXED'} 
+                                            onChange={() => setAssignmentForm({...assignmentForm, generationMode: 'FIXED'})} 
+                                            className="mb-2 text-light"
+                                        />
+                                        
+                                        <Form.Check 
+                                            type="radio" 
+                                            label="Véletlenszerű sorsolás a kijelöltekből (Anti-Cheat)" 
+                                            name="genMode" 
+                                            checked={assignmentForm.generationMode === 'RANDOM_SUBSET'} 
+                                            onChange={() => setAssignmentForm({...assignmentForm, generationMode: 'RANDOM_SUBSET'})} 
+                                            className="mb-2 text-info"
+                                        />
+
+                                        {assignmentForm.generationMode === 'RANDOM_SUBSET' && (
+                                            <Form.Group className="mt-2 ms-3 p-2 bg-black bg-opacity-25 rounded border border-info">
+                                                <Form.Label className="small text-info fw-bold">Hány kérdést kapjon 1 diák?</Form.Label>
+                                                <Form.Control 
+                                                    type="number" 
+                                                    min="1"
+                                                    max={assignmentForm.exerciseIds.length || 1}
+                                                    className="bg-dark text-light border-info" 
+                                                    placeholder={`Max: ${assignmentForm.exerciseIds.length} db`}
+                                                    value={assignmentForm.questionCount} 
+                                                    onChange={e => {
+                                                        const val = e.target.value.replace(/\D/g, '');
+                                                        setAssignmentForm({...assignmentForm, questionCount: val});
+                                                    }}
+                                                />
+                                                <div className="small text-secondary mt-1">
+                                                    A rendszer {assignmentForm.exerciseIds.length} db kijelölt kérdésből fog véletlenszerűen sorsolni ennyit minden diáknak.
+                                                </div>
+                                            </Form.Group>
+                                        )}
+                                    </div>
+                                   
                                     {assignmentMode === 'TEST' && (
                                         <div className="small border-top border-secondary pt-2">
                                             <Form.Check type="switch" label="Azonnali visszajelzés" className="mb-1" 
