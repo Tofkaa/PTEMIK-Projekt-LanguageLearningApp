@@ -112,6 +112,8 @@ public class ChallengeService {
                             challenge.getStatus().name(),
                             isMyTurn,
                             challenge.getEndTime(),
+                            challenge.getStartTime(),
+                            null,
                             null
                     );
                 })
@@ -170,6 +172,7 @@ public class ChallengeService {
 
             challenge.setWinner(winner);
             challenge.setStatus(ChallengeStatus.COMPLETED);
+            challenge.setCompletedAt(LocalDateTime.now());
 
             if (winner != null) {
                 winner.setXp(winner.getXp() + 50);
@@ -214,6 +217,8 @@ public class ChallengeService {
                             challenge.getStatus().name(),
                             false,
                             challenge.getEndTime(),
+                            challenge.getStartTime(),
+                            challenge.getCompletedAt(),
                             winnerName
                     );
                 })

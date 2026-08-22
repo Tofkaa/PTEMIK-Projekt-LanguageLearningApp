@@ -5,6 +5,7 @@ import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 import { lessonApi } from '../services/lessonApi';
 import { useNotifications } from '../context/NotificationContext';
+import { parseServerDate, formatToLocalDisplay, formatToUtcForServer } from '../utils/dateUtils';
 
 /**
  * Dashboard component for teachers to manage a specific classroom.
@@ -37,6 +38,8 @@ const TeacherClassroomDetail = () => {
 
     const { notifications } = useNotifications();
 
+     const [currentTime] = useState(() => Date.now()); 
+
     /**
      * @typedef {Object} AssignmentFormState
      * Represents the configuration payload for creating a new assignment.
@@ -61,34 +64,6 @@ const TeacherClassroomDetail = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    /**
-     * Parses a date object/array retrieved from the backend, 
-     * enforcing UTC interpretation to prevent timezone misalignment.
-     * 
-     * @param {Array|string} d - The date data from the API.
-     * @returns {Date|null} A standard JavaScript Date object.
-     */
-    const parseDate = (d) => {
-        if (!d) return null;
-        if (Array.isArray(d)) {
-            // Treat the incoming backend array specifically as UTC
-            return new Date(Date.UTC(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0));
-        }
-        const str = String(d);
-        return new Date(str.endsWith('Z') ? str : str + 'Z'); 
-    };
-
-    /**
-     * Formats a parsed date into a localized Hungarian string representation.
-     * 
-     * @param {Array|string} dateData - The raw date data.
-     * @returns {string} Formatted date string (e.g., "aug. 21. 11:12").
-     */
-    const formatTime = (dateData) => {
-        const date = parseDate(dateData);
-        if (!date) return "Nincs megadva";
-        return date.toLocaleString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    };
 
     /**
      * Fetches core classroom data including members, assignments, and statistics.
@@ -266,13 +241,6 @@ const TeacherClassroomDetail = () => {
         if (isSubmitting) return; 
         setIsSubmitting(true);
 
-        // Convert the local input value (datetime-local) into UTC representation
-        const formatLocalTimeToUTC = (dateStr) => {
-            if (!dateStr) return null;
-            const localDate = new Date(dateStr);
-            return localDate.toISOString().substring(0, 19);
-        };
-
         const payload = {
             title: assignmentForm.title,
             description: assignmentForm.description,
@@ -283,8 +251,8 @@ const TeacherClassroomDetail = () => {
             maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
             timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
             
-            availableFrom: formatLocalTimeToUTC(assignmentForm.availableFrom),
-            availableUntil: formatLocalTimeToUTC(assignmentForm.availableUntil),
+            availableFrom: formatToUtcForServer(assignmentForm.availableFrom),
+            availableUntil: formatToUtcForServer(assignmentForm.availableUntil),
             
             exerciseIds: assignmentForm.exerciseIds,
 
@@ -319,23 +287,22 @@ const TeacherClassroomDetail = () => {
         return <Container className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}><div className="spinner-border text-primary"></div></Container>;
     }
 
-    const now = new Date();
+   
     
-    // Assignment categorization based on parsed (UTC-adjusted) dates
     const activeAssignments = assignments.filter(a => {
-        const from = parseDate(a.availableFrom);
-        const until = parseDate(a.availableUntil);
-        return (!from || from <= now) && (!until || until > now);
+        const from = parseServerDate(a.availableFrom);
+        const until = parseServerDate(a.availableUntil);
+        return (!from || from.getTime() <= currentTime) && (!until || until.getTime() > currentTime);
     });
 
     const scheduledAssignments = assignments.filter(a => {
-        const from = parseDate(a.availableFrom);
-        return from && from > now;
+        const from = parseServerDate(a.availableFrom);
+        return from && from.getTime() > currentTime;
     });
 
     const expiredAssignments = assignments.filter(a => {
-        const until = parseDate(a.availableUntil);
-        return until && until <= now;
+        const until = parseServerDate(a.availableUntil);
+        return until && until.getTime() <= currentTime;
     });
 
     const hasUngradedSubmission = (assignmentId) => {
@@ -373,12 +340,12 @@ const TeacherClassroomDetail = () => {
                     <div className="mb-3 p-2 bg-black bg-opacity-25 rounded border border-secondary" style={{ fontSize: '0.8rem' }}>
                         <div className="d-flex justify-content-between mb-1">
                             <span className="text-secondary">📅 Elérhető:</span>
-                            <span className="text-info fw-bold">{formatTime(a.availableFrom)}</span>
+                            <span className="text-info fw-bold">{formatToLocalDisplay(a.availableFrom)}</span>
                         </div>
                         <div className="d-flex justify-content-between">
                             <span className="text-secondary">🕒 Határidő:</span>
                             <span className={`fw-bold ${status === 'expired' ? 'text-danger' : 'text-warning'}`}>
-                                {formatTime(a.availableUntil)}
+                                {formatToLocalDisplay(a.availableUntil)}
                             </span>
                         </div>
                     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Badge, Spinner } from 'react-bootstrap';
 import api from '../../services/api';
+import { formatToLocalDisplay } from '../../utils/dateUtils';
 
 const RecentResultsSection = () => {
     const [results, setResults] = useState([]);
@@ -46,20 +47,17 @@ const RecentResultsSection = () => {
         );
     }
 
-    return (
+  return (
         <div className="d-flex flex-column gap-3 mt-2">
             {results.map((result, idx) => (
                 <div key={idx} className="d-flex justify-content-between align-items-center p-3 rounded-3 border border-secondary bg-black bg-opacity-25">
-                    {/* Left side: Lesson name and date */}
                     <div>
                         <h6 className="fw-bold text-light mb-1">
                             {result.lessonTitle} 
                             {getDifficultyBadge(result.difficulty)}
                         </h6>
                         <small className="text-light opacity-50">
-                            {new Date(result.submittedAt).toLocaleDateString('hu-HU', { 
-                                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-                            })}
+                            {formatToLocalDisplay(result.submittedAt)}
                         </small>
                     </div>
 

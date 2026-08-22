@@ -4,7 +4,15 @@ import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, 
 import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 import { useNotifications } from '../context/NotificationContext';
+import { parseServerDate, formatToLocalDisplay } from '../utils/dateUtils';
 
+/**
+ * Dashboard component for students to view and interact with a specific classroom.
+ * Handles the display of active/completed assignments, classmates, and personal statistics.
+ * Integrates centralized timezone-safe date utilities and notification ping clearance.
+ * 
+ * @component
+ */
 const StudentClassroomDetail = () => {
     const { id: classroomId } = useParams();
     const navigate = useNavigate();
@@ -12,6 +20,7 @@ const StudentClassroomDetail = () => {
     
     const classroomName = location.state?.className || 'Osztályterem';
 
+    // --- STATE MANAGEMENT ---
     const [assignments, setAssignments] = useState([]);
     const [classmates, setClassmates] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -21,19 +30,22 @@ const StudentClassroomDetail = () => {
     const [selectedAssignmentTitle, setSelectedAssignmentTitle] = useState('');
 
     const [expandedPreviewId, setExpandedPreviewId] = useState(null);
+    const [stats, setStats] = useState(null);
 
     const { notifications } = useNotifications();
 
-    /*const [viewedResults, setViewedResults] = useState(() => {
-        const saved = localStorage.getItem('viewedResults');
-        return saved ? JSON.parse(saved) : [];
-    });*/
-
-    const [stats, setStats] = useState(null);
+    const [currentTime] = useState(() => Date.now());
     
+    /**
+     * Updates localStorage with viewed notification IDs and dispatches an event 
+     * to update the notification badges globally.
+     * 
+     * @param {string} storageKey - The key under which the viewed IDs are stored.
+     * @param {Array<string>} idsToMark - The array of specific IDs to mark as seen.
+     */
     const markAsViewed = (storageKey, idsToMark) => {
         if (!idsToMark || idsToMark.length === 0) return;
-        const stringIds = idsToMark.map(id => String(id)); // Biztosra megyünk a típusokkal
+        const stringIds = idsToMark.map(id => String(id));
         const seen = JSON.parse(localStorage.getItem(storageKey) || '[]');
         const updated = [...new Set([...seen, ...stringIds])];
         localStorage.setItem(storageKey, JSON.stringify(updated));
@@ -47,15 +59,15 @@ const StudentClassroomDetail = () => {
     const unseenAssignmentsList = (notifications?.studentActiveAssignmentIds || []).filter(id => id.startsWith(classroomId) && !viewedAssignments.includes(id));
     const unseenResultsList = (notifications?.studentGradedSessionIds || []).filter(id => id.startsWith(classroomId) && !viewedResults.includes(id));
 
-   const pingTrigger = (notifications?.studentActiveAssignmentIds?.length || 0) + (notifications?.studentGradedSessionIds?.length || 0);
+    const pingTrigger = (notifications?.studentActiveAssignmentIds?.length || 0) + (notifications?.studentGradedSessionIds?.length || 0);
 
-    // 1. Hook: Ha ping jön, újra letölti az adatokat a backendről
+    // Fetch data when component mounts or a relevant SSE ping arrives
     useEffect(() => {
         fetchClassroomData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [classroomId, pingTrigger]);
 
-    // 2. Hook: Ha betöltöttek a feladatok, az "Aktív" fülön lévőket azonnal olvasottnak jelöli a KOMBINAÁLT ID-val!
+    // Automatically clear active assignment pings upon loading the assignments
     useEffect(() => {
         if (activeAssignments && activeAssignments.length > 0 && unseenAssignmentsList.length > 0) {
             markAsViewed('viewedAssignments', activeAssignments.map(a => `${classroomId}:${a.assignmentId}`));
@@ -63,6 +75,9 @@ const StudentClassroomDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [assignments]);
     
+    /**
+     * Fetches assignments, members, and personal statistics for the classroom.
+     */
     const fetchClassroomData = async () => {
         setIsLoading(true);
         try {
@@ -81,37 +96,24 @@ const StudentClassroomDetail = () => {
         }
     };
 
-    const parseDate = (d) => {
-        if (!d) return null;
-        if (Array.isArray(d)) {
-            return new Date(Date.UTC(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0));
-        }
-        const str = String(d);
-        return new Date(str.endsWith('Z') ? str : str + 'Z'); 
-    };
-
-    const formatDeadline = (dateData) => {
-        const date = parseDate(dateData);
-        if (!date) return "Nincs határidő";
-        return date.toLocaleString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    };
-
-    // FELADATOK SZÉTVÁLOGATÁSA (Már az új parseDate-tel)
-    const now = new Date();
+    // --- ASSIGNMENT FILTERING LOGIC ---
 
     const activeAssignments = assignments.filter(a => {
         if (a.completed) return false; 
-        const availableUntil = parseDate(a.availableUntil);
-        if (availableUntil && availableUntil <= now) return false;
+        const availableUntil = parseServerDate(a.availableUntil);
+        // Compare UTC millis safely
+        if (availableUntil && availableUntil.getTime() <= currentTime) return false;
         return true;
     });
 
     const completedAssignments = assignments.filter(a => {
         if (a.completed) return true; 
-        const availableUntil = parseDate(a.availableUntil);
-        if (availableUntil && availableUntil <= now) return true; 
+        const availableUntil = parseServerDate(a.availableUntil);
+        if (availableUntil && availableUntil.getTime() <= currentTime) return true; 
         return false;
     });
+
+    // --- EVENT HANDLERS ---
 
     const handleViewResult = (assignment) => {
         const combinedId = `${classroomId}:${assignment.assignmentId}`;
@@ -134,6 +136,7 @@ const StudentClassroomDetail = () => {
         setExpandedPreviewId(prev => prev === id ? null : id);
     };
 
+    // --- RENDER HELPERS ---
 
     if (isLoading) {
         return (
@@ -154,26 +157,23 @@ const StudentClassroomDetail = () => {
 
             <Tabs defaultActiveKey="assignments" className="mb-4 custom-dark-tabs">
                 
-                {/* DIÁK FELADATOK FÜL */}
+                {/* STUDENT ASSIGNMENTS TAB */}
                 <Tab eventKey="assignments" title={<span className="fw-bold">📝 Feladatok</span>}>
                     
-                    {/* BELSŐ FÜLEK AZ AKTÍV ÉS BEFEJEZETT FELADATOKNAK */}
+                    {/* ACTIVE AND COMPLETED ASSIGNMENTS */}
                    <Tabs defaultActiveKey="active" className="mt-3 mb-3 border-secondary" 
                           onSelect={(key) => {
                               if (key === 'active') {
-                                  // Kombinált ID mentése!
                                   markAsViewed('viewedAssignments', activeAssignments.map(a => `${classroomId}:${a.assignmentId}`));
                               } else if (key === 'completed') {
-                                  // Kombinált ID mentése!
                                   markAsViewed('viewedResults', completedAssignments.filter(a => a.hasGradedSession).map(a => `${classroomId}:${a.assignmentId}`));
                               }
                           }}>
                         
-                        {/* 1. AKTÍV TEENDŐK */}
+                        {/* 1. ACTIVE TODOS */}
                         <Tab eventKey="active" title={
                             <span className="fw-bold">
                                 🔥 Aktív Teendők
-                                {/* AZ ÚJ PING LOGIKA */}
                                 {unseenAssignmentsList.length > 0 && (
                                     <Badge bg="danger" pill className="ms-2 shadow-sm animate-pulse">
                                         {unseenAssignmentsList.length}
@@ -192,7 +192,6 @@ const StudentClassroomDetail = () => {
                                                     <div className="d-flex justify-content-between align-items-start mb-2">
                                                         <Card.Title className="fw-bold m-0">{a.title}</Card.Title>
                                                         <div>
-                                                            {/* A kártyán a szöveg marad, amíg el nem kezdi */}
                                                             {a.attemptsUsed === 0 ? (
                                                                 a.test ? (
                                                                     <Badge bg="danger" className="shadow-sm border border-light animate-pulse" style={{ letterSpacing: '1px' }}>🔴 ÚJ TESZT</Badge>
@@ -209,14 +208,14 @@ const StudentClassroomDetail = () => {
                                                     <div className="mb-3 text-secondary bg-black bg-opacity-25 p-2 rounded" style={{ fontSize: '0.85rem' }}>
                                                         <div className="mb-1 text-info"><span className="fw-bold">📝 Próbálkozás:</span> {a.attemptsUsed} / {a.maxAttempts || '∞'}</div>
                                                         {a.availableFrom && (
-                                                            <div className="mb-1"><span className="fw-bold">📅 Kezdés:</span> {formatDeadline(a.availableFrom)}</div>
+                                                            <div className="mb-1"><span className="fw-bold">📅 Kezdés:</span> {formatToLocalDisplay(a.availableFrom)}</div>
                                                         )}
-                                                        <div><span className="text-warning fw-bold">🕒 Határidő:</span> {formatDeadline(a.availableUntil)}</div>
+                                                        <div><span className="text-warning fw-bold">🕒 Határidő:</span> {formatToLocalDisplay(a.availableUntil)}</div>
                                                     </div>
                                                     
                                                     {(() => {
-                                                        const availableFrom = parseDate(a.availableFrom);
-                                                        const isFuture = availableFrom && availableFrom > now;
+                                                        const availableFrom = parseServerDate(a.availableFrom);
+                                                        const isFuture = availableFrom && availableFrom.getTime() > currentTime;
                                                         return (
                                                             <Button 
                                                                 variant={isFuture ? "secondary" : "primary"} 
@@ -236,11 +235,10 @@ const StudentClassroomDetail = () => {
                             </Row>
                         </Tab>
 
-                        {/* 2. BEFEJEZETT VAGY LEJÁRT */}
+                        {/* 2. COMPLETED OR EXPIRED */}
                         <Tab eventKey="completed" title={
                             <span className="fw-bold">
                                 ✅ Befejezett / Lejárt
-                                {/* AZ ÚJ PING LOGIKA */}
                                 {unseenResultsList.length > 0 && (
                                     <Badge bg="success" pill className="ms-2 shadow-sm animate-pulse">
                                         {unseenResultsList.length}
@@ -256,7 +254,6 @@ const StudentClassroomDetail = () => {
                                                 <div className="d-flex justify-content-between align-items-start mb-2">
                                                     <Card.Title className="fw-bold m-0 text-light">{a.title}</Card.Title>
                                                     
-                                                    {/* KÁRTYA FEJLÉC PING - Kombinált ID vizsgálat! */}
                                                     {unseenResultsList.includes(`${classroomId}:${a.assignmentId}`) ? (
                                                         <Badge bg="success" className="animate-pulse shadow-sm border border-light">✉️ Új Értékelés!</Badge>
                                                     ) : (
@@ -264,10 +261,11 @@ const StudentClassroomDetail = () => {
                                                     )}
                                                 </div>
                                                 
+                                                {/* FIX: Utilizing Centralized formatToLocalDisplay */}
                                                 <div className="mb-3 bg-black bg-opacity-25 p-2 rounded small">
                                                     <div className="mb-1 text-info"><span className="fw-bold">📝 Próbálkozás:</span> {a.attemptsUsed} / {a.maxAttempts || '∞'}</div>
-                                                    {a.availableFrom && <div><span className="fw-bold">📅 Kezdés:</span> {formatDeadline(a.availableFrom)}</div>}
-                                                    <div><span className="fw-bold">🕒 Határidő:</span> {formatDeadline(a.availableUntil)}</div>
+                                                    {a.availableFrom && <div><span className="fw-bold">📅 Kezdés:</span> {formatToLocalDisplay(a.availableFrom)}</div>}
+                                                    <div><span className="fw-bold">🕒 Határidő:</span> {formatToLocalDisplay(a.availableUntil)}</div>
                                                 </div>
                                                 
                                                <div className="mt-auto d-grid gap-2">
@@ -285,16 +283,25 @@ const StudentClassroomDetail = () => {
                                                         </Button>
                                                     )}
 
-                                                    {(!a.availableUntil || parseDate(a.availableUntil) > now) && 
-                                                     (!a.maxAttempts || a.attemptsUsed < a.maxAttempts) && (
-                                                        <Button 
-                                                            variant="primary" 
-                                                            className="fw-bold"
-                                                            onClick={() => navigate(`/assignment/${a.assignmentId}/start`, { state: { assignmentDetails: a } })}
-                                                        >
-                                                            Újraírás
-                                                        </Button>
-                                                    )}
+                                                    {/* FIX: Timezone safe retry validation using parseServerDate */}
+                                                    {(() => {
+                                                        const availableUntil = parseServerDate(a.availableUntil);
+                                                        const canStillWrite = (!availableUntil || availableUntil.getTime() > currentTime);
+                                                        const hasAttemptsLeft = (!a.maxAttempts || a.attemptsUsed < a.maxAttempts);
+                                                        
+                                                        if (canStillWrite && hasAttemptsLeft) {
+                                                            return (
+                                                                <Button 
+                                                                    variant="primary" 
+                                                                    className="fw-bold"
+                                                                    onClick={() => navigate(`/assignment/${a.assignmentId}/start`, { state: { assignmentDetails: a } })}
+                                                                >
+                                                                    Újraírás
+                                                                </Button>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
                                                 </div>
                                             </Card.Body>
                                         </Card>
@@ -305,7 +312,7 @@ const StudentClassroomDetail = () => {
                     </Tabs>
                 </Tab>
 
-                {/* OSZTÁLYTÁRSAK FÜL */}
+                {/* CLASSMATES TAB */}
                 <Tab eventKey="classmates" title={<span className="fw-bold">👥 Osztálytársak</span>}>
                     <Card className="bg-dark text-light border-secondary mt-3">
                         <Card.Header className="border-secondary bg-dark">
@@ -322,7 +329,7 @@ const StudentClassroomDetail = () => {
                     </Card>
                 </Tab>
 
-                {/* DIÁK STATISZTIKA FÜL */}
+                {/* STATISTICS TAB */}
                 <Tab eventKey="statistics" title={<span className="fw-bold">📊 Saját Statisztikám</span>}>
                     {stats && (
                         <div className="mt-4">
@@ -368,7 +375,7 @@ const StudentClassroomDetail = () => {
                 </Tab>
             </Tabs>
 
-            {/* DIÁK EREDMÉNY MODAL */}
+            {/* RESULTS PREVIEW MODAL */}
             <Modal show={isResultModalOpen} onHide={() => setIsResultModalOpen(false)} size="lg" centered contentClassName="bg-dark text-light border-secondary">
                 <Modal.Header closeButton closeVariant="white" className="border-secondary">
                     <Modal.Title className="text-info fw-bold">Eredmények: {selectedAssignmentTitle}</Modal.Title>

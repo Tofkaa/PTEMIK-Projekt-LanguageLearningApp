@@ -21,5 +21,7 @@ public class ChallengeDTO {
     private boolean isMyTurn;
 
     private LocalDateTime expiresAt;
+    private LocalDateTime startTime;
+    private LocalDateTime completedAt;
     private String winnerName;
 }

@@ -1,47 +1,50 @@
+/**
+ * @file AssignmentStart.jsx
+ * @description Interstitial screen displayed before a student begins an assignment.
+ * Presents rules, time limits, and attempt constraints, and initializes the server-side session.
+ */
+
 import React, { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Card, Button, Row, Col, Alert, Spinner } from 'react-bootstrap';
 import { assignmentApi } from '../services/assignmentApi';
+import { parseServerDate } from '../utils/dateUtils';
 
+/**
+ * @component
+ * @returns {React.ReactElement} The assignment preparation UI.
+ */
 const AssignmentStart = () => {
     const { id: assignmentId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
     
-    // Azonnal kiolvassuk a memóriából az előző oldalon átadott adatokat!
     const details = location.state?.assignmentDetails;
-    
     const [isStarting, setIsStarting] = useState(false);
 
-    const parseDate = (d) => {
-        if (!d) return null;
-        if (Array.isArray(d)) {
-            return new Date(Date.UTC(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0));
-        }
-        const str = String(d);
-        return new Date(str.endsWith('Z') ? str : str + 'Z'); 
-    };
+    const [currentTime] = useState(() => Date.now());
 
+    /**
+     * Initiates the assignment session via the backend API.
+     * On success, transitions the user to the AssignmentPlayer with the required session data.
+     * 
+     * @async
+     * @function startTest
+     */
     const startTest = async () => {
         setIsStarting(true);
         try {
-            // Éles backend hívás: Létrehozza a Sessiont és letölti a feladatokat
             const res = await assignmentApi.startAssignment(assignmentId);
-            
-            // A backendtől kapott session adatokkal megyünk tovább a lejátszóba
             navigate(`/assignment/session/${res.data.sessionId}/play`, { 
-                state: { 
-                    sessionData: res.data, 
-                    assignmentDetails: details 
-                } 
+                state: { sessionData: res.data, assignmentDetails: details } 
             });
         } catch (error) {
-            console.error("Nem sikerült elindítani a tesztet", error);
+            console.error("Failed to start assignment", error);
             alert("Hiba történt a teszt indításakor. Lehet, hogy már kitöltötted, vagy lejárt az idő.");
             setIsStarting(false);
         }
     };
-    // Ha valaki frissít (F5) és elvész a memória-state, vagy rossz a link
+
     if (!details) {
         return (
             <Container className="py-5 text-center text-light">
@@ -80,7 +83,6 @@ const AssignmentStart = () => {
                                 <strong>Időkeret:</strong> {details.timeLimitMinutes ? `${details.timeLimitMinutes} perc` : 'Nincs időkorlát'}
                             </p>
                             <p className="mb-0"><strong>Kérdések száma:</strong> {details.exerciseCount} db</p>
-                            
                             <p className="mb-0 text-info mt-2 border-top border-secondary pt-2">
                                 <strong>Felhasznált próbálkozások:</strong> {details.attemptsUsed || 0} / {details.maxAttempts ? details.maxAttempts : 'Végtelen'}
                             </p>
@@ -88,14 +90,12 @@ const AssignmentStart = () => {
 
                         <div className="d-grid gap-3">
                             {(() => {
-                                const isFuture = details.availableFrom && parseDate(details.availableFrom) > new Date();
+                                // Safe timecheck
+                                const isFuture = details.availableFrom && parseServerDate(details.availableFrom).getTime() > currentTime;
                                 return (
                                     <Button 
-                                        variant="primary" 
-                                        size="lg" 
-                                        className="fw-bold" 
-                                        onClick={startTest}
-                                        disabled={isStarting || isFuture}
+                                        variant="primary" size="lg" className="fw-bold" 
+                                        onClick={startTest} disabled={isStarting || isFuture}
                                     >
                                         {isStarting ? <Spinner size="sm" /> : (isFuture ? 'Még nem elérhető' : (details.test ? 'Teszt Megkezdése' : 'Gyakorlás Indítása'))}
                                     </Button>

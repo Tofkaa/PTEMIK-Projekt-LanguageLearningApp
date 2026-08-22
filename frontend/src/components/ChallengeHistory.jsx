@@ -1,27 +1,38 @@
 /**
- * ChallengeHistory Component
- * Renders a read-only log of all closed (Completed, Expired, Declined) challenges.
- * Visually distinguishes wins, losses, and ties.
+ * @file ChallengeHistory.jsx
+ * @description Renders a read-only log of all closed (Completed, Expired, Declined) challenges.
+ * Visually distinguishes wins, losses, and ties, and maps backend timestamps securely.
  */
 
 import { useState, useEffect } from 'react';
 import { Card, Spinner, Alert, Badge, Row, Col } from 'react-bootstrap';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import {useNotifications} from '../context/NotificationContext'
+import { useNotifications } from '../context/NotificationContext'
+import { formatToLocalDisplay } from '../utils/dateUtils';
 
+/**
+ * @component
+ * @returns {React.ReactElement} A list of historical challenge records.
+ */
 const ChallengeHistory = () => {
     const { user } = useAuth();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const {notifications} = useNotifications();
+    const { notifications } = useNotifications();
 
     useEffect(() => {
         fetchHistory(true);
-
     }, [notifications.totalHistory]); 
 
+    /**
+     * Fetches the user's closed challenges from the API.
+     * 
+     * @async
+     * @function fetchHistory
+     * @param {boolean} [isInitialLoad=false] - Whether to display the global spinner during fetch.
+     */
     const fetchHistory = async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);       
         
@@ -39,8 +50,9 @@ const ChallengeHistory = () => {
 
     /**
      * Generates the appropriate UI badge based on the challenge status and the winner.
-     * * @param {Object} challenge - The challenge data object from the backend.
-     * @returns {JSX.Element|null} The React Bootstrap Badge component.
+     * 
+     * @param {Object} challenge - The challenge data object from the backend.
+     * @returns {React.ReactElement|null} The React Bootstrap Badge component.
      */
     const getResultBadge = (challenge) => {
         if (challenge.status === 'DECLINED') return <Badge bg="danger">Elutasítva ❌</Badge>;
@@ -84,6 +96,9 @@ const ChallengeHistory = () => {
                                         </h6>
                                         <div className="text-light small">
                                             Lecke: {challenge.lessonTitle} ({challenge.difficulty})
+                                        </div>
+                                        <div className="text-secondary small mt-1">
+                                            Befejezve: {formatToLocalDisplay(challenge.completedAt)}
                                         </div>
                                     </div>
                                     <div className="d-flex flex-column align-items-end gap-1">

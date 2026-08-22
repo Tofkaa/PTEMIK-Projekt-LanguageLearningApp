@@ -1,7 +1,8 @@
 /**
  * @file ActiveChallenges.jsx
  * @description Displays the list of ongoing duels for the authenticated user.
- * Manages the UI state to distinguish between waiting periods and actionable turns.
+ * Manages the UI state to distinguish between waiting periods and actionable turns,
+ * and accurately handles timestamp display via centralized utilities.
  */
 
 import { useState, useEffect} from 'react';
@@ -10,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { formatToLocalDisplay } from '../utils/dateUtils';
 
 /**
  * @component
@@ -28,14 +30,18 @@ const ActiveChallenges = () => {
     }, [notifications.pendingChallenges]);
 
     /**
-     * Fetches active challenges, bypassing cache.
+     * Fetches active challenges, bypassing cache to ensure fresh data.
+     * 
+     * @async
+     * @function fetchChallenges
+     * @param {boolean} [isInitialLoad=false] - Determines if the loading spinner should be triggered.
      */
     const fetchChallenges = async (isInitialLoad = false) => {
         if(isInitialLoad) setLoading(true);
         
         try {
             const response = await api.get('/challenges/active', {
-                params: { _t: new Date().getTime() } // Cache-busting
+                params: { _t: new Date().getTime() } 
             });
             setChallenges(response.data || []);
         } catch (err) {
@@ -45,6 +51,11 @@ const ActiveChallenges = () => {
         }
     };
 
+    /**
+     * Navigates the user to the lesson player to execute their turn in a duel.
+     * 
+     * @param {Object} challenge - The target challenge data object.
+     */
     const handlePlayChallenge = (challenge) => {
         navigate(`/lesson/${challenge.lessonId}?challengeId=${challenge.challengeId}`);
     };
@@ -61,7 +72,6 @@ const ActiveChallenges = () => {
         );
     }
 
-    // ... Return HTML blokk (a Row és Col rész marad teljesen ugyanaz)
     return (
         <div className="p-3">
             <h5 className="text-light mb-4">Aktív Kihívások ({challenges.length})</h5>
@@ -78,10 +88,13 @@ const ActiveChallenges = () => {
                                                 ? `⚔️ Kihívtad: ${challenge.opponentName}` 
                                                 : `🔥 ${challenge.challengerName} kihívott téged!`}
                                         </h5>
+                                        <div className="text-secondary small mt-1">
+                                            Küldve: {formatToLocalDisplay(challenge.startTime)}
+                                        </div>
                                     </div>
                                     <div className="d-flex flex-column align-items-end gap-2">
                                         <small className="text-danger">
-                                            Lejár: {new Date(challenge.expiresAt).toLocaleDateString('hu-HU')}
+                                            Lejár: {formatToLocalDisplay(challenge.expiresAt, false)} 
                                         </small>
                                         {challenge.isMyTurn && (
                                             <Button variant="warning" className="fw-bold px-4" onClick={() => handlePlayChallenge(challenge)} >

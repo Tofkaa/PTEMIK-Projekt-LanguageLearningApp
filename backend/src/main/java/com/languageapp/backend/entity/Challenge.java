@@ -47,6 +47,9 @@ public class Challenge {
     @Column(name = "end_time")
     private LocalDateTime endTime;
 
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     private ChallengeStatus status;

@@ -1,9 +1,19 @@
+/**
+ * @file AssignmentSubmissions.jsx
+ * @description Teacher dashboard view for evaluating and grading student submissions.
+ * Displays aggregate performance stats, individual sessions, and an interactive grading modal.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Card, Button, Badge, Table, Modal, Form, Spinner, Row, Col } from 'react-bootstrap';
 import { assignmentApi } from '../services/assignmentApi';
+import { formatToLocalDisplay } from '../utils/dateUtils';
 
-
+/**
+ * @component
+ * @returns {React.ReactElement} The submission overview and grading interface.
+ */
 const AssignmentSubmissions = () => {
     const { id: assignmentId } = useParams();
     const navigate = useNavigate();
@@ -15,17 +25,28 @@ const AssignmentSubmissions = () => {
     const [sessions, setSessions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     
-    // Modal state-ek az értékeléshez
+    // Grading modal states
     const [selectedSession, setSelectedSession] = useState(null);
     const [isGradingModalOpen, setIsGradingModalOpen] = useState(false);
     const [gradeForm, setGradeForm] = useState({ teacherScore: '', teacherComment: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [expandedPreviewIndex, setExpandedPreviewIndex] = useState(null);
 
+    /**
+     * Toggles the inline preview box for a specific question's details.
+     * 
+     * @param {number} index - The index of the answer in the modal.
+     */
     const togglePreview = (index) => {
         setExpandedPreviewIndex(prev => prev === index ? null : index);
     };
 
+    /**
+     * Fetches all completed sessions for the selected assignment.
+     * 
+     * @async
+     * @function fetchSessions
+     */
     const fetchSessions = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -48,18 +69,27 @@ const AssignmentSubmissions = () => {
         return () => { isMounted = false; }; 
     }, [fetchSessions]);
 
-    // Értékelő ablak megnyitása
+    /**
+     * Prepares and opens the grading modal with the selected session's data.
+     * 
+     * @param {Object} session - The session object to be graded.
+     */
     const openGradingModal = (session) => {
         setSelectedSession(session);
         setGradeForm({
-            // Ha a tanár már adott pontot, azt mutatjuk, amúgy a gépét
             teacherScore: session.teacherScore !== null ? session.teacherScore : session.finalScore,
             teacherComment: session.teacherComment || ''
         });
         setIsGradingModalOpen(true);
     };
 
-    // Értékelés beküldése
+    /**
+     * Submits the teacher's manual evaluation (score and comments) to the API.
+     * 
+     * @async
+     * @function handleGradeSubmit
+     * @param {React.FormEvent} e - The form submission event.
+     */
     const handleGradeSubmit = async (e) => {
         e.preventDefault();
         if (isSubmitting) return;
@@ -71,7 +101,7 @@ const AssignmentSubmissions = () => {
                 teacherComment: gradeForm.teacherComment
             });
             setIsGradingModalOpen(false);
-            fetchSessions(); // Újratöltjük a listát, hogy látszódjon a "Publikálva" státusz
+            fetchSessions(); 
         } catch (error) {
             console.error("Hiba az értékelés mentésekor:", error);
             alert("Nem sikerült elmenteni az értékelést.");
@@ -80,6 +110,11 @@ const AssignmentSubmissions = () => {
         }
     };
 
+    /**
+     * Analyzes all fetched sessions to determine the most frequently failed question.
+     * 
+     * @returns {Object|string} An object containing the question string and mistake count, or a fallback string.
+     */
     const getHardestQuestion = () => {
         if (!sessions || sessions.length === 0) return "Nincs elég adat";
         
@@ -99,7 +134,6 @@ const AssignmentSubmissions = () => {
 
         if (totalMistakes === 0) return "Mindenki hibátlan!";
 
-        // Sorrendbe rakjuk a hibákat csökkenő sorrendben
         const sortedMistakes = Object.entries(mistakeCounts).sort((a, b) => b[1] - a[1]);
         
         return {
@@ -109,13 +143,6 @@ const AssignmentSubmissions = () => {
     };
 
     const hardest = getHardestQuestion();
-
-    const parseDate = (d) => {
-    if (!d) return null;
-    if (Array.isArray(d)) return new Date(Date.UTC(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0));
-    const str = String(d);
-    return new Date(str.endsWith('Z') ? str : str + 'Z'); 
-    };
 
     if (isLoading) {
         return <Container className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}><Spinner animation="border" variant="info" /></Container>;
@@ -186,7 +213,7 @@ const AssignmentSubmissions = () => {
                                             <div className="fw-bold">{session.studentName}</div>
                                             <div className="small text-secondary">{session.studentEmail}</div>
                                         </td>
-                                        <td>{parseDate(session.finishedAt).toLocaleString('hu-HU')}</td>
+                                        <td>{formatToLocalDisplay(session.finishedAt)}</td>
                                         <td className="text-center"><Badge bg="secondary" className="fs-6">{session.finalScore}%</Badge></td>
                                         <td className="text-center">
                                             {session.teacherScore !== null ? (
@@ -211,7 +238,7 @@ const AssignmentSubmissions = () => {
                 </Card.Body>
             </Card>
 
-            {/* FELUGRÓ ABLAK AZ ÉRTÉKELÉSHEZ (Részletes válaszokkal) */}
+            {/* GRADING MODAL */}
             <Modal show={isGradingModalOpen} onHide={() => setIsGradingModalOpen(false)} size="lg" centered contentClassName="bg-dark text-light border-secondary">
                 <Modal.Header closeButton className="border-secondary" closeVariant="white">
                     <Modal.Title className="fw-bold text-info">
@@ -221,7 +248,6 @@ const AssignmentSubmissions = () => {
                 <Form onSubmit={handleGradeSubmit}>
                     <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }} className="custom-scrollbar">
                         
-                        {/* Diák válaszainak listázása */}
                         <div className="mb-4">
                             <h6 className="fw-bold text-secondary mb-3 border-bottom border-secondary pb-2">A diák válaszai:</h6>
                             {(!selectedSession?.answers || selectedSession.answers.length === 0) ? (
@@ -231,7 +257,6 @@ const AssignmentSubmissions = () => {
                                     {selectedSession.answers.map((ans, index) => (
                                         <li key={index} className="mb-3 p-3 bg-black bg-opacity-25 rounded border border-secondary shadow-sm">
                                             
-                                            {/* Fejléc a szem ikonnal */}
                                             <div className="text-info fw-bold mb-2 pb-2 border-bottom border-secondary d-flex justify-content-between align-items-center">
                                                 <div>{index + 1}. Kérdés: <span className="text-light fw-normal">{ans.question}</span></div>
                                                 
@@ -242,14 +267,12 @@ const AssignmentSubmissions = () => {
                                                 )}
                                             </div>
 
-                                            {/* AZ INLINE ELŐNÉZET (Pontosan a tesztkészítő mintájára) */}
                                             {expandedPreviewIndex === index && ans.exercise && (
                                                 <div className="mt-1 mb-3 p-2 bg-dark rounded border border-info small">
                                                     <strong>Típus:</strong> {ans.exercise.type}<br/>
                                                     {ans.exercise.content?.options && (
                                                         <div>
                                                             <strong>Opciók:</strong> {
-                                                                // Ha objektum (képes opció), akkor a textet írjuk ki, amúgy simán a stringet
                                                                 Array.isArray(ans.exercise.content.options) && typeof ans.exercise.content.options[0] === 'object' 
                                                                 ? ans.exercise.content.options.map(o => o.text).join(", ") 
                                                                 : ans.exercise.content.options.join(", ")
@@ -262,7 +285,6 @@ const AssignmentSubmissions = () => {
                                                 </div>
                                             )}
 
-                                            {/* Diák válasza és értékelés */}
                                             <div className="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
                                                 <div>
                                                     <span className="text-secondary fw-bold">Diák válasza: </span> 
@@ -289,7 +311,7 @@ const AssignmentSubmissions = () => {
                             )}
                         </div>
 
-                        {/* Értékelő Űrlap */}
+                        {/* GRADING FORM */}
                         <div className="bg-darker p-3 rounded border border-secondary">
                             <Form.Group className="mb-3">
                                 <Form.Label className="text-info fw-bold">Végső Pontszám (%)</Form.Label>
@@ -331,4 +353,4 @@ const AssignmentSubmissions = () => {
     );
 };
 
-export default AssignmentSubmissions;
+export default AssignmentSubmissions;   
