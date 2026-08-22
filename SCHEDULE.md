@@ -11,8 +11,8 @@
 - 2026-04-12: Osztályterem Modul - Backend (9. hét) - [KÉSZ]
 - 2026-04-19: Osztályterem Modul - Frontend (10. hét) - [KÉSZ]
 - 2026-04-26: Admin Panel és Nginx Reverse Proxy (11. hét) - [KÉSZ]
-- 2026-05-03: UX/UI Finomhangolás és Hibakezelés (12. hét)
-- 2026-05-10: Minimum Viable Product (MVP) és Telepítés (13. hét)
+- 2026-05-03: UX/UI Finomhangolás és Hibakezelés (12. hét) - [KÉSZ]
+- 2026-05-10: Minimum Viable Product (MVP) és Telepítés (13. hét) - [KÉSZ]
 
 ---
 
