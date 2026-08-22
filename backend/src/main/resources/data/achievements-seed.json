@@ -49,19 +49,19 @@
   },
   {
     "name": "Közösségi Motor",
-    "description": "Sikeresen felvettél 5 barátot (Későbbi funkcióhoz előkészítve)",
+    "description": "Sikeresen felvettél 5 barátot",
     "criteria": { "type": "SOCIAL_FRIENDS", "target": 5 },
     "iconUrl": "🤝"
   },
   {
     "name": "Kihívó",
-    "description": "Nyertél 3 baráti párbajt. (Későbbi funkcióhoz előkészítve)",
+    "description": "Nyertél 3 baráti párbajt.",
     "criteria": { "type": "SOCIAL_DUELS", "target": 3 },
     "iconUrl": "⚔️"
   },
   {
     "name": "Hetes Széria",
-    "description": "Egy egész héten át, minden nap tanultál. (Későbbi funkcióhoz előkészítve)",
+    "description": "Egy egész héten át, minden nap tanultál.",
     "criteria": { "type": "STREAK_DAYS", "target": 7 },
     "iconUrl": "🔥"
   }

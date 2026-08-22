@@ -10,6 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -73,6 +74,13 @@ public class User {
 
     @Column(name = "friend_code", unique = true, length = 10)
     private String friendCode;
+
+    /**
+     * Tracks the exact local date when the user last completed a valid learning activity.
+     * Used by the scheduled Cron job to evaluate streak expirations.
+     */
+    @Column(name = "last_activity_date")
+    private LocalDate lastActivityDate;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;

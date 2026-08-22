@@ -37,6 +37,7 @@ public class AssignmentService {
     private final ClassroomMemberRepository classroomMemberRepository;
     private final AssignmentSessionRepository sessionRepository;
     private final EvaluationService evaluationService;
+    private final StreakService streakService;
 
     private final SseService sseService;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -296,6 +297,8 @@ public class AssignmentService {
 
         sessionRepository.save(session);
         sseService.sendPing(session.getAssignment().getClassroom().getTeacher().getEmail());
+
+        streakService.updateActivity(session.getUser());
 
         log.info("Student {} successfully submitted assignment '{}'. Score: {}%",
                 email, session.getAssignment().getTitle(), finalScore);

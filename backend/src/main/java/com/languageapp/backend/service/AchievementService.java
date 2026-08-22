@@ -7,6 +7,8 @@ import com.languageapp.backend.entity.UserAchievement;
 import com.languageapp.backend.repository.AchievementRepository;
 import com.languageapp.backend.repository.ProgressRepository;
 import com.languageapp.backend.repository.UserAchievementRepository;
+import com.languageapp.backend.repository.ChallengeRepository;
+import com.languageapp.backend.enums.ChallengeStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,7 +22,8 @@ import java.util.stream.Collectors;
 
 /**
  * Core business logic for the Gamification Engine.
- * Evaluates dynamic rules (JSONB criteria) to award trophies to users upon lesson completion.
+ * Evaluates dynamic rules (JSONB criteria) to award trophies to users based on their learning history,
+ * social activities, and overall engagement (streaks).
  */
 @Slf4j
 @Service
@@ -31,11 +34,15 @@ public class AchievementService {
     private final UserAchievementRepository userAchievementRepository;
     private final ProgressRepository progressRepository;
 
+    // Dependencies for social and engagement achievements
+    private final FriendshipService friendshipService;
+    private final ChallengeRepository challengeRepository;
+
     /**
      * Iterates through all available achievements in the system and awards them
      * to the user if they meet the dynamically defined criteria.
      *
-     * @param user               The user who just completed a lesson.
+     * @param user               The user to be evaluated.
      * @param currentLessonScore The accuracy score (0-100) of the most recently completed lesson.
      */
     @Transactional
@@ -43,15 +50,15 @@ public class AchievementService {
         List<Achievement> allAchievements = achievementRepository.findAll();
 
         for (Achievement achievement : allAchievements) {
-            // OPTIMIZATION: Check via a highly efficient native query if the user already has this trophy
+            // OPTIMIZATION: Check if the user already has this trophy to prevent redundant processing
             if (userAchievementRepository
                     .existsByUserUserIdAndAchievementAchievementId(
                             user.getUserId(),
                             achievement.getAchievementId())) {
-                continue; // Skip evaluation if already awarded
+                continue;
             }
 
-            // Evaluate the JSONB conditions
+            // Evaluate the JSONB conditions dynamically
             if (isEligible(user, achievement, currentLessonScore)) {
                 awardAchievement(user, achievement);
             }
@@ -60,7 +67,12 @@ public class AchievementService {
 
     /**
      * Parses and evaluates the JSONB 'criteria' column of an Achievement.
-     * Functions as a dynamic rule engine.
+     * Functions as a dynamic rule engine mapping to specific backend metrics.
+     *
+     * @param user The authenticated user.
+     * @param achievement The specific achievement being evaluated.
+     * @param currentLessonScore The score achieved in the triggering lesson.
+     * @return boolean True if the criteria are fully met.
      */
     private boolean isEligible(User user, Achievement achievement, int currentLessonScore) {
         Map<String, Object> criteria = achievement.getCriteria();
@@ -71,12 +83,11 @@ public class AchievementService {
         String type = String.valueOf(criteria.get("type"));
 
         try {
-            // Helper variable: Count the total number of successfully completed lessons for this user
+            // Helper metric: Total successfully completed lessons
             long completedCount = progressRepository.findAll().stream()
                     .filter(p -> p.getUser().getUserId().equals(user.getUserId()) && p.getIsCompleted())
                     .count();
 
-            // Evaluate based on the dynamic "type" defined in the database
             switch (type) {
                 case "FIRST_LESSON":
                     return completedCount >= 1;
@@ -90,8 +101,27 @@ public class AchievementService {
                     return user.getXp() >= targetXp;
 
                 case "PERFECT_SCORE":
-                    // Requires the user to achieve a flawless 100% on the current lesson
                     return currentLessonScore == 100;
+
+                case "SOCIAL_FRIENDS":
+                    int targetFriends = Integer.parseInt(String.valueOf(criteria.get("target")));
+                    int currentFriends = friendshipService.getMyFriends(user.getUserId()).size();
+                    return currentFriends >= targetFriends;
+
+                case "SOCIAL_DUELS":
+                    int targetDuels = Integer.parseInt(String.valueOf(criteria.get("target")));
+                    long wonDuels = challengeRepository.findByChallengerUserIdOrOpponentUserId(user.getUserId(), user.getUserId())
+                            .stream()
+                            .filter(c -> c.getStatus() == ChallengeStatus.COMPLETED
+                                    && c.getWinner() != null
+                                    && c.getWinner().getUserId().equals(user.getUserId()))
+                            .count();
+                    return wonDuels >= targetDuels;
+
+                case "STREAK_DAYS":
+                    int targetStreak = Integer.parseInt(String.valueOf(criteria.get("target")));
+                    int currentStreak = user.getStreak() != null ? user.getStreak() : 0;
+                    return currentStreak >= targetStreak;
 
                 default:
                     log.warn("Unknown achievement criteria type: {}", type);
@@ -106,6 +136,9 @@ public class AchievementService {
     /**
      * Aggregates all system achievements and maps them to DTOs, flagging which ones
      * the specific user has already unlocked. Used for the Frontend Profile Screen.
+     *
+     * @param userId The UUID of the authenticated user.
+     * @return List of {@link AchievementResponse} DTOs.
      */
     @Transactional(readOnly = true)
     public List<AchievementResponse> getUserAchievements(UUID userId) {
@@ -113,7 +146,6 @@ public class AchievementService {
         List<UserAchievement> userAchievements = userAchievementRepository.findByUserUserId(userId);
 
         return allAchievements.stream().map(ach -> {
-            // Check if the current achievement exists in the user's earned list
             UserAchievement unlockedAch = userAchievements.stream()
                     .filter(ua -> ua.getAchievement().getAchievementId().equals(ach.getAchievementId()))
                     .findFirst()
@@ -124,7 +156,7 @@ public class AchievementService {
                     .name(ach.getName())
                     .description(ach.getDescription())
                     .iconUrl(ach.getIconUrl())
-                    .isUnlocked(unlockedAch != null) // Handled safely for Jackson via @JsonProperty in the DTO
+                    .isUnlocked(unlockedAch != null)
                     .achievedAt(unlockedAch != null ? unlockedAch.getAchievedAt() : null)
                     .build();
         }).collect(Collectors.toList());

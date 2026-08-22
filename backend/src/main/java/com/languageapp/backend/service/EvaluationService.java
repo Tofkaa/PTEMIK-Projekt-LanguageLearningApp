@@ -43,6 +43,7 @@ public class EvaluationService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeService challengeService;
     private final AssignmentSessionRepository sessionRepository;
+    private final StreakService streakService;
 
 
     /**
@@ -135,32 +136,7 @@ public class EvaluationService {
         // --- 2. GAMIFICATION: DAILY STREAK ENGINE ---
         // Runs on every successful lesson completion (even practice/repeats) to encourage daily engagement.
         if (passed) {
-            Result lastResult = resultRepository.findFirstByUserUserIdOrderBySubmittedAtDesc(userId).orElse(null);
-            java.time.LocalDate today = java.time.LocalDate.now();
-            int currentStreak = (user.getStreak() != null) ? user.getStreak() : 0;
-
-            if (lastResult != null) {
-                java.time.LocalDate lastDate = lastResult.getSubmittedAt().toLocalDate();
-
-                if (lastDate.equals(today.minusDays(1))) {
-                    // Maintained streak: User studied yesterday and today
-                    user.setStreak(currentStreak + 1);
-                } else if (lastDate.isBefore(today.minusDays(1))) {
-                    // Broken streak: User skipped at least one day
-                    user.setStreak(1);
-                } else if (lastDate.equals(today)) {
-                    // EDGE CASE SAFETY NET: If the user studied today, but their memory streak is 0, initialize it.
-                    if (currentStreak == 0) {
-                        user.setStreak(1);
-                    }
-                }
-            } else {
-                // First successful lesson ever
-                user.setStreak(1);
-            }
-
-            // Persist the updated XP and/or Streak to the database
-            userRepository.save(user);
+            streakService.updateActivity(user);
         }
 
         Challenge challenge = null;
