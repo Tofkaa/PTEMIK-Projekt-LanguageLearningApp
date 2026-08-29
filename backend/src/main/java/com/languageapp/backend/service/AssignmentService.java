@@ -274,9 +274,23 @@ public class AssignmentService {
 
             boolean isCorrect = true;
             for (MistakeDTO m : mistakes) {
-                if (m.getQuestion() != null && m.getQuestion().equals(questionText)) {
+                if (ex != null && m.getExerciseId() != null && m.getExerciseId().equals(ex.getExerciseId())) {
                     isCorrect = false;
                     break;
+                }
+            }
+
+            String serverCorrectAnswer = null;
+            if (ex != null && ex.getCorrectAnswer() != null) {
+                java.util.Map<String, Object> ca = ex.getCorrectAnswer();
+                if (ca.containsKey("answer")) {
+                    serverCorrectAnswer = ca.get("answer").toString();
+                } else if (ca.containsKey("translation")) {
+                    serverCorrectAnswer = ca.get("translation").toString();
+                } else if (ca.containsKey("text")) {
+                    serverCorrectAnswer = ca.get("text").toString();
+                } else {
+                    serverCorrectAnswer = ca.values().iterator().next().toString();
                 }
             }
 
@@ -285,7 +299,8 @@ public class AssignmentService {
                     sub.getAnswer() != null ? sub.getAnswer().toString() : "Nincs válasz",
                     isCorrect,
                     sub.isRetried(),
-                    ex
+                    ex,
+                    serverCorrectAnswer
             ));
         }
 
@@ -546,5 +561,134 @@ public class AssignmentService {
                 "myAverage", myAvg,
                 "classAverage", allStats.getClassAverage()
         );
+    }
+
+    /**
+     * Generates advanced analytics for a classroom, including a performance heatmap
+     * matrix and an item analysis of the most frequently failed questions.
+     *
+     * @param classroomId The UUID of the target classroom.
+     * @param teacherEmail The email of the teacher requesting the analytics.
+     * @return {@link ClassroomAnalyticsResponse} containing the heatmap and mistake data.
+     */
+    @Transactional(readOnly = true)
+    public ClassroomAnalyticsResponse getClassroomAnalytics(UUID classroomId, String teacherEmail) {
+        Classroom classroom = classroomRepository.findById(classroomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found."));
+
+        if (!classroom.getTeacher().getEmail().equals(teacherEmail)) {
+            throw new BadRequestException("Unauthorized to view detailed analytics.");
+        }
+
+        List<ClassroomAssignment> assignments = assignmentRepository
+                .findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(classroomId);
+
+        List<User> students = classroomMemberRepository
+                .findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
+                .stream().map(ClassroomMember::getUser).toList();
+
+        // 1. Prepare Assignment Headers (Columns for the Heatmap)
+        List<ClassroomAnalyticsResponse.AssignmentHeaderDTO> headers = assignments.stream()
+                .map(a -> ClassroomAnalyticsResponse.AssignmentHeaderDTO.builder()
+                        .assignmentId(a.getAssignmentId().toString())
+                        .title(a.getTitle())
+                        .build())
+                .toList();
+
+        // 2. Build the Heatmap Data (Rows for Students)
+        List<ClassroomAnalyticsResponse.StudentHeatmapRowDTO> heatmapData = new ArrayList<>();
+        java.util.Map<String, ClassroomAnalyticsResponse.FrequentMistakeDTO> globalMistakes = new java.util.HashMap<>();
+        for (User student : students) {
+            java.util.Map<String, Integer> scores = new java.util.HashMap<>();
+
+            for (ClassroomAssignment assignment : assignments) {
+                // Find the highest score if multiple attempts exist
+                Optional<AssignmentSession> bestSession = sessionRepository
+                        .findAllByAssignment_AssignmentIdAndUser_UserId(assignment.getAssignmentId(), student.getUserId())
+                        .stream()
+                        .filter(s -> s.getFinishedAt() != null)
+                        .max(java.util.Comparator.comparingInt(s -> s.getTeacherScore() != null ? s.getTeacherScore() : s.getFinalScore()));
+                if (bestSession.isPresent()) {
+                    AssignmentSession session = bestSession.get();
+                    int score = session.getTeacherScore() != null ? session.getTeacherScore() : session.getFinalScore();
+                    scores.put(assignment.getAssignmentId().toString(), score);
+
+                    // 3. Collect Mistake Data for Item Analysis
+                    try {
+                        if (session.getRawAnswers() != null) {
+                            List<AssignmentSessionResponse.AnswerDetail> answers = objectMapper.readValue(
+                                    session.getRawAnswers(),
+                                    new TypeReference<List<AssignmentSessionResponse.AnswerDetail>>() {}
+                            );
+
+                            for (AssignmentSessionResponse.AnswerDetail answer : answers) {
+                                if (!answer.isCorrect() && answer.getExercise() != null) {
+                                    UUID exId = answer.getExercise().getExerciseId();
+                                    String exIdStr = exId.toString();
+
+                                    // 1. Kikeressük a FRISS entitást az adatbázisból (ebben benne van a rejtett correctAnswer!)
+                                    Exercise realExercise = assignment.getExercises().stream()
+                                            .filter(e -> e.getExerciseId().equals(exId))
+                                            .findFirst()
+                                            .orElse(null);
+
+                                    // 2. Kinyerjük a helyes választ (Akár új mentésből, akár a friss entitásból)
+                                    String realCorrectAnswer = answer.getServerCorrectAnswer();
+
+                                    if (realCorrectAnswer == null && realExercise != null && realExercise.getCorrectAnswer() != null) {
+                                        java.util.Map<String, Object> ca = realExercise.getCorrectAnswer();
+                                        if (ca.containsKey("answer")) realCorrectAnswer = ca.get("answer").toString();
+                                        else if (ca.containsKey("translation")) realCorrectAnswer = ca.get("translation").toString();
+                                        else if (ca.containsKey("text")) realCorrectAnswer = ca.get("text").toString();
+                                        else realCorrectAnswer = ca.values().iterator().next().toString();
+                                    }
+
+                                    // 3. Eltároljuk a hibát a kinyert válasszal
+                                    if (!globalMistakes.containsKey(exIdStr)) {
+                                        globalMistakes.put(exIdStr, ClassroomAnalyticsResponse.FrequentMistakeDTO.builder()
+                                                .question(answer.getQuestion())
+                                                .mistakeCount(1)
+                                                .assignmentTitle(assignment.getTitle())
+                                                .exercise(answer.getExercise())
+                                                .serverCorrectAnswer(realCorrectAnswer) // Itt adjuk át a bombabiztos választ!
+                                                .build());
+                                    } else {
+                                        ClassroomAnalyticsResponse.FrequentMistakeDTO existing = globalMistakes.get(exIdStr);
+                                        existing.setMistakeCount(existing.getMistakeCount() + 1);
+
+                                        // Ha korábban nem volt meg a válasz, most pótoljuk
+                                        if (existing.getServerCorrectAnswer() == null && realCorrectAnswer != null) {
+                                            existing.setServerCorrectAnswer(realCorrectAnswer);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to parse raw answers for analytics", e);
+                    }
+                } else {
+                    scores.put(assignment.getAssignmentId().toString(), null);
+                }
+            }
+
+            heatmapData.add(ClassroomAnalyticsResponse.StudentHeatmapRowDTO.builder()
+                    .studentName(student.getName())
+                    .studentEmail(student.getEmail())
+                    .scores(scores)
+                    .build());
+        }
+
+        // 4. Sort and Extract Top 5 Mistakes
+        List<ClassroomAnalyticsResponse.FrequentMistakeDTO> topMistakes = globalMistakes.values().stream()
+                .sorted((a, b) -> Integer.compare(b.getMistakeCount(), a.getMistakeCount()))
+                .limit(5)
+                .toList();
+
+        return ClassroomAnalyticsResponse.builder()
+                .assignmentHeaders(headers)
+                .heatmapData(heatmapData)
+                .topMistakes(topMistakes)
+                .build();
     }
 }

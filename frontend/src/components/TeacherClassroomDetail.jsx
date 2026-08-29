@@ -6,6 +6,7 @@ import { assignmentApi } from '../services/assignmentApi';
 import { lessonApi } from '../services/lessonApi';
 import { useNotifications } from '../context/NotificationContext';
 import { parseServerDate, formatToLocalDisplay, formatToUtcForServer } from '../utils/dateUtils';
+import ExercisePreviewCard from '../components/ExercisePreviewCard';
 
 /**
  * Dashboard component for teachers to manage a specific classroom.
@@ -35,6 +36,12 @@ const TeacherClassroomDetail = () => {
     const [assignmentMode, setAssignmentMode] = useState('TEST'); 
 
     const [stats, setStats] = useState(null);
+    const [advancedStats, setAdvancedStats] = useState(null);
+    const [expandedMistakeIndex, setExpandedMistakeIndex] = useState(null);
+
+    const toggleMistakePreview = (index) => {
+        setExpandedMistakeIndex(prev => prev === index ? null : index);
+    };
 
     const { notifications } = useNotifications();
 
@@ -82,6 +89,9 @@ const TeacherClassroomDetail = () => {
 
             const statsRes = await assignmentApi.getClassroomStatistics(classroomId);
             setStats(statsRes.data);
+
+            const advStatsRes = await assignmentApi.getAdvancedClassroomStatistics(classroomId);
+            setAdvancedStats(advStatsRes.data);
 
         } catch (error) {
             console.error("Hiba az adatok lekérésekor:", error);
@@ -314,6 +324,52 @@ const TeacherClassroomDetail = () => {
     const scheduledUngradedCount = scheduledAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
     const expiredUngradedCount = expiredAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
 
+    
+    const getHeatmapColor = (score) => {
+        if (score === null || score === undefined) return 'bg-secondary bg-opacity-25 text-muted';
+        if (score >= 80) return 'bg-success text-light fw-bold';
+        if (score >= 50) return 'bg-warning text-dark fw-bold';
+        return 'bg-danger text-light fw-bold';
+    };
+
+    const exportToCSV = () => {
+        if (!advancedStats || !advancedStats.heatmapData || advancedStats.heatmapData.length === 0) {
+            alert("Nincs exportálható adat.");
+            return;
+        }
+
+        // CSV Fejléc összeállítása (Európai szabvány szerint pontosvesszővel elválasztva az Excelhez)
+        const headers = ['Diák Neve', ...advancedStats.assignmentHeaders.map(h => h.title)];
+        let csvContent = headers.join(';') + '\n';
+
+        // Sorok (Diákok és pontszámaik)
+        advancedStats.heatmapData.forEach(row => {
+            const rowData = [row.studentName]; // Első oszlop a név
+            
+            advancedStats.assignmentHeaders.forEach(header => {
+                const score = row.scores[header.assignmentId];
+                rowData.push(score !== null ? `${score}%` : 'Nincs beadva');
+            });
+            
+            csvContent += rowData.join(';') + '\n';
+        });
+
+        // UTF-8 BOM hozzáadása, hogy az Excel helyesen kezelje a magyar ékezeteket
+        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+        const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        // Letöltés triggerelése egy láthatatlan linkkel
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${classroomName.replace(/\s+/g, '_')}_Statisztika.csv`);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     /**
      * Renders an individual assignment card with dynamic badges based on status and metadata.
      * 
@@ -472,67 +528,181 @@ const TeacherClassroomDetail = () => {
                 </Tab>
 
                 <Tab eventKey="statistics" title={<span className="fw-bold">📊 Statisztika & Haladás</span>}>
-                    {stats && (
-                            <div className="mt-4">
-                                <Row className="mb-4 text-center">
-                                    <Col md={6}>
-                                        <Card className="bg-dark border-info p-3">
-                                            <h6 className="text-secondary">Osztályterem Átlag</h6>
-                                            <h2 className="text-info fw-bold">{stats.classAverage}%</h2>
-                                        </Card>
-                                    </Col>
-                                    <Col md={6}>
-                                        <Card className="bg-dark border-success p-3">
-                                            <h6 className="text-secondary">Kiadott feladatok</h6>
-                                            <h2 className="text-success fw-bold">{stats.totalAssignments} db</h2>
-                                        </Card>
-                                    </Col>
-                                </Row>
+                    {stats && advancedStats && (
+                        <div className="mt-4">
+                            <Tabs defaultActiveKey="overview" className="mb-3 border-secondary custom-dark-tabs small">
+                                
+                                {/* DEFAULT OVERVIEW */}
+                                <Tab eventKey="overview" title="Áttekintés">
+                                    <Row className="mb-4 text-center mt-3">
+                                        <Col md={6}>
+                                            <Card className="bg-dark border-info p-3">
+                                                <h6 className="text-secondary">Osztályterem Átlag</h6>
+                                                <h2 className="text-info fw-bold">{stats.classAverage}%</h2>
+                                            </Card>
+                                        </Col>
+                                        <Col md={6}>
+                                            <Card className="bg-dark border-success p-3">
+                                                <h6 className="text-secondary">Kiadott feladatok</h6>
+                                                <h2 className="text-success fw-bold">{stats.totalAssignments} db</h2>
+                                            </Card>
+                                        </Col>
+                                    </Row>
 
-                                <Card className="bg-dark text-light border-secondary shadow-lg">
-                                    <Card.Header className="bg-dark border-secondary fw-bold text-primary">
-                                        Diákok Aggregált Teljesítménye
-                                    </Card.Header>
-                                    <Table hover variant="dark" responsive className="m-0">
-                                        <thead>
-                                            <tr className="text-secondary">
-                                                <th>Diák Neve</th>
-                                                <th className="text-center">Befejezett</th>
-                                                <th className="text-center">Haladás</th>
-                                                <th className="text-center">Átlagpont</th>
-                                                <th>Utolsó Aktivitás</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {stats.studentProgress.map((s, idx) => (
-                                                <tr key={idx} className="align-middle">
-                                                    <td>
-                                                        <div className="fw-bold">{s.studentName}</div>
-                                                        <div className="small text-secondary">{s.studentEmail}</div>
-                                                    </td>
-                                                    <td className="text-center">{s.completedCount} / {stats.totalAssignments}</td>
-                                                    <td className="text-center" style={{ width: '150px' }}>
-                                                        <ProgressBar 
-                                                            now={(s.completedCount / stats.totalAssignments) * 100} 
-                                                            variant="info" 
-                                                            style={{ height: '8px' }} 
-                                                        />
-                                                    </td>
-                                                    <td className="text-center">
-                                                        <Badge bg={s.averageScore >= 80 ? "success" : s.averageScore >= 50 ? "warning" : "danger"} className="fs-6">
-                                                            {s.averageScore}%
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="text-secondary small">
-                                                        {s.lastActivity !== "Nincs adat" ? new Date(s.lastActivity).toLocaleString('hu-HU') : "Még nem kezdte el"}
-                                                    </td>
+                                    <Card className="bg-dark text-light border-secondary shadow-lg">
+                                        <Card.Header className="bg-dark border-secondary fw-bold text-primary">
+                                            Diákok Aggregált Teljesítménye
+                                        </Card.Header>
+                                        <Table hover variant="dark" responsive className="m-0">
+                                            <thead>
+                                                <tr className="text-secondary">
+                                                    <th>Diák Neve</th>
+                                                    <th className="text-center">Befejezett</th>
+                                                    <th className="text-center">Haladás</th>
+                                                    <th className="text-center">Átlagpont</th>
+                                                    <th>Utolsó Aktivitás</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </Table>
-                                </Card>
-                            </div>
-                        )}
+                                            </thead>
+                                            <tbody>
+                                                {stats.studentProgress.map((s, idx) => (
+                                                    <tr key={idx} className="align-middle">
+                                                        <td>
+                                                            <div className="fw-bold">{s.studentName}</div>
+                                                            <div className="small text-secondary">{s.studentEmail}</div>
+                                                        </td>
+                                                        <td className="text-center">{s.completedCount} / {stats.totalAssignments}</td>
+                                                        <td className="text-center" style={{ width: '150px' }}>
+                                                            <ProgressBar now={(s.completedCount / stats.totalAssignments) * 100} variant="info" style={{ height: '8px' }} />
+                                                        </td>
+                                                        <td className="text-center">
+                                                            <Badge bg={s.averageScore >= 80 ? "success" : s.averageScore >= 50 ? "warning" : "danger"} className="fs-6">
+                                                                {s.averageScore}%
+                                                            </Badge>
+                                                        </td>
+                                                        <td className="text-secondary small">
+                                                            {s.lastActivity !== "Nincs adat" ? new Date(s.lastActivity).toLocaleString('hu-HU') : "Még nem kezdte el"}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </Table>
+                                    </Card>
+                                </Tab>
+
+                                {/* HEATMAP */}
+                                <Tab eventKey="heatmap" title="Nehézségi Hőtérkép">
+                                    <Card className="bg-dark text-light border-secondary shadow-lg mt-3">
+                                        <Card.Header className="bg-dark border-secondary d-flex justify-content-between align-items-center">
+                                            <span className="fw-bold text-warning">Teljesítmény Mátrix</span>
+                                            <Button variant="outline-success" size="sm" onClick={exportToCSV} className="fw-bold d-flex align-items-center gap-2">
+                                                <span>⬇️</span> CSV Export
+                                            </Button>
+                                        </Card.Header>
+                                        <div className="table-responsive">
+                                            <Table bordered variant="dark" className="m-0 text-center align-middle" style={{ minWidth: '800px' }}>
+                                                {/* X-plane: Assignment names */}
+                                                <thead className="border-bottom border-2 border-info bg-black bg-opacity-50">
+                                                    <tr>
+                                                        <th className="text-start text-info text-uppercase p-3 border-end border-2 border-info" style={{ minWidth: '220px' }}>
+                                                            Diák \ Feladat
+                                                        </th>
+                                                        {advancedStats.assignmentHeaders.map(header => (
+                                                            <th key={header.assignmentId} title={header.title} className="text-light p-3">
+                                                                <div className="text-truncate" style={{ maxWidth: '120px', display: 'inline-block' }}>
+                                                                    {header.title}
+                                                                </div>
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                
+                                                {/* Y-plane and data: Student names and the percentages */}
+                                                <tbody>
+                                                    {advancedStats.heatmapData.map((row, idx) => (
+                                                        <tr key={idx}>
+                                                            <th className="text-start fw-bold text-light bg-black bg-opacity-25 p-3 border-end border-2 border-info">
+                                                                {row.studentName}
+                                                            </th>
+                                                            
+                                                            {advancedStats.assignmentHeaders.map(header => {
+                                                                const score = row.scores[header.assignmentId];
+                                                                return (
+                                                                    <td key={header.assignmentId} className={`p-0 ${getHeatmapColor(score)}`}>
+                                                                        <div className="p-3 w-100 h-100 d-flex align-items-center justify-content-center" title={score !== null ? `${score}%` : 'Nincs beadva'}>
+                                                                            {score !== null ? `${score}%` : '-'}
+                                                                        </div>
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                        </tr>
+                                                    ))}
+                                                    {advancedStats.heatmapData.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan={advancedStats.assignmentHeaders.length + 1} className="text-muted py-4">Nincsenek adatok a hőtérképhez.</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </Table>
+                                        </div>
+                                    </Card>
+                                </Tab>
+
+                             <Tab eventKey="mistakes" title="Gyakori Hibák">
+                                    <Card className="bg-dark text-light border-secondary shadow-lg mt-3">
+                                        <Card.Header className="bg-dark border-secondary fw-bold text-danger">
+                                            Top 5 Leggyakrabban Elrontott Kérdés
+                                        </Card.Header>
+                                        <ListGroup variant="flush">
+                                            {advancedStats.topMistakes.length === 0 ? (
+                                                <ListGroup.Item className="bg-dark text-light text-center py-4 border-0">
+                                                    Még nincsenek rögzített hibák az osztályban.
+                                                </ListGroup.Item>
+                                            ) : (
+                                                advancedStats.topMistakes.map((mistake, idx) => (
+                                                    <ListGroup.Item key={idx} className="bg-dark text-light border-secondary p-3">
+                                                        
+                                                        {/* TITLES AND BUTTONS */}
+                                                        <div className="d-flex justify-content-between align-items-center">
+                                                            <div className="d-flex align-items-center gap-3">
+                                                                <div className="fs-4 fw-bold text-secondary">#{idx + 1}</div>
+                                                                <div>
+                                                                    <div className="fw-bold">{mistake.question}</div>
+                                                                    <div className="small text-info mt-1">
+                                                                        <span className="text-secondary">Forrás:</span> {mistake.assignmentTitle}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="d-flex align-items-center gap-3">
+                                                                <Badge bg="danger" pill className="fs-6 px-3 py-2">
+                                                                    {mistake.mistakeCount} rontott válasz
+                                                                </Badge>
+                                                                {mistake.exercise && (
+                                                                    <Button variant="link" size="sm" className="text-info p-0 text-decoration-none" onClick={() => toggleMistakePreview(idx)}>
+                                                                        {expandedMistakeIndex === idx ? 'elrejtés' : 'előnézet👁️'}
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* EXPANDABLE PREVIEW */}
+                                                      {expandedMistakeIndex === idx && mistake.exercise && (
+                                                            <div className="mt-3">
+                                                                <ExercisePreviewCard 
+                                                                    exercise={mistake.exercise} 
+                                                                    serverCorrectAnswer={mistake.serverCorrectAnswer}
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                    </ListGroup.Item>
+                                                ))
+                                            )}
+                                        </ListGroup>
+                                    </Card>
+                                </Tab>
+                            </Tabs>
+                        </div>
+                    )}
                 </Tab>
             </Tabs>
 

@@ -16,6 +16,7 @@ export const assignmentApi = {
     gradeSession: (sessionId, data) => api.post(`/assignments/sessions/${sessionId}/grade`, data),
     getMyAssignmentSessions: (assignmentId) => api.get(`/assignments/${assignmentId}/my-sessions`),
     getClassroomStatistics: (classroomId) => api.get(`/assignments/classroom/${classroomId}/statistics`),
-    getStudentClassroomStatistics: (classroomId) => api.get(`/assignments/classroom/${classroomId}/my-statistics`)
+    getStudentClassroomStatistics: (classroomId) => api.get(`/assignments/classroom/${classroomId}/my-statistics`),
+    getAdvancedClassroomStatistics: (classroomId) => api.get(`/assignments/classroom/${classroomId}/advanced-statistics`),
     
 };

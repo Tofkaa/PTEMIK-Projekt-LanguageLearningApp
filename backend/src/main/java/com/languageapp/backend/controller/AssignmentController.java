@@ -3,10 +3,7 @@ package com.languageapp.backend.controller;
 import com.languageapp.backend.dto.request.AssignmentCreateRequest;
 import com.languageapp.backend.dto.request.AssignmentSubmitRequest;
 import com.languageapp.backend.dto.request.TeacherGradeRequest;
-import com.languageapp.backend.dto.response.AssignmentResponse;
-import com.languageapp.backend.dto.response.AssignmentSessionResponse;
-import com.languageapp.backend.dto.response.AssignmentStartResponse;
-import com.languageapp.backend.dto.response.ClassroomStatisticsResponse;
+import com.languageapp.backend.dto.response.*;
 import com.languageapp.backend.service.AssignmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -88,7 +85,7 @@ public class AssignmentController {
     }
 
     /**
-     * Tanár lekéri egy adott feladat összes beadott munkáját.
+     * Teacher retrieves all submissions to a specific assignment.
      */
     @GetMapping("/{id}/sessions")
     @PreAuthorize("hasRole('TEACHER')")
@@ -99,7 +96,7 @@ public class AssignmentController {
     }
 
     /**
-     * Tanár beküldi a felülbírált pontszámot és az értékelést (Publikálás).
+     * Teacher submits the overridden score and the assessment (Publish).
      */
     @PostMapping("/sessions/{sessionId}/grade")
     @PreAuthorize("hasRole('TEACHER')")
@@ -118,17 +115,27 @@ public class AssignmentController {
         return ResponseEntity.ok(assignmentService.getMySessionsForAssignment(id, auth.getName()));
     }
 
-    // Tanári statisztika
     @GetMapping("/classroom/{classroomId}/statistics")
     public ResponseEntity<ClassroomStatisticsResponse> getClassroomStatistics(@PathVariable UUID classroomId) {
         return ResponseEntity.ok(assignmentService.getClassroomStatistics(classroomId));
     }
 
-    // Diák saját statisztikája
+
     @GetMapping("/classroom/{classroomId}/my-statistics")
     public ResponseEntity<java.util.Map<String, Object>> getMyClassroomStatistics(
             @PathVariable UUID classroomId,
             Authentication auth) {
         return ResponseEntity.ok(assignmentService.getStudentClassroomStats(classroomId, auth.getName()));
+    }
+
+    /**
+     * Teacher retrieves advanced analytics (heatmap and item analysis) for a classroom.
+     */
+    @GetMapping("/classroom/{classroomId}/advanced-statistics")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<ClassroomAnalyticsResponse> getClassroomAdvancedStatistics(
+            @PathVariable UUID classroomId,
+            Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getClassroomAnalytics(classroomId, auth.getName()));
     }
 }

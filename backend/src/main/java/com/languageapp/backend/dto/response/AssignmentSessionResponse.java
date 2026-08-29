@@ -34,5 +34,6 @@ public class AssignmentSessionResponse {
         private boolean correct;
         private boolean retried;
         private Exercise exercise;
+        private String serverCorrectAnswer;
     }
 }

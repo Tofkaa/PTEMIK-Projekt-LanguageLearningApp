@@ -5,6 +5,7 @@ import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 import { useNotifications } from '../context/NotificationContext';
 import { parseServerDate, formatToLocalDisplay } from '../utils/dateUtils';
+import ExercisePreviewCard from '../components/ExercisePreviewCard';
 
 /**
  * Dashboard component for students to view and interact with a specific classroom.
@@ -420,23 +421,14 @@ const StudentClassroomDetail = () => {
                                                 </div>
 
                                                 {expandedPreviewId === previewId && ans.exercise && (
-                                                    <div className="mt-1 mb-3 p-2 bg-black bg-opacity-25 rounded border border-info small text-light">
-                                                        <strong>Típus:</strong> {ans.exercise.type}<br/>
-                                                        {ans.exercise.content?.options && (
-                                                            <div>
-                                                                <strong>Opciók:</strong> {
-                                                                    Array.isArray(ans.exercise.content.options) && typeof ans.exercise.content.options[0] === 'object' 
-                                                                    ? ans.exercise.content.options.map(o => o.text).join(", ") 
-                                                                    : ans.exercise.content.options.join(", ")
-                                                                }
-                                                            </div>
-                                                        )}
-                                                        {ans.exercise.content?.words && <div><strong>Szavak:</strong> {ans.exercise.content.words.join(", ")}</div>}
-                                                        {ans.exercise.content?.correctTranslation && <div><strong>Helyes fordítás:</strong> {ans.exercise.content.correctTranslation}</div>}
-                                                        {ans.exercise.content?.correctAnswer && <div><strong>Helyes válasz:</strong> {ans.exercise.content.correctAnswer}</div>}
+                                                    <div className="mt-2 mb-3">
+                                                        <ExercisePreviewCard 
+                                                            exercise={ans.exercise} 
+                                                            serverCorrectAnswer={ans.serverCorrectAnswer} 
+                                                        />
                                                     </div>
                                                 )}
-
+                                                
                                                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                                     <div>
                                                         <span className="text-secondary fw-bold">Válaszod: </span>

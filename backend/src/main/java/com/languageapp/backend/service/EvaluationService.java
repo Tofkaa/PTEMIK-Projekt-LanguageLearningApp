@@ -239,7 +239,7 @@ public class EvaluationService {
                     String questionText = exercise.getContent() != null && exercise.getContent().containsKey("question")
                             ? String.valueOf(exercise.getContent().get("question"))
                             : "Unknown question";
-                    mistakes.add(new MistakeDTO(questionText, firstAnswer, rawExpected));
+                    mistakes.add(new MistakeDTO(exercise.getExerciseId(), firstAnswer, rawExpected,questionText));
 
                     // CASE 2: The user failed initially, but we check if they fixed it via the retry queue
                     if (retryAttempt != null) {
