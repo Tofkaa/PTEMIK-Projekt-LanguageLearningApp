@@ -98,8 +98,8 @@ public class UserDifficultyCalculator {
     private String calculateNextDifficulty(String currentDifficulty, double score, int totalAttempts) {
         switch (currentDifficulty) {
             case "HARD":
-                // Master level: Once reached, the user is locked into HARD mode
-                // to maintain the challenge without punishing occasional low scores.
+                // If WMA drops below 60% demote the user back to MEDIUM for a better experience
+                if (score < 60.0) return "MEDIUM";
                 return "HARD";
 
             case "EASY":

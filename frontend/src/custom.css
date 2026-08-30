@@ -73,3 +73,41 @@ body {
     background-color: #E0E0E0 !important; /* Specific light-gray background from your quiz wireframe */
     color: #333333 !important; /* Specific dark text for readability on light card */
 }
+
+/* Pulse warning animation for dynamic difficulty change at the end of lessons */
+.pulse-warning-banner {
+    animation: neon-rank-up 1.5s infinite alternate;
+    border: 2px solid #ffc107; 
+    transition: all 0.3s ease-in-out;
+}
+
+/* Breathing animation for demotion (level down) banner */
+.breathing-demote-banner {
+    animation: tactical-reset 2.5s infinite alternate; 
+    border: 2px solid #6c757d; 
+    transition: all 0.3s ease-in-out;
+}
+
+@keyframes tactical-reset {
+    0% {
+        box-shadow: 0 0 5px rgba(108, 117, 125, 0.1), inset 0 0 5px rgba(108, 117, 125, 0.05);
+        opacity: 0.85;
+    }
+    100% {
+        box-shadow: 0 0 25px 8px rgba(108, 117, 125, 0.4), inset 0 0 12px 2px rgba(108, 117, 125, 0.2);
+        border-color: #adb5bd; 
+        opacity: 1;
+    }
+}
+
+@keyframes neon-rank-up {
+    0% {
+        box-shadow: 0 0 5px rgba(255, 193, 7, 0.2), inset 0 0 5px rgba(255, 193, 7, 0.1);
+        transform: scale(1);
+    }
+    100% {
+        box-shadow: 0 0 30px 10px rgba(255, 193, 7, 0.9), inset 0 0 15px 5px rgba(255, 193, 7, 0.4);
+        transform: scale(1.02); 
+        border-color: #ffea99; 
+    }
+}

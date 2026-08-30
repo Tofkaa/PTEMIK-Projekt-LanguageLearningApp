@@ -43,6 +43,7 @@ public class EvaluationService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeService challengeService;
     private final AssignmentSessionRepository sessionRepository;
+    private final StreakService streakService;
 
 
     /**
@@ -135,32 +136,7 @@ public class EvaluationService {
         // --- 2. GAMIFICATION: DAILY STREAK ENGINE ---
         // Runs on every successful lesson completion (even practice/repeats) to encourage daily engagement.
         if (passed) {
-            Result lastResult = resultRepository.findFirstByUserUserIdOrderBySubmittedAtDesc(userId).orElse(null);
-            java.time.LocalDate today = java.time.LocalDate.now();
-            int currentStreak = (user.getStreak() != null) ? user.getStreak() : 0;
-
-            if (lastResult != null) {
-                java.time.LocalDate lastDate = lastResult.getSubmittedAt().toLocalDate();
-
-                if (lastDate.equals(today.minusDays(1))) {
-                    // Maintained streak: User studied yesterday and today
-                    user.setStreak(currentStreak + 1);
-                } else if (lastDate.isBefore(today.minusDays(1))) {
-                    // Broken streak: User skipped at least one day
-                    user.setStreak(1);
-                } else if (lastDate.equals(today)) {
-                    // EDGE CASE SAFETY NET: If the user studied today, but their memory streak is 0, initialize it.
-                    if (currentStreak == 0) {
-                        user.setStreak(1);
-                    }
-                }
-            } else {
-                // First successful lesson ever
-                user.setStreak(1);
-            }
-
-            // Persist the updated XP and/or Streak to the database
-            userRepository.save(user);
+            streakService.updateActivity(user);
         }
 
         Challenge challenge = null;
@@ -169,9 +145,19 @@ public class EvaluationService {
                     .orElseThrow(() -> new ResourceNotFoundException("Challenge nem található."));
         }
 
+        // --- 3. DYNAMIC DIFFICULTY EVALUATION ---
+        // 1. Save the old difficulty BEFORE saving the Result
+        String oldDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+
         // Save historical result and update ongoing progress
         Result savedResult = saveResult(user, lesson, request, correctAnswersCount, totalQuestions, score, challenge);
         updateProgress(progress, score, passed);
+
+        // 2. Calculate the new difficulty AFTER saving the Result
+        String newDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+
+        boolean isLevelUp = checkLevelUp(oldDifficulty, newDifficulty);
+        boolean isLevelDown = checkLevelDown(oldDifficulty, newDifficulty);
 
         // --- THE EVALUATION ENGINE TRIGGER ---
         if (challengeId != null) {
@@ -192,6 +178,9 @@ public class EvaluationService {
                 .feedback(feedback)
                 .mistakes(mistakes)
                 .newStreak(user.getStreak() != null ? user.getStreak() : 0) // Attach final streak for the frontend
+                .newDifficulty(newDifficulty)
+                .isLevelUp(isLevelUp)
+                .isLevelDown(isLevelDown)
                 .build();
     }
 
@@ -250,7 +239,7 @@ public class EvaluationService {
                     String questionText = exercise.getContent() != null && exercise.getContent().containsKey("question")
                             ? String.valueOf(exercise.getContent().get("question"))
                             : "Unknown question";
-                    mistakes.add(new MistakeDTO(questionText, firstAnswer, rawExpected));
+                    mistakes.add(new MistakeDTO(exercise.getExerciseId(), firstAnswer, rawExpected,questionText));
 
                     // CASE 2: The user failed initially, but we check if they fixed it via the retry queue
                     if (retryAttempt != null) {
@@ -297,6 +286,27 @@ public class EvaluationService {
         result.setChallenge(challenge);
 
         return resultRepository.save(result);
+    }
+    private int getDifficultyRank(String difficulty) {
+        if (difficulty == null) return 0;
+        return switch (difficulty) {
+            case "EASY" -> 1;
+            case "MEDIUM" -> 2;
+            case "HARD" -> 3;
+            default -> 0;
+        };
+    }
+
+    private boolean checkLevelUp(String oldDifficulty, String newDifficulty) {
+        int oldRank = getDifficultyRank(oldDifficulty);
+        int newRank = getDifficultyRank(newDifficulty);
+        return oldRank != 0 && newRank > oldRank;
+    }
+
+    private boolean checkLevelDown(String oldDifficulty, String newDifficulty) {
+        int oldRank = getDifficultyRank(oldDifficulty);
+        int newRank = getDifficultyRank(newDifficulty);
+        return oldRank != 0 && newRank < oldRank;
     }
 
     private void updateProgress(Progress progress, int score, boolean passed) {

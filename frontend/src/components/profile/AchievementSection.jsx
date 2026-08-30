@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Row, Col, Spinner } from 'react-bootstrap';
 import api from '../../services/api'; 
+import { formatToLocalDisplay } from '../../utils/dateUtils';
 
 /**
  * AchievementsSection Component
@@ -91,7 +92,7 @@ const AchievementsSection = () => {
                             {/* Timestamp for earned achievements */}
                             {ach.isUnlocked && ach.achievedAt && (
                                 <small className="text-success fw-bold mt-1 d-block" style={{ fontSize: '0.7rem' }}>
-                                    Megszerezve: {new Date(ach.achievedAt).toLocaleDateString('hu-HU')}
+                                    Megszerezve: {formatToLocalDisplay(ach.achievedAt, false)}
                                 </small>
                             )}
                         </div>

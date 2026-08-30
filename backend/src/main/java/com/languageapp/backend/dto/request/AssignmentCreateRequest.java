@@ -32,5 +32,7 @@ public class AssignmentCreateRequest {
     private LocalDateTime availableFrom;
     private LocalDateTime availableUntil;
     private Integer timeLimitMinutes;
+    private String generationMode;
+    private Integer questionCount;
     private List<UUID> exerciseIds;
 }

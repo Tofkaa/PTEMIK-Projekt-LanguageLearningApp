@@ -13,6 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.List;
 import java.util.UUID;
@@ -28,6 +31,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class LessonService {
+
+    @Value("${app.security.exercise-salt}")
+   private String exerciseSalt;
 
     private final LessonRepository lessonRepository;
     private final UserRepository userRepository;
@@ -106,8 +112,8 @@ public class LessonService {
     }
 
     /**
-     * Visszaadja az ÖSSZES leckét (nehézségi szűrő nélkül) a Kihívások Modal legördülő listájához.
-     * Ez biztonságos, mert csak a neveket és ID-kat fedi fel, a lecke tartalmát (exercises) nem!
+     * Returns ALL lessons (without difficulty filter) to the Challenges Modal dropdown.
+     * This is safe because it only reveals the names and IDs, not the lesson content!
      */
     @Transactional(readOnly = true)
     public List<LessonResponse> getAllLessonsForChallengeDropdown() {
@@ -142,13 +148,52 @@ public class LessonService {
     }
 
     private ExerciseResponse mapToExerciseResponse(Exercise exercise) {
+        String hash = null;
+
+        // Only generate hashes for non translation exercises that have a correct answer for them
+        if (!"TRANSLATION".equals(exercise.getType()) &&
+                exercise.getCorrectAnswer() != null &&
+                exercise.getCorrectAnswer().containsKey("answer")) {
+
+            String rawAnswer = String.valueOf(exercise.getCorrectAnswer().get("answer"));
+            // Normalize the answer
+            String normalizedAnswer = rawAnswer.toLowerCase().trim();
+            hash = generateSha256Hash(normalizedAnswer + exerciseSalt);
+        }
+
         return new ExerciseResponse(
                 exercise.getExerciseId(),
                 exercise.getLesson().getLessonId(),
                 exercise.getType(),
                 exercise.getContent(),
                 exercise.getAudioUrl(),
-                exercise.getImageUrl()
+                exercise.getImageUrl(),
+                hash
         );
+    }
+
+
+    /**
+     * SHA-256 based hash generator to support client side validation.
+     */
+    private String generateSha256Hash(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] encodedHash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+
+            // Convert byte array to hexadecimal String
+            StringBuilder hexString = new StringBuilder(2 * encodedHash.length);
+            for (byte b : encodedHash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            log.error("Kritikus hiba a hash generálása közben!", e);
+            return null;
+        }
     }
 }

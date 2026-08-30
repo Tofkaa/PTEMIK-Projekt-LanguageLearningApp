@@ -5,7 +5,16 @@ import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 import { lessonApi } from '../services/lessonApi';
 import { useNotifications } from '../context/NotificationContext';
+import { parseServerDate, formatToLocalDisplay, formatToUtcForServer } from '../utils/dateUtils';
+import ExercisePreviewCard from '../components/ExercisePreviewCard';
 
+/**
+ * Dashboard component for teachers to manage a specific classroom.
+ * Provides functionalities to monitor student progress, grade submissions,
+ * manage members, and create dynamic/fixed assignments.
+ * 
+ * @component
+ */
 const TeacherClassroomDetail = () => {
     const { id: classroomId } = useParams();
     const navigate = useNavigate();
@@ -13,6 +22,7 @@ const TeacherClassroomDetail = () => {
     
     const classroomName = location.state?.className || 'Osztályterem Kezelése';
 
+    // State definitions
     const [pendingMembers, setPendingMembers] = useState([]);
     const [acceptedMembers, setAcceptedMembers] = useState([]);
     const [assignments, setAssignments] = useState([]);
@@ -26,9 +36,21 @@ const TeacherClassroomDetail = () => {
     const [assignmentMode, setAssignmentMode] = useState('TEST'); 
 
     const [stats, setStats] = useState(null);
+    const [advancedStats, setAdvancedStats] = useState(null);
+    const [expandedMistakeIndex, setExpandedMistakeIndex] = useState(null);
+
+    const toggleMistakePreview = (index) => {
+        setExpandedMistakeIndex(prev => prev === index ? null : index);
+    };
 
     const { notifications } = useNotifications();
 
+     const [currentTime] = useState(() => Date.now()); 
+
+    /**
+     * @typedef {Object} AssignmentFormState
+     * Represents the configuration payload for creating a new assignment.
+     */
     const [assignmentForm, setAssignmentForm] = useState({
         title: '',
         description: '',
@@ -40,7 +62,9 @@ const TeacherClassroomDetail = () => {
         timeLimitMinutes: '',
         availableFrom: '',
         availableUntil: '',
-        exerciseIds: []
+        exerciseIds: [],
+        generationMode: 'FIXED', 
+        questionCount: ''        
     });
 
     const [previewExerciseId, setPreviewExerciseId] = useState(null);
@@ -48,20 +72,9 @@ const TeacherClassroomDetail = () => {
     const [isLoading, setIsLoading] = useState(true);
 
 
-    const parseDate = (d) => {
-        if (!d) return null;
-        if (Array.isArray(d)) {
-            return new Date(d[0], d[1] - 1, d[2], d[3] || 0, d[4] || 0, d[5] || 0);
-        }
-        return new Date(d);
-    };
-
-    const formatTime = (dateData) => {
-        const date = parseDate(dateData);
-        if (!date) return "Nincs megadva";
-        return date.toLocaleString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    };
-
+    /**
+     * Fetches core classroom data including members, assignments, and statistics.
+     */
     const fetchDashboardData = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -77,6 +90,9 @@ const TeacherClassroomDetail = () => {
             const statsRes = await assignmentApi.getClassroomStatistics(classroomId);
             setStats(statsRes.data);
 
+            const advStatsRes = await assignmentApi.getAdvancedClassroomStatistics(classroomId);
+            setAdvancedStats(advStatsRes.data);
+
         } catch (error) {
             console.error("Hiba az adatok lekérésekor:", error);
         } finally {
@@ -90,10 +106,16 @@ const TeacherClassroomDetail = () => {
         fetchDashboardData();
     }, [fetchDashboardData, pingTrigger]);
 
-    // A memória kezelő
+    // LocalStorage handlers for notification states
     const viewedTeacherPending = JSON.parse(localStorage.getItem('viewedTeacherPending') || '[]');
     const viewedTeacherUngraded = JSON.parse(localStorage.getItem('viewedTeacherUngraded') || '[]');
 
+    /**
+     * Marks specific notification IDs as viewed within the browser's local storage.
+     * 
+     * @param {string} storageKey - The key to access in localStorage.
+     * @param {Array<string>} idsToMark - Array of IDs to append to the viewed list.
+     */
     const markAsViewed = (storageKey, idsToMark) => {
         if (!idsToMark || idsToMark.length === 0) return;
         const stringIds = idsToMark.map(id => String(id));
@@ -103,22 +125,32 @@ const TeacherClassroomDetail = () => {
         window.dispatchEvent(new Event('local-storage-update'));
     };
 
-    // Kiszámoljuk, mik az aktuális teremből jövő, olvasatlan pingek
     const unseenPendingList = (notifications?.teacherPendingJoinRequestIds || []).filter(id => id.startsWith(classroomId) && !viewedTeacherPending.includes(id));
     const unseenUngradedList = (notifications?.teacherUngradedSubmissionIds || []).filter(id => id.startsWith(classroomId) && !viewedTeacherUngraded.includes(id));
 
-    // Amikor kattint az eredményekre, levesszük a pinget:
+    /**
+     * Navigates the teacher to the grading interface and clears the related notification ping.
+     * 
+     * @param {Object} assignment - The selected assignment object.
+     */
     const handleViewSubmissions = (assignment) => {
         markAsViewed('viewedTeacherUngraded', [`${classroomId}:${assignment.assignmentId}`]);
         navigate(`/assignment/${assignment.assignmentId}/submissions`, { state: { assignmentTitle: assignment.title, classroomName: classroomName } });
     };
 
     // --- MEMBER MANAGEMENT ---
+    
+    /**
+     * Accepts or rejects a pending join request.
+     */
     const handleModerate = async (studentId, approve) => {
         try { await classroomApi.moderateMember(classroomId, studentId, approve); fetchDashboardData(); }
         catch (error) { console.error("Hiba a moderálás során:", error); }
     };
 
+    /**
+     * Removes an accepted student from the classroom.
+     */
     const handleKick = async (studentId) => {
         if (window.confirm("Biztosan el akarod távolítani ezt a diákot az osztályból?")) {
             try { await classroomApi.kickMember(classroomId, studentId); fetchDashboardData(); }
@@ -164,7 +196,9 @@ const TeacherClassroomDetail = () => {
     };
 
     /**
-     * Toggles the selection of a specific exercise for the assignment.
+     * Toggles the selection state of a specific exercise within the creation modal.
+     * 
+     * @param {Object} exercise - The exercise data object.
      */
     const toggleExerciseSelection = (exercise) => {
         const exerciseId = exercise.exerciseId;
@@ -180,8 +214,7 @@ const TeacherClassroomDetail = () => {
     };
 
     /**
-     * Selects all exercises in a lesson, without 
-     * deleting previos selections from other lessons.
+     * Selects all exercises available in the currently selected lesson.
      */
     const handleSelectAllExercises = () => {
         const newIds = [];
@@ -200,7 +233,6 @@ const TeacherClassroomDetail = () => {
         }
     };
 
-  
     const removeFromSummary = (id) => {
         setAssignmentForm(prev => ({ ...prev, exerciseIds: prev.exerciseIds.filter(exId => exId !== id) }));
         setSelectedExercisesData(prev => prev.filter(ex => ex.id !== id));
@@ -210,15 +242,14 @@ const TeacherClassroomDetail = () => {
         setPreviewExerciseId(prev => prev === exerciseId ? null : exerciseId);
     };
 
+    /**
+     * Constructs the payload and submits the new assignment to the backend API.
+     * Formats local dates to UTC to prevent cross-timezone execution blocks.
+     */
     const handleAssignmentSubmit = async (e) => {
         e.preventDefault();
         if (isSubmitting) return; 
         setIsSubmitting(true);
-
-        const formatLocalTime = (dateStr) => {
-            if (!dateStr) return null;
-            return dateStr.length === 16 ? dateStr + ':00' : dateStr;
-        };
 
         const payload = {
             title: assignmentForm.title,
@@ -230,10 +261,15 @@ const TeacherClassroomDetail = () => {
             maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
             timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
             
-            availableFrom: formatLocalTime(assignmentForm.availableFrom),
-            availableUntil: formatLocalTime(assignmentForm.availableUntil),
+            availableFrom: formatToUtcForServer(assignmentForm.availableFrom),
+            availableUntil: formatToUtcForServer(assignmentForm.availableUntil),
             
-            exerciseIds: assignmentForm.exerciseIds
+            exerciseIds: assignmentForm.exerciseIds,
+
+            generationMode: assignmentForm.generationMode,
+            questionCount: assignmentForm.generationMode === 'RANDOM_SUBSET' && assignmentForm.questionCount 
+                            ? parseInt(assignmentForm.questionCount) 
+                            : null
         };
 
        try {
@@ -241,7 +277,8 @@ const TeacherClassroomDetail = () => {
             setIsAssignmentModalOpen(false);
             setAssignmentForm({
                 title: '', description: '', hasFeedback: false, isTest: false, isRandomized: true,
-                allowRetries: false, maxAttempts: '', timeLimitMinutes: '', availableFrom: '', availableUntil: '', exerciseIds: []
+                allowRetries: false, maxAttempts: '', timeLimitMinutes: '', availableFrom: '', availableUntil: '', exerciseIds: [],
+                generationMode: 'FIXED', questionCount: ''
             });
             setSelectedExercisesData([]);
             setAssignmentMode('TEST');
@@ -260,38 +297,85 @@ const TeacherClassroomDetail = () => {
         return <Container className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}><div className="spinner-border text-primary"></div></Container>;
     }
 
-    const now = new Date();
+   
     
-    // 1. Aktív: Már elkezdődött (vagy nincs kezdete) ÉS még nincs vége (vagy nincs vége)
     const activeAssignments = assignments.filter(a => {
-        const from = parseDate(a.availableFrom);
-        const until = parseDate(a.availableUntil);
-        return (!from || from <= now) && (!until || until > now);
+        const from = parseServerDate(a.availableFrom);
+        const until = parseServerDate(a.availableUntil);
+        return (!from || from.getTime() <= currentTime) && (!until || until.getTime() > currentTime);
     });
 
-    // 2. Ütemezett: Még nem kezdődött el
     const scheduledAssignments = assignments.filter(a => {
-        const from = parseDate(a.availableFrom);
-        return from && from > now;
+        const from = parseServerDate(a.availableFrom);
+        return from && from.getTime() > currentTime;
     });
 
-    // 3. Lejárt: Már elmúlt a határideje
     const expiredAssignments = assignments.filter(a => {
-        const until = parseDate(a.availableUntil);
-        return until && until <= now;
+        const until = parseServerDate(a.availableUntil);
+        return until && until.getTime() <= currentTime;
     });
 
-    // 1. Segédfüggvény a biztonságos (kisbetű/nagybetű független) egyezéshez
     const hasUngradedSubmission = (assignmentId) => {
         const targetId = `${classroomId}:${assignmentId}`.toLowerCase();
         return unseenUngradedList.some(id => id.toLowerCase() === targetId);
     };
 
-    // 2. Kiszámoljuk, melyik belső fülön mennyi új beadás van, hogy oda is tegyünk pöttyöt!
     const activeUngradedCount = activeAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
     const scheduledUngradedCount = scheduledAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
     const expiredUngradedCount = expiredAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
 
+    
+    const getHeatmapColor = (score) => {
+        if (score === null || score === undefined) return 'bg-secondary bg-opacity-25 text-muted';
+        if (score >= 80) return 'bg-success text-light fw-bold';
+        if (score >= 50) return 'bg-warning text-dark fw-bold';
+        return 'bg-danger text-light fw-bold';
+    };
+
+    const exportToCSV = () => {
+        if (!advancedStats || !advancedStats.heatmapData || advancedStats.heatmapData.length === 0) {
+            alert("Nincs exportálható adat.");
+            return;
+        }
+
+        // CSV Fejléc összeállítása (Európai szabvány szerint pontosvesszővel elválasztva az Excelhez)
+        const headers = ['Diák Neve', ...advancedStats.assignmentHeaders.map(h => h.title)];
+        let csvContent = headers.join(';') + '\n';
+
+        // Sorok (Diákok és pontszámaik)
+        advancedStats.heatmapData.forEach(row => {
+            const rowData = [row.studentName]; // Első oszlop a név
+            
+            advancedStats.assignmentHeaders.forEach(header => {
+                const score = row.scores[header.assignmentId];
+                rowData.push(score !== null ? `${score}%` : 'Nincs beadva');
+            });
+            
+            csvContent += rowData.join(';') + '\n';
+        });
+
+        // UTF-8 BOM hozzáadása, hogy az Excel helyesen kezelje a magyar ékezeteket
+        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+        const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        // Letöltés triggerelése egy láthatatlan linkkel
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${classroomName.replace(/\s+/g, '_')}_Statisztika.csv`);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    /**
+     * Renders an individual assignment card with dynamic badges based on status and metadata.
+     * 
+     * @param {Object} a - The assignment object.
+     * @param {string} status - Enum-like string ('active', 'scheduled', 'expired').
+     */
     const renderAssignmentCard = (a, status) => (
         <Col md={6} lg={4} key={a.assignmentId}>
             <Card className={`h-100 bg-dark text-light border-secondary shadow-sm ${status === 'expired' ? 'opacity-75' : ''}`}>
@@ -299,7 +383,6 @@ const TeacherClassroomDetail = () => {
                     <div className="d-flex justify-content-between align-items-start mb-2">
                         <Card.Title className="fw-bold text-primary m-0">{a.title}</Card.Title>
                         <div>
-                            {/* A BIZTOS PING ELLENŐRZÉS */}
                             {hasUngradedSubmission(a.assignmentId) && (
                                 <Badge bg="danger" className="animate-pulse shadow-sm me-2 border border-light">🔴 ÚJ BEKÜLDÉS</Badge>
                             )}
@@ -310,16 +393,15 @@ const TeacherClassroomDetail = () => {
                     
                     <Card.Text className="text-secondary mb-3 small flex-grow-1">{a.description}</Card.Text>
 
-                    {/* IDŐPONTOK MEGJELENÍTÉSE */}
                     <div className="mb-3 p-2 bg-black bg-opacity-25 rounded border border-secondary" style={{ fontSize: '0.8rem' }}>
                         <div className="d-flex justify-content-between mb-1">
                             <span className="text-secondary">📅 Elérhető:</span>
-                            <span className="text-info fw-bold">{formatTime(a.availableFrom)}</span>
+                            <span className="text-info fw-bold">{formatToLocalDisplay(a.availableFrom)}</span>
                         </div>
                         <div className="d-flex justify-content-between">
                             <span className="text-secondary">🕒 Határidő:</span>
                             <span className={`fw-bold ${status === 'expired' ? 'text-danger' : 'text-warning'}`}>
-                                {formatTime(a.availableUntil)}
+                                {formatToLocalDisplay(a.availableUntil)}
                             </span>
                         </div>
                     </div>
@@ -367,8 +449,6 @@ const TeacherClassroomDetail = () => {
                     </div>
 
             <Tabs defaultActiveKey="active" className="mb-3 border-secondary custom-dark-tabs">
-                
-                {/* 1. AKTUÁLISAN FUTÓ FELADATOK */}
                 <Tab eventKey="active" title={
                     <span className="fw-bold text-info">
                         🔥 Aktív ({activeAssignments.length})
@@ -380,7 +460,6 @@ const TeacherClassroomDetail = () => {
                     </Row>
                 </Tab>
 
-                {/* 2. JÖVŐBEN INDULÓ FELADATOK */}
                 <Tab eventKey="scheduled" title={
                     <span className="fw-bold text-warning">
                         📅 Ütemezett ({scheduledAssignments.length})
@@ -392,7 +471,6 @@ const TeacherClassroomDetail = () => {
                     </Row>
                 </Tab>
 
-                {/* 3. ARCHÍVUM */}
                 <Tab eventKey="expired" title={
                     <span className="fw-bold text-secondary">
                         ⏳ Lejárt ({expiredAssignments.length})
@@ -407,7 +485,6 @@ const TeacherClassroomDetail = () => {
         </Tab>
 
                 <Tab eventKey="members" title={
-                    
                     <span className="fw-bold">
                         👥 Tagság kezelése
                         {unseenPendingList.length > 0 && <Badge bg="danger" pill className="ms-2 animate-pulse">{unseenPendingList.length}</Badge>}
@@ -451,67 +528,181 @@ const TeacherClassroomDetail = () => {
                 </Tab>
 
                 <Tab eventKey="statistics" title={<span className="fw-bold">📊 Statisztika & Haladás</span>}>
-                    {stats && (
-                            <div className="mt-4">
-                                <Row className="mb-4 text-center">
-                                    <Col md={6}>
-                                        <Card className="bg-dark border-info p-3">
-                                            <h6 className="text-secondary">Osztályterem Átlag</h6>
-                                            <h2 className="text-info fw-bold">{stats.classAverage}%</h2>
-                                        </Card>
-                                    </Col>
-                                    <Col md={6}>
-                                        <Card className="bg-dark border-success p-3">
-                                            <h6 className="text-secondary">Kiadott feladatok</h6>
-                                            <h2 className="text-success fw-bold">{stats.totalAssignments} db</h2>
-                                        </Card>
-                                    </Col>
-                                </Row>
+                    {stats && advancedStats && (
+                        <div className="mt-4">
+                            <Tabs defaultActiveKey="overview" className="mb-3 border-secondary custom-dark-tabs small">
+                                
+                                {/* DEFAULT OVERVIEW */}
+                                <Tab eventKey="overview" title="Áttekintés">
+                                    <Row className="mb-4 text-center mt-3">
+                                        <Col md={6}>
+                                            <Card className="bg-dark border-info p-3">
+                                                <h6 className="text-secondary">Osztályterem Átlag</h6>
+                                                <h2 className="text-info fw-bold">{stats.classAverage}%</h2>
+                                            </Card>
+                                        </Col>
+                                        <Col md={6}>
+                                            <Card className="bg-dark border-success p-3">
+                                                <h6 className="text-secondary">Kiadott feladatok</h6>
+                                                <h2 className="text-success fw-bold">{stats.totalAssignments} db</h2>
+                                            </Card>
+                                        </Col>
+                                    </Row>
 
-                                <Card className="bg-dark text-light border-secondary shadow-lg">
-                                    <Card.Header className="bg-dark border-secondary fw-bold text-primary">
-                                        Diákok Aggregált Teljesítménye
-                                    </Card.Header>
-                                    <Table hover variant="dark" responsive className="m-0">
-                                        <thead>
-                                            <tr className="text-secondary">
-                                                <th>Diák Neve</th>
-                                                <th className="text-center">Befejezett</th>
-                                                <th className="text-center">Haladás</th>
-                                                <th className="text-center">Átlagpont</th>
-                                                <th>Utolsó Aktivitás</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {stats.studentProgress.map((s, idx) => (
-                                                <tr key={idx} className="align-middle">
-                                                    <td>
-                                                        <div className="fw-bold">{s.studentName}</div>
-                                                        <div className="small text-secondary">{s.studentEmail}</div>
-                                                    </td>
-                                                    <td className="text-center">{s.completedCount} / {stats.totalAssignments}</td>
-                                                    <td className="text-center" style={{ width: '150px' }}>
-                                                        <ProgressBar 
-                                                            now={(s.completedCount / stats.totalAssignments) * 100} 
-                                                            variant="info" 
-                                                            style={{ height: '8px' }} 
-                                                        />
-                                                    </td>
-                                                    <td className="text-center">
-                                                        <Badge bg={s.averageScore >= 80 ? "success" : s.averageScore >= 50 ? "warning" : "danger"} className="fs-6">
-                                                            {s.averageScore}%
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="text-secondary small">
-                                                        {s.lastActivity !== "Nincs adat" ? new Date(s.lastActivity).toLocaleString('hu-HU') : "Még nem kezdte el"}
-                                                    </td>
+                                    <Card className="bg-dark text-light border-secondary shadow-lg">
+                                        <Card.Header className="bg-dark border-secondary fw-bold text-primary">
+                                            Diákok Aggregált Teljesítménye
+                                        </Card.Header>
+                                        <Table hover variant="dark" responsive className="m-0">
+                                            <thead>
+                                                <tr className="text-secondary">
+                                                    <th>Diák Neve</th>
+                                                    <th className="text-center">Befejezett</th>
+                                                    <th className="text-center">Haladás</th>
+                                                    <th className="text-center">Átlagpont</th>
+                                                    <th>Utolsó Aktivitás</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </Table>
-                                </Card>
-                            </div>
-                        )}
+                                            </thead>
+                                            <tbody>
+                                                {stats.studentProgress.map((s, idx) => (
+                                                    <tr key={idx} className="align-middle">
+                                                        <td>
+                                                            <div className="fw-bold">{s.studentName}</div>
+                                                            <div className="small text-secondary">{s.studentEmail}</div>
+                                                        </td>
+                                                        <td className="text-center">{s.completedCount} / {stats.totalAssignments}</td>
+                                                        <td className="text-center" style={{ width: '150px' }}>
+                                                            <ProgressBar now={(s.completedCount / stats.totalAssignments) * 100} variant="info" style={{ height: '8px' }} />
+                                                        </td>
+                                                        <td className="text-center">
+                                                            <Badge bg={s.averageScore >= 80 ? "success" : s.averageScore >= 50 ? "warning" : "danger"} className="fs-6">
+                                                                {s.averageScore}%
+                                                            </Badge>
+                                                        </td>
+                                                        <td className="text-secondary small">
+                                                            {s.lastActivity !== "Nincs adat" ? new Date(s.lastActivity).toLocaleString('hu-HU') : "Még nem kezdte el"}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </Table>
+                                    </Card>
+                                </Tab>
+
+                                {/* HEATMAP */}
+                                <Tab eventKey="heatmap" title="Nehézségi Hőtérkép">
+                                    <Card className="bg-dark text-light border-secondary shadow-lg mt-3">
+                                        <Card.Header className="bg-dark border-secondary d-flex justify-content-between align-items-center">
+                                            <span className="fw-bold text-warning">Teljesítmény Mátrix</span>
+                                            <Button variant="outline-success" size="sm" onClick={exportToCSV} className="fw-bold d-flex align-items-center gap-2">
+                                                <span>⬇️</span> CSV Export
+                                            </Button>
+                                        </Card.Header>
+                                        <div className="table-responsive">
+                                            <Table bordered variant="dark" className="m-0 text-center align-middle" style={{ minWidth: '800px' }}>
+                                                {/* X-plane: Assignment names */}
+                                                <thead className="border-bottom border-2 border-info bg-black bg-opacity-50">
+                                                    <tr>
+                                                        <th className="text-start text-info text-uppercase p-3 border-end border-2 border-info" style={{ minWidth: '220px' }}>
+                                                            Diák \ Feladat
+                                                        </th>
+                                                        {advancedStats.assignmentHeaders.map(header => (
+                                                            <th key={header.assignmentId} title={header.title} className="text-light p-3">
+                                                                <div className="text-truncate" style={{ maxWidth: '120px', display: 'inline-block' }}>
+                                                                    {header.title}
+                                                                </div>
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                
+                                                {/* Y-plane and data: Student names and the percentages */}
+                                                <tbody>
+                                                    {advancedStats.heatmapData.map((row, idx) => (
+                                                        <tr key={idx}>
+                                                            <th className="text-start fw-bold text-light bg-black bg-opacity-25 p-3 border-end border-2 border-info">
+                                                                {row.studentName}
+                                                            </th>
+                                                            
+                                                            {advancedStats.assignmentHeaders.map(header => {
+                                                                const score = row.scores[header.assignmentId];
+                                                                return (
+                                                                    <td key={header.assignmentId} className={`p-0 ${getHeatmapColor(score)}`}>
+                                                                        <div className="p-3 w-100 h-100 d-flex align-items-center justify-content-center" title={score !== null ? `${score}%` : 'Nincs beadva'}>
+                                                                            {score !== null ? `${score}%` : '-'}
+                                                                        </div>
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                        </tr>
+                                                    ))}
+                                                    {advancedStats.heatmapData.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan={advancedStats.assignmentHeaders.length + 1} className="text-muted py-4">Nincsenek adatok a hőtérképhez.</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </Table>
+                                        </div>
+                                    </Card>
+                                </Tab>
+
+                             <Tab eventKey="mistakes" title="Gyakori Hibák">
+                                    <Card className="bg-dark text-light border-secondary shadow-lg mt-3">
+                                        <Card.Header className="bg-dark border-secondary fw-bold text-danger">
+                                            Top 5 Leggyakrabban Elrontott Kérdés
+                                        </Card.Header>
+                                        <ListGroup variant="flush">
+                                            {advancedStats.topMistakes.length === 0 ? (
+                                                <ListGroup.Item className="bg-dark text-light text-center py-4 border-0">
+                                                    Még nincsenek rögzített hibák az osztályban.
+                                                </ListGroup.Item>
+                                            ) : (
+                                                advancedStats.topMistakes.map((mistake, idx) => (
+                                                    <ListGroup.Item key={idx} className="bg-dark text-light border-secondary p-3">
+                                                        
+                                                        {/* TITLES AND BUTTONS */}
+                                                        <div className="d-flex justify-content-between align-items-center">
+                                                            <div className="d-flex align-items-center gap-3">
+                                                                <div className="fs-4 fw-bold text-secondary">#{idx + 1}</div>
+                                                                <div>
+                                                                    <div className="fw-bold">{mistake.question}</div>
+                                                                    <div className="small text-info mt-1">
+                                                                        <span className="text-secondary">Forrás:</span> {mistake.assignmentTitle}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="d-flex align-items-center gap-3">
+                                                                <Badge bg="danger" pill className="fs-6 px-3 py-2">
+                                                                    {mistake.mistakeCount} rontott válasz
+                                                                </Badge>
+                                                                {mistake.exercise && (
+                                                                    <Button variant="link" size="sm" className="text-info p-0 text-decoration-none" onClick={() => toggleMistakePreview(idx)}>
+                                                                        {expandedMistakeIndex === idx ? 'elrejtés' : 'előnézet👁️'}
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* EXPANDABLE PREVIEW */}
+                                                      {expandedMistakeIndex === idx && mistake.exercise && (
+                                                            <div className="mt-3">
+                                                                <ExercisePreviewCard 
+                                                                    exercise={mistake.exercise} 
+                                                                    serverCorrectAnswer={mistake.serverCorrectAnswer}
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                    </ListGroup.Item>
+                                                ))
+                                            )}
+                                        </ListGroup>
+                                    </Card>
+                                </Tab>
+                            </Tabs>
+                        </div>
+                    )}
                 </Tab>
             </Tabs>
 
@@ -557,6 +748,49 @@ const TeacherClassroomDetail = () => {
                                         </Form.Group>
                                     )}
                                     
+                                    <div className="small border-top border-secondary pt-2 mt-2 mb-2">
+                                        <Form.Label className="text-warning fw-bold mb-2">Kérdések kiosztása a diákoknak:</Form.Label>
+                                        
+                                        <Form.Check 
+                                            type="radio" 
+                                            label="Minden kijelölt feladatot megkapnak" 
+                                            name="genMode" 
+                                            checked={assignmentForm.generationMode === 'FIXED'} 
+                                            onChange={() => setAssignmentForm({...assignmentForm, generationMode: 'FIXED'})} 
+                                            className="mb-2 text-light"
+                                        />
+                                        
+                                        <Form.Check 
+                                            type="radio" 
+                                            label="Véletlenszerű sorsolás a kijelöltekből (Anti-Cheat)" 
+                                            name="genMode" 
+                                            checked={assignmentForm.generationMode === 'RANDOM_SUBSET'} 
+                                            onChange={() => setAssignmentForm({...assignmentForm, generationMode: 'RANDOM_SUBSET'})} 
+                                            className="mb-2 text-info"
+                                        />
+
+                                        {assignmentForm.generationMode === 'RANDOM_SUBSET' && (
+                                            <Form.Group className="mt-2 ms-3 p-2 bg-black bg-opacity-25 rounded border border-info">
+                                                <Form.Label className="small text-info fw-bold">Hány kérdést kapjon 1 diák?</Form.Label>
+                                                <Form.Control 
+                                                    type="number" 
+                                                    min="1"
+                                                    max={assignmentForm.exerciseIds.length || 1}
+                                                    className="bg-dark text-light border-info" 
+                                                    placeholder={`Max: ${assignmentForm.exerciseIds.length} db`}
+                                                    value={assignmentForm.questionCount} 
+                                                    onChange={e => {
+                                                        const val = e.target.value.replace(/\D/g, '');
+                                                        setAssignmentForm({...assignmentForm, questionCount: val});
+                                                    }}
+                                                />
+                                                <div className="small text-secondary mt-1">
+                                                    A rendszer {assignmentForm.exerciseIds.length} db kijelölt kérdésből fog véletlenszerűen sorsolni ennyit minden diáknak.
+                                                </div>
+                                            </Form.Group>
+                                        )}
+                                    </div>
+                                   
                                     {assignmentMode === 'TEST' && (
                                         <div className="small border-top border-secondary pt-2">
                                             <Form.Check type="switch" label="Azonnali visszajelzés" className="mb-1" 

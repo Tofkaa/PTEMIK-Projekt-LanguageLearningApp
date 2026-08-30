@@ -23,4 +23,7 @@ public class LessonSubmitResponse {
     private String feedback;
     private List<MistakeDTO> mistakes;
     private int newStreak;
+    private String newDifficulty;
+    private boolean isLevelUp;
+    private boolean isLevelDown;
 }

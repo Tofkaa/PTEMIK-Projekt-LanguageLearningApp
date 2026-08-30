@@ -1,3 +1,9 @@
+/**
+ * @file AssignmentPlayer.jsx
+ * @description Manages the interactive quiz engine for classroom assignments.
+ * Handles countdown timers, immediate feedback mapping, client-side progression, and final API submission.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Card, Button, ProgressBar, Spinner, Form, Alert } from 'react-bootstrap';
@@ -6,7 +12,12 @@ import { assignmentApi } from '../services/assignmentApi';
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
 import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise.jsx';
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
+import { getRemainingTimeMs } from '../utils/dateUtils';
 
+/**
+ * @component
+ * @returns {React.ReactElement} The active assignment quiz interface.
+ */
 const AssignmentPlayer = () => {
     const { sessionId } = useParams();
     const navigate = useNavigate();
@@ -15,7 +26,7 @@ const AssignmentPlayer = () => {
     const sessionData = location.state?.sessionData;
     const details = location.state?.assignmentDetails;
 
-    // --- AZ OKOS FLAGEK ---
+    // --- LOGIC FLAGS ---
     const hasFeedback = details?.hasFeedback === true || sessionData?.hasFeedback === true;
     const allowRetries = details?.allowRetries === true || sessionData?.allowRetries === true;
     const isTest = details?.test === true || details?.isTest === true;
@@ -42,26 +53,30 @@ const AssignmentPlayer = () => {
         }
     }, [sessionData, details, navigate]);
 
-    // --- IDŐZÍTŐ ---
+    // --- TIMER ---
     useEffect(() => {
         if (!details?.timeLimitMinutes || !sessionData?.startedAt) return;
-        const limitMs = details?.timeLimitMinutes * 60 * 1000;
-        const startMs = new Date(sessionData.startedAt).getTime();
         
         const timer = setInterval(() => {
-            const now = Date.now();
-            const remaining = Math.max(0, limitMs - (now - startMs));
+            const remaining = getRemainingTimeMs(sessionData.startedAt, details.timeLimitMinutes);
             setTimeLeft(remaining);
 
-            if (remaining <= 0 && !isAutoSubmitting.current) {
+            if (remaining !== null && remaining <= 0 && !isAutoSubmitting.current) {
                 clearInterval(timer);
                 isAutoSubmitting.current = true;
                 handleAutoSubmit();
             }
         }, 1000);
+        
         return () => clearInterval(timer);
     }, [details, sessionData]);
 
+    /**
+     * Formats the remaining time in milliseconds into a readable MM:SS format.
+     * 
+     * @param {number} ms - Milliseconds remaining.
+     * @returns {string} Formatted time string.
+     */
     const formatTimeLeft = (ms) => {
         const totalSeconds = Math.floor(ms / 1000);
         const m = Math.floor(totalSeconds / 60);
@@ -69,24 +84,30 @@ const AssignmentPlayer = () => {
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    // --- A JAVÍTOTT, CSENDES ELLENŐRZŐ LOGIKA ---
+    /**
+     * Evaluates the current answer or progresses to the next question based on the assignment's rules.
+     * Performs API calls for validation if immediate feedback is required.
+     * 
+     * @async
+     * @function handleCheckOrNext
+     */
     const handleCheckOrNext = async () => {
         
-        // 1. HA VAK TESZT ÉS NINCS MÁSODIK ESÉLY -> Spórolunk az API hívással, egyből mentjük.
+        // 1. Strict test mode (no feedback, no retries) -> Immediate progression
         if (!hasFeedback && !allowRetries) {
             finalizeAnswerAndMove();
             return;
         }
 
-        // 2. HA VAN VIZUÁLIS VISSZAJELZÉS, és már megkaptuk a színeket -> Lapozás
+        // 2. Feedback mode: advance if user has already received the result color (excluding warning)
         if (hasFeedback && feedback && feedback.type !== 'warning') {
             finalizeAnswerAndMove();
             return;
         }
 
-        // 3. JÖHET AZ API ELLENŐRZÉS (Vagy a színek, vagy a csendes klónozás miatt!)
+        // 3. API Validation for immediate evaluation or silent exercise cloning
         setIsChecking(true);
-        let wasCloned = false; // Ezzel cselezzük ki a React State csúszását a lapozásnál
+        let wasCloned = false; 
 
         try {
             const response = await api.post(`/exercises/${currentExercise.exerciseId}/check`, {
@@ -101,9 +122,8 @@ const AssignmentPlayer = () => {
                 if (hasFeedback) {
                     setFeedback({ type: 'warning', msg: feedbackMessage || "Majdnem jó, próbáld újra!" });
                     setIsChecking(false);
-                    return; // Megállunk, mert a diák kijavíthatja!
+                    return; 
                 } else {
-                    // Csendes teszt esetén a typo is hibának számít, tehát klónozzuk!
                     if (allowRetries && !currentExercise.isRetry) {
                         setExercises(prev => [...prev, { ...currentExercise, isRetry: true }]);
                         wasCloned = true;
@@ -118,8 +138,6 @@ const AssignmentPlayer = () => {
                 }
             }
 
-            // HA NINCS VIZUÁLIS VISSZAJELZÉS (tehát csak a klónozás miatt ellenőriztünk), 
-            // AZONNAL LAPOZUNK A KÖVETKEZŐRE!
             if (!hasFeedback) {
                 finalizeAnswerAndMove(wasCloned);
             }
@@ -132,21 +150,22 @@ const AssignmentPlayer = () => {
         }
     };
 
-    // A paraméter biztosítja, hogy az utolsó kérdés klónozásánál se küldje be véletlenül a tesztet!
+    /**
+     * Saves the current answer into the collection array and progresses the quiz state.
+     * 
+     * @param {boolean} [wasJustCloned=false] - Flag indicating if the current exercise was cloned for a retry.
+     */
    const finalizeAnswerAndMove = (wasJustCloned = false) => {
-        // Megkeressük, hogy van-e már válasz ehhez a feladathoz
         const existingIndex = collectedAnswers.findIndex(a => a.exerciseId === currentExercise.exerciseId);
         let finalAnswers = [...collectedAnswers];
 
         if (existingIndex >= 0) {
-            // HA MÁR VOLT: Felülírjuk a legújabb (jó) válasszal, és beállítjuk a javítva flget!
             finalAnswers[existingIndex] = {
                 ...finalAnswers[existingIndex],
                 answer: currentAnswer.trim(),
                 retried: true
             };
         } else {
-            // HA MÉG NEM VOLT: Első próbálkozás
             finalAnswers.push({
                 exerciseId: currentExercise.exerciseId,
                 answer: currentAnswer.trim(),
@@ -158,20 +177,28 @@ const AssignmentPlayer = () => {
         setCurrentAnswer('');
         setFeedback(null);
 
-        // Lapozás vagy Beküldés
         if (currentIndex < exercises.length - 1 || wasJustCloned) {
             setCurrentIndex(prev => prev + 1);
         } else {
-            // A legvégén ezt a felokosított tömböt küldjük a backendnek
             submitAssignment(finalAnswers);
         }
     };
 
+    /**
+     * Handles automatic submission when the countdown timer reaches zero.
+     */
     const handleAutoSubmit = () => {
         alert("Az időd lejárt! A rendszer automatikusan beküldi az eddigi válaszaidat.");
         submitAssignment(collectedAnswers);
     };
 
+    /**
+     * Submits the compiled array of answers to the backend API.
+     * 
+     * @async
+     * @function submitAssignment
+     * @param {Array<Object>} answersToSubmit - Array containing the user's finalized answers.
+     */
     const submitAssignment = async (answersToSubmit) => {
         setIsSubmitting(true);
         try {
@@ -198,10 +225,10 @@ const AssignmentPlayer = () => {
     const currentExercise = exercises[currentIndex];
     const progressPercentage = (currentIndex / exercises.length) * 100;
     
-    // Blokkoljuk a bevitelt, ha már van kiértékelt válasz
+    // Disable inputs while verifying or if a definitive feedback is shown
     const isInputDisabled = isSubmitting || (hasFeedback && feedback && feedback.type !== 'warning');
 
-    // --- DINAMIKUS GOMB FELIRATOK ---
+    // --- DYNAMIC BUTTON TEXT ---
     let buttonText = 'Ellenőrzés';
     let buttonVariant = 'info';
 
@@ -227,8 +254,7 @@ const AssignmentPlayer = () => {
         }
     }
 
-
-    // --- SIKER KÉPERNYŐ (SUMMARY SCREEN) ---
+    // --- SUMMARY SCREEN ---
     if (showSummary) {
         return (
             <div className="min-vh-100 pb-5 text-light d-flex align-items-center bg-darker animate-fade-in">
@@ -256,7 +282,7 @@ const AssignmentPlayer = () => {
     return (
         <div className="min-vh-100 pb-5 text-light d-flex align-items-center">
             <Container>
-                {/* Fejléc */}
+                {/* Header Section */}
                 <div className="mb-4">
                     <div className="d-flex justify-content-between align-items-center mb-2 fw-bold text-light opacity-75 small">
                         <span style={{ width: '60px' }}>{currentIndex + 1} / {exercises.length}</span>
@@ -282,7 +308,7 @@ const AssignmentPlayer = () => {
                             </p>
                         )}
 
-                        {/* FELADATOK BEEMELÉSE */}
+                        {/* DYNAMIC EXERCISE RENDERING */}
                         {currentExercise.type === 'IMAGE_CHOICE' && <ImageChoiceExercise exercise={currentExercise} currentAnswer={currentAnswer} onAnswer={setCurrentAnswer} disabled={isInputDisabled} />}
                         {currentExercise.type === 'WORD_BANK' && <WordBankExercise data={currentExercise.content} currentAnswer={currentAnswer} onAnswer={setCurrentAnswer} disabled={isInputDisabled} />}
                         {currentExercise.type === 'MULTIPLE_CHOICE' && <MultipleChoiceExercise data={currentExercise.content} currentAnswer={currentAnswer} onAnswer={setCurrentAnswer} disabled={isInputDisabled} />}
@@ -292,7 +318,7 @@ const AssignmentPlayer = () => {
                             </Form.Group>
                         )}
 
-                        {/* VISSZAJELZÉS */}
+                        {/* VISUAL FEEDBACK */}
                         {feedback && hasFeedback && (
                             <Alert variant={feedback.type} className="mt-4 fw-bold text-start fs-5 border-0 shadow-sm transition-all">
                                 {feedback.msg}

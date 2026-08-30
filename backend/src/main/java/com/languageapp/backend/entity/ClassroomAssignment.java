@@ -62,6 +62,12 @@ public class ClassroomAssignment {
     @Column(name = "time_limit_minutes")
     private Integer timeLimitMinutes;
 
+    @Column(name = "generation_mode", length = 20)
+    private String generationMode = "FIXED";
+
+    @Column(name = "question_count")
+    private Integer questionCount;
+
     @OneToMany(mappedBy = "assignment", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AssignmentSession> sessions = new ArrayList<>();
 

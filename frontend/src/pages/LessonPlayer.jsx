@@ -1,13 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col, Alert } from 'react-bootstrap';
+import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col, Alert, Toast, ToastContainer } from 'react-bootstrap';
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
 import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise.jsx';
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import CryptoJS from 'crypto-js';
 
+
+const SALT = import.meta.env.VITE_APP_SECURITY_EXERCISE_SALT;
+const generateHash = (input) => {
+    if (!input) return "";
+   
+    const normalized = input
+        .replace(/[!"#$%&'()*+,\-./:;<=>?@[\]^_`{|}~]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+   
+    return CryptoJS.SHA256(normalized + SALT).toString(CryptoJS.enc.Hex);
+};
 /**
  * LessonPlayer Component
  * Manages the interactive learning experience (Quiz Engine).
@@ -85,33 +99,59 @@ const LessonPlayer = () => {
     
     const isInputDisabled = feedback && feedback.type !== 'warning';
 
-    // --- PHASE 2: IMMEDIATE FEEDBACK & NEXT QUESTION ---
+   // --- PHASE 2: IMMEDIATE FEEDBACK & NEXT QUESTION ---
     const handleCheckOrNext = async () => {
         if (!feedback || feedback.type === 'warning') {
             setIsChecking(true);
-            try {
-                const response = await api.post(`/exercises/${currentExercise.exerciseId}/check`, {
-                    answer: currentAnswer.trim()
-                });
+            
+            // EXERCISE TYPE?
+            if (currentExercise.type === 'TRANSLATION') {
+                // CASE #1: Translation (typing!!) -> Call backend (typo handling ect.)
+                try {
+                    const response = await api.post(`/exercises/${currentExercise.exerciseId}/check`, {
+                        answer: currentAnswer.trim()
+                    });
 
-                const { correct, almostCorrect, feedbackMessage } = response.data;
+                    const { correct, almostCorrect, feedbackMessage } = response.data;
 
-                if (correct) {
-                    setFeedback({ type: 'success', msg: feedbackMessage });
-                } else if (almostCorrect) {
-                    setFeedback({ type: 'warning', msg: feedbackMessage });
-                } else {
-                    setFeedback({ type: 'danger', msg: feedbackMessage });
-                    
-                    if (!currentExercise.isRetry) {
-                        setExercises(prev => [...prev, { ...currentExercise, isRetry: true }]);
+                    if (correct) {
+                        setFeedback({ type: 'success', msg: feedbackMessage });
+                    } else if (almostCorrect) {
+                        setFeedback({ type: 'warning', msg: feedbackMessage });
+                    } else {
+                        setFeedback({ type: 'danger', msg: feedbackMessage });
+                        
+                        if (!currentExercise.isRetry) {
+                            setExercises(prev => [...prev, { ...currentExercise, isRetry: true }]);
+                        }
                     }
+                } catch (err) {
+                    console.error("Hiba a backend ellenőrzés során:", err);
+                    finalizeAnswerAndMove();
+                } finally {
+                    setIsChecking(false);
                 }
-            } catch (err) {
-                console.error("Hiba az ellenőrzés során:", err);
-                finalizeAnswerAndMove();
-            } finally {
-                setIsChecking(false);
+            } else {
+                // CASE #2: Everything else (Multiple choice, Images, Wordbank) -> Client side Hash validating
+                try {
+                    const localHash = generateHash(currentAnswer);
+                    if (localHash === currentExercise.answerHash) {
+                        // Perfect match
+                        setFeedback({ type: 'success', msg: 'Tökéletes! ✅' });
+                    } else {
+                        // Faulty answer
+                        setFeedback({ type: 'danger', msg: 'Helytelen! Semmi baj, menjünk tovább. ❌' });
+                        
+                        if (!currentExercise.isRetry) {
+                            setExercises(prev => [...prev, { ...currentExercise, isRetry: true }]);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Hiba a lokális hash ellenőrzés során:", err);
+                    finalizeAnswerAndMove();
+                } finally {
+                    setIsChecking(false);
+                }
             }
         } 
         else {
@@ -209,6 +249,42 @@ const LessonPlayer = () => {
                     <p className="text-light opacity-75 fs-5 fst-italic">"{lessonResult.feedback}"</p>
                 </div>
 
+                {(lessonResult.isLevelUp || lessonResult.levelUp) && (
+                    <div 
+                        className="mb-4 p-3 rounded-4 border border-warning w-100 d-flex align-items-center justify-content-center gap-3 pulse-warning-banner"
+                        style={{ 
+                            maxWidth: '600px', 
+                            backgroundColor: 'rgba(255, 193, 7, 0.15)'
+                        }}
+                    >
+                        <span className="fs-1">🔥</span>
+                        <div className="text-start">
+                            <h4 className="text-warning fw-bold mb-1">Szintet léptél!</h4>
+                            <p className="text-light opacity-75 mb-0 small">
+                                Kiválóan teljesítesz! A rendszer <strong className="text-warning">{lessonResult.newDifficulty}</strong> szintre kapcsolt.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {(lessonResult.isLevelDown || lessonResult.levelDown) && (
+                    <div 
+                        className="mb-4 p-3 rounded-4 w-100 d-flex align-items-center justify-content-center gap-3 breathing-demote-banner"
+                        style={{ 
+                            maxWidth: '600px', 
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)'
+                        }}
+                    >
+                        <span className="fs-1">📉</span>
+                        <div className="text-start">
+                            <h4 className="text-secondary fw-bold mb-1">Kicsit visszavettünk a tempóból</h4>
+                            <p className="text-light opacity-75 mb-0 small">
+                                A rendszer <strong className="text-light">{lessonResult.newDifficulty}</strong> szintre állított, hogy nyugodtan gyakorolhass.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 <Card className="shadow-lg border-0 bg-dark text-light p-3 rounded-4 w-100 mb-4" style={{ maxWidth: '600px' }}>
                     <Card.Body>
                         <Row className="text-center mb-4 g-3">
@@ -287,7 +363,6 @@ const LessonPlayer = () => {
             </div>
         );
     }
-
     if (isLoading || isSubmitting) {
         return (
             <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-light">

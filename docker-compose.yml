@@ -29,7 +29,10 @@ services:
     restart: always
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        - VITE_APP_SECURITY_EXERCISE_SALT=${VITE_APP_SECURITY_EXERCISE_SALT}
     image: languageapp-frontend
     container_name: languageapp-frontend
     depends_on:
