@@ -80,6 +80,10 @@ const NavigationBar = () => {
                             )}
                         </Nav.Link>
 
+                        <Nav.Link onClick={() => navigate('/practice')} className="fw-bold position-relative d-flex align-items-center gap-2">
+                            <span>🎯</span> Szavak gyakorlása
+                        </Nav.Link>
+
                         {/* Admin Link */}
                         {(user.role === 'ADMIN' || user.role === 'ROLE_ADMIN') && (
                             <Nav.Link onClick={() => navigate('/admin')} className="text-danger fw-bold d-flex align-items-center gap-2 ms-lg-3 border-start border-secondary ps-lg-4">

@@ -8,6 +8,7 @@ import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExerci
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import CryptoJS from 'crypto-js';
+import ClickableText from '../components/ClickableText.jsx';
 
 
 const SALT = import.meta.env.VITE_APP_SECURITY_EXERCISE_SALT;
@@ -418,7 +419,7 @@ const LessonPlayer = () => {
                         }}
                     >
                         <h2 className="fw-bold text-light mb-0" style={{ lineHeight: '1.4', fontSize: '1.8rem' }}>
-                            {questionText} 
+                            {questionText}
                         </h2>
                     </div>
                 )}
