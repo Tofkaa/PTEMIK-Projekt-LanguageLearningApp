@@ -418,7 +418,7 @@ const LessonPlayer = () => {
                         }}
                     >
                         <h2 className="fw-bold text-light mb-0" style={{ lineHeight: '1.4', fontSize: '1.8rem' }}>
-                            {questionText}
+                            {questionText} 
                         </h2>
                     </div>
                 )}
