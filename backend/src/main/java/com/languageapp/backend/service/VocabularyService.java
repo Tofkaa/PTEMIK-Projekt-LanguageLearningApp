@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.languageapp.backend.dto.response.VocabularyResponse;
 import com.languageapp.backend.entity.StudentVocabulary;
 import com.languageapp.backend.entity.User;
+import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.StudentVocabularyRepository;
 import com.languageapp.backend.repository.UserRepository;
@@ -14,7 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -90,5 +93,53 @@ public class VocabularyService {
             log.error("Hiba a külső szótár API hívásakor a '{}' szóra: {}", word, e.getMessage());
             return "Fordítás nem érhető el"; // Fallback hálózati hiba esetén
         }
+    }
+
+    /**
+     * Feldolgozza a gyakorlás eredményét és frissíti az SRS szinteket.
+     */
+    @Transactional
+    public VocabularyResponse recordPracticeResult(UUID vocabularyId, String email, boolean isCorrect) {
+        StudentVocabulary voc = vocabularyRepository.findById(vocabularyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Szó nem található"));
+
+        // Biztonsági ellenőrzés: csak a saját szavát módosíthatja a diák
+        if (!voc.getUser().getEmail().equals(email)) {
+            throw new ForbiddenException("Nincs jogosultságod módosítani ezt a szót");
+        }
+
+        voc.setLastPracticedAt(LocalDateTime.now());
+
+        if (isCorrect) {
+            // Helyes válasz: Szint lépés, maximum 6-ig (Mastered)
+            voc.setSrsLevel(Math.min(6, voc.getSrsLevel() + 1));
+        } else {
+            // Rontott válasz: Szigorú Leitner szerint visszaesik 0-ra,
+            // de ha megengedőbb akarsz lenni, elég 1 szintet levonni. Most nullázzuk:
+            voc.setSrsLevel(0);
+        }
+
+        // Időzítés kiszámítása az új szint alapján
+        int daysToAdd = switch (voc.getSrsLevel()) {
+            case 0 -> 0;  // Azonnal (még ma újra feljön)
+            case 1 -> 1;  // Holnap
+            case 2 -> 3;  // 3 nap múlva
+            case 3 -> 7;  // 1 hét múlva
+            case 4 -> 14; // 2 hét múlva
+            case 5 -> 30; // 1 hónap múlva
+            default -> 90; // "Mastered" - csak ritka frissítés
+        };
+
+        voc.setNextPracticeAt(LocalDateTime.now().plusDays(daysToAdd));
+        StudentVocabulary updatedVoc = vocabularyRepository.save(voc);
+
+        return VocabularyResponse.builder()
+                .vocabularyId(updatedVoc.getVocabularyId())
+                .word(updatedVoc.getWord())
+                .translation(updatedVoc.getTranslation())
+                .srsLevel(updatedVoc.getSrsLevel())
+                .nextPracticeAt(updatedVoc.getNextPracticeAt())
+                .isNewAddition(false)
+                .build();
     }
 }
