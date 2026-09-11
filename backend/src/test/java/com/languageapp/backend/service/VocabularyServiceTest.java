@@ -4,7 +4,9 @@ import com.languageapp.backend.dto.response.VocabularyResponse;
 import com.languageapp.backend.entity.StudentVocabulary;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.exception.ForbiddenException;
+import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.StudentVocabularyRepository;
+import com.languageapp.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,6 +31,9 @@ class VocabularyServiceTest {
 
     @InjectMocks
     private VocabularyService vocabularyService;
+
+    @Mock
+    private UserRepository userRepository;
 
     private User testUser;
     private StudentVocabulary testVocabulary;
@@ -66,6 +72,43 @@ class VocabularyServiceTest {
     }
 
     @Test
+    void getDueVocabularyForToday_ShouldReturnDueItems() {
+        // Arrange
+        when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.of(testUser));
+
+        // A Mockito any() paraméterével jelezzük, hogy bármilyen LocalDateTime-ot elfogadunk a metódushívásnál
+        when(vocabularyRepository.findAllByUser_UserIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(
+                eq(testUser.getUserId()), any(LocalDateTime.class)))
+                .thenReturn(List.of(testVocabulary));
+
+        // Act
+        List<VocabularyResponse> result = vocabularyService.getDueVocabularyForToday(USER_EMAIL);
+
+        // Assert
+        assertNotNull(result, "A visszaadott lista nem lehet null");
+        assertEquals(1, result.size(), "Pontosan 1 elemnek kell a listában lennie");
+        assertEquals("apple", result.get(0).getWord(), "A szónak 'apple'-nek kell lennie");
+        assertEquals(0, result.get(0).getSrsLevel(), "Az SRS szintnek egyeznie kell");
+        assertFalse(result.get(0).isNewAddition(), "A lekérdezett szavaknál ez a flag false kell legyen");
+    }
+
+    @Test
+    void getDueVocabularyForToday_UserNotFound_ShouldThrowException() {
+        // Arrange
+        String unknownEmail = "ghost@gmail.com";
+        when(userRepository.findByEmail(unknownEmail)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, () -> {
+            vocabularyService.getDueVocabularyForToday(unknownEmail);
+        }, "Kivételt kell dobnia, ha a felhasználó nem létezik");
+
+        // Ellenőrizzük, hogy ilyenkor biztosan nem futott-e le az adatbázis lekérdezés a szavakra
+        verify(vocabularyRepository, never())
+                .findAllByUser_UserIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(any(), any());
+    }
+
+    @Test
     void recordPracticeResult_IncorrectAnswer_ShouldResetLevel() {
         // Arrange
         testVocabulary.setSrsLevel(3); // Már egy haladó szinten van
@@ -94,4 +137,6 @@ class VocabularyServiceTest {
         // Biztosítjuk, hogy illetéktelen hívásnál soha ne hívódjon meg a mentés
         verify(vocabularyRepository, never()).save(any());
     }
+
+
 }

@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -96,14 +97,13 @@ public class VocabularyService {
     }
 
     /**
-     * Feldolgozza a gyakorlás eredményét és frissíti az SRS szinteket.
+     * Processes the training results and updates the SRS levels.
      */
     @Transactional
     public VocabularyResponse recordPracticeResult(UUID vocabularyId, String email, boolean isCorrect) {
         StudentVocabulary voc = vocabularyRepository.findById(vocabularyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Szó nem található"));
 
-        // Biztonsági ellenőrzés: csak a saját szavát módosíthatja a diák
         if (!voc.getUser().getEmail().equals(email)) {
             throw new ForbiddenException("Nincs jogosultságod módosítani ezt a szót");
         }
@@ -111,23 +111,19 @@ public class VocabularyService {
         voc.setLastPracticedAt(LocalDateTime.now());
 
         if (isCorrect) {
-            // Helyes válasz: Szint lépés, maximum 6-ig (Mastered)
             voc.setSrsLevel(Math.min(6, voc.getSrsLevel() + 1));
         } else {
-            // Rontott válasz: Szigorú Leitner szerint visszaesik 0-ra,
-            // de ha megengedőbb akarsz lenni, elég 1 szintet levonni. Most nullázzuk:
             voc.setSrsLevel(0);
         }
 
-        // Időzítés kiszámítása az új szint alapján
         int daysToAdd = switch (voc.getSrsLevel()) {
-            case 0 -> 0;  // Azonnal (még ma újra feljön)
-            case 1 -> 1;  // Holnap
-            case 2 -> 3;  // 3 nap múlva
-            case 3 -> 7;  // 1 hét múlva
-            case 4 -> 14; // 2 hét múlva
-            case 5 -> 30; // 1 hónap múlva
-            default -> 90; // "Mastered" - csak ritka frissítés
+            case 0 -> 0;
+            case 1 -> 1;
+            case 2 -> 3;
+            case 3 -> 7;
+            case 4 -> 14;
+            case 5 -> 30;
+            default -> 90;
         };
 
         voc.setNextPracticeAt(LocalDateTime.now().plusDays(daysToAdd));
@@ -141,5 +137,32 @@ public class VocabularyService {
                 .nextPracticeAt(updatedVoc.getNextPracticeAt())
                 .isNewAddition(false)
                 .build();
+    }
+
+    /**
+     * Retrieves the words that the student needs to repeat up to the current time.
+     * Results are in ascending order of next practice time (oldest due first).
+     */
+    @Transactional(readOnly = true)
+    public List<VocabularyResponse> getDueVocabularyForToday(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+
+        LocalDateTime now = LocalDateTime.now();
+
+        List<StudentVocabulary> dueVocabs = vocabularyRepository
+                .findAllByUser_UserIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(user.getUserId(), now);
+
+        return dueVocabs.stream()
+                .map(voc -> VocabularyResponse.builder()
+                        .vocabularyId(voc.getVocabularyId())
+                        .word(voc.getWord())
+                        .translation(voc.getTranslation())
+                        .srsLevel(voc.getSrsLevel())
+                        .nextPracticeAt(voc.getNextPracticeAt())
+                        .isNewAddition(false)
+                        .build())
+                .toList();
     }
 }

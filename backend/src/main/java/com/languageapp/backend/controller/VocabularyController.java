@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -48,5 +49,12 @@ public class VocabularyController {
                 request.getIsCorrect()
         );
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/due")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<VocabularyResponse>> getDueVocabulary(Authentication authentication) {
+        List<VocabularyResponse> dueWords = vocabularyService.getDueVocabularyForToday(authentication.getName());
+        return ResponseEntity.ok(dueWords);
     }
 }
