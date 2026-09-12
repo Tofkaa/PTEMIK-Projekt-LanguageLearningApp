@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -56,5 +57,12 @@ public class VocabularyController {
     public ResponseEntity<List<VocabularyResponse>> getDueVocabulary(Authentication authentication) {
         List<VocabularyResponse> dueWords = vocabularyService.getDueVocabularyForToday(authentication.getName());
         return ResponseEntity.ok(dueWords);
+    }
+
+    @GetMapping("/map")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Integer>> getVocabularyMap(Authentication authentication) {
+        Map<String, Integer> vocabMap = vocabularyService.getVocabularyMap(authentication.getName());
+        return ResponseEntity.ok(vocabMap);
     }
 }

@@ -17,8 +17,10 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -164,5 +166,26 @@ public class VocabularyService {
                         .isNewAddition(false)
                         .build())
                 .toList();
+    }
+
+    /**
+     * Returns the entire student dictionary as a key-value (word -> SRS level) map.
+     * This optimizes frontend rendering, avoiding unnecessary API calls.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Integer> getVocabularyMap(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<StudentVocabulary> allVocabs = vocabularyRepository
+                .findAllByUser_UserIdOrderByFirstSeenAtDesc(user.getUserId());
+
+        return allVocabs.stream()
+                .filter(voc -> voc.getSrsLevel() >= 3)
+                .collect(Collectors.toMap(
+                        voc -> voc.getWord().toLowerCase(),
+                        StudentVocabulary::getSrsLevel,
+                        (existing, replacement) -> existing
+                ));
     }
 }

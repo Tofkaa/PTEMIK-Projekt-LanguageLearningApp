@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -138,5 +139,46 @@ class VocabularyServiceTest {
         verify(vocabularyRepository, never()).save(any());
     }
 
+    @Test
+    void getVocabularyMap_ShouldReturnOnlyWordsWithSrsLevelThreeOrHigher() {
+        // Arrange
+        when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.of(testUser));
+
+        // Készítünk egy 0-s és egy 3-as szintű szót a teszthez
+        StudentVocabulary lowLevelVocab = new StudentVocabulary();
+        lowLevelVocab.setWord("apple");
+        lowLevelVocab.setSrsLevel(0);
+
+        StudentVocabulary highLevelVocab = new StudentVocabulary();
+        highLevelVocab.setWord("banana");
+        highLevelVocab.setSrsLevel(3);
+
+        when(vocabularyRepository.findAllByUser_UserIdOrderByFirstSeenAtDesc(testUser.getUserId()))
+                .thenReturn(List.of(lowLevelVocab, highLevelVocab));
+
+        // Act
+        Map<String, Integer> result = vocabularyService.getVocabularyMap(USER_EMAIL);
+
+        // Assert
+        assertNotNull(result, "A visszaadott Map nem lehet null");
+        assertEquals(1, result.size(), "Csak a 3-as vagy annál nagyobb szintű szavak kerülhetnek a Map-be");
+        assertFalse(result.containsKey("apple"), "A 0-s szintű 'apple' nem lehet benne a szűrés miatt");
+        assertTrue(result.containsKey("banana"), "A 3-as szintű 'banana' benne kell legyen");
+        assertEquals(3, result.get("banana"));
+    }
+
+    @Test
+    void getVocabularyMap_UserNotFound_ShouldThrowException() {
+        // Arrange
+        String unknownEmail = "ghost@gmail.com";
+        when(userRepository.findByEmail(unknownEmail)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, () -> {
+            vocabularyService.getVocabularyMap(unknownEmail);
+        }, "Kivételt kell dobnia, ha a felhasználó nem létezik");
+
+        verify(vocabularyRepository, never()).findAllByUser_UserIdOrderByFirstSeenAtDesc(any());
+    }
 
 }
