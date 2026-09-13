@@ -80,8 +80,8 @@ const NavigationBar = () => {
                             )}
                         </Nav.Link>
 
-                        <Nav.Link onClick={() => navigate('/practice')} className="fw-bold position-relative d-flex align-items-center gap-2">
-                            <span>🎯</span> Szavak gyakorlása
+                        <Nav.Link onClick={() => navigate('/hub')} className="fw-bold position-relative d-flex align-items-center gap-2">
+                            <span>🎯</span> Szótár HUB
                         </Nav.Link>
 
                         {/* Admin Link */}

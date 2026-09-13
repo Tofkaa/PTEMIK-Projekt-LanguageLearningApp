@@ -19,6 +19,7 @@ import AssignmentSubmissions from './pages/AssignmentSubmissions.jsx';
 import AdminRoute from './components/AdminRoute.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import GlobalErrorToast from './components/GlobalErrorToast.jsx';
+import VocabularyHub from './pages/VocabularyHub.jsx';
 import VocabularyPractice from './pages/VocabularyPractice.jsx';
 
 /**
@@ -56,7 +57,8 @@ function App() {
                     <Route path="/lesson/:id" element={<PrivateRoute><Lesson /></PrivateRoute>} />
                     <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                     <Route path="/friends" element={<PrivateRoute><Friends /></PrivateRoute>} />
-                    <Route path="/practice" element={<PrivateRoute><VocabularyPractice /></PrivateRoute>} />
+                    <Route path="/hub" element={<PrivateRoute><VocabularyHub /></PrivateRoute>} />
+                    <Route path="/vocabulary/practice" element={<PrivateRoute><VocabularyPractice /></PrivateRoute>} />
                     
                     {/* Admin pages */}
                     <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
