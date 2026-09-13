@@ -2,6 +2,8 @@ package com.languageapp.backend.controller;
 
 import com.languageapp.backend.dto.request.VocabularyLookupRequest;
 import com.languageapp.backend.dto.request.VocabularyPracticeRequest;
+import com.languageapp.backend.dto.response.DynamicExerciseDTO;
+import com.languageapp.backend.dto.response.VocabularyDetailDTO;
 import com.languageapp.backend.dto.response.VocabularyResponse;
 import com.languageapp.backend.service.VocabularyService;
 import jakarta.validation.Valid;
@@ -11,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -64,5 +67,15 @@ public class VocabularyController {
     public ResponseEntity<Map<String, Integer>> getVocabularyMap(Authentication authentication) {
         Map<String, Integer> vocabMap = vocabularyService.getVocabularyMap(authentication.getName());
         return ResponseEntity.ok(vocabMap);
+    }
+
+    @GetMapping("/hub")
+    public ResponseEntity<List<VocabularyDetailDTO>> getVocabularyHub(Principal principal) {
+        return ResponseEntity.ok(vocabularyService.getDetailedVocabularyForUser(principal.getName()));
+    }
+
+    @GetMapping("/practice/generate")
+    public ResponseEntity<List<DynamicExerciseDTO>> generatePracticeSession(Principal principal) {
+        return ResponseEntity.ok(vocabularyService.generateDynamicPracticeSession(principal.getName(), 10));
     }
 }

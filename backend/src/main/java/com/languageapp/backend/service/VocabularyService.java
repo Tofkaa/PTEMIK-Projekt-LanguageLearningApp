@@ -2,6 +2,8 @@ package com.languageapp.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.languageapp.backend.dto.response.DynamicExerciseDTO;
+import com.languageapp.backend.dto.response.VocabularyDetailDTO;
 import com.languageapp.backend.dto.response.VocabularyResponse;
 import com.languageapp.backend.entity.StudentVocabulary;
 import com.languageapp.backend.entity.User;
@@ -16,10 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -195,5 +194,114 @@ public class VocabularyService {
                         StudentVocabulary::getSrsLevel,
                         (existing, replacement) -> existing
                 ));
+    }
+
+    /**
+     * Visszaadja a diák összes mentett szavát részletes SRS adatokkal a Vocabulary Hub számára.
+     */
+    @Transactional(readOnly = true)
+    public List<VocabularyDetailDTO> getDetailedVocabularyForUser(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<StudentVocabulary> entries = vocabularyRepository.findAllByUser(user);
+
+        return entries.stream().map(v -> new VocabularyDetailDTO(
+                v.getWord(),
+                v.getTranslation(),
+                v.getSrsLevel(),
+                v.getNextPracticeAt(),
+                v.getSrsLevel() >= 4
+        )).toList();
+    }
+
+    /**
+     * Dinamikus gyakorló feladatsor generálása az esedékes (due) vagy alacsony SRS szintű szavakból.
+     */
+    @Transactional(readOnly = true)
+    public List<DynamicExerciseDTO> generateDynamicPracticeSession(String email, int limit) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Megkeressük azokat a szavakat, amik esedékesek a gyakorlásra, vagy még alacsony szintűek
+        List<StudentVocabulary> dueWords = vocabularyRepository.findDueOrLowLevelWords(user.getUserId(), now);
+
+        if (dueWords.isEmpty()) {
+            // Fallback: Ha nincs esedékes, véletlenszerűen szedünk fel eddig tanult szavakat
+            dueWords = vocabularyRepository.findAllByUser(user);
+            Collections.shuffle(dueWords);
+        }
+
+        // Limitáljuk a méretet (pl. max 10-15 feladat egy sessionben)
+        if (dueWords.size() > limit) {
+            dueWords = dueWords.subList(0, limit);
+        }
+
+        List<StudentVocabulary> allUserWords = vocabularyRepository.findAllByUser(user);
+        List<DynamicExerciseDTO> dynamicExercises = new ArrayList<>();
+
+        for (StudentVocabulary item : dueWords) {
+            // Véletlenszerűen kiválasztunk egy feladattípust erre a szóra: 0 = Multiple Choice, 1 = Word Bank, 2 = Translation
+            int exerciseTypeSelector = new Random().nextInt(3);
+
+            if (exerciseTypeSelector == 0) {
+                // MULTIPLE CHOICE GENERÁLÁS
+                List<String> wrongOptions = allUserWords.stream()
+                        .filter(w -> !w.getWord().equalsIgnoreCase(item.getWord()))
+                        .map(StudentVocabulary::getTranslation)
+                        .distinct()
+                        .collect(Collectors.toList());
+                Collections.shuffle(wrongOptions);
+
+                List<String> options = new ArrayList<>();
+                options.add(item.getTranslation());
+                if (wrongOptions.size() >= 3) {
+                    options.addAll(wrongOptions.subList(0, 3));
+                } else {
+                    options.addAll(wrongOptions);
+                    options.add("alternatív jelentés");
+                }
+                Collections.shuffle(options);
+
+                dynamicExercises.add(DynamicExerciseDTO.builder()
+                        .exerciseId(UUID.randomUUID())
+                        .type("MULTIPLE_CHOICE")
+                        .question("Mi a jelentése ennek a szónak: " + item.getWord() + "?")
+                        .targetWord(item.getWord())
+                        .correctAnswer(item.getTranslation())
+                        .options(options)
+                        .build());
+
+            } else if (exerciseTypeSelector == 1 && item.getWord().contains(" ")) {
+                // WORD BANK (ha több szóból álló kifejezés)
+                List<String> words = Arrays.asList(item.getWord().split(" "));
+                List<String> shuffledWords = new ArrayList<>(words);
+                Collections.shuffle(shuffledWords);
+
+                dynamicExercises.add(DynamicExerciseDTO.builder()
+                        .exerciseId(UUID.randomUUID())
+                        .type("WORD_BANK")
+                        .question("Rakd sorba a kifejezés szavait: " + item.getTranslation())
+                        .targetWord(item.getWord())
+                        .correctAnswer(item.getWord())
+                        .options(shuffledWords)
+                        .build());
+
+            } else {
+                // TRANSLATION (Gépeléses)
+                dynamicExercises.add(DynamicExerciseDTO.builder()
+                        .exerciseId(UUID.randomUUID())
+                        .type("TRANSLATION")
+                        .question("Fordítsd le magyarra: " + item.getWord())
+                        .targetWord(item.getWord())
+                        .correctAnswer(item.getTranslation())
+                        .hint(item.getWord() + " = " + item.getTranslation())
+                        .build());
+            }
+        }
+
+        return dynamicExercises;
     }
 }

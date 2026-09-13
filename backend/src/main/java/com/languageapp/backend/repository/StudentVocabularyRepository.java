@@ -1,7 +1,10 @@
 package com.languageapp.backend.repository;
 
 import com.languageapp.backend.entity.StudentVocabulary;
+import com.languageapp.backend.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -34,4 +37,15 @@ public interface StudentVocabularyRepository extends JpaRepository<StudentVocabu
      * Counts the number of vocabulary items currently due for review.
      */
     long countByUser_UserIdAndNextPracticeAtBefore(UUID userId, LocalDateTime time);
+
+    /**
+     * Retrieves all dictionary entries for the user.
+     */
+    List<StudentVocabulary> findAllByUser(User user);
+
+    /**
+     * Retrieves due (or low SRS level) words for dynamic practice.
+     */
+    @Query("SELECT v FROM StudentVocabulary v WHERE v.user.userId = :userId AND (v.nextPracticeAt <= :now OR v.srsLevel < 3) ORDER BY v.nextPracticeAt ASC")
+    List<StudentVocabulary> findDueOrLowLevelWords(@Param("userId") UUID userId, @Param("now") LocalDateTime now);
 }
