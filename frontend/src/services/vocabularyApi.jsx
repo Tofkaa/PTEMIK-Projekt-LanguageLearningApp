@@ -15,5 +15,8 @@ export const vocabularyApi = {
 
 
     getDueVocabulary: () => 
-        api.get('/vocabulary/due')
+        api.get('/vocabulary/due'),
+
+    getVocabularyMap: () => 
+        api.get('/vocabulary/learned')
 };

@@ -13,6 +13,7 @@ import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
 import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise.jsx';
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
 import { getRemainingTimeMs } from '../utils/dateUtils';
+import ClickableText from '../components/ClickableText.jsx';
 
 /**
  * @component
@@ -303,9 +304,45 @@ const AssignmentPlayer = () => {
                         </h4>
 
                         {currentExercise.content?.question && (
-                            <p className="fs-4 mb-4 border border-secondary rounded p-3 bg-black bg-opacity-25">
-                                {currentExercise.content.question.replace('Translate: ', '').replace('Translate to English: ', '')}
-                            </p>
+                            (() => {
+                                const cleanQuestion = currentExercise.content.question.replace('Translate: ', '').replace('Translate to English: ', '');
+                                const isEnglishQuestion = currentExercise.content?.questionLang === 'en';
+                                const isDictAllowedByAssignment = details?.allowDictionary ?? true; 
+                                
+                                const showDictionary = isEnglishQuestion && isDictAllowedByAssignment;
+                                const showHint = !isEnglishQuestion && currentExercise.content?.hint && isDictAllowedByAssignment;
+
+                                return (
+                                    <div className="mb-4 text-center">
+                                        <div className="fs-4 fw-bold p-3 border border-secondary rounded bg-black bg-opacity-25 mx-auto" style={{ color: '#0dcaf0', maxWidth: '800px' }}>
+                                            {showDictionary ? (
+                                                <ClickableText 
+                                                    text={cleanQuestion} 
+                                                    source="LESSON" 
+                                                    hint={currentExercise.content.hint} 
+                                                />
+                                            ) : (
+                                                <span>{cleanQuestion}</span>
+                                            )}
+                                        </div>
+
+                                        {showHint && (
+                                            <div className="d-inline-block text-start mt-2 px-3 py-2 rounded shadow-sm" style={{ backgroundColor: 'rgba(13, 202, 240, 0.1)', borderLeft: '4px solid #0dcaf0' }}>
+                                                <span className="small text-info fw-bold text-uppercase" style={{ letterSpacing: '1px' }}>
+                                                    <i className="bi bi-lightbulb me-2 text-warning"></i>Tipp a fordításhoz
+                                                </span>
+                                                <div className="mt-1 small fw-medium" style={{ color: '#e0e0e0' }}>
+                                                    {currentExercise.content.hint.split(',').map((pair, idx) => (
+                                                        <span key={idx} className="me-3 d-inline-block">
+                                                            {pair.trim()}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()
                         )}
 
                         {/* DYNAMIC EXERCISE RENDERING */}

@@ -69,6 +69,7 @@ public class AssignmentService {
         assignment.setRandomized(request.isRandomized());
         assignment.setAllowRetries(request.isAllowRetries());
         assignment.setHasFeedback(request.isHasFeedback());
+        assignment.setAllowDictionary(request.isAllowDictionary());
         assignment.setMaxAttempts(request.getMaxAttempts());
         assignment.setAvailableFrom(request.getAvailableFrom());
         assignment.setAvailableUntil(request.getAvailableUntil());
@@ -477,6 +478,7 @@ public class AssignmentService {
                 a.isRandomized(),
                 a.isAllowRetries(),
                 a.isHasFeedback(),
+                a.isAllowDictionary(),
                 isCompleted,
                 a.getMaxAttempts(),
                 attemptsUsed,

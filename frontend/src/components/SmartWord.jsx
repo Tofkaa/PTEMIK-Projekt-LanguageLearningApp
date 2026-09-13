@@ -1,36 +1,44 @@
 import React, { useState } from 'react';
 import { OverlayTrigger, Popover, Spinner, Badge } from 'react-bootstrap';
-import { vocabularyApi } from '../services/vocabularyApi'; // Ellenőrizd az import útvonalat!
+import { vocabularyApi } from '../services/vocabularyApi';
 
 /**
- * Interaktív szó-komponens. Kattintásra lekéri és egy Bootstrap Popoverben 
- * megjeleníti a fordítást, és a háttérben elmenti az SRS adatbázisba.
- * 
- * @param {string} word - Az angol szó (központozás automatikusan eltávolítva)
- * @param {boolean} disabled - Vizsga módban (isTest=true) letiltja a szótárat
- * @param {string} source - Az extra kontextus a backend felé
- */
-const SmartWord = ({ word, disabled = false, source = 'LESSON' }) => {
-    const [translationData, setTranslationData] = useState(null);
+* Interactive word component. Retrieves on click and displays the translation in a Bootstrap Popover 
+* and saves it to the SRS database in the background.
+* 
+* @param {string} word - The original word (as it appears in the sentence, even in uppercase)
+* @param {string} queryWord - The lowercase, clean word for the API call
+* @param {boolean} disabled - Disables the dictionary in test mode (isTest=true)
+* @param {string} source - The extra context to the backend
+* @param {string} preloadedTranslation - Optional, preloaded translation (JSON hint)
+*/
+const SmartWord = ({ word, queryWord, disabled = false, source = 'LESSON', preloadedTranslation = null }) => {
+    
+    // If we received a burned-in hint, we load it immediately
+    const [translationData, setTranslationData] = useState(
+        preloadedTranslation 
+            ? { 
+                translation: preloadedTranslation, 
+                srsLevel: 'Beépített tipp', 
+                newAddition: false,
+                isHint: true
+              } 
+            : null
+    );
+
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const handleToggle = async (show) => {
-        // Csak akkor hívjuk az API-t, ha megnyílik a popover és még nincs adat
-        if (show && !translationData && !isLoading) {
+       // If there is already a translation (e.g. because of the hint) or it is loading, we do not call the backend
+       if (show && !translationData && !isLoading) {
             setIsLoading(true);
-            setError(null);
             
             try {
-                // Eltávolítjuk a központozást (pl. "apple," -> "apple")
-                const cleanWord = word.replace(/[.,!?]/g, '').trim();
-                
-                // Mivel az api.jsx kezeli a tokent és a hibákat, itt csak hívunk
-                const response = await vocabularyApi.lookupWord(cleanWord, source);
+               // We use the queryWord towards the backend, which is already lowercase and clear
+                const response = await vocabularyApi.lookupWord(queryWord || word.toLowerCase(), source);
                 setTranslationData(response.data);
             } catch (err) {
-                // A globális hiba toast úgyis megjelenik (api.jsx miatt), 
-                // ide csak egy apró lokalizált visszajelzés kell
                 setError("Fordítás nem elérhető.", err);
             } finally {
                 setIsLoading(false);
@@ -38,7 +46,6 @@ const SmartWord = ({ word, disabled = false, source = 'LESSON' }) => {
         }
     };
 
-    // Ha vizsga módban vagyunk, egy teljesen sima <span>-t adunk vissza, nulla interakcióval
     if (disabled) {
         return <span>{word}</span>;
     }
@@ -46,7 +53,7 @@ const SmartWord = ({ word, disabled = false, source = 'LESSON' }) => {
     const popover = (
         <Popover id={`popover-${word.replace(/\s+/g, '-')}`} className="shadow-lg">
             <Popover.Header className="d-flex justify-content-between align-items-center bg-primary text-white">
-                <strong className="text-capitalize">{word.replace(/[.,!?]/g, '').trim()}</strong>
+                <strong className="text-capitalize">{word}</strong>
                 {translationData?.newAddition && (
                     <Badge bg="success" className="ms-2">Új</Badge>
                 )}
@@ -64,12 +71,15 @@ const SmartWord = ({ word, disabled = false, source = 'LESSON' }) => {
                         <div className="fw-bold fs-6 mb-2">{translationData.translation}</div>
                         
                         <div className="d-flex justify-content-between align-items-center pt-2 mt-2 border-top small text-muted">
-                            <span title="Spaced Repetition Szint">
-                                🧠 Szint: {translationData.srsLevel}/6
+                            <span title="Tudás szint">
+                                🧠 Szint: {translationData.srsLevel} {translationData.isHint ? '' : '/6'}
                             </span>
-                            <span title="Következő ismétlés">
-                                📅 {new Date(translationData.nextPracticeAt).toLocaleDateString('hu-HU')}
-                            </span>
+                            
+                            {!translationData.isHint && translationData.nextPracticeAt && (
+                                <span title="Következő ismétlés">
+                                    📅 {new Date(translationData.nextPracticeAt).toLocaleDateString('hu-HU')}
+                                </span>
+                            )}
                         </div>
                     </div>
                 ) : null}
@@ -83,7 +93,7 @@ const SmartWord = ({ word, disabled = false, source = 'LESSON' }) => {
             placement="top" 
             overlay={popover} 
             onToggle={handleToggle}
-            rootClose // Bárhova máshova kattintva bezáródik
+            rootClose 
         >
             <span 
                 className="text-primary fw-medium" 

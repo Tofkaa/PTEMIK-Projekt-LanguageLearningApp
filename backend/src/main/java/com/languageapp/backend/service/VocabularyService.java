@@ -78,23 +78,31 @@ public class VocabularyService {
     }
 
     /**
-     * External API Call for fetching translation from Lingva
+     * External API Call for fetching translation from MyMemory API
      */
     private String fetchTranslationFromExternalApi(String word) {
         try {
-            // Lingva API végpont: /api/v1/{forrás_nyelv}/{cél_nyelv}/{szó}
-            String url = "https://lingva.ml/api/v1/en/hu/" + word;
-            String response = restTemplate.getForObject(url, String.class);
+            String cleanWord = word.trim().toLowerCase();
+            String url = "https://api.mymemory.translated.net/get?q={word}&langpair=en|hu";
 
-            // JSON feldolgozás: A Lingva a "translation" mezőben adja vissza az eredményt
+            // optinal for higher rate limit
+            // String url = "https://api.mymemory.translated.net/get?q={word}&langpair=en|hu&de=email@gmail.com";
+
+            String response = restTemplate.getForObject(url, String.class, cleanWord);
+
             JsonNode root = objectMapper.readTree(response);
-            String translatedText = root.path("translation").asText();
 
-            return translatedText != null && !translatedText.isEmpty() ? translatedText : "Ismeretlen jelentés";
+            String translatedText = root.path("responseData").path("translatedText").asText();
+
+            if (translatedText != null && !translatedText.isEmpty() && !translatedText.contains("MYMEMORY WARNING")) {
+                return translatedText;
+            } else {
+                return "Ismeretlen jelentés";
+            }
 
         } catch (Exception e) {
             log.error("Hiba a külső szótár API hívásakor a '{}' szóra: {}", word, e.getMessage());
-            return "Fordítás nem érhető el"; // Fallback hálózati hiba esetén
+            return "Fordítás nem érhető el";
         }
     }
 

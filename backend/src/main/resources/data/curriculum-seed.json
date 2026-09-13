@@ -11,13 +11,23 @@
         "exercises": [
           {
             "type": "IMAGE_CHOICE",
-            "content": { "question": "Válaszd ki a képhez illő angol szót!", "options": ["Apple", "Banana", "Grape"] },
+            "content": {
+              "question": "Válaszd ki a képhez illő angol szót!",
+              "options": ["Apple", "Banana", "Grape"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Apple" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Apple+%F0%9F%8D%8E"
           },
           {
             "type": "IMAGE_CHOICE",
-            "content": { "question": "Válaszd ki a képhez illő angol szót!", "options": ["Apple", "Banana", "Grape"] },
+            "content": {
+              "question": "Válaszd ki a képhez illő angol szót!",
+              "options": ["Apple", "Banana", "Grape"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Banana" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Banana+%F0%9F%8D%8C"
           }
@@ -31,17 +41,32 @@
         "exercises": [
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "What color is a ripe banana?", "options": ["Red", "Blue", "Yellow"] },
+            "content": {
+              "question": "What color is a ripe banana?",
+              "options": ["Red", "Blue", "Yellow"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Yellow" }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Az alma piros.", "hint": "apple = alma, red = piros" },
+            "content": {
+              "question": "Az alma piros.",
+              "hint": "apple = alma, red = piros",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "The apple is red." }
           },
           {
             "type": "WORD_BANK",
-            "content": { "question": "Az alma piros.", "options": ["The", "is", "red", "apple", "blue", "a"] },
+            "content": {
+              "question": "Az alma piros.",
+              "options": ["The", "is", "red", "apple", "blue", "a"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "The apple is red" }
           }
         ]
@@ -54,12 +79,20 @@
         "exercises": [
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Szeretem a zöld almát és a sárga banánt." },
+            "content": {
+              "question": "Szeretem a zöld almát és a sárga banánt.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "I like the green apple and the yellow banana." }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: A kedvenc gyümölcsöm a szőlő." },
+            "content": {
+              "question": "A kedvenc gyümölcsöm a szőlő.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "My favorite fruit is the grape." }
           }
         ]
@@ -72,12 +105,22 @@
         "exercises": [
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "How do you say 'Anya'?", "options": ["Father", "Mother", "Brother"] },
+            "content": {
+              "question": "How do you say 'Anya'?",
+              "options": ["Father", "Mother", "Brother"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Mother" }
           },
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "How do you say 'Testvér (fiú)'?", "options": ["Sister", "Brother", "Uncle"] },
+            "content": {
+              "question": "How do you say 'Testvér (fiú)'?",
+              "options": ["Sister", "Brother", "Uncle"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Brother" }
           }
         ]
@@ -90,17 +133,32 @@
         "exercises": [
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "Your mother's brother is your...", "options": ["Uncle", "Aunt", "Cousin"] },
+            "content": {
+              "question": "Your mother's brother is your...",
+              "options": ["Uncle", "Aunt", "Cousin"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Uncle" }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Ő az én nővérem.", "hint": "nővér/húg = sister" },
+            "content": {
+              "question": "Ő az én nővérem.",
+              "hint": "nővér/húg = sister",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "She is my sister." }
           },
           {
             "type": "WORD_BANK",
-            "content": { "question": "Ő az én nővérem.", "options": ["She", "is", "my", "sister", "He", "brother"] },
+            "content": {
+              "question": "Ő az én nővérem.",
+              "options": ["She", "is", "my", "sister", "He", "brother"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "She is my sister" }
           }
         ]
@@ -113,12 +171,20 @@
         "exercises": [
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: A nagybátyám felesége az én nagynéném." },
+            "content": {
+              "question": "A nagybátyám felesége az én nagynéném.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "My uncle's wife is my aunt." }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Van két fiútestvérem és egy lánytestvérem." },
+            "content": {
+              "question": "Van két fiútestvérem és egy lánytestvérem.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "I have two brothers and one sister." }
           }
         ]
@@ -131,13 +197,23 @@
         "exercises": [
           {
             "type": "IMAGE_CHOICE",
-            "content": { "question": "Melyik állat van a képen?", "options": ["Cat", "Dog", "Bird"] },
+            "content": {
+              "question": "Melyik állat van a képen?",
+              "options": ["Cat", "Dog", "Bird"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Dog" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Dog+%F0%9F%90%B6"
           },
           {
             "type": "IMAGE_CHOICE",
-            "content": { "question": "Melyik állat van a képen?", "options": ["Cat", "Dog", "Fish"] },
+            "content": {
+              "question": "Melyik állat van a képen?",
+              "options": ["Cat", "Dog", "Fish"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Cat" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Cat+%F0%9F%90%B1"
           }
@@ -151,17 +227,32 @@
         "exercises": [
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "Which animal can fly?", "options": ["Dog", "Bird", "Fish"] },
+            "content": {
+              "question": "Which animal can fly?",
+              "options": ["Dog", "Bird", "Fish"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Bird" }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: A kutya nagy.", "hint": "nagy = big" },
+            "content": {
+              "question": "A kutya nagy.",
+              "hint": "nagy = big",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "The dog is big." }
           },
           {
             "type": "WORD_BANK",
-            "content": { "question": "A kutya nagy.", "options": ["The", "dog", "is", "big", "small", "cat"] },
+            "content": {
+              "question": "A kutya nagy.",
+              "options": ["The", "dog", "is", "big", "small", "cat"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "The dog is big" }
           }
         ]
@@ -174,12 +265,20 @@
         "exercises": [
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: A macska alszik a kanapén." },
+            "content": {
+              "question": "A macska alszik a kanapén.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "The cat is sleeping on the sofa." }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: A madarak énekelnek a fákon." },
+            "content": {
+              "question": "A madarak énekelnek a fákon.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "The birds are singing in the trees." }
           }
         ]
@@ -198,13 +297,23 @@
         "exercises": [
           {
             "type": "IMAGE_CHOICE",
-            "content": { "question": "Mit látsz a képen?", "options": ["Train", "Airplane", "Bus"] },
+            "content": {
+              "question": "Mit látsz a képen?",
+              "options": ["Train", "Airplane", "Bus"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Airplane" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Airplane+%E2%9C%88%EF%B8%8F"
           },
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "Where do you check your bags?", "options": ["Gate", "Check-in desk", "Bathroom"] },
+            "content": {
+              "question": "Where do you check your bags?",
+              "options": ["Gate", "Check-in desk", "Bathroom"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Check-in desk" }
           }
         ]
@@ -217,12 +326,22 @@
         "exercises": [
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "You need this document to board an international flight.", "options": ["Ticket", "Passport", "Receipt"] },
+            "content": {
+              "question": "You need this document to board an international flight.",
+              "options": ["Ticket", "Passport", "Receipt"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Passport" }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Hol van a csomagom?", "hint": "csomag = luggage / bag" },
+            "content": {
+              "question": "Hol van a csomagom?",
+              "hint": "csomag = luggage / bag",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Where is my luggage?" }
           }
         ]
@@ -235,12 +354,20 @@
         "exercises": [
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: A gépünk késik két órát." },
+            "content": {
+              "question": "A gépünk késik két órát.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Our flight is delayed by two hours." }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Kérem, mutassa meg az útlevelét és a beszállókártyáját." },
+            "content": {
+              "question": "Kérem, mutassa meg az útlevelét és a beszállókártyáját.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Please show your passport and boarding pass." }
           }
         ]
@@ -253,13 +380,23 @@
         "exercises": [
           {
             "type": "IMAGE_CHOICE",
-            "content": { "question": "Mi van a képen?", "options": ["Key", "Map", "Ticket"] },
+            "content": {
+              "question": "Mi van a képen?",
+              "options": ["Key", "Map", "Ticket"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Key" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Hotel+Key+%F0%9F%97%9D%EF%B8%8F"
           },
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "The place where you sleep in a hotel is called...", "options": ["Lobby", "Room", "Elevator"] },
+            "content": {
+              "question": "The place where you sleep in a hotel is called...",
+              "options": ["Lobby", "Room", "Elevator"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Room" }
           }
         ]
@@ -272,12 +409,22 @@
         "exercises": [
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "I would like to ___ a room for two nights.", "options": ["book", "buy", "sell"] },
+            "content": {
+              "question": "I would like to ___ a room for two nights.",
+              "options": ["book", "buy", "sell"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "book" }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Van szabad szobájuk?", "hint": "szabad szoba = available room" },
+            "content": {
+              "question": "Van szabad szobájuk?",
+              "hint": "szabad szoba = available room",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Do you have an available room?" }
           }
         ]
@@ -290,12 +437,20 @@
         "exercises": [
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: A légkondicionáló nem működik a szobámban." },
+            "content": {
+              "question": "A légkondicionáló nem működik a szobámban.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "The air conditioning is not working in my room." }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Kérhetnék egy extra takarót és két párnát?" },
+            "content": {
+              "question": "Kérhetnék egy extra takarót és két párnát?",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Could I have an extra blanket and two pillows?" }
           }
         ]
@@ -308,13 +463,23 @@
         "exercises": [
           {
             "type": "IMAGE_CHOICE",
-            "content": { "question": "Melyik ez az irány?", "options": ["Right", "Left", "Straight"] },
+            "content": {
+              "question": "Melyik ez az irány?",
+              "options": ["Right", "Left", "Straight"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Left" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Left+%E2%AC%85%EF%B8%8F"
           },
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "How do you say 'Jobbra'?", "options": ["Left", "Right", "Back"] },
+            "content": {
+              "question": "How do you say 'Jobbra'?",
+              "options": ["Left", "Right", "Back"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Right" }
           }
         ]
@@ -327,12 +492,22 @@
         "exercises": [
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "Excuse me, how do I get ___ the train station?", "options": ["to", "on", "at"] },
+            "content": {
+              "question": "Excuse me, how do I get ___ the train station?",
+              "options": ["to", "on", "at"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "to" }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Menjen egyenesen.", "hint": "egyenesen = straight" },
+            "content": {
+              "question": "Menjen egyenesen.",
+              "hint": "egyenesen = straight",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Go straight." }
           }
         ]
@@ -345,12 +520,20 @@
         "exercises": [
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Forduljon balra a következő saroknál, majd menjen egyenesen." },
+            "content": {
+              "question": "Forduljon balra a következő saroknál, majd menjen egyenesen.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Turn left at the next corner, then go straight." }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: A gyógyszertár a szupermarkettel szemben van." },
+            "content": {
+              "question": "A gyógyszertár a szupermarkettel szemben van.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "The pharmacy is opposite the supermarket." }
           }
         ]
@@ -369,13 +552,23 @@
         "exercises": [
           {
             "type": "IMAGE_CHOICE",
-            "content": { "question": "Mit látsz a képen?", "options": ["Water", "Bread", "Meat"] },
+            "content": {
+              "question": "Mit látsz a képen?",
+              "options": ["Water", "Bread", "Meat"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Bread" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Bread+%F0%9F%8D%9E"
           },
           {
             "type": "IMAGE_CHOICE",
-            "content": { "question": "Mit látsz a képen?", "options": ["Coffee", "Water", "Tea"] },
+            "content": {
+              "question": "Mit látsz a képen?",
+              "options": ["Coffee", "Water", "Tea"],
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Water" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Water+%F0%9F%A5%A4"
           }
@@ -389,12 +582,22 @@
         "exercises": [
           {
             "type": "MULTIPLE_CHOICE",
-            "content": { "question": "I would like a ___ of water.", "options": ["slice", "glass", "plate"] },
+            "content": {
+              "question": "I would like a ___ of water.",
+              "options": ["slice", "glass", "plate"],
+              "questionLang": "en",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "glass" }
           },
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Kérek egy kávét.", "hint": "kérek = I would like" },
+            "content": {
+              "question": "Kérek egy kávét.",
+              "hint": "kérek = I would like",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "I would like a coffee." }
           }
         ]
@@ -407,121 +610,12 @@
         "exercises": [
           {
             "type": "TRANSLATION",
-            "content": { "question": "Translate: Vágd fel a hagymát és süsd meg egy kevés olajon." },
+            "content": {
+              "question": "Vágd fel a hagymát és süsd meg egy kevés olajon.",
+              "questionLang": "hu",
+              "answerLang": "en"
+            },
             "correctAnswer": { "answer": "Chop the onion and fry it in a little oil." }
-          },
-          {
-            "type": "TRANSLATION",
-            "content": { "question": "Translate: Hozzáadtál elég sót a leveshez?" },
-            "correctAnswer": { "answer": "Did you add enough salt to the soup?" }
-          }
-        ]
-      },
-      {
-        "title": "Éttermi Rendelés",
-        "difficulty": "EASY",
-        "description": "Egyszerű rendelés.",
-        "language": "en",
-        "exercises": [
-          {
-            "type": "MULTIPLE_CHOICE",
-            "content": { "question": "The book with the list of food is the...", "options": ["Menu", "Bill", "Check"] },
-            "correctAnswer": { "answer": "Menu" }
-          },
-          {
-            "type": "MULTIPLE_CHOICE",
-            "content": { "question": "How do you say 'Pincér'?", "options": ["Cook", "Waiter", "Manager"] },
-            "correctAnswer": { "answer": "Waiter" }
-          }
-        ]
-      },
-      {
-        "title": "Éttermi Rendelés",
-        "difficulty": "MEDIUM",
-        "description": "Kommunikáció a pincérrel.",
-        "language": "en",
-        "exercises": [
-          {
-            "type": "MULTIPLE_CHOICE",
-            "content": { "question": "Can I have the ___, please? I want to pay.", "options": ["bill", "menu", "plate"] },
-            "correctAnswer": { "answer": "bill" }
-          },
-          {
-            "type": "TRANSLATION",
-            "content": { "question": "Translate: Fizetni szeretnék.", "hint": "fizetni = to pay" },
-            "correctAnswer": { "answer": "I would like to pay." }
-          }
-        ]
-      },
-      {
-        "title": "Éttermi Rendelés",
-        "difficulty": "HARD",
-        "description": "Éttermi panaszok és komplex rendelések.",
-        "language": "en",
-        "exercises": [
-          {
-            "type": "TRANSLATION",
-            "content": { "question": "Translate: Elnézést, de a levesem teljesen hideg." },
-            "correctAnswer": { "answer": "Excuse me, but my soup is completely cold." }
-          },
-          {
-            "type": "TRANSLATION",
-            "content": { "question": "Translate: Két főre szeretnék asztalt foglalni ma estére." },
-            "correctAnswer": { "answer": "I would like to book a table for two for tonight." }
-          }
-        ]
-      },
-      {
-        "title": "Diéták és Kérések",
-        "difficulty": "EASY",
-        "description": "Alapvető preferenciák.",
-        "language": "en",
-        "exercises": [
-          {
-            "type": "MULTIPLE_CHOICE",
-            "content": { "question": "If you don't eat meat, you are a...", "options": ["Vegetarian", "Carnivore", "Chef"] },
-            "correctAnswer": { "answer": "Vegetarian" }
-          },
-          {
-            "type": "MULTIPLE_CHOICE",
-            "content": { "question": "How do you say 'Allergia'?", "options": ["Allergy", "Sickness", "Diet"] },
-            "correctAnswer": { "answer": "Allergy" }
-          }
-        ]
-      },
-      {
-        "title": "Diéták és Kérések",
-        "difficulty": "MEDIUM",
-        "description": "Speciális étrend kifejezése.",
-        "language": "en",
-        "exercises": [
-          {
-            "type": "MULTIPLE_CHOICE",
-            "content": { "question": "I am allergic ___ peanuts.", "options": ["at", "to", "for"] },
-            "correctAnswer": { "answer": "to" }
-          },
-          {
-            "type": "TRANSLATION",
-            "content": { "question": "Translate: Nem eszem húst.", "hint": "hús = meat" },
-            "correctAnswer": { "answer": "I do not eat meat." }
-          }
-        ]
-      },
-      {
-        "title": "Diéták és Kérések",
-        "difficulty": "HARD",
-        "description": "Részletes diétás kérések étteremben.",
-        "language": "en",
-        "exercises": [
-          {
-            "type": "TRANSLATION",
-            "content": { "question": "Translate: Van gluténmentes opciójuk az étlapon?" },
-            "correctAnswer": { "answer": "Do you have a gluten-free option on the menu?" }
-          },
-          {
-            "type": "TRANSLATION",
-            "content": { "question": "Translate: Kérem, hagyják ki a sajtot a salátámból." },
-            "correctAnswer": { "answer": "Please leave the cheese out of my salad." }
           }
         ]
       }

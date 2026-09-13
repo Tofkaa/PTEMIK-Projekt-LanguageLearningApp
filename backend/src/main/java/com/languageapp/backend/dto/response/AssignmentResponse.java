@@ -24,6 +24,7 @@ public class AssignmentResponse {
     private boolean isRandomized;
     private boolean allowRetries;
     private boolean hasFeedback;
+    private boolean allowDictionary;
     private boolean isCompleted;
     private Integer maxAttempts;
     private int attemptsUsed;

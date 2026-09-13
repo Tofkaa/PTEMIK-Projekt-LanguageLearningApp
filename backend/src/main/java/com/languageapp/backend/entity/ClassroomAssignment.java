@@ -50,6 +50,9 @@ public class ClassroomAssignment {
     @Column(name = "has_feedback", nullable = false)
     private boolean hasFeedback;
 
+    @Column(name = "allow_dictionary", nullable = false)
+    private boolean allowDictionary = true;
+
     @Column(name = "max_attempts")
     private Integer maxAttempts;
 

@@ -59,7 +59,7 @@ public class VocabularyController {
         return ResponseEntity.ok(dueWords);
     }
 
-    @GetMapping("/map")
+    @GetMapping("/learned")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Integer>> getVocabularyMap(Authentication authentication) {
         Map<String, Integer> vocabMap = vocabularyService.getVocabularyMap(authentication.getName());

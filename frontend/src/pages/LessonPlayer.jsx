@@ -387,11 +387,16 @@ const LessonPlayer = () => {
         if (!currentExercise) return null;
 
         const { type, content } = currentExercise;
-        const questionText = content?.question?.replace('Translate: ', '').replace('Translate to English: ', '') || '';
-
+        
+        const questionText = content?.question || '';
+        
         const getTitle = () => {
+            if (type === 'TRANSLATION') {
+                const qLang = content?.questionLang === 'hu' ? 'Magyar' : 'Angol';
+                const aLang = content?.answerLang === 'hu' ? 'Magyar' : 'Angol';
+                return `Fordítás (${qLang} ➔ ${aLang})`;
+            }
             switch (type) {
-                case 'TRANSLATION': return 'Írd be a fordítást';
                 case 'MULTIPLE_CHOICE': return 'Válaszd ki a helyes opciót';
                 case 'WORD_BANK': return 'Rakd sorba a szavakat';
                 case 'IMAGE_CHOICE': return 'Válaszd ki a megfelelő képet';
@@ -399,15 +404,17 @@ const LessonPlayer = () => {
             }
         };
 
+        const allowDictionary = content?.questionLang !== 'hu';
+
         return (
             <div className="d-flex flex-column align-items-center w-100">
                 
-                {/* 1. Demoted Task Type */}
+                {/* 1. Task Type */}
                 <span className="text-secondary fw-bold text-uppercase mb-3 d-block" style={{ letterSpacing: '2px', fontSize: '0.8rem' }}>
                     {getTitle()}
                 </span>
                 
-                {/* 2. Promoted Question Text with Cyan Glow and Border */}
+                {/* Question 2 Text */}
                 {questionText && (
                     <div 
                         className="mb-5 p-4 rounded-4 border border-info border-opacity-50 text-center w-100"
@@ -415,12 +422,36 @@ const LessonPlayer = () => {
                             maxWidth: '800px', 
                             backgroundColor: 'rgba(13, 202, 240, 0.05)',
                             borderWidth: '2px',
-                            boxShadow: '0 0 20px rgba(13, 202, 240, 0.15)' // Kék ragyogás
+                            boxShadow: '0 0 20px rgba(13, 202, 240, 0.15)'
                         }}
                     >
                         <h2 className="fw-bold text-light mb-0" style={{ lineHeight: '1.4', fontSize: '1.8rem' }}>
-                            {questionText}
+                            {allowDictionary ? (
+                                <ClickableText 
+                                    text={questionText} 
+                                    disabled={!!challengeId} 
+                                    hint={content?.hint} 
+                                    source="LESSON" 
+                                />
+                            ) : (
+                                <span>{questionText}</span>
+                            )}
                         </h2>
+
+                       {!allowDictionary && content?.hint && (
+                            <div className="d-inline-block text-start mt-2 px-3 py-2 rounded" style={{ backgroundColor: 'rgba(13, 202, 240, 0.1)', borderLeft: '4px solid #0dcaf0' }}>
+                                <span className="small text-light fw-bold text-uppercase" style={{ letterSpacing: '1px' }}>
+                                    <i className="bi bi-lightbulb me-2 text-warning"></i>Tipp a fordításhoz
+                                </span>
+                                <div className="mt-1 small fw-medium" style={{ color: '#e0e0e0' }}>
+                                    {content.hint.split(',').map((pair, idx) => (
+                                        <span key={idx} className="me-3 d-inline-block">
+                                            {pair.trim()}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
