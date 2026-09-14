@@ -21,6 +21,7 @@ import AdminDashboard from './pages/AdminDashboard.jsx';
 import GlobalErrorToast from './components/GlobalErrorToast.jsx';
 import VocabularyHub from './pages/VocabularyHub.jsx';
 import VocabularyPractice from './pages/VocabularyPractice.jsx';
+import FlashcardPractice from './pages/FlashcardPractice.jsx';
 
 /**
  * Main Application Component
@@ -53,13 +54,16 @@ function App() {
                     <Route path="/assignment/session/:sessionId/play" element={<PrivateRoute><AssignmentPlayer /></PrivateRoute>} />
                     <Route path="/assignment/:id/submissions" element={<AssignmentSubmissions />} />
 
+                    {/* Vocabulary pages */}
+                    <Route path="/hub" element={<PrivateRoute><VocabularyHub /></PrivateRoute>} />
+                    <Route path="/vocabulary/practice" element={<PrivateRoute><VocabularyPractice /></PrivateRoute>} />
+                    <Route path="/vocabulary/flashcards" element={<PrivateRoute><FlashcardPractice /></PrivateRoute>} />
+                    
                     {/* Other pages */}
                     <Route path="/lesson/:id" element={<PrivateRoute><Lesson /></PrivateRoute>} />
                     <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                     <Route path="/friends" element={<PrivateRoute><Friends /></PrivateRoute>} />
-                    <Route path="/hub" element={<PrivateRoute><VocabularyHub /></PrivateRoute>} />
-                    <Route path="/vocabulary/practice" element={<PrivateRoute><VocabularyPractice /></PrivateRoute>} />
-                    
+                   
                     {/* Admin pages */}
                     <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 

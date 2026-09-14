@@ -53,20 +53,30 @@ const VocabularyHub = () => {
 
     return (
         <Container className="py-5 text-light">
-            {/* Header & Practice Trigger */}
+            {/* Header & Practice Triggers */}
             <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
                 <div>
                     <h2 className="fw-bold mb-1">📖 Szótár Hub & Tudástár</h2>
                     <p className="text-light opacity-75 mb-0">Tekintsd át az összes eddig elsajátított szavad és SRS fejlődésed.</p>
                 </div>
-                <Button 
-                    variant="info" 
-                    size="lg" 
-                    className="fw-bold text-dark rounded-pill px-4 shadow-sm"
-                    onClick={() => navigate('/vocabulary/practice')}
-                >
-                    ⚡ Dinamikus Gyakorlás Indítása
-                </Button>
+                <div className="d-flex gap-3">
+                    <Button 
+                        variant="outline-info" 
+                        size="lg" 
+                        className="fw-bold rounded-pill px-4 shadow-sm"
+                        onClick={() => navigate('/vocabulary/flashcards')}
+                    >
+                        🃏 Szabad Gyakorlás
+                    </Button>
+                    <Button 
+                        variant="info" 
+                        size="lg" 
+                        className="fw-bold text-dark rounded-pill px-4 shadow-sm"
+                        onClick={() => navigate('/vocabulary/practice')}
+                    >
+                        ⚡ Dinamikus Teszt
+                    </Button>
+                </div>
             </div>
 
             {/* Filters and Search Bar */}
