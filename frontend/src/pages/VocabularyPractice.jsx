@@ -13,12 +13,14 @@ const VocabularyPractice = () => {
     const [isChecking, setIsChecking] = useState(false);
     const [feedback, setFeedback] = useState(null);
     const [error, setError] = useState(null);
+    const [results, setResults] = useState([]);
+    const [startTime] = useState(Date.now());
     const [isCompleted, setIsCompleted] = useState(false);
+    const [sessionSummary, setSessionSummary] = useState(null);
 
     useEffect(() => {
         const fetchDynamicExercises = async () => {
             try {
-                // Lekérdjük az új dinamikus feladatsort a backendről
                 const response = await api.get('/vocabulary/practice/generate');
                 if (response.data.length === 0) {
                     setExercises([]);
@@ -49,17 +51,31 @@ const VocabularyPractice = () => {
             setFeedback({ type: 'danger', msg: `Helytelen! A helyes válasz: ${currentEx.correctAnswer} ❌` });
         }
 
+       const updatedResults = [...results, { targetWord: currentEx.targetWord, correct: isCorrect }];
+        setResults(updatedResults);
+
         setIsChecking(true);
         
-        // Itt opcionálisan hívhatod a recordPractice-t is, ha a backend SRS-t frissít időközben
-        setTimeout(() => {
-            setIsChecking(false);
+        setTimeout(async () => {
             if (currentIndex < exercises.length - 1) {
                 setCurrentIndex(prev => prev + 1);
                 setCurrentAnswer('');
                 setFeedback(null);
+                setIsChecking(false);
             } else {
-                setIsCompleted(true);
+                try {
+                    const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+                    const response = await api.post('/vocabulary/practice/submit', {
+                        results: updatedResults,
+                        timeTakenSeconds: timeTaken
+                    });
+                    setSessionSummary(response.data); 
+                } catch (err) {
+                    console.error("Hiba az eredmények mentésekor:", err);
+                } finally {
+                    setIsChecking(false);
+                    setIsCompleted(true);
+                }
             }
         }, 1500);
     };
@@ -90,8 +106,8 @@ const VocabularyPractice = () => {
                 <p className="text-light opacity-75 mb-4">
                     Gyűjts még szavakat a leckékből vagy a szótárból, hogy indíthass egy dinamikus sessiont.
                 </p>
-                <Button variant="info" size="lg" className="rounded-pill fw-bold" onClick={() => navigate('/dashboard')}>
-                    Vissza a Dashboardra
+                <Button variant="info" size="lg" className="rounded-pill fw-bold" onClick={() => navigate('/hub')}>
+                    Vissza a Szótárba
                 </Button>
             </Container>
         );
@@ -102,11 +118,32 @@ const VocabularyPractice = () => {
             <Container className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-center text-light">
                 <div className="mb-4" style={{ fontSize: '4rem' }}>🧠</div>
                 <h2 className="fw-bold mb-3 text-success">Dinamikus gyakorlás teljesítve!</h2>
-                <p className="text-light opacity-75 mb-4">
-                    Sikeresen végigmentél a vegyes tesztsorozaton. Remek munkát végeztél!
-                </p>
-                <Button variant="success" size="lg" className="rounded-pill fw-bold" onClick={() => navigate('/dashboard')}>
-                    Befejezés
+                
+                {sessionSummary ? (
+                    <div className="bg-dark p-4 rounded-4 border border-secondary mb-4 w-100 shadow-lg" style={{ maxWidth: '400px' }}>
+                        <h4 className="text-info fw-bold mb-4">Eredmények</h4>
+                        <p className="fs-5 mb-2 d-flex justify-content-between">
+                            <span>✅ Helyes:</span> 
+                            <span className="text-success fw-bold">{sessionSummary.correctCount} / {sessionSummary.totalQuestions}</span>
+                        </p>
+                        <p className="fs-5 mb-2 d-flex justify-content-between">
+                            <span>⭐ Szerzett XP:</span> 
+                            <span className="text-warning fw-bold">+{sessionSummary.earnedXp}</span>
+                        </p>
+                        <hr className="border-secondary" />
+                        <p className="fs-5 mb-0 d-flex justify-content-between">
+                            <span>🔥 Napi Streak:</span> 
+                            <span className="text-danger fw-bold">{sessionSummary.newStreak} nap</span>
+                        </p>
+                    </div>
+                ) : (
+                    <p className="text-light opacity-75 mb-4">
+                        Sikeresen végigmentél a vegyes tesztsorozaton. Remek munkát végeztél!
+                    </p>
+                )}
+
+                <Button variant="success" size="lg" className="rounded-pill fw-bold shadow-sm" onClick={() => navigate('/hub')}>
+                    Vissza a Szótárba
                 </Button>
             </Container>
         );
@@ -193,6 +230,11 @@ const VocabularyPractice = () => {
                                     className="bg-black text-info text-center fs-4 py-3 rounded-pill border-secondary shadow-none fw-bold"
                                     autoFocus
                                     disabled={isChecking || feedback}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && currentAnswer.trim() && !isChecking) {
+                                            handleCheckAnswer();
+                                        }
+                                    }}
                                 />
                             </Form.Group>
                         )}
@@ -221,9 +263,9 @@ const VocabularyPractice = () => {
                     <Button 
                         variant="link" 
                         className="text-secondary text-decoration-none" 
-                        onClick={() => navigate('/dashboard')}
+                        onClick={() => navigate('/hub')}
                     >
-                        Kilépés a Dashboardra
+                        Kilépés a Szótárba
                     </Button>
                 </div>
 

@@ -1,5 +1,6 @@
 package com.languageapp.backend.controller;
 
+import com.languageapp.backend.dto.request.DynamicPracticeSubmitRequest;
 import com.languageapp.backend.dto.request.VocabularyLookupRequest;
 import com.languageapp.backend.dto.request.VocabularyPracticeRequest;
 import com.languageapp.backend.dto.response.DynamicExerciseDTO;
@@ -77,5 +78,15 @@ public class VocabularyController {
     @GetMapping("/practice/generate")
     public ResponseEntity<List<DynamicExerciseDTO>> generatePracticeSession(Principal principal) {
         return ResponseEntity.ok(vocabularyService.generateDynamicPracticeSession(principal.getName(), 10));
+    }
+
+    @PostMapping("/practice/submit")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> submitDynamicPractice(
+            Principal principal,
+            @RequestBody DynamicPracticeSubmitRequest request) {
+
+        Map<String, Object> result = vocabularyService.processDynamicPracticeSession(principal.getName(), request);
+        return ResponseEntity.ok(result);
     }
 }

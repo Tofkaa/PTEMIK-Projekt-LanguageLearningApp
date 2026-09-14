@@ -48,4 +48,14 @@ public interface StudentVocabularyRepository extends JpaRepository<StudentVocabu
      */
     @Query("SELECT v FROM StudentVocabulary v WHERE v.user.userId = :userId AND (v.nextPracticeAt <= :now OR v.srsLevel < 3) ORDER BY v.nextPracticeAt ASC")
     List<StudentVocabulary> findDueOrLowLevelWords(@Param("userId") UUID userId, @Param("now") LocalDateTime now);
+
+    /**
+     * Counts the number of words the student has saved so far.
+     */
+    long countByUser_UserId(UUID userId);
+
+    /**
+     * Counts words that reach a given SRS level (or above).
+     */
+    long countByUser_UserIdAndSrsLevelGreaterThanEqual(UUID userId, int srsLevel);
 }

@@ -4,10 +4,7 @@ import com.languageapp.backend.dto.response.AchievementResponse;
 import com.languageapp.backend.entity.Achievement;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.entity.UserAchievement;
-import com.languageapp.backend.repository.AchievementRepository;
-import com.languageapp.backend.repository.ProgressRepository;
-import com.languageapp.backend.repository.UserAchievementRepository;
-import com.languageapp.backend.repository.ChallengeRepository;
+import com.languageapp.backend.repository.*;
 import com.languageapp.backend.enums.ChallengeStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +34,7 @@ public class AchievementService {
     // Dependencies for social and engagement achievements
     private final FriendshipService friendshipService;
     private final ChallengeRepository challengeRepository;
+    private final StudentVocabularyRepository vocabularyRepository;
 
     /**
      * Iterates through all available achievements in the system and awards them
@@ -122,6 +120,16 @@ public class AchievementService {
                     int targetStreak = Integer.parseInt(String.valueOf(criteria.get("target")));
                     int currentStreak = user.getStreak() != null ? user.getStreak() : 0;
                     return currentStreak >= targetStreak;
+
+                case "VOCAB_COUNT":
+                    int targetVocab = Integer.parseInt(String.valueOf(criteria.get("target")));
+                    long currentVocabCount = vocabularyRepository.countByUser_UserId(user.getUserId());
+                    return currentVocabCount >= targetVocab;
+
+                case "MASTERED_VOCAB_COUNT":
+                    int targetMastered = Integer.parseInt(String.valueOf(criteria.get("target")));
+                    long masteredCount = vocabularyRepository.countByUser_UserIdAndSrsLevelGreaterThanEqual(user.getUserId(), 6);
+                    return masteredCount >= targetMastered;
 
                 default:
                     log.warn("Unknown achievement criteria type: {}", type);

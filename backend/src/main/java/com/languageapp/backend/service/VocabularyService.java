@@ -2,6 +2,7 @@ package com.languageapp.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.languageapp.backend.dto.request.DynamicPracticeSubmitRequest;
 import com.languageapp.backend.dto.response.DynamicExerciseDTO;
 import com.languageapp.backend.dto.response.VocabularyDetailDTO;
 import com.languageapp.backend.dto.response.VocabularyResponse;
@@ -30,7 +31,8 @@ public class VocabularyService {
     private final UserRepository userRepository;
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
-
+    private final StreakService streakService;
+    private final AchievementService achievementService;
 
     @Transactional
     public VocabularyResponse lookupAndSaveWord(String email, String word, String source) {
@@ -303,5 +305,64 @@ public class VocabularyService {
         }
 
         return dynamicExercises;
+    }
+
+    @Transactional
+    public Map<String, Object> processDynamicPracticeSession(String email, DynamicPracticeSubmitRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        int correctCount = 0;
+        int totalQuestions = request.getResults().size();
+        int earnedXp = 0;
+
+        for (DynamicPracticeSubmitRequest.AnswerResult result : request.getResults()) {
+            Optional<StudentVocabulary> vocOpt = vocabularyRepository
+                    .findByUser_UserIdAndWordIgnoreCase(user.getUserId(), result.getTargetWord());
+
+            if (vocOpt.isPresent()) {
+                StudentVocabulary voc = vocOpt.get();
+                voc.setLastPracticedAt(LocalDateTime.now());
+
+                if (result.isCorrect()) {
+                    correctCount++;
+                    earnedXp += 2;
+                    voc.setSrsLevel(Math.min(6, voc.getSrsLevel() + 1));
+                } else {
+                    voc.setSrsLevel(0);
+                }
+
+
+                int daysToAdd = switch (voc.getSrsLevel()) {
+                    case 0 -> 0;
+                    case 1 -> 1;
+                    case 2 -> 3;
+                    case 3 -> 7;
+                    case 4 -> 14;
+                    case 5 -> 30;
+                    default -> 90;
+                };
+
+                voc.setNextPracticeAt(LocalDateTime.now().plusDays(daysToAdd));
+                vocabularyRepository.save(voc);
+            }
+        }
+
+        if (correctCount == totalQuestions && totalQuestions > 0) {
+            earnedXp += 10;
+        }
+
+        user.setXp(user.getXp() + earnedXp);
+        streakService.updateActivity(user);
+        userRepository.save(user);
+
+        achievementService.checkAndAwardAchievements(user, (correctCount * 100) / (totalQuestions == 0 ? 1 : totalQuestions));
+
+        return Map.of(
+                "correctCount", correctCount,
+                "totalQuestions", totalQuestions,
+                "earnedXp", earnedXp,
+                "newStreak", user.getStreak()
+        );
     }
 }
