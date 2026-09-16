@@ -218,7 +218,40 @@ public class VocabularyService {
     }
 
     /**
-     * Dinamikus gyakorló feladatsor generálása az esedékes (due) vagy alacsony SRS szintű szavakból.
+     * Add words to user's vocabulary where they did not request the clickabletext help and still got the answer right.
+     * This means the user presumably already knew the meaning well enough to grant them a srs level of 2
+     */
+      @Transactional
+    public void addKnownWordsBatch(String email, List<String> words) {
+        if (words == null || words.isEmpty()) return;
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        for (String word : words) {
+            String cleanWord = word.trim().toLowerCase();
+
+            if (vocabularyRepository.findByUser_UserIdAndWordIgnoreCase(user.getUserId(), cleanWord).isPresent()) {
+                continue;
+            }
+
+            String translation = fetchTranslationFromExternalApi(cleanWord);
+
+            StudentVocabulary newVoc = new StudentVocabulary();
+            newVoc.setUser(user);
+            newVoc.setWord(cleanWord);
+            newVoc.setTranslation(translation);
+            newVoc.setSource("AUTO_LEARNED");
+            newVoc.setSrsLevel(2);
+            newVoc.setNextPracticeAt(LocalDateTime.now().plusDays(3));
+            newVoc.setLastPracticedAt(LocalDateTime.now());
+
+            vocabularyRepository.save(newVoc);
+        }
+    }
+
+    /**
+     * Generate Dynamic Practice session from due words in the users vocabulary
      */
     @Transactional(readOnly = true)
     public List<DynamicExerciseDTO> generateDynamicPracticeSession(String email, int limit) {

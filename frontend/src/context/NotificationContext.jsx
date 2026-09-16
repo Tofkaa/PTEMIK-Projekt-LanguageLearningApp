@@ -136,7 +136,7 @@ export const NotificationProvider = ({ children }) => {
     const activeNotifications = user ? notifications : { 
         total: 0, pendingFriends: 0, pendingChallenges: 0,
         teacherPendingJoinRequests: 0, teacherUngradedSubmissions: 0, studentActiveAssignmentIds: [], studentGradedSessionIds: [], lastPingTime: 0,
-        dueVocabularyCount: 0 // <-- Fallback mező
+        dueVocabularyCount: 0 
     };
 
     return (

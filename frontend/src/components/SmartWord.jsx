@@ -12,7 +12,7 @@ import { vocabularyApi } from '../services/vocabularyApi';
 * @param {string} source - The extra context to the backend
 * @param {string} preloadedTranslation - Optional, preloaded translation (JSON hint)
 */
-const SmartWord = ({ word, queryWord, disabled = false, source = 'LESSON', preloadedTranslation = null }) => {
+const SmartWord = ({ word, queryWord, disabled = false, source = 'LESSON', preloadedTranslation = null, onWordClick }) => {
     
     // If we received a burned-in hint, we load it immediately
     const [translationData, setTranslationData] = useState(
@@ -30,7 +30,12 @@ const SmartWord = ({ word, queryWord, disabled = false, source = 'LESSON', prelo
     const [error, setError] = useState(null);
 
     const handleToggle = async (show) => {
-       // If there is already a translation (e.g. because of the hint) or it is loading, we do not call the backend
+        
+        if (show && onWordClick) {
+           onWordClick();
+       }
+      
+        // If there is already a translation (e.g. because of the hint) or it is loading, we do not call the backend
        if (show && !translationData && !isLoading) {
             setIsLoading(true);
             

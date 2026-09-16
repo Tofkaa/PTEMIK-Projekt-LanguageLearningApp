@@ -52,6 +52,9 @@ const LessonPlayer = () => {
     const [feedback, setFeedback] = useState(null);
     const [isChecking, setIsChecking] = useState(false); 
 
+    const [renderedWords, setRenderedWords] = useState([]);
+    const [clickedWords, setClickedWords] = useState(new Set());
+
     const { refreshNotifications } = useNotifications();
    
     // --- PHASE 1: DATA FETCHING ---
@@ -100,6 +103,15 @@ const LessonPlayer = () => {
     
     const isInputDisabled = feedback && feedback.type !== 'warning';
 
+    const handleAutoAddWords = () => {
+        const unclicked = renderedWords.filter(w => !clickedWords.has(w));
+        
+        if (unclicked.length > 0) {
+            api.post('/vocabulary/known-batch', { words: unclicked })
+                .catch(err => console.error("Auto-add sikertelen:", err));
+        }
+    };
+
    // --- PHASE 2: IMMEDIATE FEEDBACK & NEXT QUESTION ---
     const handleCheckOrNext = async () => {
         if (!feedback || feedback.type === 'warning') {
@@ -117,6 +129,7 @@ const LessonPlayer = () => {
 
                     if (correct) {
                         setFeedback({ type: 'success', msg: feedbackMessage });
+                       handleAutoAddWords();
                     } else if (almostCorrect) {
                         setFeedback({ type: 'warning', msg: feedbackMessage });
                     } else {
@@ -139,6 +152,7 @@ const LessonPlayer = () => {
                     if (localHash === currentExercise.answerHash) {
                         // Perfect match
                         setFeedback({ type: 'success', msg: 'Tökéletes! ✅' });
+                       handleAutoAddWords();
                     } else {
                         // Faulty answer
                         setFeedback({ type: 'danger', msg: 'Helytelen! Semmi baj, menjünk tovább. ❌' });
@@ -173,6 +187,8 @@ const LessonPlayer = () => {
         setCollectedAnswers(finalAnswers);
         setCurrentAnswer('');
         setFeedback(null);
+        setRenderedWords([]);
+        setClickedWords(new Set());
 
         if (currentIndex < exercises.length - 1) {
             setCurrentIndex(prevIndex => prevIndex + 1);
@@ -425,13 +441,15 @@ const LessonPlayer = () => {
                             boxShadow: '0 0 20px rgba(13, 202, 240, 0.15)'
                         }}
                     >
-                        <h2 className="fw-bold text-light mb-0" style={{ lineHeight: '1.4', fontSize: '1.8rem' }}>
+                      <h2 className="fw-bold text-light mb-0" style={{ lineHeight: '1.4', fontSize: '1.8rem' }}>
                             {allowDictionary ? (
                                 <ClickableText 
                                     text={questionText} 
                                     disabled={!!challengeId} 
                                     hint={content?.hint} 
                                     source="LESSON" 
+                                    onWordsFound={(words) => setRenderedWords(words)} 
+                                    onWordClick={(word) => setClickedWords(prev => new Set(prev).add(word))}
                                 />
                             ) : (
                                 <span>{questionText}</span>

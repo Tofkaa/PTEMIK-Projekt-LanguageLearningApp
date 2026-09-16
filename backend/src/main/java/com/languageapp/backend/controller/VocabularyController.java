@@ -70,6 +70,16 @@ public class VocabularyController {
         return ResponseEntity.ok(vocabMap);
     }
 
+    @PostMapping("/known-batch")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> addKnownWordsBatch(
+            Authentication authentication,
+            @RequestBody Map<String, List<String>> request) {
+
+        vocabularyService.addKnownWordsBatch(authentication.getName(), request.get("words"));
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/hub")
     public ResponseEntity<List<VocabularyDetailDTO>> getVocabularyHub(Principal principal) {
         return ResponseEntity.ok(vocabularyService.getDetailedVocabularyForUser(principal.getName()));
