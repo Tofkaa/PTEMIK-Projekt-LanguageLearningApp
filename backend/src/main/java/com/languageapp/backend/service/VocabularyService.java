@@ -227,16 +227,10 @@ public class VocabularyService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        // 1. Megkeressük azokat a szavakat, amik esedékesek a gyakorlásra, vagy még alacsony szintűek
-        List<StudentVocabulary> dueWords = vocabularyRepository.findDueOrLowLevelWords(user.getUserId(), now);
+        List<StudentVocabulary> dueWords = vocabularyRepository
+                .findAllByUser_UserIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(user.getUserId(), now);
 
-        if (dueWords.isEmpty()) {
-            // Fallback: Ha nincs esedékes, véletlenszerűen szedünk fel eddig tanult szavakat
-            dueWords = vocabularyRepository.findAllByUser(user);
-            Collections.shuffle(dueWords);
-        }
 
-        // Limitáljuk a méretet (pl. max 10-15 feladat egy sessionben)
         if (dueWords.size() > limit) {
             dueWords = dueWords.subList(0, limit);
         }
@@ -245,11 +239,10 @@ public class VocabularyService {
         List<DynamicExerciseDTO> dynamicExercises = new ArrayList<>();
 
         for (StudentVocabulary item : dueWords) {
-            // Véletlenszerűen kiválasztunk egy feladattípust erre a szóra: 0 = Multiple Choice, 1 = Word Bank, 2 = Translation
             int exerciseTypeSelector = new Random().nextInt(3);
 
             if (exerciseTypeSelector == 0) {
-                // MULTIPLE CHOICE GENERÁLÁS
+
                 List<String> wrongOptions = allUserWords.stream()
                         .filter(w -> !w.getWord().equalsIgnoreCase(item.getWord()))
                         .map(StudentVocabulary::getTranslation)
@@ -277,7 +270,6 @@ public class VocabularyService {
                         .build());
 
             } else if (exerciseTypeSelector == 1 && item.getWord().contains(" ")) {
-                // WORD BANK (ha több szóból álló kifejezés)
                 List<String> words = Arrays.asList(item.getWord().split(" "));
                 List<String> shuffledWords = new ArrayList<>(words);
                 Collections.shuffle(shuffledWords);
@@ -292,7 +284,6 @@ public class VocabularyService {
                         .build());
 
             } else {
-                // TRANSLATION (Gépeléses)
                 dynamicExercises.add(DynamicExerciseDTO.builder()
                         .exerciseId(UUID.randomUUID())
                         .type("TRANSLATION")
@@ -324,6 +315,14 @@ public class VocabularyService {
                 StudentVocabulary voc = vocOpt.get();
                 voc.setLastPracticedAt(LocalDateTime.now());
 
+                // Anti-Cheat protection: if the user manages to bypass the systems intended usage functions and practice ahead of time
+                // meaning the due date is in the future, we ignore it and do not update their srs level
+                if (voc.getNextPracticeAt() != null && voc.getNextPracticeAt().isAfter(LocalDateTime.now())) {
+                    log.warn("User {} tried to practice word '{}' ahead of time. Ignoring SRS update.", email, voc.getWord());
+                    continue;
+                }
+
+                voc.setLastPracticedAt(LocalDateTime.now());
                 if (result.isCorrect()) {
                     correctCount++;
                     earnedXp += 2;

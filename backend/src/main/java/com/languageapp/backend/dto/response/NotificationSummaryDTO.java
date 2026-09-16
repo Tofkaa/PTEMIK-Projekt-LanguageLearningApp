@@ -20,6 +20,7 @@ public class NotificationSummaryDTO {
     private List<String> studentGradedSessionIds;
 
     private long lastPingTime;
+    private int dueVocabularyCount;
 
     public int getTotal() {
         return pendingFriendRequests + pendingChallenges +

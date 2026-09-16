@@ -38,7 +38,7 @@ public class DataSeeder implements CommandLineRunner {
             log.info("Database is empty. Initializing structured seed data from JSON...");
             seedCurriculumFromJson();
         }
-        
+
         log.info("Checking and synchronizing achievements...");
         syncAchievementsFromJson();
     }
