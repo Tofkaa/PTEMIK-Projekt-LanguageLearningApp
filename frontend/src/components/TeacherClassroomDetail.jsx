@@ -59,6 +59,7 @@ const TeacherClassroomDetail = () => {
         isTest: false,
         isRandomized: true,
         allowRetries: false,
+        allowLateSubmission: false,
         maxAttempts: '',
         timeLimitMinutes: '',
         availableFrom: '',
@@ -136,7 +137,7 @@ const TeacherClassroomDetail = () => {
      */
     const handleViewSubmissions = (assignment) => {
         markAsViewed('viewedTeacherUngraded', [`${classroomId}:${assignment.assignmentId}`]);
-        navigate(`/assignment/${assignment.assignmentId}/submissions`, { state: { assignmentTitle: assignment.title, classroomName: classroomName } });
+        navigate(`/assignment/${assignment.assignmentId}/submissions`, { state: { assignmentTitle: assignment.title, classroomName: classroomName, timeLimitMinutes: assignment.timeLimitMinutes } });
     };
 
     // --- MEMBER MANAGEMENT ---
@@ -258,6 +259,7 @@ const TeacherClassroomDetail = () => {
             isTest: assignmentMode === 'TEST',
             hasFeedback: assignmentMode === 'TEST' ? assignmentForm.hasFeedback : true,
             allowDictionary: assignmentMode === 'TEST' ? assignmentForm.allowDictionary : true,
+            allowLateSubmission: assignmentMode === 'TEST' ? assignmentForm.allowLateSubmission : true,
             randomized: assignmentForm.isRandomized,
             allowRetries: assignmentMode === 'TEST' ? assignmentForm.allowRetries : true,
             maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
@@ -810,6 +812,13 @@ const TeacherClassroomDetail = () => {
                                             <Form.Check type="switch" label="Második esély a hibás válaszoknál" 
                                                 checked={assignmentForm.allowRetries} 
                                                 onChange={e => setAssignmentForm({...assignmentForm, allowRetries: e.target.checked})} />
+                                            
+                                            {assignmentForm.timeLimitMinutes > 0 && (
+                                                <Form.Check type="switch" label="Késedelmes beadás engedélyezése" 
+                                                    className="mt-2 text-light"
+                                                    checked={assignmentForm.allowLateSubmission} 
+                                                    onChange={e => setAssignmentForm({...assignmentForm, allowLateSubmission: e.target.checked})} />
+                                            )}
                                         </div>
                                     )}
                                 </div>

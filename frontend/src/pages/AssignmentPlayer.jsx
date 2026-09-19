@@ -12,8 +12,8 @@ import { assignmentApi } from '../services/assignmentApi';
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
 import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise.jsx';
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
-import { getRemainingTimeMs } from '../utils/dateUtils';
 import ClickableText from '../components/ClickableText.jsx';
+import { parseServerDate } from '../utils/dateUtils.js';
 
 /**
  * @component
@@ -54,15 +54,21 @@ const AssignmentPlayer = () => {
         }
     }, [sessionData, details, navigate]);
 
-    // --- TIMER ---
+   // --- TIMER ---
+    const allowLate = details?.allowLateSubmission === true;
+
     useEffect(() => {
         if (!details?.timeLimitMinutes || !sessionData?.startedAt) return;
         
+        const startTimeMs = parseServerDate(sessionData.startedAt).getTime();
+        const limitMs = details.timeLimitMinutes * 60 * 1000;
+        const exactDeadline = startTimeMs + limitMs;
+        
         const timer = setInterval(() => {
-            const remaining = getRemainingTimeMs(sessionData.startedAt, details.timeLimitMinutes);
+            const remaining = exactDeadline - Date.now();
             setTimeLeft(remaining);
 
-            if (remaining !== null && remaining <= 0 && !isAutoSubmitting.current) {
+            if (remaining <= 0 && !isAutoSubmitting.current && !allowLate) {
                 clearInterval(timer);
                 isAutoSubmitting.current = true;
                 handleAutoSubmit();
@@ -70,19 +76,19 @@ const AssignmentPlayer = () => {
         }, 1000);
         
         return () => clearInterval(timer);
-    }, [details, sessionData]);
+    }, [details, sessionData, allowLate]);
 
     /**
      * Formats the remaining time in milliseconds into a readable MM:SS format.
-     * 
-     * @param {number} ms - Milliseconds remaining.
-     * @returns {string} Formatted time string.
      */
     const formatTimeLeft = (ms) => {
-        const totalSeconds = Math.floor(ms / 1000);
+        const isNegative = ms < 0;
+        const absMs = Math.abs(ms);
+        const totalSeconds = Math.floor(absMs / 1000);
         const m = Math.floor(totalSeconds / 60);
         const s = totalSeconds % 60;
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        const formatted = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        return isNegative ? `+${formatted}` : formatted;
     };
 
     /**
@@ -288,8 +294,8 @@ const AssignmentPlayer = () => {
                     <div className="d-flex justify-content-between align-items-center mb-2 fw-bold text-light opacity-75 small">
                         <span style={{ width: '60px' }}>{currentIndex + 1} / {exercises.length}</span>
                         {timeLeft !== null && (
-                            <span className={`fs-6 px-3 py-1 bg-dark rounded-pill border ${timeLeft < 60000 ? 'border-danger text-danger' : 'border-secondary text-info'}`}>
-                                ⏱️ {formatTimeLeft(timeLeft)}
+                            <span className={`fs-6 px-3 py-1 bg-dark rounded-pill border ${timeLeft < 0 ? 'border-danger text-light bg-danger' : (timeLeft < 60000 ? 'border-danger text-danger' : 'border-secondary text-info')}`}>
+                                ⏱️ {timeLeft < 0 ? 'Túllépés: ' : ''}{formatTimeLeft(timeLeft)}
                             </span>
                         )}
                         <span className="text-end" style={{ width: '60px' }}>{Math.round(progressPercentage)}%</span>

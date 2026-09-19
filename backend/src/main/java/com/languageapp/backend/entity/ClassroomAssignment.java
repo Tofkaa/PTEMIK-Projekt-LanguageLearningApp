@@ -53,6 +53,9 @@ public class ClassroomAssignment {
     @Column(name = "allow_dictionary", nullable = false)
     private boolean allowDictionary = true;
 
+    @Column(name = "allow_latesubmission", nullable = false)
+    private boolean allowLateSubmission = true;
+
     @Column(name = "max_attempts")
     private Integer maxAttempts;
 
