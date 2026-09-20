@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Container, Card, Button, Badge, Table, Modal, Form, Spinner, Row, Col } from 'react-bootstrap';
+import { Container, Card, Button, Badge, Table, Modal, Form, Spinner, Row, Col, Alert } from 'react-bootstrap';
 import { assignmentApi } from '../services/assignmentApi';
 import { formatToLocalDisplay } from '../utils/dateUtils';
 import ExercisePreviewCard from '../components/ExercisePreviewCard';
@@ -22,6 +22,7 @@ const AssignmentSubmissions = () => {
     
     const assignmentTitle = location.state?.assignmentTitle || 'Feladat';
     const classroomName = location.state?.classroomName || 'Osztályterem';
+    const timeLimitMinutes = location.state?.timeLimitMinutes || null;
 
     const [sessions, setSessions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -34,9 +35,29 @@ const AssignmentSubmissions = () => {
     const [expandedPreviewIndex, setExpandedPreviewIndex] = useState(null);
 
     /**
+     * Calculates if the student's submission is late, and if it is, by how much
+     */
+    const getLateInfo = (session) => {
+        if (!timeLimitMinutes || !session?.startedAt || !session?.finishedAt) return null;
+        
+        const start = new Date(session.startedAt).getTime();
+        const end = new Date(session.finishedAt).getTime();
+        
+        const takenMs = end - start;
+        const limitMs = timeLimitMinutes * 60 * 1000;
+        
+        // 5 másodperc kegyelmi idő hálózati késés miatt
+        if (takenMs > limitMs + 5000) { 
+            const overS = Math.floor((takenMs - limitMs) / 1000);
+            const overM = Math.floor(overS / 60);
+            const remS = overS % 60;
+            return `${overM}p ${remS}mp`;
+        }
+        return null;
+    };
+
+    /**
      * Toggles the inline preview box for a specific question's details.
-     * 
-     * @param {number} index - The index of the answer in the modal.
      */
     const togglePreview = (index) => {
         setExpandedPreviewIndex(prev => prev === index ? null : index);
@@ -44,9 +65,6 @@ const AssignmentSubmissions = () => {
 
     /**
      * Fetches all completed sessions for the selected assignment.
-     * 
-     * @async
-     * @function fetchSessions
      */
     const fetchSessions = useCallback(async () => {
         setIsLoading(true);
@@ -72,8 +90,6 @@ const AssignmentSubmissions = () => {
 
     /**
      * Prepares and opens the grading modal with the selected session's data.
-     * 
-     * @param {Object} session - The session object to be graded.
      */
     const openGradingModal = (session) => {
         setSelectedSession(session);
@@ -85,11 +101,7 @@ const AssignmentSubmissions = () => {
     };
 
     /**
-     * Submits the teacher's manual evaluation (score and comments) to the API.
-     * 
-     * @async
-     * @function handleGradeSubmit
-     * @param {React.FormEvent} e - The form submission event.
+     * Submits the teacher's manual evaluation.
      */
     const handleGradeSubmit = async (e) => {
         e.preventDefault();
@@ -111,14 +123,8 @@ const AssignmentSubmissions = () => {
         }
     };
 
-    /**
-     * Analyzes all fetched sessions to determine the most frequently failed question.
-     * 
-     * @returns {Object|string} An object containing the question string and mistake count, or a fallback string.
-     */
     const getHardestQuestion = () => {
         if (!sessions || sessions.length === 0) return "Nincs elég adat";
-        
         const mistakeCounts = {};
         let totalMistakes = 0;
 
@@ -134,13 +140,8 @@ const AssignmentSubmissions = () => {
         });
 
         if (totalMistakes === 0) return "Mindenki hibátlan!";
-
         const sortedMistakes = Object.entries(mistakeCounts).sort((a, b) => b[1] - a[1]);
-        
-        return {
-            question: sortedMistakes[0][0],
-            count: sortedMistakes[0][1]
-        };
+        return { question: sortedMistakes[0][0], count: sortedMistakes[0][1] };
     };
 
     const hardest = getHardestQuestion();
@@ -208,31 +209,42 @@ const AssignmentSubmissions = () => {
                             {sessions.length === 0 ? (
                                 <tr><td colSpan="6" className="text-center py-4 text-light">Még senki sem küldte be ezt a feladatot.</td></tr>
                             ) : (
-                                sessions.map(session => (
-                                    <tr key={session.sessionId} className="align-middle">
-                                        <td>
-                                            <div className="fw-bold">{session.studentName}</div>
-                                            <div className="small text-secondary">{session.studentEmail}</div>
-                                        </td>
-                                        <td>{formatToLocalDisplay(session.finishedAt)}</td>
-                                        <td className="text-center"><Badge bg="secondary" className="fs-6">{session.finalScore}%</Badge></td>
-                                        <td className="text-center">
-                                            {session.teacherScore !== null ? (
-                                                <Badge bg={session.teacherScore >= 50 ? "success" : "danger"} className="fs-6">{session.teacherScore}%</Badge>
-                                            ) : (
-                                                <span className="text-light">-</span>
-                                            )}
-                                        </td>
-                                        <td className="text-center">
-                                            {session.graded ? <Badge bg="info">Publikálva</Badge> : <Badge bg="warning" text="dark">Várakozik</Badge>}
-                                        </td>
-                                        <td className="text-end">
-                                            <Button variant={session.graded ? "outline-info" : "primary"} size="sm" onClick={() => openGradingModal(session)}>
-                                                {session.graded ? 'Módosítás' : 'Értékelés'}
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))
+                                sessions.map(session => {
+                                    const lateString = getLateInfo(session);
+
+                                    return (
+                                        <tr key={session.sessionId} className="align-middle">
+                                            <td>
+                                                <div className="fw-bold">{session.studentName}</div>
+                                                <div className="small text-secondary">{session.studentEmail}</div>
+                                            </td>
+                                            <td>
+                                                <div>{formatToLocalDisplay(session.finishedAt)}</div>
+                                                {lateString && (
+                                                    <Badge bg="danger" className="mt-1 shadow-sm d-block" title={`Az eredeti korlát ${timeLimitMinutes} perc volt.`}>
+                                                        ⏱️ +{lateString} késés
+                                                    </Badge>
+                                                )}
+                                            </td>
+                                            <td className="text-center"><Badge bg="secondary" className="fs-6">{session.finalScore}%</Badge></td>
+                                            <td className="text-center">
+                                                {session.teacherScore !== null ? (
+                                                    <Badge bg={session.teacherScore >= 50 ? "success" : "danger"} className="fs-6">{session.teacherScore}%</Badge>
+                                                ) : (
+                                                    <span className="text-light">-</span>
+                                                )}
+                                            </td>
+                                            <td className="text-center">
+                                                {session.graded ? <Badge bg="info">Publikálva</Badge> : <Badge bg="warning" text="dark">Várakozik</Badge>}
+                                            </td>
+                                            <td className="text-end">
+                                                <Button variant={session.graded ? "outline-info" : "primary"} size="sm" onClick={() => openGradingModal(session)}>
+                                                    {session.graded ? 'Módosítás' : 'Értékelés'}
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </Table>
@@ -249,6 +261,20 @@ const AssignmentSubmissions = () => {
                 <Form onSubmit={handleGradeSubmit}>
                     <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }} className="custom-scrollbar">
                         
+                        {/* HATALMAS PIROS FIGYELMEZTETÉS A KÉSÉSRŐL A MODALBAN */}
+                        {selectedSession && getLateInfo(selectedSession) && (
+                            <Alert variant="danger" className="d-flex align-items-center mb-4 shadow-sm border-danger">
+                                <span className="fs-2 me-3">⚠️</span>
+                                <div>
+                                    <h5 className="fw-bold text-danger mb-1">Időtúllépés történt!</h5>
+                                    <div className="text-dark">
+                                        A diák <strong>+{getLateInfo(selectedSession)}</strong> késéssel adta be a munkát 
+                                        az eredeti {timeLimitMinutes} perces korláthoz képest. Ezt vedd figyelembe a pontozásnál!
+                                    </div>
+                                </div>
+                            </Alert>
+                        )}
+
                         <div className="mb-4">
                             <h6 className="fw-bold text-secondary mb-3 border-bottom border-secondary pb-2">A diák válaszai:</h6>
                             {(!selectedSession?.answers || selectedSession.answers.length === 0) ? (
@@ -345,4 +371,4 @@ const AssignmentSubmissions = () => {
     );
 };
 
-export default AssignmentSubmissions;   
+export default AssignmentSubmissions;

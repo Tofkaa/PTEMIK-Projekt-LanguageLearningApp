@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.LocalDateTime;
+
 /**
  * REST Controller handling real-time notifications and summary data fetching.
  */
@@ -32,6 +34,7 @@ public class NotificationController {
     private final ClassroomAssignmentRepository assignmentRepository;
     private final AssignmentSessionRepository sessionRepository;
     private final ClassroomMemberRepository classroomMemberRepository;
+    private final StudentVocabularyRepository studentVocabularyRepository;
 
     private final SseService sseService;
 
@@ -53,6 +56,7 @@ public class NotificationController {
         int totalFriends = friendshipRepository.countByFriendUserIdAndStatus(userId, com.languageapp.backend.enums.FriendshipStatus.ACCEPTED)
                 + friendshipRepository.countByUserUserIdAndStatus(userId, com.languageapp.backend.enums.FriendshipStatus.ACCEPTED);
         int totalHistory = challengeRepository.countHistoryForUser(userId);
+        int dueVocabCount = (int) studentVocabularyRepository.countByUser_UserIdAndNextPracticeAtBefore(userId, LocalDateTime.now());
 
         java.util.List<String> tPendingIds = new java.util.ArrayList<>();
         java.util.List<String> tUngradedIds = new java.util.ArrayList<>();
@@ -97,7 +101,7 @@ public class NotificationController {
 
         return ResponseEntity.ok(new NotificationSummaryDTO(
                 pendingFriends, pendingChallenges, totalFriends, totalHistory,
-                tPendingIds, tUngradedIds, sActiveIds, sGradedIds, 1L
+                tPendingIds, tUngradedIds, sActiveIds, sGradedIds, 1L, dueVocabCount
         ));
     }
 

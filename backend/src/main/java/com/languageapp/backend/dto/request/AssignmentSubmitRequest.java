@@ -2,6 +2,7 @@ package com.languageapp.backend.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import java.util.List;
 
@@ -12,7 +13,7 @@ import java.util.List;
 @Data
 public class AssignmentSubmitRequest {
 
-    @NotEmpty(message = "The list of answers cannot be empty")
+    @NotNull(message = "The list of answers cannot be null")
     @Valid
     private List<ExerciseSubmission> answers;
 }

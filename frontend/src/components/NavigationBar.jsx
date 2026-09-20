@@ -43,6 +43,8 @@ const NavigationBar = () => {
 
     const classroomPings = unseenAssignments + unseenResults + unseenTeacherPending + unseenTeacherUngraded;
     const communityPings = (notifications?.pendingFriendRequests || 0) + (notifications?.pendingChallenges || 0);
+
+    const dueVocabCount = notifications?.dueVocabularyCount || 0;
                            
     return (
         <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm mb-4 border-bottom border-secondary">
@@ -55,7 +57,7 @@ const NavigationBar = () => {
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
                 <Navbar.Collapse id="basic-navbar-nav">
                     
-                    {/* Fő Navigációs Linkek  */}
+                    {/* Main Navigation Links  */}
                     <Nav className="me-auto align-items-lg-center gap-3 mt-3 mt-lg-0">
                         
                         <Nav.Link onClick={() => navigate('/dashboard')} className="fw-bold d-flex align-items-center gap-2">
@@ -80,6 +82,16 @@ const NavigationBar = () => {
                             )}
                         </Nav.Link>
 
+                        {/* Vocabulary Hub */}
+                        <Nav.Link onClick={() => navigate('/hub')} className="fw-bold position-relative d-flex align-items-center gap-2">
+                            <span>🎯</span> Szótár HUB
+                            {dueVocabCount > 0 && (
+                                <Badge bg="danger" pill className="position-absolute top-0 start-100 translate-middle shadow-sm" style={{ fontSize: '0.65rem' }}>
+                                    {dueVocabCount}
+                                </Badge>
+                            )}
+                        </Nav.Link>
+
                         {/* Admin Link */}
                         {(user.role === 'ADMIN' || user.role === 'ROLE_ADMIN') && (
                             <Nav.Link onClick={() => navigate('/admin')} className="text-danger fw-bold d-flex align-items-center gap-2 ms-lg-3 border-start border-secondary ps-lg-4">
@@ -89,7 +101,7 @@ const NavigationBar = () => {
 
                     </Nav>
                     
-                    {/* Jobb oldali szekció (XP és Profil) */}
+                    {/* Right side section (XP and Profile) */}
                     <Nav className="align-items-lg-center gap-3 mt-3 mt-lg-0">
                         <Badge bg="warning" text="dark" className="rounded-pill px-3 py-2 shadow-sm fs-6 d-flex align-items-center gap-1">
                             <span>⭐</span> {user.xp || 0} XP

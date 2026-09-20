@@ -24,7 +24,8 @@ export const NotificationProvider = ({ children }) => {
         teacherUngradedSubmissionIds: [],
         studentActiveAssignmentIds: [],
         studentGradedSessionIds: [],
-        lastPingTime: 0
+        lastPingTime: 0,
+        dueVocabularyCount: 0 // <-- Új mező hozzáadva
     });
 
    /**
@@ -38,7 +39,6 @@ export const NotificationProvider = ({ children }) => {
             });
             const data = response.data;
             
-        
             setNotifications({
                 ...data, 
                 // Visszafelé kompatibilitás a régi komponensek miatt:
@@ -46,13 +46,13 @@ export const NotificationProvider = ({ children }) => {
                 pendingFriends: data.pendingFriendRequests || 0, 
                 pendingChallenges: data.pendingChallenges || 0,
                 totalFriends: data.totalAcceptedFriends || 0,
-                totalHistory: data.totalHistoryItems || 0
+                totalHistory: data.totalHistoryItems || 0,
+                dueVocabularyCount: data.dueVocabularyCount || 0 // <-- Új mező rögzítése
             });
         } catch (error) {
             console.error("Értesítések lekérése sikertelen", error);
         }
     }, [user]);
-
 
    useEffect(() => {
         if (!user) return;
@@ -78,7 +78,8 @@ export const NotificationProvider = ({ children }) => {
                         pendingFriends: data.pendingFriendRequests || 0,
                         pendingChallenges: data.pendingChallenges || 0,
                         totalFriends: data.totalAcceptedFriends || 0,
-                        totalHistory: data.totalHistoryItems || 0
+                        totalHistory: data.totalHistoryItems || 0,
+                        dueVocabularyCount: data.dueVocabularyCount || 0 // <-- Új mező rögzítése
                     });
                 }
             } catch (error) {
@@ -125,7 +126,8 @@ export const NotificationProvider = ({ children }) => {
             // Takarításnál is nullázzuk az új mezőket
             setNotifications({ 
                 total: 0, pendingFriends: 0, pendingChallenges: 0, totalFriends: 0, totalHistory: 0,
-                teacherPendingJoinRequests: 0, teacherUngradedSubmissions: 0, studentActiveAssignmentIds: [], studentGradedSessionIds: [], lastPingTime: 0
+                teacherPendingJoinRequests: 0, teacherUngradedSubmissions: 0, studentActiveAssignmentIds: [], studentGradedSessionIds: [], lastPingTime: 0,
+                dueVocabularyCount: 0 // <-- Új mező nullázása
             });
         };
     }, [user]);
@@ -133,7 +135,8 @@ export const NotificationProvider = ({ children }) => {
     // Üres fallback state beállítása, ha kijelentkezik a user
     const activeNotifications = user ? notifications : { 
         total: 0, pendingFriends: 0, pendingChallenges: 0,
-        teacherPendingJoinRequests: 0, teacherUngradedSubmissions: 0, studentActiveAssignmentIds: [], studentGradedSessionIds: [], lastPingTime: 0
+        teacherPendingJoinRequests: 0, teacherUngradedSubmissions: 0, studentActiveAssignmentIds: [], studentGradedSessionIds: [], lastPingTime: 0,
+        dueVocabularyCount: 0 
     };
 
     return (

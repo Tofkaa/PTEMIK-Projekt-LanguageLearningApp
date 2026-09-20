@@ -69,6 +69,8 @@ public class AssignmentService {
         assignment.setRandomized(request.isRandomized());
         assignment.setAllowRetries(request.isAllowRetries());
         assignment.setHasFeedback(request.isHasFeedback());
+        assignment.setAllowDictionary(request.isAllowDictionary());
+        assignment.setAllowLateSubmission(request.isAllowLateSubmission());
         assignment.setMaxAttempts(request.getMaxAttempts());
         assignment.setAvailableFrom(request.getAvailableFrom());
         assignment.setAvailableUntil(request.getAvailableUntil());
@@ -218,21 +220,25 @@ public class AssignmentService {
             throw new BadRequestException("Assignment already submitted.");
         }
 
-        // Server-side enforcement of the time limit (+2 minutes grace period for network latency)
+        // JAVÍTÁS: Kivettük a szigorú 'throw new BadRequestException'-t!
+        // Ha a diák késve küldi be (vagy beragadt egy lejárt tesztbe),
+        // a rendszer csak logol, de feldolgozza és LEZÁRJA a tesztet, hogy ne ragadjon be örökre.
         Integer limit = session.getAssignment().getTimeLimitMinutes();
         if (limit != null && limit > 0) {
             LocalDateTime deadline = session.getStartedAt().plusMinutes(limit + 2);
             if (LocalDateTime.now().isAfter(deadline)) {
-                log.error("Late submission blocked for user {}.", email);
-                throw new BadRequestException("Time limit exceeded! Submission failed.");
+                log.warn("Late submission for user {}. Accepting to prevent session lock.", email);
             }
         }
 
         List<Exercise> assignmentExercises = session.getAssignment().getExercises();
         List<MistakeDTO> mistakes = new ArrayList<>();
 
+        // Biztonságos null-ellenőrzés
+        List<ExerciseSubmission> rawAnswers = request.getAnswers() != null ? request.getAnswers() : new ArrayList<>();
+
         LessonSubmitRequest dummyRequest = new LessonSubmitRequest();
-        dummyRequest.setAnswers(request.getAnswers());
+        dummyRequest.setAnswers(rawAnswers);
         dummyRequest.setTimeTakenSeconds(0);
 
         EvaluationService.EvaluationDetails details = evaluationService.calculateEvaluationDetails(
@@ -241,7 +247,7 @@ public class AssignmentService {
                 mistakes
         );
 
-        // Calculate dynamic total exercises based on generation mode
+        // Dinamikus feladatszámítás
         int totalExercises = assignmentExercises.size();
 
         if ("RANDOM_SUBSET".equals(session.getAssignment().getGenerationMode())
@@ -258,30 +264,64 @@ public class AssignmentService {
 
         List<AssignmentSessionResponse.AnswerDetail> detailedAnswers = new ArrayList<>();
 
-        for (ExerciseSubmission sub : request.getAnswers()) {
-            Exercise ex = assignmentExercises.stream()
-                    .filter(e -> e.getExerciseId().equals(sub.getExerciseId()))
-                    .findFirst().orElse(null);
+        // Hogy a tanár lássa a hiányzó kérdéseket is, végigmegyünk a kiosztott feladatokon
+        List<Exercise> targetExercises = assignmentExercises;
+        if ("RANDOM_SUBSET".equals(session.getAssignment().getGenerationMode())) {
+            if (rawAnswers.isEmpty() && totalExercises < assignmentExercises.size()) {
+                targetExercises = assignmentExercises.subList(0, totalExercises);
+            } else {
+                List<UUID> submittedIds = rawAnswers.stream().map(ExerciseSubmission::getExerciseId).toList();
+                targetExercises = assignmentExercises.stream()
+                        .filter(e -> submittedIds.contains(e.getExerciseId()))
+                        .toList();
+
+                // Ha kevesebbet küldött be, mint amennyit kellett volna, feltöltjük hiányzókkal
+                if (targetExercises.size() < totalExercises) {
+                    List<Exercise> remaining = assignmentExercises.stream()
+                            .filter(e -> !submittedIds.contains(e.getExerciseId()))
+                            .toList();
+                    List<Exercise> modifiableTarget = new ArrayList<>(targetExercises);
+                    int needed = totalExercises - modifiableTarget.size();
+                    modifiableTarget.addAll(remaining.subList(0, Math.min(needed, remaining.size())));
+                    targetExercises = modifiableTarget;
+                }
+            }
+        }
+
+        for (Exercise ex : targetExercises) {
+            ExerciseSubmission studentSub = rawAnswers.stream()
+                    .filter(sub -> sub.getExerciseId().equals(ex.getExerciseId()))
+                    .findFirst()
+                    .orElse(null);
 
             String questionText = "Ismeretlen kérdés";
-            if (ex != null && ex.getContent() != null) {
+            if (ex.getContent() != null) {
                 if (ex.getContent().containsKey("question")) {
                     questionText = ex.getContent().get("question").toString();
                 } else {
-                    questionText = ex.getType().toString();
+                    questionText = ex.getType();
                 }
             }
 
-            boolean isCorrect = true;
-            for (MistakeDTO m : mistakes) {
-                if (ex != null && m.getExerciseId() != null && m.getExerciseId().equals(ex.getExerciseId())) {
-                    isCorrect = false;
-                    break;
+            boolean isCorrect = false;
+            boolean isRetried = false;
+            String studentAnswerText = "Nincs válasz (Időtúllépés)";
+
+            if (studentSub != null) {
+                isRetried = studentSub.isRetried();
+                studentAnswerText = studentSub.getAnswer() != null ? studentSub.getAnswer().toString() : "Nincs válasz";
+
+                isCorrect = true;
+                for (MistakeDTO m : mistakes) {
+                    if (m.getExerciseId() != null && m.getExerciseId().equals(ex.getExerciseId())) {
+                        isCorrect = false;
+                        break;
+                    }
                 }
             }
 
             String serverCorrectAnswer = null;
-            if (ex != null && ex.getCorrectAnswer() != null) {
+            if (ex.getCorrectAnswer() != null) {
                 java.util.Map<String, Object> ca = ex.getCorrectAnswer();
                 if (ca.containsKey("answer")) {
                     serverCorrectAnswer = ca.get("answer").toString();
@@ -296,9 +336,9 @@ public class AssignmentService {
 
             detailedAnswers.add(new AssignmentSessionResponse.AnswerDetail(
                     questionText,
-                    sub.getAnswer() != null ? sub.getAnswer().toString() : "Nincs válasz",
+                    studentAnswerText,
                     isCorrect,
-                    sub.isRetried(),
+                    isRetried,
                     ex,
                     serverCorrectAnswer
             ));
@@ -477,6 +517,8 @@ public class AssignmentService {
                 a.isRandomized(),
                 a.isAllowRetries(),
                 a.isHasFeedback(),
+                a.isAllowDictionary(),
+                a.isAllowLateSubmission(),
                 isCompleted,
                 a.getMaxAttempts(),
                 attemptsUsed,

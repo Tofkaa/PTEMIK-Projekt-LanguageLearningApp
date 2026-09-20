@@ -27,6 +27,12 @@ public class AssignmentCreateRequest {
     @JsonProperty("hasFeedback")
     private boolean hasFeedback;
 
+    @JsonProperty("allowDictionary")
+    private boolean allowDictionary;
+
+    @JsonProperty("allowLateSubmission")
+    private boolean allowLateSubmission;
+
     private Integer maxAttempts;
 
     private LocalDateTime availableFrom;

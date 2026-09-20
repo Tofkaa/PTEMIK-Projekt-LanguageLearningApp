@@ -55,9 +55,11 @@ const TeacherClassroomDetail = () => {
         title: '',
         description: '',
         hasFeedback: false,
+        allowDictionary: true,
         isTest: false,
         isRandomized: true,
         allowRetries: false,
+        allowLateSubmission: false,
         maxAttempts: '',
         timeLimitMinutes: '',
         availableFrom: '',
@@ -135,7 +137,7 @@ const TeacherClassroomDetail = () => {
      */
     const handleViewSubmissions = (assignment) => {
         markAsViewed('viewedTeacherUngraded', [`${classroomId}:${assignment.assignmentId}`]);
-        navigate(`/assignment/${assignment.assignmentId}/submissions`, { state: { assignmentTitle: assignment.title, classroomName: classroomName } });
+        navigate(`/assignment/${assignment.assignmentId}/submissions`, { state: { assignmentTitle: assignment.title, classroomName: classroomName, timeLimitMinutes: assignment.timeLimitMinutes } });
     };
 
     // --- MEMBER MANAGEMENT ---
@@ -256,6 +258,8 @@ const TeacherClassroomDetail = () => {
             description: assignmentForm.description,
             isTest: assignmentMode === 'TEST',
             hasFeedback: assignmentMode === 'TEST' ? assignmentForm.hasFeedback : true,
+            allowDictionary: assignmentMode === 'TEST' ? assignmentForm.allowDictionary : true,
+            allowLateSubmission: assignmentMode === 'TEST' ? assignmentForm.allowLateSubmission : true,
             randomized: assignmentForm.isRandomized,
             allowRetries: assignmentMode === 'TEST' ? assignmentForm.allowRetries : true,
             maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
@@ -713,7 +717,7 @@ const TeacherClassroomDetail = () => {
                 <Form onSubmit={handleAssignmentSubmit}>
                     <Modal.Body>
                         <Row>
-                            {/* BAL: ALAPOK */}
+                            {/* LEFT: BASICS */}
                             <Col lg={4}>
                                 <div className="p-3 border border-secondary rounded bg-darker mb-3">
                                     <Form.Label className="text-info fw-bold mb-2">Cél:</Form.Label>
@@ -796,7 +800,11 @@ const TeacherClassroomDetail = () => {
                                             <Form.Check type="switch" label="Azonnali visszajelzés" className="mb-1" 
                                                 checked={assignmentForm.hasFeedback} 
                                                 onChange={e => setAssignmentForm({...assignmentForm, hasFeedback: e.target.checked})} />
-                                                
+
+                                             <Form.Check type="switch" label="Szótár és Tippek engedélyezése" className="mb-1" 
+                                                checked={assignmentForm.allowDictionary} 
+                                                onChange={e => setAssignmentForm({...assignmentForm, allowDictionary: e.target.checked})} />   
+                                           
                                             <Form.Check type="switch" label="Kevert sorrend" className="mb-1" 
                                                 checked={assignmentForm.isRandomized} 
                                                 onChange={e => setAssignmentForm({...assignmentForm, isRandomized: e.target.checked})} />
@@ -804,12 +812,19 @@ const TeacherClassroomDetail = () => {
                                             <Form.Check type="switch" label="Második esély a hibás válaszoknál" 
                                                 checked={assignmentForm.allowRetries} 
                                                 onChange={e => setAssignmentForm({...assignmentForm, allowRetries: e.target.checked})} />
+                                            
+                                            {assignmentForm.timeLimitMinutes > 0 && (
+                                                <Form.Check type="switch" label="Késedelmes beadás engedélyezése" 
+                                                    className="mt-2 text-light"
+                                                    checked={assignmentForm.allowLateSubmission} 
+                                                    onChange={e => setAssignmentForm({...assignmentForm, allowLateSubmission: e.target.checked})} />
+                                            )}
                                         </div>
                                     )}
                                 </div>
                             </Col>
 
-                            {/* KÖZÉP: VÁLOGATÁS */}
+                            {/* MIDDLE: SELECTION */}
                             <Col lg={4} className="border-start border-secondary">
                                 <h6 className="fw-bold text-info">Válogatás Forrásból</h6>
                                 <Form.Select className="bg-dark text-light border-secondary mb-3" value={selectedLessonId} onChange={handleLessonChange}>
@@ -839,7 +854,7 @@ const TeacherClassroomDetail = () => {
                                 )}
                             </Col>
 
-                            {/* JOBB: KOSÁR (SUMMARY) */}
+                            {/* RIGHT: SUMMARY */}
                             <Col lg={4} className="border-start border-secondary">
                                 <h6 className="fw-bold text-success mb-3">Kiválasztott tartalom ({selectedExercisesData.length} db)</h6>
                                 <div style={{ maxHeight: '450px', overflowY: 'auto' }} className="pe-2 custom-scrollbar">

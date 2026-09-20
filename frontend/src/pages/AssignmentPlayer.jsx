@@ -12,7 +12,8 @@ import { assignmentApi } from '../services/assignmentApi';
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
 import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise.jsx';
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
-import { getRemainingTimeMs } from '../utils/dateUtils';
+import ClickableText from '../components/ClickableText.jsx';
+import { parseServerDate } from '../utils/dateUtils.js';
 
 /**
  * @component
@@ -53,15 +54,21 @@ const AssignmentPlayer = () => {
         }
     }, [sessionData, details, navigate]);
 
-    // --- TIMER ---
+   // --- TIMER ---
+    const allowLate = details?.allowLateSubmission === true;
+
     useEffect(() => {
         if (!details?.timeLimitMinutes || !sessionData?.startedAt) return;
         
+        const startTimeMs = parseServerDate(sessionData.startedAt).getTime();
+        const limitMs = details.timeLimitMinutes * 60 * 1000;
+        const exactDeadline = startTimeMs + limitMs;
+        
         const timer = setInterval(() => {
-            const remaining = getRemainingTimeMs(sessionData.startedAt, details.timeLimitMinutes);
+            const remaining = exactDeadline - Date.now();
             setTimeLeft(remaining);
 
-            if (remaining !== null && remaining <= 0 && !isAutoSubmitting.current) {
+            if (remaining <= 0 && !isAutoSubmitting.current && !allowLate) {
                 clearInterval(timer);
                 isAutoSubmitting.current = true;
                 handleAutoSubmit();
@@ -69,19 +76,19 @@ const AssignmentPlayer = () => {
         }, 1000);
         
         return () => clearInterval(timer);
-    }, [details, sessionData]);
+    }, [details, sessionData, allowLate]);
 
     /**
      * Formats the remaining time in milliseconds into a readable MM:SS format.
-     * 
-     * @param {number} ms - Milliseconds remaining.
-     * @returns {string} Formatted time string.
      */
     const formatTimeLeft = (ms) => {
-        const totalSeconds = Math.floor(ms / 1000);
+        const isNegative = ms < 0;
+        const absMs = Math.abs(ms);
+        const totalSeconds = Math.floor(absMs / 1000);
         const m = Math.floor(totalSeconds / 60);
         const s = totalSeconds % 60;
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        const formatted = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        return isNegative ? `+${formatted}` : formatted;
     };
 
     /**
@@ -287,8 +294,8 @@ const AssignmentPlayer = () => {
                     <div className="d-flex justify-content-between align-items-center mb-2 fw-bold text-light opacity-75 small">
                         <span style={{ width: '60px' }}>{currentIndex + 1} / {exercises.length}</span>
                         {timeLeft !== null && (
-                            <span className={`fs-6 px-3 py-1 bg-dark rounded-pill border ${timeLeft < 60000 ? 'border-danger text-danger' : 'border-secondary text-info'}`}>
-                                ⏱️ {formatTimeLeft(timeLeft)}
+                            <span className={`fs-6 px-3 py-1 bg-dark rounded-pill border ${timeLeft < 0 ? 'border-danger text-light bg-danger' : (timeLeft < 60000 ? 'border-danger text-danger' : 'border-secondary text-info')}`}>
+                                ⏱️ {timeLeft < 0 ? 'Túllépés: ' : ''}{formatTimeLeft(timeLeft)}
                             </span>
                         )}
                         <span className="text-end" style={{ width: '60px' }}>{Math.round(progressPercentage)}%</span>
@@ -303,9 +310,45 @@ const AssignmentPlayer = () => {
                         </h4>
 
                         {currentExercise.content?.question && (
-                            <p className="fs-4 mb-4 border border-secondary rounded p-3 bg-black bg-opacity-25">
-                                {currentExercise.content.question.replace('Translate: ', '').replace('Translate to English: ', '')}
-                            </p>
+                            (() => {
+                                const cleanQuestion = currentExercise.content.question.replace('Translate: ', '').replace('Translate to English: ', '');
+                                const isEnglishQuestion = currentExercise.content?.questionLang === 'en';
+                                const isDictAllowedByAssignment = details?.allowDictionary ?? true; 
+                                
+                                const showDictionary = isEnglishQuestion && isDictAllowedByAssignment;
+                                const showHint = !isEnglishQuestion && currentExercise.content?.hint && isDictAllowedByAssignment;
+
+                                return (
+                                    <div className="mb-4 text-center">
+                                        <div className="fs-4 fw-bold p-3 border border-secondary rounded bg-black bg-opacity-25 mx-auto" style={{ color: '#0dcaf0', maxWidth: '800px' }}>
+                                            {showDictionary ? (
+                                                <ClickableText 
+                                                    text={cleanQuestion} 
+                                                    source="LESSON" 
+                                                    hint={currentExercise.content.hint} 
+                                                />
+                                            ) : (
+                                                <span>{cleanQuestion}</span>
+                                            )}
+                                        </div>
+
+                                        {showHint && (
+                                            <div className="d-inline-block text-start mt-2 px-3 py-2 rounded shadow-sm" style={{ backgroundColor: 'rgba(13, 202, 240, 0.1)', borderLeft: '4px solid #0dcaf0' }}>
+                                                <span className="small text-info fw-bold text-uppercase" style={{ letterSpacing: '1px' }}>
+                                                    <i className="bi bi-lightbulb me-2 text-warning"></i>Tipp a fordításhoz
+                                                </span>
+                                                <div className="mt-1 small fw-medium" style={{ color: '#e0e0e0' }}>
+                                                    {currentExercise.content.hint.split(',').map((pair, idx) => (
+                                                        <span key={idx} className="me-3 d-inline-block">
+                                                            {pair.trim()}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()
                         )}
 
                         {/* DYNAMIC EXERCISE RENDERING */}

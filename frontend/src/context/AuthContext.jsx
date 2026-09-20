@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import api from '../services/api';
+import { vocabularyApi } from '../services/vocabularyApi';
 
 /**
  * Global Authentication Context
@@ -16,8 +17,20 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
     // Global state for the authenticated user object
     const [user, setUser] = useState(null);
+    // Global state for user vocabulary wordmap
+    const [vocabularyMap, setVocabularyMap] = useState({});
     // Global loading state used during initial token verification
     const [loading, setLoading] = useState(true);
+
+    // Retrieve the wordmap
+    const fetchVocabularyMap = async () => {
+        try {
+            const response = await vocabularyApi.getVocabularyMap();
+            setVocabularyMap(response.data);
+        } catch (error) {
+            console.error("Hiba a szótérkép betöltésekor:", error);
+        }
+    };
 
     /**
      * Runs once when the application mounts (e.g., on hard refresh).
@@ -32,6 +45,7 @@ export const AuthProvider = ({ children }) => {
                     // If token exists, fetch the latest user profile from the backend
                     const response = await api.get('/users/me');
                     setUser(response.data);
+                    await fetchVocabularyMap();
                 } catch (error) {
                     console.error("Error fetching user profile (expired token?):", error);
                     // Clear invalid/expired token and reset user state
@@ -54,13 +68,14 @@ export const AuthProvider = ({ children }) => {
      * * @param {string} token - The JWT access token
      * @param {Object} userData - The authenticated user's profile data
      */
-    const login = (token, userData, rememberMe = false) => {
+    const login = async (token, userData, rememberMe = false) => {
         if (rememberMe) {
             localStorage.setItem('token', token);
         } else {
             sessionStorage.setItem('token', token);
         }
         setUser(userData);
+        await fetchVocabularyMap();
     };
 
     /**
@@ -81,6 +96,7 @@ export const AuthProvider = ({ children }) => {
             sessionStorage.removeItem('token');
             // 3. Reset the React state, which triggers a redirect to the Login page via PrivateRoute
             setUser(null);
+            setVocabularyMap({});
         }
     };
 
@@ -97,7 +113,7 @@ export const AuthProvider = ({ children }) => {
 
     // Provide the authentication state and methods to the rest of the application
     return (
-        <AuthContext.Provider value={{ user, login, logout }}>
+        <AuthContext.Provider value={{ user, login, logout, vocabularyMap }}>
             {children}
         </AuthContext.Provider>
     );

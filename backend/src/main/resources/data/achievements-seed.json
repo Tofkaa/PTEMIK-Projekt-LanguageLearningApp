@@ -64,5 +64,29 @@
     "description": "Egy egész héten át, minden nap tanultál.",
     "criteria": { "type": "STREAK_DAYS", "target": 7 },
     "iconUrl": "🔥"
+  },
+  {
+    "name": "Szófaló I.",
+    "description": "Bővítetted a szótáradat 50 új szóval.",
+    "criteria": { "type": "VOCAB_COUNT", "target": 50 },
+    "iconUrl": "📖"
+  },
+  {
+    "name": "Poliglott II.",
+    "description": "Elérted a 250 szavas szókincset! Lenyűgöző szókincs.",
+    "criteria": { "type": "VOCAB_COUNT", "target": 250 },
+    "iconUrl": "📚"
+  },
+  {
+    "name": "Élő Szótár III.",
+    "description": "Összegyűjtöttél 500 szót. Készen állsz bármilyen társalgásra!",
+    "criteria": { "type": "VOCAB_COUNT", "target": 500 },
+    "iconUrl": "🌍"
+  },
+  {
+    "name": "Tökéletes Memória",
+    "description": "Legalább 50 szót juttattál mesteri (6-os) szintre.",
+    "criteria": { "type": "MASTERED_VOCAB_COUNT", "target": 50 },
+    "iconUrl": "🧠"
   }
 ]
