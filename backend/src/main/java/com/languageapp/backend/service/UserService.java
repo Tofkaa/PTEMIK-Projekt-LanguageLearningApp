@@ -47,6 +47,7 @@ public class UserService {
                 .preferredDifficulty(user.getPreferredDifficulty().name())
                 .userTag(user.getUserTag())
                 .friendCode(user.getFriendCode())
+                .isVerified(user.isVerified())
                 .build();
     }
 
