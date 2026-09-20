@@ -22,6 +22,7 @@ import GlobalErrorToast from './components/GlobalErrorToast.jsx';
 import VocabularyHub from './pages/VocabularyHub.jsx';
 import VocabularyPractice from './pages/VocabularyPractice.jsx';
 import FlashcardPractice from './pages/FlashcardPractice.jsx';
+import VerifyEmail from './components/VerifyEmail.jsx';
 
 /**
  * Main Application Component
@@ -63,7 +64,8 @@ function App() {
                     <Route path="/lesson/:id" element={<PrivateRoute><Lesson /></PrivateRoute>} />
                     <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
                     <Route path="/friends" element={<PrivateRoute><Friends /></PrivateRoute>} />
-                   
+                    <Route path="/verify" element={<VerifyEmail />} />
+                    
                     {/* Admin pages */}
                     <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
