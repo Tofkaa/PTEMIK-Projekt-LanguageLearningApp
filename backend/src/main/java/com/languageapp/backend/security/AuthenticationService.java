@@ -124,7 +124,8 @@ public class AuthenticationService {
                 user.getEmail(),
                 user.getRole(),
                 user.getUserTag(),
-                user.getFriendCode()
+                user.getFriendCode(),
+                user.isVerified()
         );
 
         log.info("Tokens successfully generated for user: {}", user.getEmail());
@@ -184,7 +185,8 @@ public class AuthenticationService {
                 user.getEmail(),
                 user.getRole(),
                 user.getUserTag(),
-                user.getFriendCode()
+                user.getFriendCode(),
+                user.isVerified()
         );
 
         log.info("User successfully authenticated: {}", user.getEmail());
@@ -220,7 +222,8 @@ public class AuthenticationService {
                             user.getEmail(),
                             user.getRole(),
                             user.getUserTag(),
-                            user.getFriendCode()
+                            user.getFriendCode(),
+                            user.isVerified()
                     );
                 })
                 .orElseThrow(() -> {
