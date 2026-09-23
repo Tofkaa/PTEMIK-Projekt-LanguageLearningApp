@@ -7,6 +7,7 @@ import com.languageapp.backend.entity.User;
 import com.languageapp.backend.entity.VerificationToken;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.BadRequestException;
+import com.languageapp.backend.repository.PasswordResetTokenRepository;
 import com.languageapp.backend.repository.UserRepository;
 import com.languageapp.backend.repository.VerificationTokenRepository;
 import com.languageapp.backend.service.EmailService;
@@ -33,6 +34,7 @@ public class AuthenticationService {
 
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
@@ -151,6 +153,64 @@ public class AuthenticationService {
 
         verificationTokenRepository.delete(verificationToken);
         log.info("User {} successfully verified their email address.", user.getEmail());
+    }
+
+    /**
+     * Starts the password reset process.
+     */
+    @Transactional
+    public void requestPasswordReset(String email) {
+        log.info("Password reset requested for email: {}", email);
+
+        userRepository.findByEmail(email).ifPresent(user -> {
+            // Delete previous tokens
+            passwordResetTokenRepository.deleteByUser_UserId(user.getUserId());
+
+            // New token with 1 hour lifetime
+            String tokenStr = UUID.randomUUID().toString();
+            com.languageapp.backend.entity.PasswordResetToken resetToken = new com.languageapp.backend.entity.PasswordResetToken();
+            resetToken.setToken(tokenStr);
+            resetToken.setUser(user);
+            resetToken.setExpiryDate(LocalDateTime.now().plusHours(1));
+
+            passwordResetTokenRepository.save(resetToken);
+
+            // Send async email
+            emailService.sendPasswordResetEmail(user.getEmail(), tokenStr);
+            log.info("Password reset token generated and email dispatched for user ID: {}", user.getUserId());
+        });
+
+        // No exception, if the email does not exist
+    }
+
+    /**
+     * Sets the new password based on the token
+     */
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        com.languageapp.backend.entity.PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+                .orElseThrow(() -> new BadRequestException("Érvénytelen vagy már felhasznált token!"));
+
+        if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            passwordResetTokenRepository.delete(resetToken);
+            throw new BadRequestException("A jelszóvisszaállító link lejárt. Kérlek, igényelj újat.");
+        }
+
+        User user = resetToken.getUser();
+
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw new BadRequestException("Az új jelszó nem lehet azonos a jelenlegi jelszavaddal!");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Delete token to make sure it can not be used again
+        passwordResetTokenRepository.delete(resetToken);
+
+        // Security step: log out all sessions
+        refreshTokenService.deleteByRawToken(user.getUserId().toString());
+        log.info("Password successfully reset for user: {}", user.getEmail());
     }
 
     @Transactional

@@ -2,6 +2,7 @@ package com.languageapp.backend.controller;
 
 import com.languageapp.backend.dto.request.LoginRequest;
 import com.languageapp.backend.dto.request.RegisterRequest;
+import com.languageapp.backend.dto.request.ResetPasswordRequest;
 import com.languageapp.backend.dto.response.AuthResponse;
 import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.security.AuthenticationService;
@@ -92,6 +93,21 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, deadCookie.toString())
                 .build();
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@RequestParam String email) {
+        log.info("Received forgot password request");
+        authenticationService.requestPasswordReset(email);
+        // Always return this response, to not leak if the user with said email exists or not
+        return ResponseEntity.ok("Ha létezik fiók ezzel az e-mail címmel, elküldtük a visszaállító linket.");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        log.info("Received password reset confirmation request");
+        authenticationService.resetPassword(request.getToken(), request.getNewPassword());
+        return ResponseEntity.ok("Jelszó sikeresen frissítve!");
     }
 
     private ResponseCookie createCookie(String refreshToken, boolean rememberMe) {

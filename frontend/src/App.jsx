@@ -25,6 +25,8 @@ import VocabularyPractice from './pages/VocabularyPractice.jsx';
 import FlashcardPractice from './pages/FlashcardPractice.jsx';
 import VerifyEmail from './components/VerifyEmail.jsx';
 import VerifiedRoute from './components/VerifiedRoute.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
+import ResetPassword from './pages/ResetPassword.jsx';
 
 /**
  * VerificationBanner Component
@@ -75,6 +77,8 @@ function App() {
                     {/* Guest Routes */}
                     <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
                     <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+                    <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
+                    <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
 
                     {/* Private Routes */}
                     <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
