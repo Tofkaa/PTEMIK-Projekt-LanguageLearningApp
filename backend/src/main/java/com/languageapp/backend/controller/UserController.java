@@ -6,9 +6,11 @@ import com.languageapp.backend.dto.response.UserResponse;
 import com.languageapp.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -45,5 +47,23 @@ public class UserController {
     public ResponseEntity<String> updatePreferences(@RequestBody UserPreferencesRequest request, Authentication authentication) {
         userService.updateUserPreferences(authentication.getName(), request.getPreferredDifficulty());
         return ResponseEntity.ok("Preferences updated successfully");
+    }
+
+    /**
+     * Uploads and updates the authenticated user's profile picture.
+     */
+    @PostMapping(value = "/me/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> uploadProfilePicture(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+
+        if (file.isEmpty() || file.getContentType() == null || !file.getContentType().startsWith("image/")) {
+            return ResponseEntity.badRequest().body("Érvénytelen fájl! Csak képformátum (JPG, PNG, stb.) engedélyezett.");
+        }
+        log.info("REST request to upload profile picture for user: {}", authentication.getName());
+
+        String newImageUrl = userService.updateProfilePicture(authentication.getName(), file);
+
+        return ResponseEntity.ok(newImageUrl);
     }
 }

@@ -29,6 +29,7 @@ services:
       - SMTP_USERNAME=${SMTP_USERNAME}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - FRONTEND_URL=${FRONTEND_URL}
+      - CLOUDINARY_URL=${CLOUDINARY_URL}
     ports:
       - "8080:8080"
     restart: always

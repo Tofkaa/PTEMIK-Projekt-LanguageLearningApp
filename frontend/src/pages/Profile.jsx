@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Container, Row, Col, Card, Form, Button, Badge, Spinner, Alert } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../services/api.jsx';
@@ -11,12 +11,15 @@ import RecentResultsSection from '../components/profile/RecentResultsSection.jsx
  * their learning preferences (e.g., preferred difficulty) by interacting with the backend API.
  */
 const Profile = () => {
-    const { user, login } = useAuth();
+    const { user, login, setUser } = useAuth();
     
     // --- STATE MANAGEMENT ---
     const [difficulty, setDifficulty] = useState(user?.preferredDifficulty || 'MEDIUM');
     const [isUpdating, setIsUpdating] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
+    
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const fileInputRef = useRef(null);
     
     // Translate roles
     const roleLabels = {
@@ -63,6 +66,41 @@ const Profile = () => {
         }
     };
 
+    // --- METHOD FOR IMAGE UPLOADING ---
+    const handleFileChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            alert('Kérlek, csak képformátumot (JPG, PNG) tölts fel!');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setIsUploadingImage(true);
+        try {
+            const response = await api.post('/users/me/profile-picture', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
+            const newImageUrl = response.data;
+            
+            setUser((prevUser) => ({
+                ...prevUser,
+                profilePictureUrl: newImageUrl
+            }));
+            
+        } catch (error) {
+            console.error('Hiba a profilkép feltöltésekor:', error);
+            alert('Nem sikerült feltölteni a képet. Kérlek, próbáld újra!');
+        } finally {
+            setIsUploadingImage(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
     // Prevent rendering if user context is not yet populated
     if (!user) return null;
 
@@ -75,17 +113,47 @@ const Profile = () => {
                 <Row className="g-4">
                    {/* --- LEFT COLUMN: USER INFO --- */}
                     <Col md={4}>
-                        {/* A sticky-top biztosítja, hogy a kártya a képernyőn maradjon görgetéskor is */}
                         <div className="sticky-top" style={{ top: '20px', zIndex: 10 }}>
                             <Card className="shadow-lg border-0 bg-dark text-center rounded-4">
                                 <Card.Body className="p-4 d-flex flex-column align-items-center">
                                     
-                                    {/* User Avatar */}
+                                    {/* --- HIDDEN INPUT FOR FILE UPLOADING --- */}
+                                    <input 
+                                        type="file" 
+                                        accept="image/png, image/jpeg, image/webp" 
+                                        ref={fileInputRef} 
+                                        style={{ display: 'none' }} 
+                                        onChange={handleFileChange} 
+                                    />
+
+                                    {/* --- AVATAR BLOCK --- */}
                                     <div 
-                                        className="rounded-circle bg-secondary bg-opacity-50 d-flex align-items-center justify-content-center mb-3 shadow"
-                                        style={{ width: '100px', height: '100px', fontSize: '3rem' }}
+                                        className="position-relative mx-auto mb-3" 
+                                        style={{ width: '120px', height: '120px', cursor: 'pointer' }}
+                                        onClick={() => !isUploadingImage && fileInputRef.current.click()}
+                                        title="Kattints a profilkép módosításához"
                                     >
-                                        👤
+                                        {isUploadingImage ? (
+                                            <div className="w-100 h-100 rounded-circle bg-secondary d-flex justify-content-center align-items-center">
+                                                <Spinner animation="border" variant="light" />
+                                            </div>
+                                        ) : user.profilePictureUrl ? (
+                                            <img 
+                                                src={user.profilePictureUrl} 
+                                                alt="Profil" 
+                                                className="w-100 h-100 rounded-circle object-fit-cover border border-2 border-info shadow"
+                                            />
+                                        ) : (
+                                            <div className="w-100 h-100 rounded-circle bg-secondary bg-opacity-50 d-flex justify-content-center align-items-center border border-2 border-secondary shadow">
+                                                <span style={{ fontSize: '4rem' }}>👤</span>
+                                            </div>
+                                        )}
+                                        
+                                        {!isUploadingImage && (
+                                            <Badge bg="info" pill className="position-absolute bottom-0 end-0 p-2 shadow">
+                                                ✏️
+                                            </Badge>
+                                        )}
                                     </div>
                                     
                                     <h4 className="fw-bold text-light mb-1">{user.name}</h4>

@@ -106,8 +106,27 @@ const NavigationBar = () => {
                         <Badge bg="warning" text="dark" className="rounded-pill px-3 py-2 shadow-sm fs-6 d-flex align-items-center gap-1">
                             <span>⭐</span> {user.xp || 0} XP
                         </Badge>
-                        
-                        <NavDropdown title={<span className="text-light fw-bold d-inline-flex align-items-center gap-2"><span>👤</span> {user.name}</span>} id="basic-nav-dropdown" align="end" menuVariant="dark">
+                                                    
+                            <NavDropdown 
+                                title={
+                                    <span className="text-light fw-bold d-inline-flex align-items-center gap-2">
+                                        {user.profilePictureUrl ? (
+                                            <img 
+                                                src={user.profilePictureUrl} 
+                                                alt="PFP" 
+                                                className="rounded-circle object-fit-cover border border-secondary"
+                                                style={{ width: '30px', height: '30px' }}
+                                            />
+                                        ) : (
+                                            <span>👤</span>
+                                        )}
+                                        {user.name}
+                                    </span>
+                                } 
+                                id="basic-nav-dropdown" 
+                                align="end" 
+                                menuVariant="dark"
+                            >
                             <NavDropdown.Item onClick={() => navigate('/profile')} className="text-light">Profilom</NavDropdown.Item>
                             <NavDropdown.Divider />
                             <NavDropdown.Item onClick={handleLogout} className="text-danger fw-bold">Kijelentkezés</NavDropdown.Item>

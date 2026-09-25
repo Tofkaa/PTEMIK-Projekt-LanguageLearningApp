@@ -27,4 +27,6 @@ public class UserResponse {
     private String userTag;
     private String friendCode;
     private boolean isVerified;
+    private String profilePictureUrl;
+
 }

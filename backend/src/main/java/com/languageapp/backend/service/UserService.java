@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 
 import java.util.List;
 
@@ -24,6 +26,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final ProgressRepository progressRepository;
+    private final ImageStorageService imageStorageService;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -48,6 +51,7 @@ public class UserService {
                 .userTag(user.getUserTag())
                 .friendCode(user.getFriendCode())
                 .isVerified(user.isVerified())
+                .profilePictureUrl(user.getProfilePictureUrl())
                 .build();
     }
 
@@ -100,5 +104,23 @@ public class UserService {
         user.setPreferredDifficulty(DifficultyLevel.valueOf(newDifficulty));
         userRepository.save(user);
         log.info("User {} updated preferred difficulty to {}", email, newDifficulty);
+    }
+    @Transactional
+    public String updateProfilePicture(String email, MultipartFile file) {
+        User user = getUserByEmail(email);
+
+        try {
+
+            String imageUrl = imageStorageService.uploadProfileImage(file);
+
+            user.setProfilePictureUrl(imageUrl);
+            userRepository.save(user);
+
+            log.info("User {} updated profile picture", email);
+            return imageUrl;
+        } catch (IOException e) {
+            log.error("Failed to upload profile picture for user {}: {}", email, e.getMessage());
+            throw new RuntimeException("Nem sikerült feltölteni a képet. Kérlek, próbáld újra.");
+        }
     }
 }
