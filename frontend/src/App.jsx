@@ -27,6 +27,7 @@ import VerifyEmail from './components/VerifyEmail.jsx';
 import VerifiedRoute from './components/VerifiedRoute.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
+import Settings from './pages/Settings.jsx';
 
 /**
  * VerificationBanner Component
@@ -82,6 +83,9 @@ function App() {
 
                     {/* Private Routes */}
                     <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                    
+                
+                    <Route path="/settings" element={<PrivateRoute><Settings/></PrivateRoute>} />
                     
                     {/* Classrooms pages  */}
                     <Route path="/classrooms" element={<VerifiedRoute><ClassroomsPage /></VerifiedRoute>} />
