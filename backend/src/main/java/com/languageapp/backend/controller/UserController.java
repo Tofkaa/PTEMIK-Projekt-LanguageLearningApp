@@ -1,5 +1,6 @@
 package com.languageapp.backend.controller;
 
+import com.languageapp.backend.dto.request.UpdateNameRequest;
 import com.languageapp.backend.dto.request.UserPreferencesRequest;
 import com.languageapp.backend.dto.response.ProgressResponse;
 import com.languageapp.backend.dto.response.UserResponse;
@@ -65,5 +66,18 @@ public class UserController {
         String newImageUrl = userService.updateProfilePicture(authentication.getName(), file);
 
         return ResponseEntity.ok(newImageUrl);
+    }
+
+    /**
+     * Updates the authenticated user's display name and regenerates their tag.
+     */
+    @PutMapping("/me/name")
+    public ResponseEntity<UserResponse> updateName(
+            @RequestBody UpdateNameRequest request,
+            Authentication authentication) {
+
+        log.info("REST request to update name for user: {}", authentication.getName());
+        UserResponse updatedUser = userService.updateUserName(authentication.getName(), request.getName());
+        return ResponseEntity.ok(updatedUser);
     }
 }

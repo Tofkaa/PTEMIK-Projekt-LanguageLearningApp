@@ -16,6 +16,10 @@ const Settings = () => {
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const fileInputRef = useRef(null);
 
+    const [name, setName] = useState(user?.name || '');
+    const [isUpdatingName, setIsUpdatingName] = useState(false);
+    const [nameMessage, setNameMessage] = useState({ type: '', text: '' });
+
     // --- IMAGE UPLOAD LOGIC ---
     const handleFileChange = async (e) => {
         const file = e.target.files[0];
@@ -68,6 +72,41 @@ const Settings = () => {
         }
     };
 
+    // --- USERNAME SAVE LOGIC ---
+    const handleSaveName = async (e) => {
+        e.preventDefault();
+        const trimmed = name.trim();
+        if (trimmed.length < 3) {
+            setNameMessage({ type: 'danger', text: 'A névnek legalább 3 karakternek kell lennie!' });
+            return;
+        }
+
+        setIsUpdatingName(true);
+        setNameMessage({ type: '', text: '' });
+
+        try {
+            const response = await api.put('/users/me/name', { name: trimmed });
+            
+            // Frissítjük a globális user objektumot az új névvel és az új generált userTag-gel
+            setUser((prevUser) => ({
+                ...prevUser,
+                name: response.data.name,
+                userTag: response.data.userTag
+            }));
+
+            setNameMessage({ 
+                type: 'success', 
+                text: `Név sikeresen frissítve! Az új azonosítód: ${response.data.name} #${response.data.userTag} ✅` 
+            });
+            setTimeout(() => setNameMessage({ type: '', text: '' }), 4000);
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || 'Hiba történt a név módosításakor.';
+            setNameMessage({ type: 'danger', text: errorMsg });
+        } finally {
+            setIsUpdatingName(false);
+        }
+    };
+
     if (!user) return null;
 
     return (
@@ -114,14 +153,40 @@ const Settings = () => {
                                 </Col>
                             </Row>
 
-                            <Form>
+                            {nameMessage.text && (
+                                <Alert variant={nameMessage.type} className="py-2 border-0 fw-bold mb-3">
+                                    {nameMessage.text}
+                                </Alert>
+                            )}
+
+                            <Form onSubmit={handleSaveName}>
                                 <Form.Group className="mb-4">
-                                    <Form.Label className="text-light opacity-75">Felhasználónév</Form.Label>
+                                    <Form.Label className="text-light opacity-75">
+                                        Felhasználónév <span className="text-info ms-1">#{user.userTag}</span>
+                                    </Form.Label>
                                     <div className="d-flex gap-2">
-                                        <Form.Control type="text" className="bg-secondary bg-opacity-25 text-light border-secondary" defaultValue={user.name} disabled />
-                                        <Button variant="info" disabled>Mentés</Button>
+                                        <Form.Control 
+                                            type="text" 
+                                            className="bg-secondary bg-opacity-25 text-light border-secondary" 
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            minLength={3}
+                                            maxLength={30}
+                                            required
+                                            disabled={isUpdatingName}
+                                        />
+                                        <Button 
+                                            variant="info" 
+                                            type="submit" 
+                                            className="fw-bold text-dark px-4"
+                                            disabled={isUpdatingName || name.trim() === user.name || name.trim().length < 3}
+                                        >
+                                            {isUpdatingName ? <Spinner size="sm" /> : 'Mentés'}
+                                        </Button>
                                     </div>
-                                    <Form.Text className="text-secondary">A felhasználónév módosítása új azonosítót (tag) generál a neved mellé.</Form.Text>
+                                    <Form.Text className="text-secondary">
+                                        A felhasználónév módosítása új, négyjegyű azonosítót (#tag) generál a neved mellé, a barátkódod ({user.friendCode}) viszont változatlan marad.
+                                    </Form.Text>
                                 </Form.Group>
                             </Form>
                         </Tab>

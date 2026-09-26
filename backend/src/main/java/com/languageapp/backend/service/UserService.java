@@ -4,6 +4,7 @@ import com.languageapp.backend.dto.response.ProgressResponse;
 import com.languageapp.backend.dto.response.UserResponse;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.DifficultyLevel;
+import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.ProgressRepository;
 import com.languageapp.backend.repository.UserRepository;
@@ -122,5 +123,42 @@ public class UserService {
             log.error("Failed to upload profile picture for user {}: {}", email, e.getMessage());
             throw new RuntimeException("Nem sikerült feltölteni a képet. Kérlek, próbáld újra.");
         }
+    }
+
+    /**
+     * Updates the user's display name and generates a new unique 4-digit userTag.
+     */
+    @Transactional
+    public UserResponse updateUserName(String email, String newName) {
+        if (newName == null || newName.trim().length() < 3) {
+            throw new BadRequestException("A felhasználónévnek legalább 3 karakter hosszúnak kell lennie!");
+        }
+
+        String trimmedName = newName.trim();
+        User user = getUserByEmail(email);
+
+        if (trimmedName.equals(user.getName())) {
+            throw new BadRequestException("Az új felhasználónév nem lehet azonos a jelenlegivel!");
+        }
+
+        String generatedTag;
+        int attempts = 0;
+        java.util.Random random = new java.util.Random();
+        do {
+            int randomTag = 1000 + random.nextInt(9000);
+            generatedTag = String.valueOf(randomTag);
+            attempts++;
+            if (attempts > 100) {
+                throw new BadRequestException("Túl sok felhasználó van ezzel a névvel. Kérlek, válassz egy egyedibb nevet!");
+            }
+        } while (userRepository.existsByNameAndUserTag(trimmedName, generatedTag));
+
+        user.setName(trimmedName);
+        user.setUserTag(generatedTag);
+        userRepository.save(user);
+
+        log.info("User {} updated name to {}#{}", email, trimmedName, generatedTag);
+
+        return getUserProfile(email);
     }
 }
