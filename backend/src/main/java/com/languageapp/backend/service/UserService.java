@@ -10,6 +10,7 @@ import com.languageapp.backend.repository.ProgressRepository;
 import com.languageapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,6 +29,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final ProgressRepository progressRepository;
     private final ImageStorageService imageStorageService;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -160,5 +162,28 @@ public class UserService {
         log.info("User {} updated name to {}#{}", email, trimmedName, generatedTag);
 
         return getUserProfile(email);
+    }
+    /**
+     * Changes the authenticated user's password after verifying the current password.
+     */
+    @Transactional
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        User user = getUserByEmail(email);
+
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new BadRequestException("A megadott jelenlegi jelszó hibás!");
+        }
+
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new BadRequestException("Az új jelszónak legalább 6 karakter hosszúnak kell lennie!");
+        }
+
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw new BadRequestException("Az új jelszó nem lehet azonos a jelenlegi jelszavaddal!");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        log.info("User {} successfully changed their password", email);
     }
 }

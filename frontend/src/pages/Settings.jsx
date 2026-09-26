@@ -20,6 +20,10 @@ const Settings = () => {
     const [isUpdatingName, setIsUpdatingName] = useState(false);
     const [nameMessage, setNameMessage] = useState({ type: '', text: '' });
 
+    const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+
     // --- IMAGE UPLOAD LOGIC ---
     const handleFileChange = async (e) => {
         const file = e.target.files[0];
@@ -104,6 +108,39 @@ const Settings = () => {
             setNameMessage({ type: 'danger', text: errorMsg });
         } finally {
             setIsUpdatingName(false);
+        }
+    };
+
+    // --- PASSWORD CHANGE LOGIC
+    const handleSavePassword = async (e) => {
+        e.preventDefault();
+        setPasswordMessage({ type: '', text: '' });
+
+        if (passwords.newPassword !== passwords.confirmPassword) {
+            setPasswordMessage({ type: 'danger', text: 'Az új jelszavak nem egyeznek!' });
+            return;
+        }
+
+        if (passwords.newPassword.length < 6) {
+            setPasswordMessage({ type: 'danger', text: 'Az új jelszónak legalább 6 karakternek kell lennie!' });
+            return;
+        }
+
+        setIsUpdatingPassword(true);
+        try {
+            await api.put('/users/me/password', {
+                currentPassword: passwords.currentPassword,
+                newPassword: passwords.newPassword
+            });
+
+            setPasswordMessage({ type: 'success', text: 'Jelszó sikeresen módosítva! ✅' });
+            setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+            setTimeout(() => setPasswordMessage({ type: '', text: '' }), 4000);
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || err.response?.data || 'Hiba történt a jelszó módosításakor.';
+            setPasswordMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hiba történt!' });
+        } finally {
+            setIsUpdatingPassword(false);
         }
     };
 
@@ -218,9 +255,63 @@ const Settings = () => {
 
                         {/* 3. TAB: Security */}
                         <Tab eventKey="security" title="Biztonság" className="p-4">
-                            <h5 className="fw-bold text-danger mb-4">Érzékeny adatok</h5>
-                            <p className="text-secondary">Ezen funkciók implementálása folyamatban van.</p>
-                            {/* Ide jön majd az E-mail és Jelszó módosító form */}
+                            <h5 className="fw-bold text-info mb-3">🔒 Jelszó módosítása</h5>
+                            
+                            {passwordMessage.text && (
+                                <Alert variant={passwordMessage.type} className="py-2 border-0 fw-bold mb-3">
+                                    {passwordMessage.text}
+                                </Alert>
+                            )}
+
+                            <Form onSubmit={handleSavePassword} className="mb-5" style={{ maxWidth: '500px' }}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label className="text-light opacity-75">Jelenlegi jelszó</Form.Label>
+                                    <Form.Control 
+                                        type="password" 
+                                        className="bg-secondary bg-opacity-25 text-light border-secondary"
+                                        value={passwords.currentPassword}
+                                        onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
+                                        required
+                                        disabled={isUpdatingPassword}
+                                    />
+                                </Form.Group>
+
+                                <Form.Group className="mb-3">
+                                    <Form.Label className="text-light opacity-75">Új jelszó</Form.Label>
+                                    <Form.Control 
+                                        type="password" 
+                                        className="bg-secondary bg-opacity-25 text-light border-secondary"
+                                        placeholder="Legalább 6 karakter"
+                                        value={passwords.newPassword}
+                                        onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
+                                        minLength={6}
+                                        required
+                                        disabled={isUpdatingPassword}
+                                    />
+                                </Form.Group>
+
+                                <Form.Group className="mb-4">
+                                    <Form.Label className="text-light opacity-75">Új jelszó megerősítése</Form.Label>
+                                    <Form.Control 
+                                        type="password" 
+                                        className="bg-secondary bg-opacity-25 text-light border-secondary"
+                                        value={passwords.confirmPassword}
+                                        onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
+                                        minLength={6}
+                                        required
+                                        disabled={isUpdatingPassword}
+                                    />
+                                </Form.Group>
+
+                                <Button 
+                                    variant="info" 
+                                    type="submit" 
+                                    className="fw-bold text-dark px-4"
+                                    disabled={isUpdatingPassword || !passwords.currentPassword || !passwords.newPassword || !passwords.confirmPassword}
+                                >
+                                    {isUpdatingPassword ? <Spinner size="sm" /> : 'Jelszó frissítése'}
+                                </Button>
+                            </Form>
                         </Tab>
                         
                     </Tabs>

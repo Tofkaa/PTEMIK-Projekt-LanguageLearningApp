@@ -1,5 +1,6 @@
 package com.languageapp.backend.controller;
 
+import com.languageapp.backend.dto.request.ChangePasswordRequest;
 import com.languageapp.backend.dto.request.UpdateNameRequest;
 import com.languageapp.backend.dto.request.UserPreferencesRequest;
 import com.languageapp.backend.dto.response.ProgressResponse;
@@ -79,5 +80,22 @@ public class UserController {
         log.info("REST request to update name for user: {}", authentication.getName());
         UserResponse updatedUser = userService.updateUserName(authentication.getName(), request.getName());
         return ResponseEntity.ok(updatedUser);
+    }
+
+    /**
+     * Updates the authenticated user's password.
+     */
+    @PutMapping("/me/password")
+    public ResponseEntity<String> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            Authentication authentication) {
+
+        log.info("REST request to change password for user: {}", authentication.getName());
+        userService.changePassword(
+                authentication.getName(),
+                request.getCurrentPassword(),
+                request.getNewPassword()
+        );
+        return ResponseEntity.ok("Jelszó sikeresen módosítva!");
     }
 }
