@@ -26,7 +26,7 @@ public class CloudinaryStorageServiceImpl implements ImageStorageService {
 
         Map uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
                 "folder", "languageapp/profiles",
-                "transformation", "c_fill,g_face,w_250,h_250" // Smart crop: Arc keresése és 250x250-es négyzetre vágás
+                "transformation", "c_fill,w_250,h_250"
         ));
 
         String secureUrl = uploadResult.get("secure_url").toString();

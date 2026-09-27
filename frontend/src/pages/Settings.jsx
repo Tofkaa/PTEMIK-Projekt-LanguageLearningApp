@@ -1,8 +1,10 @@
-import React, { useState, useRef } from 'react';
-import { Container, Card, Form, Button, Spinner, Alert, Tabs, Tab, Row, Col } from 'react-bootstrap';
+import React, { useState, useRef, useCallback } from 'react';
+import { Container, Card, Form, Button, Spinner, Alert, Tabs, Tab, Row, Col, Modal } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api.jsx';
+import Cropper from 'react-easy-crop';
+import getCroppedImg from '../utils/cropImage.js';
 
 const Settings = () => {
     const { user, setUser, logout } = useAuth();
@@ -14,7 +16,17 @@ const Settings = () => {
     const [diffMessage, setDiffMessage] = useState({ type: '', text: '' });
 
     const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [imageMessage, setImageMessage] = useState({ type: '', text: '' });
     const fileInputRef = useRef(null);
+
+    const [imageSrc, setImageSrc] = useState(null);
+    const [showCropModal, setShowCropModal] = useState(false);
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+    const MAX_FILE_SIZE_MB = 5;
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
     const [name, setName] = useState(user?.name || '');
     const [isUpdatingName, setIsUpdatingName] = useState(false);
@@ -29,33 +41,93 @@ const Settings = () => {
     const [isProcessingEmail, setIsProcessingEmail] = useState(false);
     const [emailMessage, setEmailMessage] = useState({ type: '', text: '' });
 
+    
     // --- IMAGE UPLOAD LOGIC ---
-    const handleFileChange = async (e) => {
+    const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        if (!file.type.startsWith('image/')) {
-            alert('Kérlek, csak képformátumot (JPG, PNG) tölts fel!');
+        setImageMessage({ type: '', text: '' });
+
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            const extension = file.name.includes('.') 
+                ? `.${file.name.split('.').pop().toLowerCase()}` 
+                : 'ismeretlen';
+
+            setImageMessage({
+                type: 'danger',
+                text: `Nem támogatott fájlformátum (${extension})! Kérlek, csak JPG, PNG vagy WEBP képet válassz.`
+            });
+            e.target.value = '';
             return;
         }
 
-        const formData = new FormData();
-        formData.append('file', file);
+        const fileSizeMB = file.size / (1024 * 1024);
+        if (fileSizeMB > MAX_FILE_SIZE_MB) {
+            setImageMessage({
+                type: 'danger',
+                text: `A kiválasztott kép túl nagy (${fileSizeMB.toFixed(1)} MB)! A maximális megengedett méret ${MAX_FILE_SIZE_MB} MB.`
+            });
+            e.target.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+            setImageSrc(reader.result);
+            setCrop({ x: 0, y: 0 });
+            setZoom(1);
+            setShowCropModal(true);
+        });
+        reader.readAsDataURL(file);
+    };
+
+    const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+        setCroppedAreaPixels(croppedAreaPixels);
+    }, []);
+
+
+    const handleCropAndUpload = async () => {
+        if (!imageSrc || !croppedAreaPixels) return;
 
         setIsUploadingImage(true);
+        setImageMessage({ type: '', text: '' });
+
         try {
+            const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
+            const formData = new FormData();
+            formData.append('file', croppedBlob, 'profile.jpg');
+
             const response = await api.post('/users/me/profile-picture', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            
+
             setUser((prevUser) => ({ ...prevUser, profilePictureUrl: response.data }));
+            setShowCropModal(false);
+            setImageSrc(null);
+            setImageMessage({ type: 'success', text: 'Profilkép sikeresen frissítve! ✅' });
+            setTimeout(() => setImageMessage({ type: '', text: '' }), 4000);
         } catch (error) {
             console.error('Hiba a profilkép feltöltésekor:', error);
-            alert('Nem sikerült feltölteni a képet. Kérlek, próbáld újra!');
+            const backendError = error.response?.data;
+            setImageMessage({
+                type: 'danger',
+                text: typeof backendError === 'string'
+                    ? backendError
+                    : 'Nem sikerült feltölteni a képet a szerverre. Kérlek, próbáld újra!'
+            });
+            setShowCropModal(false);
         } finally {
             setIsUploadingImage(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
+    };
+
+    const handleCloseCropModal = () => {
+        if (isUploadingImage) return;
+        setShowCropModal(false);
+        setImageSrc(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     // --- DIFFICULTY SAVE LOGIC ---
@@ -213,7 +285,11 @@ const Settings = () => {
                         {/* 1. TAB: Account information */}
                         <Tab eventKey="account" title="Fiókadatok" className="p-4">
                             <h5 className="fw-bold text-info mb-4">Profilkép és Felhasználónév</h5>
-                            
+                            {imageMessage.text && (
+                                <Alert variant={imageMessage.type} className="py-2 border-0 fw-bold mb-3">
+                                    {imageMessage.text}
+                                </Alert>
+                            )}
                             <Row className="align-items-center mb-5">
                                 <Col xs="auto">
                                     <input type="file" accept="image/png, image/jpeg, image/webp" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
@@ -462,6 +538,52 @@ const Settings = () => {
                     </Tabs>
                 </Card.Body>
             </Card>
+            {/* --- PROFILKÉP VÁGÓ ÉS NAGYÍTÓ MODAL --- */}
+            <Modal show={showCropModal} onHide={handleCloseCropModal} centered backdrop="static" contentClassName="bg-dark text-light border-secondary">
+                <Modal.Header closeButton closeVariant="white" className="border-secondary">
+                    <Modal.Title className="fw-bold text-info">Profilkép beállítása</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="p-4">
+                    <div className="position-relative w-100 rounded-3 overflow-hidden mb-4" style={{ height: '320px', backgroundColor: '#111' }}>
+                        {imageSrc && (
+                            <Cropper
+                                image={imageSrc}
+                                crop={crop}
+                                zoom={zoom}
+                                aspect={1}
+                                cropShape="round"
+                                showGrid={false}
+                                onCropChange={setCrop}
+                                onCropComplete={onCropComplete}
+                                onZoomChange={setZoom}
+                            />
+                        )}
+                    </div>
+
+                    <Form.Group className="px-2">
+                        <div className="d-flex justify-content-between mb-1">
+                            <Form.Label className="small text-secondary mb-0">Nagyítás (Zoom)</Form.Label>
+                            <span className="small text-info fw-bold">{Math.round(zoom * 100)}%</span>
+                        </div>
+                        <Form.Range
+                            min={1}
+                            max={3}
+                            step={0.05}
+                            value={zoom}
+                            onChange={(e) => setZoom(Number(e.target.value))}
+                            disabled={isUploadingImage}
+                        />
+                    </Form.Group>
+                </Modal.Body>
+                <Modal.Footer className="border-secondary">
+                    <Button variant="outline-secondary" onClick={handleCloseCropModal} disabled={isUploadingImage}>
+                        Mégse
+                    </Button>
+                    <Button variant="info" className="fw-bold text-dark px-4" onClick={handleCropAndUpload} disabled={isUploadingImage}>
+                        {isUploadingImage ? <><Spinner size="sm" className="me-2" />Feltöltés...</> : 'Kivágás és Mentés'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </Container>
     );
 };
