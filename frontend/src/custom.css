@@ -88,6 +88,22 @@ body {
     transition: all 0.3s ease-in-out;
 }
 
+.custom-tabs .nav-link {
+    color: rgba(255, 255, 255, 0.6) !important; 
+    transition: all 0.2s ease-in-out;
+}
+
+.custom-tabs .nav-link:hover {
+    color: #ffffff !important;
+    border-bottom-color: #0dcaf0 !important;
+}
+
+.custom-tabs .nav-link.active {
+    color: #ffffff !important; 
+    border-bottom-color: #0dcaf0 !important; 
+    font-weight: 700;
+}
+
 @keyframes tactical-reset {
     0% {
         box-shadow: 0 0 5px rgba(108, 117, 125, 0.1), inset 0 0 5px rgba(108, 117, 125, 0.05);

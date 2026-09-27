@@ -4,9 +4,13 @@ import com.languageapp.backend.dto.request.LoginRequest;
 import com.languageapp.backend.dto.request.RegisterRequest;
 import com.languageapp.backend.dto.response.AuthResponse;
 import com.languageapp.backend.entity.User;
+import com.languageapp.backend.entity.VerificationToken;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.BadRequestException;
+import com.languageapp.backend.repository.PasswordResetTokenRepository;
 import com.languageapp.backend.repository.UserRepository;
+import com.languageapp.backend.repository.VerificationTokenRepository;
+import com.languageapp.backend.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,12 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Service responsible for user authentication and registration logic.
- * <p>
- * Handles secure password hashing, user verification, and the generation
- * of both access and refresh tokens.
  */
 @Slf4j
 @Service
@@ -31,27 +33,16 @@ import java.time.LocalDateTime;
 public class AuthenticationService {
 
     private final UserRepository userRepository;
+    private final VerificationTokenRepository verificationTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final AuthenticationManager authenticationManager;
+    private final EmailService emailService;
 
-    /**
-     * Internal record to transport the response payload and the HTTP-only refresh token
-     * back to the controller.
-     */
     public record AuthResult(AuthResponse responseDto, String refreshToken) {}
 
-    /**
-     * Registers a new user account in the system.
-     * <p>
-     * Note: All public registrations are strictly assigned the 'STUDENT' role
-     * to prevent Privilege Escalation (Mass Assignment) vulnerabilities.
-     *
-     * @param request registration details provided by the client
-     * @return {@link AuthResult} containing the generated tokens and user info
-     * @throws BadRequestException if the email is already registered
-     */
     @Transactional
     public AuthResult register(RegisterRequest request) {
         log.info("Attempting to register new user with email: {}", request.getEmail());
@@ -65,6 +56,7 @@ public class AuthenticationService {
         user.setEmail(request.getEmail());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setName(request.getName());
+        user.setVerified(false);
 
         if (request.getPreferredDifficulty() != null && !request.getPreferredDifficulty().isBlank()) {
             try {
@@ -84,32 +76,36 @@ public class AuthenticationService {
         user.setRole(request.getRole() != null ? request.getRole() : Role.STUDENT);
         log.info("Registering {} user with email: {}...", user.getRole(), request.getEmail());
 
-        // 1. Steam-stílusú Barátkód (Globálisan egyedi)
         String generatedFriendCode;
         do {
             generatedFriendCode = generateFriendCode();
-        } while (userRepository.existsByFriendCode(generatedFriendCode)); // Addig pörög, amíg talál egy szabadot
+        } while (userRepository.existsByFriendCode(generatedFriendCode));
         user.setFriendCode(generatedFriendCode);
 
-        // 2. Discord-stílusú Tag (Adott néven belül egyedi)
         String generatedTag;
         int attempts = 0;
         do {
             int randomTag = 1000 + new java.util.Random().nextInt(9000);
             generatedTag = String.valueOf(randomTag);
             attempts++;
-
-            // Biztonsági fék: Ha 100 próbálkozásból sem talál szabad taget (pl. 9000 Kovács János van), ne fagyjon ki a szerver.
             if (attempts > 100) {
                 throw new BadRequestException("Túl sok felhasználó van ezzel a névvel. Kérlek, válassz egy egyedibb nevet!");
             }
         } while (userRepository.existsByNameAndUserTag(request.getName(), generatedTag));
         user.setUserTag(generatedTag);
 
-        // ---------------------------------------------------------
-
         userRepository.save(user);
         log.info("User successfully saved to database with ID: {}", user.getUserId());
+
+        String tokenStr = UUID.randomUUID().toString();
+        VerificationToken verificationToken = new VerificationToken();
+        verificationToken.setToken(tokenStr);
+        verificationToken.setUser(user);
+        verificationToken.setExpiryDate(LocalDateTime.now().plusHours(24));
+        verificationTokenRepository.save(verificationToken);
+
+        emailService.sendVerificationEmail(user.getEmail(), user.getName(), tokenStr);
+
 
         UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
                 .username(user.getEmail())
@@ -130,7 +126,8 @@ public class AuthenticationService {
                 user.getEmail(),
                 user.getRole(),
                 user.getUserTag(),
-                user.getFriendCode()
+                user.getFriendCode(),
+                user.isVerified()
         );
 
         log.info("Tokens successfully generated for user: {}", user.getEmail());
@@ -138,16 +135,87 @@ public class AuthenticationService {
     }
 
     /**
-     * Authenticates an existing user and issues new tokens.
-     *
-     * @param request login credentials provided by the client
-     * @return {@link AuthResult} containing the generated tokens and user info
-     * @throws BadRequestException if the user is not found in the database
+     * Verifies the user's email using the provided token.
      */
+    @Transactional
+    public void verifyEmail(String token) {
+        VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new BadRequestException("Érvénytelen vagy lejárt token!"));
+
+        if (verificationToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            verificationTokenRepository.delete(verificationToken);
+            throw new BadRequestException("A megerősítő link lejárt. Kérlek, igényelj újat a profilodban.");
+        }
+
+        User user = verificationToken.getUser();
+        user.setVerified(true);
+        userRepository.save(user);
+
+        verificationTokenRepository.delete(verificationToken);
+        log.info("User {} successfully verified their email address.", user.getEmail());
+    }
+
+    /**
+     * Starts the password reset process.
+     */
+    @Transactional
+    public void requestPasswordReset(String email) {
+        log.info("Password reset requested for email: {}", email);
+
+        userRepository.findByEmail(email).ifPresent(user -> {
+            // Delete previous tokens
+            passwordResetTokenRepository.deleteByUser_UserId(user.getUserId());
+
+            // New token with 1 hour lifetime
+            String tokenStr = UUID.randomUUID().toString();
+            com.languageapp.backend.entity.PasswordResetToken resetToken = new com.languageapp.backend.entity.PasswordResetToken();
+            resetToken.setToken(tokenStr);
+            resetToken.setUser(user);
+            resetToken.setExpiryDate(LocalDateTime.now().plusHours(1));
+
+            passwordResetTokenRepository.save(resetToken);
+
+            // Send async email
+            emailService.sendPasswordResetEmail(user.getEmail(), tokenStr);
+            log.info("Password reset token generated and email dispatched for user ID: {}", user.getUserId());
+        });
+
+        // No exception, if the email does not exist
+    }
+
+    /**
+     * Sets the new password based on the token
+     */
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        com.languageapp.backend.entity.PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+                .orElseThrow(() -> new BadRequestException("Érvénytelen vagy már felhasznált token!"));
+
+        if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            passwordResetTokenRepository.delete(resetToken);
+            throw new BadRequestException("A jelszóvisszaállító link lejárt. Kérlek, igényelj újat.");
+        }
+
+        User user = resetToken.getUser();
+
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw new BadRequestException("Az új jelszó nem lehet azonos a jelenlegi jelszavaddal!");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Delete token to make sure it can not be used again
+        passwordResetTokenRepository.delete(resetToken);
+
+        // Security step: log out all sessions
+        refreshTokenService.deleteByRawToken(user.getUserId().toString());
+        log.info("Password successfully reset for user: {}", user.getEmail());
+    }
+
     @Transactional
     public AuthResult authenticate(LoginRequest request) {
         log.info("Authentication attempt for email: {}", request.getEmail());
-
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -177,28 +245,19 @@ public class AuthenticationService {
                 user.getEmail(),
                 user.getRole(),
                 user.getUserTag(),
-                user.getFriendCode()
+                user.getFriendCode(),
+                user.isVerified()
         );
 
         log.info("User successfully authenticated: {}", user.getEmail());
         return new AuthResult(response, refreshToken);
     }
 
-    /**
-     * Deletes the refresh token if a user requests to log out.
-     * @param rawRefreshToken the refresh token to be deleted.
-     */
     @Transactional
     public String logout(String rawRefreshToken) {
         return refreshTokenService.deleteByRawToken(rawRefreshToken);
     }
 
-    /**
-     * Generates a new Access Token using a valid Refresh Token.
-     * * @param rawRefreshToken the raw refresh token string from the HttpOnly cookie
-     * @return {@link AuthResponse} containing the new JWT access token
-     * @throws BadRequestException if the refresh token is invalid or expired
-     */
     @Transactional(readOnly = true)
     public AuthResponse refreshToken(String rawRefreshToken) {
         log.info("Attempting to refresh access token...");
@@ -223,7 +282,8 @@ public class AuthenticationService {
                             user.getEmail(),
                             user.getRole(),
                             user.getUserTag(),
-                            user.getFriendCode()
+                            user.getFriendCode(),
+                            user.isVerified()
                     );
                 })
                 .orElseThrow(() -> {
@@ -232,10 +292,6 @@ public class AuthenticationService {
                 });
     }
 
-    /**
-     * Segédmetódus egy 7 karakteres barátkód generálásához (pl. "A8X-P9Q").
-     * Csak nagybetűket és számokat használ, kihagyva az összetéveszthetőeket (O, 0, I, 1).
-     */
     private String generateFriendCode() {
         String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         java.util.Random rnd = new java.util.Random();

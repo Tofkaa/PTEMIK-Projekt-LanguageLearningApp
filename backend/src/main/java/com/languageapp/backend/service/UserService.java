@@ -2,16 +2,24 @@ package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.response.ProgressResponse;
 import com.languageapp.backend.dto.response.UserResponse;
+import com.languageapp.backend.entity.EmailChangeToken;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.DifficultyLevel;
+import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
+import com.languageapp.backend.repository.EmailChangeTokenRepository;
 import com.languageapp.backend.repository.ProgressRepository;
 import com.languageapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -24,6 +32,10 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final ProgressRepository progressRepository;
+    private final ImageStorageService imageStorageService;
+    private final PasswordEncoder passwordEncoder;
+    private final EmailChangeTokenRepository emailChangeTokenRepository;
+    private final EmailService emailService;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -47,6 +59,8 @@ public class UserService {
                 .preferredDifficulty(user.getPreferredDifficulty().name())
                 .userTag(user.getUserTag())
                 .friendCode(user.getFriendCode())
+                .isVerified(user.isVerified())
+                .profilePictureUrl(user.getProfilePictureUrl())
                 .build();
     }
 
@@ -99,5 +113,159 @@ public class UserService {
         user.setPreferredDifficulty(DifficultyLevel.valueOf(newDifficulty));
         userRepository.save(user);
         log.info("User {} updated preferred difficulty to {}", email, newDifficulty);
+    }
+    @Transactional
+    public String updateProfilePicture(String email, MultipartFile file) {
+        User user = getUserByEmail(email);
+
+        try {
+
+            String imageUrl = imageStorageService.uploadProfileImage(file);
+
+            user.setProfilePictureUrl(imageUrl);
+            userRepository.save(user);
+
+            log.info("User {} updated profile picture", email);
+            return imageUrl;
+        } catch (IOException e) {
+            log.error("Failed to upload profile picture for user {}: {}", email, e.getMessage());
+            throw new RuntimeException("Nem sikerült feltölteni a képet. Kérlek, próbáld újra.");
+        }
+    }
+
+    /**
+     * Updates the user's display name and generates a new unique 4-digit userTag.
+     */
+    @Transactional
+    public UserResponse updateUserName(String email, String newName) {
+        if (newName == null || newName.trim().length() < 3) {
+            throw new BadRequestException("A felhasználónévnek legalább 3 karakter hosszúnak kell lennie!");
+        }
+
+        String trimmedName = newName.trim();
+        User user = getUserByEmail(email);
+
+        if (trimmedName.equals(user.getName())) {
+            throw new BadRequestException("Az új felhasználónév nem lehet azonos a jelenlegivel!");
+        }
+
+        String generatedTag;
+        int attempts = 0;
+        java.util.Random random = new java.util.Random();
+        do {
+            int randomTag = 1000 + random.nextInt(9000);
+            generatedTag = String.valueOf(randomTag);
+            attempts++;
+            if (attempts > 100) {
+                throw new BadRequestException("Túl sok felhasználó van ezzel a névvel. Kérlek, válassz egy egyedibb nevet!");
+            }
+        } while (userRepository.existsByNameAndUserTag(trimmedName, generatedTag));
+
+        user.setName(trimmedName);
+        user.setUserTag(generatedTag);
+        userRepository.save(user);
+
+        log.info("User {} updated name to {}#{}", email, trimmedName, generatedTag);
+
+        return getUserProfile(email);
+    }
+    /**
+     * Changes the authenticated user's password after verifying the current password.
+     */
+    @Transactional
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        User user = getUserByEmail(email);
+
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new BadRequestException("A megadott jelenlegi jelszó hibás!");
+        }
+
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new BadRequestException("Az új jelszónak legalább 6 karakter hosszúnak kell lennie!");
+        }
+
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw new BadRequestException("Az új jelszó nem lehet azonos a jelenlegi jelszavaddal!");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        log.info("User {} successfully changed their password", email);
+    }
+
+    /**
+     * Step 1: Validates password and target email, then generates a 6-digit OTP.
+     */
+    @Transactional
+    public void requestEmailChange(String currentEmail, String newEmail, String currentPassword) {
+        User user = getUserByEmail(currentEmail);
+
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new BadRequestException("A megadott jelenlegi jelszó hibás!");
+        }
+
+        if (newEmail == null || newEmail.isBlank() || !newEmail.contains("@")) {
+            throw new BadRequestException("Kérlek, adj meg egy érvényes e-mail címet!");
+        }
+
+        String normalizedNewEmail = newEmail.trim().toLowerCase();
+
+        if (normalizedNewEmail.equalsIgnoreCase(currentEmail)) {
+            throw new BadRequestException("Az új e-mail cím nem lehet azonos a jelenlegivel!");
+        }
+
+        if (userRepository.existsByEmail(normalizedNewEmail)) {
+            throw new BadRequestException("Ez az e-mail cím már használatban van!");
+        }
+
+        emailChangeTokenRepository.deleteByUser_UserId(user.getUserId());
+        emailChangeTokenRepository.flush();
+
+        // 6-digit safe OTP  (100000 - 999999)
+        String otpCode = String.valueOf(100000 + new SecureRandom().nextInt(900000));
+
+        EmailChangeToken token = new EmailChangeToken();
+        token.setUser(user);
+        token.setNewEmail(normalizedNewEmail);
+        token.setOtpCode(otpCode);
+        token.setExpiryDate(LocalDateTime.now().plusMinutes(15));
+
+        emailChangeTokenRepository.save(token);
+
+        emailService.sendEmailChangeOtp(normalizedNewEmail, otpCode);
+        emailService.sendEmailChangeSecurityAlert(currentEmail, normalizedNewEmail);
+        log.info("Email change OTP generated for user {} -> new email: {}", currentEmail, normalizedNewEmail);
+    }
+
+    /**
+     * Step 2: Verifies the 6-digit OTP and updates the user's primary email.
+     */
+    @Transactional
+    public void verifyEmailChange(String currentEmail, String otpCode) {
+        User user = getUserByEmail(currentEmail);
+
+        EmailChangeToken token = emailChangeTokenRepository.findByUser_UserId(user.getUserId())
+                .orElseThrow(() -> new BadRequestException("Nincs folyamatban lévő e-mail módosítási kérés!"));
+
+        if (token.getExpiryDate().isBefore(LocalDateTime.now())) {
+            emailChangeTokenRepository.delete(token);
+            throw new BadRequestException("Az ellenőrző kód lejárt! Kérlek, indítsd újra a folyamatot.");
+        }
+
+        if (otpCode == null || !token.getOtpCode().equals(otpCode.trim())) {
+            throw new BadRequestException("Hibás ellenőrző kód!");
+        }
+
+        if (userRepository.existsByEmail(token.getNewEmail())) {
+            emailChangeTokenRepository.delete(token);
+            throw new BadRequestException("Ez az e-mail cím időközben foglalt lett!");
+        }
+
+        String oldEmail = user.getEmail();
+        user.setEmail(token.getNewEmail());
+        userRepository.save(user);
+
+        emailChangeTokenRepository.delete(token);
+        log.info("User successfully changed email from {} to {}", oldEmail, user.getEmail());
     }
 }

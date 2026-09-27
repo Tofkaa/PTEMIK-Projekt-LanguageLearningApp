@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }) => {
 
     // Provide the authentication state and methods to the rest of the application
     return (
-        <AuthContext.Provider value={{ user, login, logout, vocabularyMap }}>
+        <AuthContext.Provider value={{ user,setUser, login, logout, vocabularyMap }}>
             {children}
         </AuthContext.Provider>
     );

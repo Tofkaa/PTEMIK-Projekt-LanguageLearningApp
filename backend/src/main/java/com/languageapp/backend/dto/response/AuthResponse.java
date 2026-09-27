@@ -16,4 +16,5 @@ public class AuthResponse {
     private Role role;
     private String userTag;
     private String friendCode;
+    boolean isVerified;
 }

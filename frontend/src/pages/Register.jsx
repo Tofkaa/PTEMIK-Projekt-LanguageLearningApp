@@ -17,7 +17,9 @@ const Register = () => {
     const [role, setRole] = useState('STUDENT');
     
     const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isRegistered, setIsRegistered] = useState(false); // ÚJ ÁLLAPOT A SIKERES UX-HEZ
+    
     const navigate = useNavigate();
 
     /**
@@ -26,15 +28,14 @@ const Register = () => {
      */
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
         setError('');
-        setSuccess('');
 
         if (password !== confirmPassword) {
             setError('A két jelszó nem egyezik! Kérlek, próbáld újra.');
             return; 
         }
         
+        setIsSubmitting(true);
         console.log(`Initiating registration attempt for: ${name} (${email}) as ${role}`);
 
         try {
@@ -46,10 +47,7 @@ const Register = () => {
                 role
             });
 
-            setSuccess('Sikeres regisztráció! Irányítás a bejelentkezéshez...');
-            setTimeout(() => {
-                navigate('/login');
-            }, 2000);
+            setIsRegistered(true);
 
         } catch (err) {
             console.error("Registration error:", err);
@@ -59,9 +57,39 @@ const Register = () => {
             } else {
                 setError('Nem sikerült csatlakozni a szerverhez.');
             }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
+    if (isRegistered) {
+        return (
+            <Container className="mt-5">
+                <Row className="justify-content-center">
+                    <Col md={8} lg={5}>
+                        <Card className="bg-dark text-light border-info shadow-lg mt-5 text-center p-4">
+                            <Card.Body>
+                                <div className="text-info mb-3" style={{ fontSize: '3rem' }}>✉️</div>
+                                <h3 className="fw-bold text-info mb-3">Ellenőrizd a postafiókodat!</h3>
+                                <p className="mb-3">
+                                    Sikeresen regisztráltál! Küldtünk egy megerősítő linket a(z) <strong className="text-light">{email}</strong> címre.
+                                </p>
+                                <p className="small text-secondary mb-4">
+                                    A fiókod használatához előbb rá kell kattintanod a levélben található linkre. 
+                                    Ha nem találod a levelet, nézd meg a Spam mappában is!
+                                </p>
+                                <Button variant="outline-info" onClick={() => navigate('/login')} className="w-100 fw-bold">
+                                    Vissza a bejelentkezéshez
+                                </Button>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                </Row>
+            </Container>
+        );
+    }
+
+    // NORMÁL REGISZTRÁCIÓS ŰRLAP
     return (
         <Container className="mt-5">
             <Row className="justify-content-center">
@@ -71,27 +99,26 @@ const Register = () => {
                             <h2 className="text-center mb-4 fw-bold">Új fiók létrehozása</h2>
                             
                             {error && <Alert variant="danger" className="text-center rounded-4 border-0 shadow-sm fw-bold">⚠️ {error}</Alert>}
-                            {success && <Alert variant="success" className="text-center rounded-4 border-0 shadow-sm fw-bold">✅ {success}</Alert>}
 
                             <Form onSubmit={handleSubmit}>
                                 <Form.Group className="mb-3" controlId="formName">
                                     <Form.Label>Teljes név</Form.Label>
-                                    <Form.Control type="text" placeholder="Pl. Teszt Elek" value={name} onChange={(e) => setName(e.target.value)} required />
+                                    <Form.Control type="text" placeholder="Pl. Teszt Elek" value={name} onChange={(e) => setName(e.target.value)} required disabled={isSubmitting} />
                                 </Form.Group>
 
                                 <Form.Group className="mb-3" controlId="formEmail">
                                     <Form.Label>Email cím</Form.Label>
-                                    <Form.Control type="email" placeholder="pelda@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                                    <Form.Control type="email" placeholder="pelda@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={isSubmitting} />
                                 </Form.Group>
 
                                 <Form.Group className="mb-3" controlId="formPassword">
                                     <Form.Label>Jelszó</Form.Label>
-                                    <Form.Control type="password" placeholder="Legalább 6 karakter" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete='new-password'/>
+                                    <Form.Control type="password" placeholder="Legalább 6 karakter" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete='new-password' disabled={isSubmitting} />
                                 </Form.Group>
 
                                 <Form.Group className="mb-4" controlId="formConfirmPassword">
                                     <Form.Label>Jelszó újra</Form.Label>
-                                    <Form.Control type="password" placeholder="Jelszó megerősítése" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} autoComplete='new-password'/>
+                                    <Form.Control type="password" placeholder="Jelszó megerősítése" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} autoComplete='new-password' disabled={isSubmitting} />
                                 </Form.Group>
                                 
                                 <Form.Group className="mb-4 text-center">
@@ -106,6 +133,7 @@ const Register = () => {
                                             checked={role === 'STUDENT'}
                                             onChange={(e) => setRole(e.currentTarget.value)}
                                             className="fw-bold"
+                                            disabled={isSubmitting}
                                         >
                                             👨‍🎓 Tanuló
                                         </ToggleButton>
@@ -118,6 +146,7 @@ const Register = () => {
                                             checked={role === 'TEACHER'}
                                             onChange={(e) => setRole(e.currentTarget.value)}
                                             className="fw-bold"
+                                            disabled={isSubmitting}
                                         >
                                             👩‍🏫 Tanár
                                         </ToggleButton>
@@ -131,6 +160,7 @@ const Register = () => {
                                         onChange={(e) => setPreferredDifficulty(e.target.value)}
                                         className="bg-secondary text-light border-0 shadow-sm"
                                         style={{ cursor: 'pointer' }}
+                                        disabled={isSubmitting}
                                     >
                                         <option value="DYNAMIC">🚀 Dinamikus (Ajánlott)</option>
                                         <option value="EASY">🟢 Fix: Kezdő (Csak EASY feladatok)</option>
@@ -142,8 +172,8 @@ const Register = () => {
                                     </Form.Text>
                                 </Form.Group>
 
-                                <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold" disabled={!!success}>
-                                    Regisztráció
+                                <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold" disabled={isSubmitting}>
+                                    {isSubmitting ? 'Regisztráció folyamatban...' : 'Regisztráció'}
                                 </Button>
                             </Form>
                             

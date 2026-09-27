@@ -668,13 +668,11 @@ public class AssignmentService {
                                     UUID exId = answer.getExercise().getExerciseId();
                                     String exIdStr = exId.toString();
 
-                                    // 1. Kikeressük a FRISS entitást az adatbázisból (ebben benne van a rejtett correctAnswer!)
                                     Exercise realExercise = assignment.getExercises().stream()
                                             .filter(e -> e.getExerciseId().equals(exId))
                                             .findFirst()
                                             .orElse(null);
 
-                                    // 2. Kinyerjük a helyes választ (Akár új mentésből, akár a friss entitásból)
                                     String realCorrectAnswer = answer.getServerCorrectAnswer();
 
                                     if (realCorrectAnswer == null && realExercise != null && realExercise.getCorrectAnswer() != null) {
@@ -685,20 +683,18 @@ public class AssignmentService {
                                         else realCorrectAnswer = ca.values().iterator().next().toString();
                                     }
 
-                                    // 3. Eltároljuk a hibát a kinyert válasszal
                                     if (!globalMistakes.containsKey(exIdStr)) {
                                         globalMistakes.put(exIdStr, ClassroomAnalyticsResponse.FrequentMistakeDTO.builder()
                                                 .question(answer.getQuestion())
                                                 .mistakeCount(1)
                                                 .assignmentTitle(assignment.getTitle())
                                                 .exercise(answer.getExercise())
-                                                .serverCorrectAnswer(realCorrectAnswer) // Itt adjuk át a bombabiztos választ!
+                                                .serverCorrectAnswer(realCorrectAnswer)
                                                 .build());
                                     } else {
                                         ClassroomAnalyticsResponse.FrequentMistakeDTO existing = globalMistakes.get(exIdStr);
                                         existing.setMistakeCount(existing.getMistakeCount() + 1);
 
-                                        // Ha korábban nem volt meg a válasz, most pótoljuk
                                         if (existing.getServerCorrectAnswer() == null && realCorrectAnswer != null) {
                                             existing.setServerCorrectAnswer(realCorrectAnswer);
                                         }

@@ -4,7 +4,6 @@ import { Form, Button, Card, Container, Row, Col, Alert } from 'react-bootstrap'
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-
 /**
  * Login Component
  * Responsible for user authentication, JWT token management, 
@@ -83,7 +82,7 @@ const Login = () => {
                            <h2 className="text-center mb-4 fw-bold text-white">Bejelentkezés</h2>
                            
                            {/* Render error alert upon failed authentication */}
-                           {error && <Alert variant="danger" className="text-center rounded-4 border-0 shadow-sm fw-bold">⚠️{error}</Alert>}
+                           {error && <Alert variant="danger" className="text-center rounded-4 border-0 shadow-sm fw-bold">⚠️ {error}</Alert>}
 
                            <Form onSubmit={handleSubmit}>
                                <Form.Group className="mb-3" controlId="formBasicEmail">
@@ -94,10 +93,11 @@ const Login = () => {
                                         value={email} 
                                         onChange={(e) => setEmail(e.target.value)} 
                                         required 
+                                        disabled={isLoading}
                                     />
                                </Form.Group>
 
-                               <Form.Group className="mb-4" controlId="formBasicPassword">
+                               <Form.Group className="mb-3" controlId="formBasicPassword">
                                    <Form.Label>Jelszó</Form.Label>
                                    <Form.Control 
                                         type="password" 
@@ -106,26 +106,33 @@ const Login = () => {
                                         onChange={(e) => setPassword(e.target.value)} 
                                         required 
                                         autoComplete="current-password"
+                                        disabled={isLoading}
                                     />
                                </Form.Group>
                                
-                               <Form.Group className="mb-4 text-start" controlId="rememberMeCheckbox">
+                               <Form.Group className="mb-4 d-flex justify-content-between align-items-center">
                                    <Form.Check 
                                        type="checkbox" 
-                                       label="Jegyezz meg ezen az eszközön" 
-                                       className="text-light opacity-75 custom-checkbox"
+                                       id="rememberMeCheckbox"
+                                       label="Jegyezz meg" 
+                                       className="text-light opacity-75 custom-checkbox mb-0"
                                        checked={rememberMe}
                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                       disabled={isLoading}
                                    />
+                                   <Link to="/forgot-password" className="small text-info text-decoration-none fw-bold">
+                                       Elfelejtetted a jelszavad?
+                                   </Link>
                                </Form.Group>
-                                        <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold" disabled={isLoading}>
-                                             {isLoading ? 'Bejelentkezés folyamatban...' : 'Belépés'}
-                                        </Button>
+
+                               <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold" disabled={isLoading}>
+                                    {isLoading ? 'Bejelentkezés folyamatban...' : 'Belépés'}
+                               </Button>
                            </Form>
                            
                            <div className="text-center mt-3">
                                <span className="text-light">Nincs még fiókod? </span>
-                               <Link to="/register" className="text-decoration-none fw-bold">Regisztrálj itt!</Link>
+                               <Link to="/register" className="text-decoration-none fw-bold text-info">Regisztrálj itt!</Link>
                            </div>
                        </Card.Body>
                    </Card>

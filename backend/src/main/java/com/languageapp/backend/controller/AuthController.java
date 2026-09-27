@@ -2,6 +2,7 @@ package com.languageapp.backend.controller;
 
 import com.languageapp.backend.dto.request.LoginRequest;
 import com.languageapp.backend.dto.request.RegisterRequest;
+import com.languageapp.backend.dto.request.ResetPasswordRequest;
 import com.languageapp.backend.dto.response.AuthResponse;
 import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.security.AuthenticationService;
@@ -15,9 +16,6 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * REST controller responsible for authentication-related operations.
- * <p>
- * Provides endpoints for user registration, login, logout, and token refresh.
- * Manages the issuance and lifecycle of HTTP-only refresh token cookies.
  */
 @Slf4j
 @RestController
@@ -27,13 +25,6 @@ public class AuthController {
 
     private final AuthenticationService authenticationService;
 
-    /**
-     * Registers a new user account.
-     *
-     * @param request contains user registration data
-     * @return {@link ResponseEntity} containing authentication response
-     * and a session-bound refresh token stored in an HTTP-only cookie
-     */
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         AuthenticationService.AuthResult result = authenticationService.register(request);
@@ -46,12 +37,15 @@ public class AuthController {
     }
 
     /**
-     * Authenticates an existing user.
-     *
-     * @param request contains login credentials and "remember me" preference
-     * @return {@link ResponseEntity} containing authentication response
-     * and a refresh token stored in an HTTP-only cookie
+     * Endpoint to verify email based on token
      */
+    @GetMapping("/verify")
+    public ResponseEntity<String> verifyEmail(@RequestParam String token) {
+        log.info("Received email verification request for token");
+        authenticationService.verifyEmail(token);
+        return ResponseEntity.ok("E-mail cím sikeresen megerősítve!");
+    }
+
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthenticationService.AuthResult result = authenticationService.authenticate(request);
@@ -63,12 +57,6 @@ public class AuthController {
                 .body(result.responseDto());
     }
 
-    /**
-     * Refreshes the JWT Access Token using the HttpOnly Refresh Token cookie.
-     *
-     * @param refreshToken the refresh token automatically sent by the browser
-     * @return {@link ResponseEntity} containing the new access token
-     */
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(
             @CookieValue(name = "refreshToken", required = false) String refreshToken) {
@@ -82,18 +70,11 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Logs out the user by deleting the refresh token from the database
-     * and invalidating the browser's cookie.
-     *
-     * @param refreshToken the refresh token to be invalidated
-     * @return empty {@link ResponseEntity} with an expired cookie header
-     */
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @CookieValue(name = "refreshToken", required = false) String refreshToken) {
 
-        String loggedOutUser = "Unkonw/Guest";
+        String loggedOutUser = "Unknown/Guest";
 
         if (refreshToken != null && !refreshToken.trim().isEmpty()) {
             loggedOutUser = authenticationService.logout(refreshToken);
@@ -114,13 +95,21 @@ public class AuthController {
                 .build();
     }
 
-    /**
-     * Creates a refresh token cookie with secure attributes.
-     *
-     * @param refreshToken JWT refresh token value
-     * @param rememberMe determines cookie lifespan (7 days vs Session)
-     * @return configured {@link ResponseCookie}
-     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@RequestParam String email) {
+        log.info("Received forgot password request");
+        authenticationService.requestPasswordReset(email);
+        // Always return this response, to not leak if the user with said email exists or not
+        return ResponseEntity.ok("Ha létezik fiók ezzel az e-mail címmel, elküldtük a visszaállító linket.");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        log.info("Received password reset confirmation request");
+        authenticationService.resetPassword(request.getToken(), request.getNewPassword());
+        return ResponseEntity.ok("Jelszó sikeresen frissítve!");
+    }
+
     private ResponseCookie createCookie(String refreshToken, boolean rememberMe) {
         long maxAgeInSeconds = rememberMe ? (7 * 24 * 60 * 60) : -1;
 

@@ -1,14 +1,16 @@
 package com.languageapp.backend.controller;
 
-import com.languageapp.backend.dto.request.UserPreferencesRequest;
+import com.languageapp.backend.dto.request.*;
 import com.languageapp.backend.dto.response.ProgressResponse;
 import com.languageapp.backend.dto.response.UserResponse;
 import com.languageapp.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -45,5 +47,77 @@ public class UserController {
     public ResponseEntity<String> updatePreferences(@RequestBody UserPreferencesRequest request, Authentication authentication) {
         userService.updateUserPreferences(authentication.getName(), request.getPreferredDifficulty());
         return ResponseEntity.ok("Preferences updated successfully");
+    }
+
+    /**
+     * Uploads and updates the authenticated user's profile picture.
+     */
+    @PostMapping(value = "/me/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> uploadProfilePicture(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+
+        if (file.isEmpty() || file.getContentType() == null || !file.getContentType().startsWith("image/")) {
+            return ResponseEntity.badRequest().body("Érvénytelen fájl! Csak képformátum (JPG, PNG, stb.) engedélyezett.");
+        }
+        log.info("REST request to upload profile picture for user: {}", authentication.getName());
+
+        String newImageUrl = userService.updateProfilePicture(authentication.getName(), file);
+
+        return ResponseEntity.ok(newImageUrl);
+    }
+
+    /**
+     * Updates the authenticated user's display name and regenerates their tag.
+     */
+    @PutMapping("/me/name")
+    public ResponseEntity<UserResponse> updateName(
+            @RequestBody UpdateNameRequest request,
+            Authentication authentication) {
+
+        log.info("REST request to update name for user: {}", authentication.getName());
+        UserResponse updatedUser = userService.updateUserName(authentication.getName(), request.getName());
+        return ResponseEntity.ok(updatedUser);
+    }
+
+    /**
+     * Updates the authenticated user's password.
+     */
+    @PutMapping("/me/password")
+    public ResponseEntity<String> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            Authentication authentication) {
+
+        log.info("REST request to change password for user: {}", authentication.getName());
+        userService.changePassword(
+                authentication.getName(),
+                request.getCurrentPassword(),
+                request.getNewPassword()
+        );
+        return ResponseEntity.ok("Jelszó sikeresen módosítva!");
+    }
+
+    @PostMapping("/me/email-change/request")
+    public ResponseEntity<String> requestEmailChange(
+            @RequestBody EmailChangeRequestDto request,
+            Authentication authentication) {
+
+        log.info("REST request to initiate email change for user: {}", authentication.getName());
+        userService.requestEmailChange(
+                authentication.getName(),
+                request.getNewEmail(),
+                request.getCurrentPassword()
+        );
+        return ResponseEntity.ok("Ellenőrző kód elküldve az új e-mail címre!");
+    }
+
+    @PostMapping("/me/email-change/verify")
+    public ResponseEntity<String> verifyEmailChange(
+            @RequestBody EmailChangeVerifyDto request,
+            Authentication authentication) {
+
+        log.info("REST request to verify email change OTP for user: {}", authentication.getName());
+        userService.verifyEmailChange(authentication.getName(), request.getOtpCode());
+        return ResponseEntity.ok("E-mail cím sikeresen frissítve!");
     }
 }

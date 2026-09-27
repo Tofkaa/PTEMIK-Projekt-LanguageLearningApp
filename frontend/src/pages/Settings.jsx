@@ -1,0 +1,591 @@
+import React, { useState, useRef, useCallback } from 'react';
+import { Container, Card, Form, Button, Spinner, Alert, Tabs, Tab, Row, Col, Modal } from 'react-bootstrap';
+import { useAuth } from '../context/AuthContext.jsx';
+import { useNavigate } from 'react-router-dom';
+import api from '../services/api.jsx';
+import Cropper from 'react-easy-crop';
+import getCroppedImg from '../utils/cropImage.js';
+
+const Settings = () => {
+    const { user, setUser, logout } = useAuth();
+    const navigate = useNavigate();
+
+    // --- STATES ---
+    const [difficulty, setDifficulty] = useState(user?.preferredDifficulty || 'MEDIUM');
+    const [isUpdatingDiff, setIsUpdatingDiff] = useState(false);
+    const [diffMessage, setDiffMessage] = useState({ type: '', text: '' });
+
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const [imageMessage, setImageMessage] = useState({ type: '', text: '' });
+    const fileInputRef = useRef(null);
+
+    const [imageSrc, setImageSrc] = useState(null);
+    const [showCropModal, setShowCropModal] = useState(false);
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+    const MAX_FILE_SIZE_MB = 5;
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+    const [name, setName] = useState(user?.name || '');
+    const [isUpdatingName, setIsUpdatingName] = useState(false);
+    const [nameMessage, setNameMessage] = useState({ type: '', text: '' });
+
+    const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+
+    const [emailStep, setEmailStep] = useState('REQUEST'); // 'REQUEST' vagy 'VERIFY'
+    const [emailForm, setEmailForm] = useState({ newEmail: '', currentPassword: '', otpCode: '' });
+    const [isProcessingEmail, setIsProcessingEmail] = useState(false);
+    const [emailMessage, setEmailMessage] = useState({ type: '', text: '' });
+
+    
+    // --- IMAGE UPLOAD LOGIC ---
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setImageMessage({ type: '', text: '' });
+
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            const extension = file.name.includes('.') 
+                ? `.${file.name.split('.').pop().toLowerCase()}` 
+                : 'ismeretlen';
+
+            setImageMessage({
+                type: 'danger',
+                text: `Nem támogatott fájlformátum (${extension})! Kérlek, csak JPG, PNG vagy WEBP képet válassz.`
+            });
+            e.target.value = '';
+            return;
+        }
+
+        const fileSizeMB = file.size / (1024 * 1024);
+        if (fileSizeMB > MAX_FILE_SIZE_MB) {
+            setImageMessage({
+                type: 'danger',
+                text: `A kiválasztott kép túl nagy (${fileSizeMB.toFixed(1)} MB)! A maximális megengedett méret ${MAX_FILE_SIZE_MB} MB.`
+            });
+            e.target.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+            setImageSrc(reader.result);
+            setCrop({ x: 0, y: 0 });
+            setZoom(1);
+            setShowCropModal(true);
+        });
+        reader.readAsDataURL(file);
+    };
+
+    const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+        setCroppedAreaPixels(croppedAreaPixels);
+    }, []);
+
+
+    const handleCropAndUpload = async () => {
+        if (!imageSrc || !croppedAreaPixels) return;
+
+        setIsUploadingImage(true);
+        setImageMessage({ type: '', text: '' });
+
+        try {
+            const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
+            const formData = new FormData();
+            formData.append('file', croppedBlob, 'profile.jpg');
+
+            const response = await api.post('/users/me/profile-picture', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            setUser((prevUser) => ({ ...prevUser, profilePictureUrl: response.data }));
+            setShowCropModal(false);
+            setImageSrc(null);
+            setImageMessage({ type: 'success', text: 'Profilkép sikeresen frissítve! ✅' });
+            setTimeout(() => setImageMessage({ type: '', text: '' }), 4000);
+        } catch (error) {
+            console.error('Hiba a profilkép feltöltésekor:', error);
+            const backendError = error.response?.data;
+            setImageMessage({
+                type: 'danger',
+                text: typeof backendError === 'string'
+                    ? backendError
+                    : 'Nem sikerült feltölteni a képet a szerverre. Kérlek, próbáld újra!'
+            });
+            setShowCropModal(false);
+        } finally {
+            setIsUploadingImage(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleCloseCropModal = () => {
+        if (isUploadingImage) return;
+        setShowCropModal(false);
+        setImageSrc(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    // --- DIFFICULTY SAVE LOGIC ---
+   const handleSavePreferences = async (e) => {
+        e.preventDefault();
+        setIsUpdatingDiff(true);
+        setDiffMessage({ type: '', text: '' });
+
+        try {
+            await api.put('/users/me/preferences', { preferredDifficulty: difficulty });
+            
+            setUser((prevUser) => ({ 
+                ...prevUser, 
+                preferredDifficulty: difficulty 
+            }));
+            
+            setDiffMessage({ type: 'success', text: 'Tanulási beállítások elmentve! ✅' });
+            setTimeout(() => setDiffMessage({ type: '', text: '' }), 3000);
+        } catch (err) {
+            setDiffMessage({ type: 'danger', text: 'Hiba történt a beállítások mentésekor.' }, err);
+        } finally {
+            setIsUpdatingDiff(false);
+        }
+    };
+
+    // --- USERNAME SAVE LOGIC ---
+    const handleSaveName = async (e) => {
+        e.preventDefault();
+        const trimmed = name.trim();
+        if (trimmed.length < 3) {
+            setNameMessage({ type: 'danger', text: 'A névnek legalább 3 karakternek kell lennie!' });
+            return;
+        }
+
+        setIsUpdatingName(true);
+        setNameMessage({ type: '', text: '' });
+
+        try {
+            const response = await api.put('/users/me/name', { name: trimmed });
+            
+            // Frissítjük a globális user objektumot az új névvel és az új generált userTag-gel
+            setUser((prevUser) => ({
+                ...prevUser,
+                name: response.data.name,
+                userTag: response.data.userTag
+            }));
+
+            setNameMessage({ 
+                type: 'success', 
+                text: `Név sikeresen frissítve! Az új azonosítód: ${response.data.name} #${response.data.userTag} ✅` 
+            });
+            setTimeout(() => setNameMessage({ type: '', text: '' }), 4000);
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || 'Hiba történt a név módosításakor.';
+            setNameMessage({ type: 'danger', text: errorMsg });
+        } finally {
+            setIsUpdatingName(false);
+        }
+    };
+
+    // --- PASSWORD CHANGE LOGIC
+    const handleSavePassword = async (e) => {
+        e.preventDefault();
+        setPasswordMessage({ type: '', text: '' });
+
+        if (passwords.newPassword !== passwords.confirmPassword) {
+            setPasswordMessage({ type: 'danger', text: 'Az új jelszavak nem egyeznek!' });
+            return;
+        }
+
+        if (passwords.newPassword.length < 6) {
+            setPasswordMessage({ type: 'danger', text: 'Az új jelszónak legalább 6 karakternek kell lennie!' });
+            return;
+        }
+
+        setIsUpdatingPassword(true);
+        try {
+            await api.put('/users/me/password', {
+                currentPassword: passwords.currentPassword,
+                newPassword: passwords.newPassword
+            });
+
+            setPasswordMessage({ type: 'success', text: 'Jelszó sikeresen módosítva! ✅' });
+            setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+            setTimeout(() => setPasswordMessage({ type: '', text: '' }), 4000);
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || err.response?.data || 'Hiba történt a jelszó módosításakor.';
+            setPasswordMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hiba történt!' });
+        } finally {
+            setIsUpdatingPassword(false);
+        }
+    };
+
+    const handleRequestEmailChange = async (e) => {
+        e.preventDefault();
+        setEmailMessage({ type: '', text: '' });
+        setIsProcessingEmail(true);
+
+        try {
+            await api.post('/users/me/email-change/request', {
+                newEmail: emailForm.newEmail.trim(),
+                currentPassword: emailForm.currentPassword
+            });
+            setEmailStep('VERIFY');
+            setEmailMessage({ 
+                type: 'info', 
+                text: `Küldtünk egy 6-jegyű ellenőrző kódot a(z) ${emailForm.newEmail} címre! (15 percig érvényes)` 
+            });
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || err.response?.data || 'Hiba történt a kérés indításakor.';
+            setEmailMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hiba történt!' });
+        } finally {
+            setIsProcessingEmail(false);
+        }
+    };
+
+    const handleVerifyEmailChange = async (e) => {
+        e.preventDefault();
+        setEmailMessage({ type: '', text: '' });
+        setIsProcessingEmail(true);
+
+        try {
+            await api.post('/users/me/email-change/verify', {
+                otpCode: emailForm.otpCode.trim()
+            });
+            setEmailMessage({ 
+                type: 'success', 
+                text: 'E-mail cím sikeresen frissítve! ✅ Biztonsági okokból kérlek, jelentkezz be újra az új címeddel...' 
+            });
+            setTimeout(() => {
+                logout();
+                navigate('/login');
+            }, 3000);
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || err.response?.data || 'Hibás vagy lejárt ellenőrző kód.';
+            setEmailMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hiba történt!' });
+            setIsProcessingEmail(false);
+        }
+    };
+
+    if (!user) return null;
+
+    return (
+        <Container className="mt-5 pt-4 text-light pb-5" style={{ maxWidth: '900px' }}>
+            <Button variant="link" className="text-info text-decoration-none p-0 mb-3 fw-bold" onClick={() => navigate('/profile')}>
+                ⬅️ Vissza a profilomra
+            </Button>
+            
+            <h2 className="fw-bold mb-4">Beállítások</h2>
+
+            <Card className="bg-dark border-0 shadow-lg rounded-4">
+                <Card.Body className="p-0">
+                    <Tabs defaultActiveKey="account" className="custom-tabs border-secondary p-3 pb-0" variant="underline">
+                        
+                        {/* 1. TAB: Account information */}
+                        <Tab eventKey="account" title="Fiókadatok" className="p-4">
+                            <h5 className="fw-bold text-info mb-4">Profilkép és Felhasználónév</h5>
+                            {imageMessage.text && (
+                                <Alert variant={imageMessage.type} className="py-2 border-0 fw-bold mb-3">
+                                    {imageMessage.text}
+                                </Alert>
+                            )}
+                            <Row className="align-items-center mb-5">
+                                <Col xs="auto">
+                                    <input type="file" accept="image/png, image/jpeg, image/webp" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+                                    <div 
+                                        className="position-relative" 
+                                        style={{ width: '100px', height: '100px', cursor: 'pointer' }}
+                                        onClick={() => !isUploadingImage && fileInputRef.current.click()}
+                                    >
+                                        {isUploadingImage ? (
+                                            <div className="w-100 h-100 rounded-circle bg-secondary d-flex justify-content-center align-items-center">
+                                                <Spinner animation="border" variant="light" />
+                                            </div>
+                                        ) : user.profilePictureUrl ? (
+                                            <img src={user.profilePictureUrl} alt="Profil" className="w-100 h-100 rounded-circle object-fit-cover border border-2 border-info" />
+                                        ) : (
+                                            <div className="w-100 h-100 rounded-circle bg-secondary d-flex justify-content-center align-items-center border border-2 border-secondary">
+                                                <span style={{ fontSize: '3rem' }}>👤</span>
+                                            </div>
+                                        )}
+                                        {!isUploadingImage && <div className="position-absolute bottom-0 end-0 bg-info rounded-circle p-1" style={{ width: '28px', height: '28px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>✏️</div>}
+                                    </div>
+                                </Col>
+                                <Col>
+                                    <p className="text-secondary mb-0 small">Engedélyezett formátumok: JPG, PNG, WEBP. Maximum 5MB.</p>
+                                    <Button variant="outline-light" size="sm" className="mt-2" onClick={() => fileInputRef.current.click()}>Kép módosítása</Button>
+                                </Col>
+                            </Row>
+
+                            {nameMessage.text && (
+                                <Alert variant={nameMessage.type} className="py-2 border-0 fw-bold mb-3">
+                                    {nameMessage.text}
+                                </Alert>
+                            )}
+
+                            <Form onSubmit={handleSaveName}>
+                                <Form.Group className="mb-4">
+                                    <Form.Label className="text-light opacity-75">
+                                        Felhasználónév <span className="text-info ms-1">#{user.userTag}</span>
+                                    </Form.Label>
+                                    <div className="d-flex gap-2">
+                                        <Form.Control 
+                                            type="text" 
+                                            className="bg-secondary bg-opacity-25 text-light border-secondary" 
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            minLength={3}
+                                            maxLength={30}
+                                            required
+                                            disabled={isUpdatingName}
+                                        />
+                                        <Button 
+                                            variant="info" 
+                                            type="submit" 
+                                            className="fw-bold text-dark px-4"
+                                            disabled={isUpdatingName || name.trim() === user.name || name.trim().length < 3}
+                                        >
+                                            {isUpdatingName ? <Spinner size="sm" /> : 'Mentés'}
+                                        </Button>
+                                    </div>
+                                    <Form.Text className="text-secondary">
+                                        A felhasználónév módosítása új, négyjegyű azonosítót (#tag) generál a neved mellé, a barátkódod ({user.friendCode}) viszont változatlan marad.
+                                    </Form.Text>
+                                </Form.Group>
+                            </Form>
+                        </Tab>
+
+                        {/* 2. TAB: Learning Preferences */}
+                        <Tab eventKey="learning" title="Tanulás" className="p-4">
+                            <h5 className="fw-bold text-info mb-3">Adaptív Algoritmus</h5>
+                            <p className="text-light opacity-75 mb-4">Itt felülírhatod az adaptív algoritmust, és beállíthatod, hogy milyen nehézségű leckéket szeretnél kapni.</p>
+                            
+                            <div style={{ minHeight: '50px' }}>
+                                {diffMessage.text && <Alert variant={diffMessage.type} className="py-2 border-0 fw-bold">{diffMessage.text}</Alert>}
+                            </div>
+
+                            <Form onSubmit={handleSavePreferences}>
+                                <Form.Group className="mb-4">
+                                    <Form.Label className="fw-bold text-light opacity-75">Célzott Nehézség</Form.Label>
+                                    <Form.Select className="bg-secondary bg-opacity-25 text-light border-secondary p-2" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+                                        <option value="DYNAMIC" className="text-dark">🔵 Dinamikus (DYNAMIC) - Nehézség a teljesítményed alapján</option>
+                                        <option value="EASY" className="text-dark">🟢 Kezdő (EASY) - Több kártyás feladat</option>
+                                        <option value="MEDIUM" className="text-dark">🟡 Haladó (MEDIUM) - Vegyes feladatok</option>
+                                        <option value="HARD" className="text-dark">🔴 Profi (HARD) - Csak gépelés</option>
+                                    </Form.Select>
+                                </Form.Group>
+                                <Button variant="info" type="submit" className="fw-bold text-dark" disabled={isUpdatingDiff || difficulty === user.preferredDifficulty}>
+                                    {isUpdatingDiff ? <Spinner size="sm" /> : 'Beállítások Mentése'}
+                                </Button>
+                            </Form>
+                        </Tab>
+
+                        {/* 3. TAB: Security */}
+                        <Tab eventKey="security" title="Biztonság" className="p-4">
+                            
+                            {/* --- E-MAIL ADDRESS CHANGE (OTP FLOW) --- */}
+                            <h5 className="fw-bold text-info mb-3">📧 E-mail cím módosítása</h5>
+                            <p className="text-secondary small mb-3">
+                                Jelenlegi e-mail címed: <strong className="text-light">{user.email}</strong>
+                            </p>
+
+                            {emailMessage.text && (
+                                <Alert variant={emailMessage.type} className="py-2 border-0 fw-bold mb-3" style={{ maxWidth: '500px' }}>
+                                    {emailMessage.text}
+                                </Alert>
+                            )}
+
+                            {emailStep === 'REQUEST' ? (
+                                <Form onSubmit={handleRequestEmailChange} className="mb-5 pb-4 border-bottom border-secondary" style={{ maxWidth: '500px' }}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label className="text-light opacity-75">Új e-mail cím</Form.Label>
+                                        <Form.Control 
+                                            type="email" 
+                                            className="bg-secondary bg-opacity-25 text-light border-secondary"
+                                            placeholder="uj.cim@pelda.hu"
+                                            value={emailForm.newEmail}
+                                            onChange={(e) => setEmailForm({ ...emailForm, newEmail: e.target.value })}
+                                            required
+                                            disabled={isProcessingEmail}
+                                        />
+                                    </Form.Group>
+
+                                    <Form.Group className="mb-4">
+                                        <Form.Label className="text-light opacity-75">Jelenlegi jelszó (megerősítéshez)</Form.Label>
+                                        <Form.Control 
+                                            type="password" 
+                                            className="bg-secondary bg-opacity-25 text-light border-secondary"
+                                            value={emailForm.currentPassword}
+                                            onChange={(e) => setEmailForm({ ...emailForm, currentPassword: e.target.value })}
+                                            required
+                                            disabled={isProcessingEmail}
+                                        />
+                                    </Form.Group>
+
+                                    <Button 
+                                        variant="info" 
+                                        type="submit" 
+                                        className="fw-bold text-dark px-4"
+                                        disabled={isProcessingEmail || !emailForm.newEmail || !emailForm.currentPassword}
+                                    >
+                                        {isProcessingEmail ? <Spinner size="sm" /> : 'Ellenőrző kód küldése'}
+                                    </Button>
+                                </Form>
+                            ) : (
+                                <Form onSubmit={handleVerifyEmailChange} className="mb-5 pb-4 border-bottom border-secondary" style={{ maxWidth: '500px' }}>
+                                    <Form.Group className="mb-4">
+                                        <Form.Label className="text-light opacity-75">6-jegyű ellenőrző kód (OTP)</Form.Label>
+                                        <Form.Control 
+                                            type="text" 
+                                            className="bg-secondary bg-opacity-25 text-light border-info fs-4 text-center font-monospace tracking-wide"
+                                            placeholder="123456"
+                                            maxLength={6}
+                                            value={emailForm.otpCode}
+                                            onChange={(e) => setEmailForm({ ...emailForm, otpCode: e.target.value.replace(/\D/g, '') })}
+                                            required
+                                            disabled={isProcessingEmail}
+                                        />
+                                        <Form.Text className="text-secondary">
+                                            Add meg az új e-mail címre küldött 6 számjegyű kódot.
+                                        </Form.Text>
+                                    </Form.Group>
+
+                                    <div className="d-flex gap-2">
+                                        <Button 
+                                            variant="success" 
+                                            type="submit" 
+                                            className="fw-bold px-4"
+                                            disabled={isProcessingEmail || emailForm.otpCode.length !== 6}
+                                        >
+                                            {isProcessingEmail ? <Spinner size="sm" /> : 'Kód megerősítése'}
+                                        </Button>
+                                        <Button 
+                                            variant="outline-secondary" 
+                                            type="button"
+                                            disabled={isProcessingEmail}
+                                            onClick={() => {
+                                                setEmailStep('REQUEST');
+                                                setEmailMessage({ type: '', text: '' });
+                                                setEmailForm({ ...emailForm, otpCode: '' });
+                                            }}
+                                        >
+                                            Mégse
+                                        </Button>
+                                    </div>
+                                </Form>
+                            )}
+
+                            {/* --- PASSWORD CHANGE --- */}
+                            <h5 className="fw-bold text-info mb-3">🔒 Jelszó módosítása</h5>
+                            
+                            {passwordMessage.text && (
+                                <Alert variant={passwordMessage.type} className="py-2 border-0 fw-bold mb-3" style={{ maxWidth: '500px' }}>
+                                    {passwordMessage.text}
+                                </Alert>
+                            )}
+
+                            <Form onSubmit={handleSavePassword} style={{ maxWidth: '500px' }}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label className="text-light opacity-75">Jelenlegi jelszó</Form.Label>
+                                    <Form.Control 
+                                        type="password" 
+                                        className="bg-secondary bg-opacity-25 text-light border-secondary"
+                                        value={passwords.currentPassword}
+                                        onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
+                                        required
+                                        disabled={isUpdatingPassword}
+                                    />
+                                </Form.Group>
+
+                                <Form.Group className="mb-3">
+                                    <Form.Label className="text-light opacity-75">Új jelszó</Form.Label>
+                                    <Form.Control 
+                                        type="password" 
+                                        className="bg-secondary bg-opacity-25 text-light border-secondary"
+                                        placeholder="Legalább 6 karakter"
+                                        value={passwords.newPassword}
+                                        onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
+                                        minLength={6}
+                                        required
+                                        disabled={isUpdatingPassword}
+                                    />
+                                </Form.Group>
+
+                                <Form.Group className="mb-4">
+                                    <Form.Label className="text-light opacity-75">Új jelszó megerősítése</Form.Label>
+                                    <Form.Control 
+                                        type="password" 
+                                        className="bg-secondary bg-opacity-25 text-light border-secondary"
+                                        value={passwords.confirmPassword}
+                                        onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
+                                        minLength={6}
+                                        required
+                                        disabled={isUpdatingPassword}
+                                    />
+                                </Form.Group>
+
+                                <Button 
+                                    variant="info" 
+                                    type="submit" 
+                                    className="fw-bold text-dark px-4"
+                                    disabled={isUpdatingPassword || !passwords.currentPassword || !passwords.newPassword || !passwords.confirmPassword}
+                                >
+                                    {isUpdatingPassword ? <Spinner size="sm" /> : 'Jelszó frissítése'}
+                                </Button>
+                            </Form>
+                        </Tab>
+                    </Tabs>
+                </Card.Body>
+            </Card>
+            {/* --- PROFILKÉP VÁGÓ ÉS NAGYÍTÓ MODAL --- */}
+            <Modal show={showCropModal} onHide={handleCloseCropModal} centered backdrop="static" contentClassName="bg-dark text-light border-secondary">
+                <Modal.Header closeButton closeVariant="white" className="border-secondary">
+                    <Modal.Title className="fw-bold text-info">Profilkép beállítása</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="p-4">
+                    <div className="position-relative w-100 rounded-3 overflow-hidden mb-4" style={{ height: '320px', backgroundColor: '#111' }}>
+                        {imageSrc && (
+                            <Cropper
+                                image={imageSrc}
+                                crop={crop}
+                                zoom={zoom}
+                                aspect={1}
+                                cropShape="round"
+                                showGrid={false}
+                                onCropChange={setCrop}
+                                onCropComplete={onCropComplete}
+                                onZoomChange={setZoom}
+                            />
+                        )}
+                    </div>
+
+                    <Form.Group className="px-2">
+                        <div className="d-flex justify-content-between mb-1">
+                            <Form.Label className="small text-secondary mb-0">Nagyítás (Zoom)</Form.Label>
+                            <span className="small text-info fw-bold">{Math.round(zoom * 100)}%</span>
+                        </div>
+                        <Form.Range
+                            min={1}
+                            max={3}
+                            step={0.05}
+                            value={zoom}
+                            onChange={(e) => setZoom(Number(e.target.value))}
+                            disabled={isUploadingImage}
+                        />
+                    </Form.Group>
+                </Modal.Body>
+                <Modal.Footer className="border-secondary">
+                    <Button variant="outline-secondary" onClick={handleCloseCropModal} disabled={isUploadingImage}>
+                        Mégse
+                    </Button>
+                    <Button variant="info" className="fw-bold text-dark px-4" onClick={handleCropAndUpload} disabled={isUploadingImage}>
+                        {isUploadingImage ? <><Spinner size="sm" className="me-2" />Feltöltés...</> : 'Kivágás és Mentés'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+        </Container>
+    );
+};
+
+export default Settings;

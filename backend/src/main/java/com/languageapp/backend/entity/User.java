@@ -48,6 +48,9 @@ public class User {
     @Column(nullable = false)
     private Integer streak = 0;
 
+    @Column(name = "is_verified", nullable = false)
+    private boolean isVerified = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
