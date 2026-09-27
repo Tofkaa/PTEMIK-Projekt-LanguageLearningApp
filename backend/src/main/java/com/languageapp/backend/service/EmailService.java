@@ -69,4 +69,34 @@ public class EmailService {
             log.error("Failed to send email to {}", to, e);
         }
     }
+    @Async
+    public void sendEmailChangeOtp(String toNewEmail, String otpCode) {
+        log.info("Sending email change OTP ({}) to new address: {}", otpCode, toNewEmail);
+
+        String htmlBody = String.format(
+                "<h2>E-mail cím módosításának megerősítése</h2>" +
+                        "<p>Kaptunk egy kérést, hogy a LanguageApp fiókod e-mail címét erre a címre módosítsuk.</p>" +
+                        "<p>A módosítás véglegesítéséhez írd be az alábbi 6-jegyű ellenőrző kódot a Beállítások oldalon (a kód 15 percig érvényes):</p>" +
+                        "<div style='display:inline-block;padding:12px 24px;background-color:#17a2b8;color:#FFF;font-size:24px;font-weight:bold;letter-spacing:4px;border-radius:5px;margin:10px 0;'>%s</div>" +
+                        "<p>Ha nem te kezdeményezted a módosítást, hagyd figyelmen kívül ezt az üzenetet.</p>",
+                otpCode
+        );
+
+        sendHtmlEmail(toNewEmail, "E-mail cím módosítás megerősítése - LanguageApp", htmlBody);
+    }
+
+    @Async
+    public void sendEmailChangeSecurityAlert(String toOldEmail, String newEmail) {
+        log.info("Sending email change security alert to old address: {}", toOldEmail);
+
+        String htmlBody = String.format(
+                "<h2>Biztonsági értesítés: E-mail cím módosítás</h2>" +
+                        "<p>Értesítünk, hogy a LanguageApp fiókodhoz e-mail cím módosítást kezdeményeztek a következő új címre: <strong>%s</strong></p>" +
+                        "<p>A folyamat befejezéséhez az új e-mail címre küldött 6-jegyű kód megadása szükséges.</p>" +
+                        "<p style='color:#DC3545;font-weight:bold;'>Ha NEM te kezdeményezted ezt a módosítást, valaki hozzáférhetett a jelszavadhoz! Kérjük, azonnal lépj be és változtasd meg a jelszavadat a Beállítások menüben.</p>",
+                newEmail
+        );
+
+        sendHtmlEmail(toOldEmail, "Biztonsági értesítés: E-mail módosítási kérelem - LanguageApp", htmlBody);
+    }
 }

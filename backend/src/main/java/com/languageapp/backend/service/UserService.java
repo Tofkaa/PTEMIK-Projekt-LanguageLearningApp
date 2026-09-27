@@ -2,10 +2,12 @@ package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.response.ProgressResponse;
 import com.languageapp.backend.dto.response.UserResponse;
+import com.languageapp.backend.entity.EmailChangeToken;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.DifficultyLevel;
 import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
+import com.languageapp.backend.repository.EmailChangeTokenRepository;
 import com.languageapp.backend.repository.ProgressRepository;
 import com.languageapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -30,6 +34,8 @@ public class UserService {
     private final ProgressRepository progressRepository;
     private final ImageStorageService imageStorageService;
     private final PasswordEncoder passwordEncoder;
+    private final EmailChangeTokenRepository emailChangeTokenRepository;
+    private final EmailService emailService;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -185,5 +191,81 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         log.info("User {} successfully changed their password", email);
+    }
+
+    /**
+     * Step 1: Validates password and target email, then generates a 6-digit OTP.
+     */
+    @Transactional
+    public void requestEmailChange(String currentEmail, String newEmail, String currentPassword) {
+        User user = getUserByEmail(currentEmail);
+
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new BadRequestException("A megadott jelenlegi jelszó hibás!");
+        }
+
+        if (newEmail == null || newEmail.isBlank() || !newEmail.contains("@")) {
+            throw new BadRequestException("Kérlek, adj meg egy érvényes e-mail címet!");
+        }
+
+        String normalizedNewEmail = newEmail.trim().toLowerCase();
+
+        if (normalizedNewEmail.equalsIgnoreCase(currentEmail)) {
+            throw new BadRequestException("Az új e-mail cím nem lehet azonos a jelenlegivel!");
+        }
+
+        if (userRepository.existsByEmail(normalizedNewEmail)) {
+            throw new BadRequestException("Ez az e-mail cím már használatban van!");
+        }
+
+        emailChangeTokenRepository.deleteByUser_UserId(user.getUserId());
+        emailChangeTokenRepository.flush();
+
+        // 6-digit safe OTP  (100000 - 999999)
+        String otpCode = String.valueOf(100000 + new SecureRandom().nextInt(900000));
+
+        EmailChangeToken token = new EmailChangeToken();
+        token.setUser(user);
+        token.setNewEmail(normalizedNewEmail);
+        token.setOtpCode(otpCode);
+        token.setExpiryDate(LocalDateTime.now().plusMinutes(15));
+
+        emailChangeTokenRepository.save(token);
+
+        emailService.sendEmailChangeOtp(normalizedNewEmail, otpCode);
+        emailService.sendEmailChangeSecurityAlert(currentEmail, normalizedNewEmail);
+        log.info("Email change OTP generated for user {} -> new email: {}", currentEmail, normalizedNewEmail);
+    }
+
+    /**
+     * Step 2: Verifies the 6-digit OTP and updates the user's primary email.
+     */
+    @Transactional
+    public void verifyEmailChange(String currentEmail, String otpCode) {
+        User user = getUserByEmail(currentEmail);
+
+        EmailChangeToken token = emailChangeTokenRepository.findByUser_UserId(user.getUserId())
+                .orElseThrow(() -> new BadRequestException("Nincs folyamatban lévő e-mail módosítási kérés!"));
+
+        if (token.getExpiryDate().isBefore(LocalDateTime.now())) {
+            emailChangeTokenRepository.delete(token);
+            throw new BadRequestException("Az ellenőrző kód lejárt! Kérlek, indítsd újra a folyamatot.");
+        }
+
+        if (otpCode == null || !token.getOtpCode().equals(otpCode.trim())) {
+            throw new BadRequestException("Hibás ellenőrző kód!");
+        }
+
+        if (userRepository.existsByEmail(token.getNewEmail())) {
+            emailChangeTokenRepository.delete(token);
+            throw new BadRequestException("Ez az e-mail cím időközben foglalt lett!");
+        }
+
+        String oldEmail = user.getEmail();
+        user.setEmail(token.getNewEmail());
+        userRepository.save(user);
+
+        emailChangeTokenRepository.delete(token);
+        log.info("User successfully changed email from {} to {}", oldEmail, user.getEmail());
     }
 }

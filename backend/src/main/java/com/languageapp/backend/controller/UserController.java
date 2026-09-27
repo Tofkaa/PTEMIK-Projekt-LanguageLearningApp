@@ -1,8 +1,6 @@
 package com.languageapp.backend.controller;
 
-import com.languageapp.backend.dto.request.ChangePasswordRequest;
-import com.languageapp.backend.dto.request.UpdateNameRequest;
-import com.languageapp.backend.dto.request.UserPreferencesRequest;
+import com.languageapp.backend.dto.request.*;
 import com.languageapp.backend.dto.response.ProgressResponse;
 import com.languageapp.backend.dto.response.UserResponse;
 import com.languageapp.backend.service.UserService;
@@ -97,5 +95,29 @@ public class UserController {
                 request.getNewPassword()
         );
         return ResponseEntity.ok("Jelszó sikeresen módosítva!");
+    }
+
+    @PostMapping("/me/email-change/request")
+    public ResponseEntity<String> requestEmailChange(
+            @RequestBody EmailChangeRequestDto request,
+            Authentication authentication) {
+
+        log.info("REST request to initiate email change for user: {}", authentication.getName());
+        userService.requestEmailChange(
+                authentication.getName(),
+                request.getNewEmail(),
+                request.getCurrentPassword()
+        );
+        return ResponseEntity.ok("Ellenőrző kód elküldve az új e-mail címre!");
+    }
+
+    @PostMapping("/me/email-change/verify")
+    public ResponseEntity<String> verifyEmailChange(
+            @RequestBody EmailChangeVerifyDto request,
+            Authentication authentication) {
+
+        log.info("REST request to verify email change OTP for user: {}", authentication.getName());
+        userService.verifyEmailChange(authentication.getName(), request.getOtpCode());
+        return ResponseEntity.ok("E-mail cím sikeresen frissítve!");
     }
 }

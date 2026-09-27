@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api.jsx';
 
 const Settings = () => {
-    const { user, setUser } = useAuth();
+    const { user, setUser, logout } = useAuth();
     const navigate = useNavigate();
 
     // --- STATES ---
@@ -23,6 +23,11 @@ const Settings = () => {
     const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
     const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+
+    const [emailStep, setEmailStep] = useState('REQUEST'); // 'REQUEST' vagy 'VERIFY'
+    const [emailForm, setEmailForm] = useState({ newEmail: '', currentPassword: '', otpCode: '' });
+    const [isProcessingEmail, setIsProcessingEmail] = useState(false);
+    const [emailMessage, setEmailMessage] = useState({ type: '', text: '' });
 
     // --- IMAGE UPLOAD LOGIC ---
     const handleFileChange = async (e) => {
@@ -144,6 +149,53 @@ const Settings = () => {
         }
     };
 
+    const handleRequestEmailChange = async (e) => {
+        e.preventDefault();
+        setEmailMessage({ type: '', text: '' });
+        setIsProcessingEmail(true);
+
+        try {
+            await api.post('/users/me/email-change/request', {
+                newEmail: emailForm.newEmail.trim(),
+                currentPassword: emailForm.currentPassword
+            });
+            setEmailStep('VERIFY');
+            setEmailMessage({ 
+                type: 'info', 
+                text: `Küldtünk egy 6-jegyű ellenőrző kódot a(z) ${emailForm.newEmail} címre! (15 percig érvényes)` 
+            });
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || err.response?.data || 'Hiba történt a kérés indításakor.';
+            setEmailMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hiba történt!' });
+        } finally {
+            setIsProcessingEmail(false);
+        }
+    };
+
+    const handleVerifyEmailChange = async (e) => {
+        e.preventDefault();
+        setEmailMessage({ type: '', text: '' });
+        setIsProcessingEmail(true);
+
+        try {
+            await api.post('/users/me/email-change/verify', {
+                otpCode: emailForm.otpCode.trim()
+            });
+            setEmailMessage({ 
+                type: 'success', 
+                text: 'E-mail cím sikeresen frissítve! ✅ Biztonsági okokból kérlek, jelentkezz be újra az új címeddel...' 
+            });
+            setTimeout(() => {
+                logout();
+                navigate('/login');
+            }, 3000);
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || err.response?.data || 'Hibás vagy lejárt ellenőrző kód.';
+            setEmailMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hiba történt!' });
+            setIsProcessingEmail(false);
+        }
+    };
+
     if (!user) return null;
 
     return (
@@ -255,15 +307,109 @@ const Settings = () => {
 
                         {/* 3. TAB: Security */}
                         <Tab eventKey="security" title="Biztonság" className="p-4">
+                            
+                            {/* --- E-MAIL ADDRESS CHANGE (OTP FLOW) --- */}
+                            <h5 className="fw-bold text-info mb-3">📧 E-mail cím módosítása</h5>
+                            <p className="text-secondary small mb-3">
+                                Jelenlegi e-mail címed: <strong className="text-light">{user.email}</strong>
+                            </p>
+
+                            {emailMessage.text && (
+                                <Alert variant={emailMessage.type} className="py-2 border-0 fw-bold mb-3" style={{ maxWidth: '500px' }}>
+                                    {emailMessage.text}
+                                </Alert>
+                            )}
+
+                            {emailStep === 'REQUEST' ? (
+                                <Form onSubmit={handleRequestEmailChange} className="mb-5 pb-4 border-bottom border-secondary" style={{ maxWidth: '500px' }}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label className="text-light opacity-75">Új e-mail cím</Form.Label>
+                                        <Form.Control 
+                                            type="email" 
+                                            className="bg-secondary bg-opacity-25 text-light border-secondary"
+                                            placeholder="uj.cim@pelda.hu"
+                                            value={emailForm.newEmail}
+                                            onChange={(e) => setEmailForm({ ...emailForm, newEmail: e.target.value })}
+                                            required
+                                            disabled={isProcessingEmail}
+                                        />
+                                    </Form.Group>
+
+                                    <Form.Group className="mb-4">
+                                        <Form.Label className="text-light opacity-75">Jelenlegi jelszó (megerősítéshez)</Form.Label>
+                                        <Form.Control 
+                                            type="password" 
+                                            className="bg-secondary bg-opacity-25 text-light border-secondary"
+                                            value={emailForm.currentPassword}
+                                            onChange={(e) => setEmailForm({ ...emailForm, currentPassword: e.target.value })}
+                                            required
+                                            disabled={isProcessingEmail}
+                                        />
+                                    </Form.Group>
+
+                                    <Button 
+                                        variant="info" 
+                                        type="submit" 
+                                        className="fw-bold text-dark px-4"
+                                        disabled={isProcessingEmail || !emailForm.newEmail || !emailForm.currentPassword}
+                                    >
+                                        {isProcessingEmail ? <Spinner size="sm" /> : 'Ellenőrző kód küldése'}
+                                    </Button>
+                                </Form>
+                            ) : (
+                                <Form onSubmit={handleVerifyEmailChange} className="mb-5 pb-4 border-bottom border-secondary" style={{ maxWidth: '500px' }}>
+                                    <Form.Group className="mb-4">
+                                        <Form.Label className="text-light opacity-75">6-jegyű ellenőrző kód (OTP)</Form.Label>
+                                        <Form.Control 
+                                            type="text" 
+                                            className="bg-secondary bg-opacity-25 text-light border-info fs-4 text-center font-monospace tracking-wide"
+                                            placeholder="123456"
+                                            maxLength={6}
+                                            value={emailForm.otpCode}
+                                            onChange={(e) => setEmailForm({ ...emailForm, otpCode: e.target.value.replace(/\D/g, '') })}
+                                            required
+                                            disabled={isProcessingEmail}
+                                        />
+                                        <Form.Text className="text-secondary">
+                                            Add meg az új e-mail címre küldött 6 számjegyű kódot.
+                                        </Form.Text>
+                                    </Form.Group>
+
+                                    <div className="d-flex gap-2">
+                                        <Button 
+                                            variant="success" 
+                                            type="submit" 
+                                            className="fw-bold px-4"
+                                            disabled={isProcessingEmail || emailForm.otpCode.length !== 6}
+                                        >
+                                            {isProcessingEmail ? <Spinner size="sm" /> : 'Kód megerősítése'}
+                                        </Button>
+                                        <Button 
+                                            variant="outline-secondary" 
+                                            type="button"
+                                            disabled={isProcessingEmail}
+                                            onClick={() => {
+                                                setEmailStep('REQUEST');
+                                                setEmailMessage({ type: '', text: '' });
+                                                setEmailForm({ ...emailForm, otpCode: '' });
+                                            }}
+                                        >
+                                            Mégse
+                                        </Button>
+                                    </div>
+                                </Form>
+                            )}
+
+                            {/* --- PASSWORD CHANGE --- */}
                             <h5 className="fw-bold text-info mb-3">🔒 Jelszó módosítása</h5>
                             
                             {passwordMessage.text && (
-                                <Alert variant={passwordMessage.type} className="py-2 border-0 fw-bold mb-3">
+                                <Alert variant={passwordMessage.type} className="py-2 border-0 fw-bold mb-3" style={{ maxWidth: '500px' }}>
                                     {passwordMessage.text}
                                 </Alert>
                             )}
 
-                            <Form onSubmit={handleSavePassword} className="mb-5" style={{ maxWidth: '500px' }}>
+                            <Form onSubmit={handleSavePassword} style={{ maxWidth: '500px' }}>
                                 <Form.Group className="mb-3">
                                     <Form.Label className="text-light opacity-75">Jelenlegi jelszó</Form.Label>
                                     <Form.Control 
@@ -313,7 +459,6 @@ const Settings = () => {
                                 </Button>
                             </Form>
                         </Tab>
-                        
                     </Tabs>
                 </Card.Body>
             </Card>
