@@ -15,7 +15,7 @@ const ClassroomManager = () => {
             const response = await adminApi.getAllClassrooms();
             setClassrooms(response.data);
         } catch (error) {
-            setMessage({ text: 'Hiba az osztálytermek betöltésekor.', type: 'danger' });
+            setMessage({ text: 'Hiba az osztálytermek betöltésekor.', type: 'danger' }, error);
         } finally { setIsLoading(false); }
     };
 
@@ -27,7 +27,7 @@ const ClassroomManager = () => {
                 setMessage({ text: 'Státusz sikeresen frissítve.', type: 'success' });
                 fetchClassrooms();
             } catch (error) {
-                setMessage({ text: 'Hiba történt a művelet során.', type: 'danger' });
+                setMessage({ text: 'Hiba történt a művelet során.', type: 'danger' }, error);
             }
         }
     };

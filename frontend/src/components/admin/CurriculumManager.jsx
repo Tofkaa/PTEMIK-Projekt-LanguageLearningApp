@@ -10,7 +10,7 @@ const AdminDeleteButton = ({ onClick, label }) => (
         className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 transition-all hover-scale"
         onClick={onClick}
     >
-        <span>🗑️Törlés</span> {label}
+        <span>🗑️</span> {label}
     </Button>
 );
 
