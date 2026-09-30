@@ -47,7 +47,13 @@ const NavigationBar = () => {
     const dueVocabCount = notifications?.dueVocabularyCount || 0;
                            
     return (
-        <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm mb-4 border-bottom border-secondary">
+        <Navbar 
+            bg="dark" 
+            variant="dark" 
+            expand="lg" 
+            className="shadow-sm mb-4 border-bottom border-secondary position-relative"
+            style={{ zIndex: 1050 }}
+        >
             <Container>
                 {/* Brand Logo */}
                 <Navbar.Brand className="fw-bold d-flex align-items-center gap-2" style={{ cursor: 'pointer', color: 'var(--primary-cyan)' }} onClick={() => navigate('/dashboard')}>
@@ -64,7 +70,7 @@ const NavigationBar = () => {
                             <span>📊</span> Dashboard
                         </Nav.Link>
 
-                        <Nav.Link onClick={() => navigate('/classrooms')} className="fw-bold position-relative d-flex align-items-center gap-2">
+                       <Nav.Link onClick={() => navigate('/classrooms')} className="tour-navbar-classrooms fw-bold position-relative d-flex align-items-center gap-2">
                             <span>🏫</span> Osztálytermek
                             {classroomPings > 0 && (
                                 <Badge bg="danger" pill className="position-absolute top-0 start-100 translate-middle shadow-sm" style={{ fontSize: '0.65rem' }}>
@@ -73,7 +79,7 @@ const NavigationBar = () => {
                             )}
                         </Nav.Link>
 
-                        <Nav.Link onClick={() => navigate('/friends')} className="fw-bold position-relative d-flex align-items-center gap-2">
+                       <Nav.Link onClick={() => navigate('/friends')} className="tour-navbar-community fw-bold position-relative d-flex align-items-center gap-2">
                             <span>🌐</span> Közösség
                             {communityPings > 0 && (
                                 <Badge bg="danger" pill className="position-absolute top-0 start-100 translate-middle shadow-sm" style={{ fontSize: '0.65rem' }}>
@@ -82,8 +88,8 @@ const NavigationBar = () => {
                             )}
                         </Nav.Link>
 
-                        {/* Vocabulary Hub */}
-                        <Nav.Link onClick={() => navigate('/hub')} className="fw-bold position-relative d-flex align-items-center gap-2">
+                       {/* Vocabulary Hub */}
+                        <Nav.Link onClick={() => navigate('/hub')} className="tour-dictionary-hub fw-bold position-relative d-flex align-items-center gap-2">
                             <span>🎯</span> Szótár HUB
                             {dueVocabCount > 0 && (
                                 <Badge bg="danger" pill className="position-absolute top-0 start-100 translate-middle shadow-sm" style={{ fontSize: '0.65rem' }}>
@@ -108,6 +114,7 @@ const NavigationBar = () => {
                         </Badge>
                                                     
                             <NavDropdown 
+                                className="tour-profile-menu"
                                 title={
                                     <span className="text-light fw-bold d-inline-flex align-items-center gap-2">
                                         {user.profilePictureUrl ? (

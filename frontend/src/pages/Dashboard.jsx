@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import api from '../services/api.jsx';
 import { useNavigate } from 'react-router-dom';
 import Leaderboard from '../components/Leaderboard.jsx';
+import TutorialTour from '../components/TutorialTour.jsx';
 
 /**
  * Dashboard Component
@@ -117,8 +118,9 @@ const Dashboard = () => {
         }
     };
 
-    return (
+   return (
         <div className="min-vh-100 pb-5 text-light">
+            <TutorialTour />
             <Container>
                 {/* --- HEADER SECTION --- */}
                 <Row className="mb-4 pt-3">
@@ -140,7 +142,7 @@ const Dashboard = () => {
                             {/* HERO WIDGET */}
                             {heroState && (
                                 <Card 
-                                    className={`border-2 ${heroState.borderColor} bg-dark rounded-4`}
+                                    className={`tour-hero-widget border-2 ${heroState.borderColor} bg-dark rounded-4`}
                                     style={{ boxShadow: heroState.glow || 'none' }}
                                 >
                                     <Card.Body className="d-flex flex-column flex-md-row align-items-md-center justify-content-between p-4 p-md-5">
@@ -164,13 +166,13 @@ const Dashboard = () => {
                                 </Card>
                             )}
 
-                            {/* LEARNING PATH (LESSONS GRID) */}
+                           {/* LEARNING PATH (LESSONS GRID) */}
                             <Card className="shadow-sm border-0 bg-transparent text-light">
                                 <Card.Body className="p-0">
-                                    <h4 className="fw-bold border-bottom border-secondary pb-3 mb-4 d-flex align-items-center gap-2">
+                                    <h4 className="tour-learning-path fw-bold border-bottom border-secondary pb-3 mb-4 d-flex align-items-center gap-2">
                                         📚 Tanulási Útvonal
                                     </h4>
-                                    
+
                                     {/* UI State: Loading */}
                                     {isLoading && (
                                         <div className="text-center py-5">
@@ -235,10 +237,10 @@ const Dashboard = () => {
 
                     {/* --- RIGHT COLUMN: SIDEBAR (META DATA) (lg=4) --- */}
                     <Col lg={4}>
-                        <div className="d-flex flex-column gap-4 sticky-top" style={{ top: '20px' }}>
+                        <div className="d-flex flex-column gap-4" style={{ top: '20px' }}>
                             
-                            {/* STATISTICS */}
-                            <Card className="shadow-lg border-secondary rounded-4 bg-dark text-light">
+                          {/* STATISTICS */}
+                            <Card className="tour-performance shadow-lg border-secondary rounded-4 bg-dark text-light">
                                 <Card.Body className="p-4">
                                     <h5 className="fw-bold border-bottom border-secondary pb-3 mb-4">📊 Teljesítményed</h5>
                                     
@@ -279,12 +281,11 @@ const Dashboard = () => {
                             </Card>
 
                             {/* LEADERBOARD */}
-                            <Card className="shadow-lg border-secondary rounded-4 bg-dark overflow-hidden">
+                            <Card className="tour-leaderboard shadow-lg border-secondary rounded-4 bg-dark overflow-hidden">
                                 <Card.Body className="p-0">
                                     <Leaderboard defaultScope="global" />
                                 </Card.Body>
                             </Card>
-                            
                         </div>
                     </Col>
                 </Row>
