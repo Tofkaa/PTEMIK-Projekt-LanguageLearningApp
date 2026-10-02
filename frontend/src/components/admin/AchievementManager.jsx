@@ -17,7 +17,10 @@ const AchievementManager = () => {
         setIsLoadingAch(true);
         try {
             const response = await adminApi.getAllAchievements();
-            setAchievements(Array.isArray(response.data) ? response.data : []);
+            let data = Array.isArray(response.data) ? response.data : [];
+            // Lokális ABC rendezés a biztonság kedvéért
+            data.sort((a, b) => a.name.localeCompare(b.name));
+            setAchievements(data);
         } catch (error) {
             console.error("Hiba a kitüntetések lekérésekor:", error);
             setAchievements([]);
@@ -54,14 +57,19 @@ const AchievementManager = () => {
         reader.readAsText(selectedFile);
     };
 
-    const handleDelete = async (id, name) => {
-        if (window.confirm(`Biztosan törlöd ezt a kitüntetést? (${name})`)) {
+    const handleStatusToggle = async (id, name, currentStatus) => {
+        const nextStatus = !currentStatus;
+        if (window.confirm(`Biztosan ${nextStatus ? 'visszaállítod' : 'felfüggeszted'} ezt a kitüntetést? (${name})`)) {
             try {
-                await adminApi.deleteAchievement(id);
-                setMessage({ text: 'Kitüntetés sikeresen eltávolítva!', type: 'success' });
-                fetchAchievements();
+                await adminApi.toggleAchievementStatus(id, nextStatus);
+                setMessage({ text: 'Kitüntetés státusza frissítve!', type: 'success' });
+                
+                // LOKÁLIS ÁLLAPOTFRISSÍTÉS: Nincs újratöltés, nincs ugrálás a tábla aljára!
+                setAchievements(prev => prev.map(ach => 
+                    ach.achievementId === id ? { ...ach, active: nextStatus } : ach
+                ));
             } catch (error) {
-                setMessage({ text: 'Hiba a törlés során.', type: 'danger' , error});
+                setMessage({ text: 'Hiba a művelet során.', type: 'danger' , error});
             }
         }
     };
@@ -100,7 +108,7 @@ const AchievementManager = () => {
                         </thead>
                         <tbody>
                             {achievements.map(ach => (
-                                <tr key={ach.achievementId}>
+                                <tr key={ach.achievementId} className={!ach.active ? 'opacity-75 bg-danger bg-opacity-10' : ''}>
                                     <td className="px-4">
                                         <span className="fs-4 me-3">{ach.iconUrl}</span>
                                         <span className="fw-bold text-light">{ach.name}</span>
@@ -108,8 +116,13 @@ const AchievementManager = () => {
                                     <td className="text-secondary small">{ach.description}</td>
                                     <td><Badge bg="secondary" pill className="px-3 py-2">{ach.criteria?.type}</Badge></td>
                                     <td className="text-end px-4">
-                                        <Button variant="outline-danger" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" onClick={() => handleDelete(ach.achievementId, ach.name)}>
-                                            <span>🗑️</span> Törlés
+                                        <Button 
+                                            variant={ach.active ? "outline-danger" : "outline-success"} 
+                                            size="sm" 
+                                            className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" 
+                                            onClick={() => handleStatusToggle(ach.achievementId, ach.name, ach.active)}
+                                        >
+                                            <span>{ach.active ? '🛑' : '♻️'}</span> {ach.active ? 'Felfüggesztés' : 'Visszaállítás'}
                                         </Button>
                                     </td>
                                 </tr>

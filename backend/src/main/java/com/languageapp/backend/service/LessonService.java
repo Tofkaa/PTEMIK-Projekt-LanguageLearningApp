@@ -59,7 +59,10 @@ public class LessonService {
         log.info("Target difficulty for user {} is set to: {}", userEmail, targetDifficulty);
 
         // 2. Only get the correct lessons for desired difficulty
-        List<Lesson> tailoredLessons = lessonRepository.findByDifficulty(targetDifficulty);
+        List<Lesson> tailoredLessons = lessonRepository.findByDifficulty(targetDifficulty)
+                .stream()
+                .filter(lesson -> lesson.isActive() && lesson.getTopic().isActive())
+                .toList();
 
         return tailoredLessons.stream()
                 .map(lesson -> mapToLessonResponse(lesson, user))
@@ -87,19 +90,21 @@ public class LessonService {
                     return new ResourceNotFoundException("No lesson found with this ID!");
                 });
 
+        if (!lesson.isActive() || !lesson.getTopic().isActive()) {
+            throw new ForbiddenException("Ez a lecke jelenleg nem elérhető.");
+        }
+
         if ("STUDENT".equals(user.getRole())) {
             // --- BYPASS LOGIKA ---
             if (challengeId != null) {
                 Challenge challenge = challengeRepository.findById(challengeId)
                         .orElseThrow(() -> new ForbiddenException("Kihívás nem létezik!"));
 
-                // Csak a résztvevők mehetnek be
                 if (!challenge.getChallenger().getUserId().equals(user.getUserId()) &&
                         !challenge.getOpponent().getUserId().equals(user.getUserId())) {
                     throw new ForbiddenException("Nem vagy tagja ennek a kihívásnak!");
                 }
 
-                // Csak a saját leckéjével
                 if (!challenge.getLesson().getLessonId().equals(lessonId)) {
                     throw new ForbiddenException("Ez a kihívás egy másik leckére szól!");
                 }
@@ -107,6 +112,7 @@ public class LessonService {
         }
 
         return lesson.getExercises().stream()
+                .filter(Exercise::isActive)
                 .map(this::mapToExerciseResponse)
                 .toList();
     }
@@ -118,6 +124,7 @@ public class LessonService {
     @Transactional(readOnly = true)
     public List<LessonResponse> getAllLessonsForChallengeDropdown() {
         return lessonRepository.findAll().stream()
+                .filter(lesson -> lesson.isActive() && lesson.getTopic().isActive())
                 .map(lesson -> new LessonResponse(
                         lesson.getLessonId(),
                         lesson.getTopic().getName(),

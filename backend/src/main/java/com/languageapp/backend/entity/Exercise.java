@@ -20,7 +20,7 @@ import java.util.UUID;
 @Table(name = "exercises")
 
 @SQLDelete(sql = "UPDATE exercises SET is_active = false WHERE exercise_id=?")
-@SQLRestriction("is_active = true")
+//@SQLRestriction("is_active = true")
 public class Exercise {
 
     @Id

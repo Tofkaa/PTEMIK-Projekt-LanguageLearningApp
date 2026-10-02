@@ -35,22 +35,22 @@ public class AdminController {
         return ResponseEntity.ok("Curriculum imported successfully!");
     }
 
-    @DeleteMapping("/curriculum/topic/{id}")
-    public ResponseEntity<Void> deleteTopic(@PathVariable UUID id, Authentication auth) {
-        adminService.deleteTopic(id, auth.getName());
-        return ResponseEntity.noContent().build();
+    @PutMapping("/curriculum/topic/{id}/status")
+    public ResponseEntity<String> toggleTopicStatus(@PathVariable UUID id, @RequestParam boolean isActive, Authentication auth) {
+        adminService.toggleTopicStatus(id, isActive, auth.getName());
+        return ResponseEntity.ok("Topic status updated.");
     }
 
-    @DeleteMapping("/curriculum/lesson/{id}")
-    public ResponseEntity<Void> deleteLesson(@PathVariable UUID id, Authentication auth) {
-        adminService.deleteLesson(id, auth.getName());
-        return ResponseEntity.noContent().build();
+    @PutMapping("/curriculum/lesson/{id}/status")
+    public ResponseEntity<String> toggleLessonStatus(@PathVariable UUID id, @RequestParam boolean isActive, Authentication auth) {
+        adminService.toggleLessonStatus(id, isActive, auth.getName());
+        return ResponseEntity.ok("Lesson status updated.");
     }
 
-    @DeleteMapping("/curriculum/exercise/{id}")
-    public ResponseEntity<Void> deleteExercise(@PathVariable UUID id, Authentication auth) {
-        adminService.deleteExercise(id, auth.getName());
-        return ResponseEntity.noContent().build();
+    @PutMapping("/curriculum/exercise/{id}/status")
+    public ResponseEntity<String> toggleExerciseStatus(@PathVariable UUID id, @RequestParam boolean isActive, Authentication auth) {
+        adminService.toggleExerciseStatus(id, isActive, auth.getName());
+        return ResponseEntity.ok("Exercise status updated.");
     }
 
     @GetMapping("/curriculum/topics")
@@ -91,10 +91,10 @@ public class AdminController {
         return ResponseEntity.ok("Achievements imported successfully!");
     }
 
-    @DeleteMapping("/achievements/{id}")
-    public ResponseEntity<Void> deleteAchievement(@PathVariable UUID id, Authentication auth) {
-        adminService.deleteAchievement(id, auth.getName());
-        return ResponseEntity.noContent().build();
+    @PutMapping("/achievements/{id}/status")
+    public ResponseEntity<String> toggleAchievementStatus(@PathVariable UUID id, @RequestParam boolean isActive, Authentication auth) {
+        adminService.toggleAchievementStatus(id, isActive, auth.getName());
+        return ResponseEntity.ok("Achievement status updated.");
     }
 
     @GetMapping("/achievements")

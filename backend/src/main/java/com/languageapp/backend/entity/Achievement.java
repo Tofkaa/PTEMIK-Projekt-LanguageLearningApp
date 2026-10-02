@@ -34,4 +34,7 @@ public class Achievement {
 
     @Column(name = "icon_url", columnDefinition = "TEXT")
     private String iconUrl;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
 }

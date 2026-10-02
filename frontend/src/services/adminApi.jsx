@@ -12,15 +12,13 @@ export const adminApi = {
     // --- TANANYAG CMS ---
     importCurriculum: (data) => api.post('/admin/curriculum/import', data),
     getAllTopics: () => api.get('/admin/curriculum/topics'),
-    deleteTopic: (id) => api.delete(`/admin/curriculum/topic/${id}`),
-    deleteLesson: (id) => api.delete(`/admin/curriculum/lesson/${id}`),
-    deleteExercise: (id) => api.delete(`/admin/curriculum/exercise/${id}`),
-
+    toggleTopicStatus: (id, isActive) => api.put(`/admin/curriculum/topic/${id}/status?isActive=${isActive}`),
+    toggleLessonStatus: (id, isActive) => api.put(`/admin/curriculum/lesson/${id}/status?isActive=${isActive}`),
+    toggleExerciseStatus: (id, isActive) => api.put(`/admin/curriculum/exercise/${id}/status?isActive=${isActive}`),
     // --- KITÜNTETÉSEK ---
     importAchievements: (data) => api.post('/admin/achievements/import', data),
     getAllAchievements: () => api.get('/admin/achievements'),
-    deleteAchievement: (id) => api.delete(`/admin/achievements/${id}`),
-
+    toggleAchievementStatus: (id, isActive) => api.put(`/admin/achievements/${id}/status?isActive=${isActive}`),
     // --- OSZTÁLYTERMEK ---
     getAllClassrooms: () => api.get('/admin/classrooms'),
     toggleClassroomStatus: (id, isActive) => api.put(`/admin/classrooms/${id}/status?isActive=${isActive}`)

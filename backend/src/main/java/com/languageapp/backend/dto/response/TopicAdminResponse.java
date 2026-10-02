@@ -10,6 +10,7 @@ import java.util.UUID;
 public class TopicAdminResponse {
     private UUID topicId;
     private String topicName;
+    private boolean isActive;
     private List<LessonDto> lessons;
 
     @Data
@@ -18,6 +19,7 @@ public class TopicAdminResponse {
         private UUID lessonId;
         private String title;
         private String difficulty;
+        private boolean isActive;
         private List<ExerciseDto> exercises;
     }
 
@@ -28,5 +30,6 @@ public class TopicAdminResponse {
         private String type;
         private Object content;
         private Object correctAnswer;
+        private boolean isActive;
     }
 }

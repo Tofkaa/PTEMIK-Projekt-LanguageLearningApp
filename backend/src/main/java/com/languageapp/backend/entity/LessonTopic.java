@@ -18,7 +18,7 @@ import java.util.UUID;
 @Table(name = "lesson_topics")
 
 @SQLDelete(sql = "UPDATE lesson_topics SET is_active = false WHERE topic_id=?")
-@SQLRestriction("is_active = true")
+//@SQLRestriction("is_active = true")
 public class LessonTopic {
 
     @Id

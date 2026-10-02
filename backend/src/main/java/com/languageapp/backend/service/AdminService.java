@@ -96,31 +96,55 @@ public class AdminService {
     }
 
     @Transactional
-    public void deleteTopic(UUID topicId, String adminEmail) {
+    public void toggleTopicStatus(UUID topicId, boolean isActive, String adminEmail) {
         User admin = userRepository.findByEmail(adminEmail).orElseThrow();
-        topicRepository.deleteById(topicId);
-        logAdminAction(admin, "TOPIC_DELETED", null, "Topic deleted: " + topicId);
+        var topic = topicRepository.findById(topicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Topic not found"));
+
+        topic.setActive(isActive);
+        topicRepository.save(topic);
+
+        String action = isActive ? "TOPIC_RESTORED" : "TOPIC_SUSPENDED";
+        logAdminAction(admin, action, null, "Témakör " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + topic.getName());
     }
 
     @Transactional
-    public void deleteLesson(UUID lessonId, String adminEmail) {
+    public void toggleLessonStatus(UUID lessonId, boolean isActive, String adminEmail) {
         User admin = userRepository.findByEmail(adminEmail).orElseThrow();
-        lessonRepository.deleteById(lessonId);
-        logAdminAction(admin, "LESSON_DELETED", null, "Lesson deleted: " + lessonId);
+        var lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
+
+        lesson.setActive(isActive);
+        lessonRepository.save(lesson);
+
+        String action = isActive ? "LESSON_RESTORED" : "LESSON_SUSPENDED";
+        logAdminAction(admin, action, null, "Lecke " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + lesson.getTitle());
     }
 
     @Transactional
-    public void deleteExercise(UUID exerciseId, String adminEmail) {
+    public void toggleExerciseStatus(UUID exerciseId, boolean isActive, String adminEmail) {
         User admin = userRepository.findByEmail(adminEmail).orElseThrow();
-        exerciseRepository.deleteById(exerciseId);
-        logAdminAction(admin, "EXERCISE_DELETED", null, "Exercise deleted: " + exerciseId);
+        var exercise = exerciseRepository.findById(exerciseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Exercise not found"));
+
+        exercise.setActive(isActive);
+        exerciseRepository.save(exercise);
+
+        String action = isActive ? "EXERCISE_RESTORED" : "EXERCISE_SUSPENDED";
+        logAdminAction(admin, action, null, "Feladat (" + exercise.getType() + ") " + (isActive ? "visszaállítva" : "felfüggesztve"));
     }
 
     @Transactional
-    public void deleteAchievement(UUID achievementId, String adminEmail) {
+    public void toggleAchievementStatus(UUID achievementId, boolean isActive, String adminEmail) {
         User admin = userRepository.findByEmail(adminEmail).orElseThrow();
-        achievementRepository.deleteById(achievementId);
-        logAdminAction(admin, "ACHIEVEMENT_DELETED", null, "Achievement deleted: " + achievementId);
+        var achievement = achievementRepository.findById(achievementId)
+                .orElseThrow(() -> new ResourceNotFoundException("Achievement not found"));
+
+        achievement.setActive(isActive);
+        achievementRepository.save(achievement);
+
+        String action = isActive ? "ACHIEVEMENT_RESTORED" : "ACHIEVEMENT_SUSPENDED";
+        logAdminAction(admin, action, null, "Kitüntetés " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + achievement.getName());
     }
 
     @Transactional(readOnly = true)
@@ -146,7 +170,7 @@ public class AdminService {
                 .filter(c -> c.getClassroomId().equals(classroomId))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Classroom not found"));
-        
+
         classroomRepository.updateClassroomStatus(classroomId, isActive);
 
         String action = isActive ? "CLASSROOM_RESTORED" : "CLASSROOM_BANNED";
@@ -156,21 +180,24 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public List<com.languageapp.backend.dto.response.TopicAdminResponse> getAllTopics() {
-        return topicRepository.findAll().stream().map(topic ->
+        return topicRepository.findAllTopicsIncludingDeleted().stream().map(topic ->
                 com.languageapp.backend.dto.response.TopicAdminResponse.builder()
                         .topicId(topic.getTopicId())
                         .topicName(topic.getName())
+                        .isActive(topic.isActive())
                         .lessons(topic.getLessons().stream().map(lesson ->
                                 com.languageapp.backend.dto.response.TopicAdminResponse.LessonDto.builder()
                                         .lessonId(lesson.getLessonId())
                                         .title(lesson.getTitle())
                                         .difficulty(lesson.getDifficulty())
+                                        .isActive(lesson.isActive())
                                         .exercises(lesson.getExercises().stream().map(exercise ->
                                                 com.languageapp.backend.dto.response.TopicAdminResponse.ExerciseDto.builder()
                                                         .exerciseId(exercise.getExerciseId())
                                                         .type(exercise.getType())
                                                         .content(exercise.getContent())
                                                         .correctAnswer(exercise.getCorrectAnswer())
+                                                        .isActive(exercise.isActive())
                                                         .build()
                                         ).collect(java.util.stream.Collectors.toList()))
                                         .build()
