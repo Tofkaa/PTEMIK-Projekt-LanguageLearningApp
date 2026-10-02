@@ -7,13 +7,14 @@ const AdminDeleteButton = ({ onClick, label }) => (
     <Button 
         variant="outline-danger" 
         size="sm" 
-        className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 transition-all hover-scale"
+        className="rounded-circle d-flex align-items-center justify-content-center transition-all hover-scale flex-shrink-0"
+        style={{ width: '32px', height: '32px' }}
         onClick={onClick}
+        title={label} 
     >
-        <span>🗑️</span> {label}
+        <span>🗑️</span>
     </Button>
 );
-
 const CurriculumManager = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);

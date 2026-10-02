@@ -38,7 +38,7 @@ const ClassroomManager = () => {
         <div>
             {message.text && <Alert variant={message.type} dismissible onClose={() => setMessage({text:'', type:''})}>{message.text}</Alert>}
             <Table hover variant="dark" className="border-secondary align-middle">
-                <thead>
+                <thead className="bg-black bg-opacity-25">
                     <tr className="text-secondary">
                         <th>Név & Tanár</th>
                         <th>Kód</th>
@@ -48,7 +48,7 @@ const ClassroomManager = () => {
                 </thead>
                 <tbody>
                     {classrooms.map(c => (
-                        <tr key={c.classroomId} className={!c.active ? 'opacity-50' : ''}>
+                       <tr key={c.classroomId} className={!c.active ? 'opacity-75 bg-danger bg-opacity-10' : ''}>
                             <td>
                                 <div className="fw-bold text-light">{c.name}</div>
                                 <div className="text-secondary small">Tanár: {c.teacherName} ({c.teacherEmail})</div>
@@ -58,9 +58,15 @@ const ClassroomManager = () => {
                                 <Badge bg={c.active ? 'success' : 'danger'}>{c.active ? 'Aktív' : 'Tiltott'}</Badge>
                             </td>
                             <td className="text-end">
-                                <Button variant={c.active ? "outline-danger" : "outline-success"} size="sm" onClick={() => handleStatusToggle(c.classroomId, c.active)}>
-                                    {c.active ? 'Letiltás' : 'Visszaállítás'}
-                                </Button>
+                                {c.active ? (
+                                    <Button variant="outline-danger" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" onClick={() => handleStatusToggle(c.classroomId, c.active)}>
+                                        <span>🛑</span> Letiltás
+                                    </Button>
+                                ) : (
+                                    <Button variant="outline-success" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" onClick={() => handleStatusToggle(c.classroomId, c.active)}>
+                                        <span>♻️</span> Visszaállítás
+                                    </Button>
+                                )}
                             </td>
                         </tr>
                     ))}

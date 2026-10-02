@@ -93,7 +93,7 @@ const UserManagement = () => {
 
             <div className="table-responsive">
                 <Table hover variant="dark" className="border-secondary align-middle">
-                    <thead>
+                    <thead className="bg-black bg-opacity-25">
                         <tr className="text-secondary">
                             <th>Név & Email</th>
                             <th>Regisztrált</th>
@@ -107,7 +107,7 @@ const UserManagement = () => {
                             <tr><td colSpan="5" className="text-center text-light py-4">Nincs találat.</td></tr>
                         ) : (
                             filteredUsers.map(u => (
-                                <tr key={u.userId} className={!u.active ? 'opacity-50' : ''}>
+                              <tr key={u.userId} className={!u.active ? 'opacity-75 bg-danger bg-opacity-10' : ''}>
                                     <td>
                                         <div className="fw-bold text-light">{u.name} <span className="text-secondary small">#{u.userTag}</span></div>
                                         <div className="text-light small">{u.email}</div>
@@ -123,27 +123,27 @@ const UserManagement = () => {
                                         )}
                                     </td>
                                     <td className="text-center">
-                                        {/* Jogosultság váltó lenyíló menü */}
+                                        {/* Színkódolt jogosultság váltó */}
                                         <Form.Select 
                                             size="sm" 
-                                            className={`bg-dark text-${getRoleBadgeColor(u.role)} border-secondary fw-bold`}
+                                            className={`bg-dark text-${getRoleBadgeColor(u.role)} border-${getRoleBadgeColor(u.role)} fw-bold shadow-sm`}
                                             value={u.role.replace('ROLE_', '')}
                                             onChange={(e) => handleRoleChange(u.userId, e.target.value)}
+                                            style={{ width: '110px', cursor: 'pointer', margin: '0 auto' }}
                                         >
-                                            <option value="STUDENT">Diák</option>
-                                            <option value="TEACHER">Tanár</option>
-                                            <option value="ADMIN">Admin</option>
+                                            <option value="STUDENT" className="text-info bg-dark fw-bold">Diák</option>
+                                            <option value="TEACHER" className="text-warning bg-dark fw-bold">Tanár</option>
+                                            <option value="ADMIN" className="text-danger bg-dark fw-bold">Admin</option>
                                         </Form.Select>
                                     </td>
                                     <td className="text-end">
-                                        {/* A Soft Delete Gomb (Ban / Unban) */}
                                         {u.active ? (
-                                            <Button variant="outline-danger" size="sm" onClick={() => handleStatusToggle(u.userId, u.active)}>
-                                                Letiltás 🛑
+                                            <Button variant="outline-danger" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" onClick={() => handleStatusToggle(u.userId, u.active)}>
+                                                <span>🛑</span> Felfüggesztés
                                             </Button>
                                         ) : (
-                                            <Button variant="outline-success" size="sm" onClick={() => handleStatusToggle(u.userId, u.active)}>
-                                                Visszaállítás ♻️
+                                            <Button variant="outline-success" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" onClick={() => handleStatusToggle(u.userId, u.active)}>
+                                                <span>♻️</span> Visszaállítás
                                             </Button>
                                         )}
                                     </td>

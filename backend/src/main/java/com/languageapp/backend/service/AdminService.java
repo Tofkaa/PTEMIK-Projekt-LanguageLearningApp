@@ -63,17 +63,22 @@ public class AdminService {
         userRepository.save(targetUser);
 
         logAdminAction(admin, "ROLE_CHANGED", targetUserId,
-                "Role changed from " + oldRole + " to " + newRole.name());
+                "Jogosultság módosítva: " + oldRole + " -> " + newRole.name() + " (" + targetUser.getEmail() + ")");
     }
 
     @Transactional
     public void toggleUserStatus(UUID targetUserId, boolean isActive, String adminEmail) {
         User admin = userRepository.findByEmail(adminEmail).orElseThrow();
+        User targetUser = userRepository.findAllUsersIncludingDeleted().stream()
+                .filter(u -> u.getUserId().equals(targetUserId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
         userRepository.updateUserStatus(targetUserId, isActive);
 
         String action = isActive ? "USER_UNBANNED" : "USER_BANNED";
-        logAdminAction(admin, action, targetUserId, "User status set to active=" + isActive);
+        logAdminAction(admin, action, targetUserId,
+                "Fiók " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + targetUser.getEmail());
     }
 
     private void logAdminAction(User admin, String actionType, UUID targetUserId, String details) {
@@ -137,10 +142,16 @@ public class AdminService {
     @Transactional
     public void toggleClassroomStatus(UUID classroomId, boolean isActive, String adminEmail) {
         User admin = userRepository.findByEmail(adminEmail).orElseThrow();
+        var classroom = classroomRepository.findAllClassroomsIncludingDeleted().stream()
+                .filter(c -> c.getClassroomId().equals(classroomId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found"));
+        
         classroomRepository.updateClassroomStatus(classroomId, isActive);
 
         String action = isActive ? "CLASSROOM_RESTORED" : "CLASSROOM_BANNED";
-        logAdminAction(admin, action, null, "Classroom status set to active=" + isActive + " for ID: " + classroomId);
+        logAdminAction(admin, action, null,
+                "Osztályterem " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + classroom.getName());
     }
 
     @Transactional(readOnly = true)
