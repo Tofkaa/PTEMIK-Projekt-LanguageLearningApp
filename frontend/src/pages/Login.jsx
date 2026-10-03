@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Form, Button, Card, Container, Row, Col, Alert } from 'react-bootstrap';
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import ThemeToggle from '../components/ThemeToggle.jsx';
 
 /**
  * Login Component
@@ -74,7 +75,11 @@ const Login = () => {
     };
 
    return (
-       <Container className="mt-5">
+       <Container className="mt-5 position-relative">
+           <div className="position-absolute top-0 end-0 p-3" style={{ zIndex: 1000 }}>
+               <ThemeToggle />
+           </div>
+
            <Row className="justify-content-center">
                <Col md={8} lg={5}>
                    <Card className="bg-transparent border-0 mt-5 text-light">

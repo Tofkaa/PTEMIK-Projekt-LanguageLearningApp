@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Form, Button, Card, Container, Row, Col, Alert, ButtonGroup, ToggleButton } from 'react-bootstrap';
 import api from '../services/api.jsx';
+import ThemeToggle from '../components/ThemeToggle.jsx';
 
 /**
  * Register Component
@@ -62,9 +63,13 @@ const Register = () => {
         }
     };
 
-    if (isRegistered) {
+   if (isRegistered) {
         return (
-            <Container className="mt-5">
+            <Container className="mt-5 position-relative">
+                <div className="position-absolute top-0 end-0 p-3" style={{ zIndex: 1000 }}>
+                    <ThemeToggle />
+                </div>
+
                 <Row className="justify-content-center">
                     <Col md={8} lg={5}>
                         <Card className="bg-dark text-light border-info shadow-lg mt-5 text-center p-4">
@@ -90,8 +95,12 @@ const Register = () => {
     }
 
     // NORMÁL REGISZTRÁCIÓS ŰRLAP
-    return (
-        <Container className="mt-5">
+   return (
+        <Container className="mt-5 position-relative">
+            <div className="position-absolute top-0 end-0 p-3" style={{ zIndex: 1000 }}>
+                <ThemeToggle />
+            </div>
+
             <Row className="justify-content-center">
                 <Col md={8} lg={5}>
                     <Card className="bg-transparent border-0 mt-5 text-light">

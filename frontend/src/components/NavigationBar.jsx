@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import { useEffect, useState } from 'react'; 
-
+import ThemeToggle from './ThemeToggle.jsx'; 
 const NavigationBar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
@@ -11,7 +11,6 @@ const NavigationBar = () => {
     
     const [, setLocalUpdate] = useState(0);
 
-    // Kiterjesztett eseményfigyelő: Reagál a saját ablakban történő kattintásokra is!
     useEffect(() => {
         const handleStorage = () => setLocalUpdate(prev => prev + 1);
         window.addEventListener('storage', handleStorage);
@@ -107,33 +106,34 @@ const NavigationBar = () => {
 
                     </Nav>
                     
-                    {/* Right side section (XP and Profile) */}
+                    {/* Right side section (Theme Toggle, XP and Profile) */}
                     <Nav className="align-items-lg-center gap-3 mt-3 mt-lg-0">
+                        <ThemeToggle />
                         <Badge bg="warning" text="dark" className="rounded-pill px-3 py-2 shadow-sm fs-6 d-flex align-items-center gap-1">
                             <span>⭐</span> {user.xp || 0} XP
                         </Badge>
                                                     
-                            <NavDropdown 
-                                className="tour-profile-menu"
-                                title={
-                                    <span className="text-light fw-bold d-inline-flex align-items-center gap-2">
-                                        {user.profilePictureUrl ? (
-                                            <img 
-                                                src={user.profilePictureUrl} 
-                                                alt="PFP" 
-                                                className="rounded-circle object-fit-cover border border-secondary"
-                                                style={{ width: '30px', height: '30px' }}
-                                            />
-                                        ) : (
-                                            <span>👤</span>
-                                        )}
-                                        {user.name}
-                                    </span>
-                                } 
-                                id="basic-nav-dropdown" 
-                                align="end" 
-                                menuVariant="dark"
-                            >
+                        <NavDropdown 
+                            className="tour-profile-menu"
+                            title={
+                                <span className="text-light fw-bold d-inline-flex align-items-center gap-2">
+                                    {user.profilePictureUrl ? (
+                                        <img 
+                                            src={user.profilePictureUrl} 
+                                            alt="PFP" 
+                                            className="rounded-circle object-fit-cover border border-secondary"
+                                            style={{ width: '30px', height: '30px' }}
+                                        />
+                                    ) : (
+                                        <span>👤</span>
+                                    )}
+                                    {user.name}
+                                </span>
+                            } 
+                            id="basic-nav-dropdown" 
+                            align="end" 
+                            menuVariant="dark"
+                        >
                             <NavDropdown.Item onClick={() => navigate('/profile')} className="text-light">Profilom</NavDropdown.Item>
                             <NavDropdown.Divider />
                             <NavDropdown.Item onClick={handleLogout} className="text-danger fw-bold">Kijelentkezés</NavDropdown.Item>

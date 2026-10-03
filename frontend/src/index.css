@@ -1,69 +1,161 @@
-/*:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+/**
+ * ==========================================================================
+ * LANGUAGEAPP GLOBAL STYLES & LIGHT MODE OVERRIDES
+ * ==========================================================================
+ * This file contains global utility overrides, specifically targeting 
+ * hardcoded dark mode Bootstrap classes to support a dynamic Light Theme.
+ */
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+/* --- 1. Global Base --- */
+[data-bs-theme="light"] body {
+    background-color: #f8f9fa !important;
+    color: #212529 !important;
 }
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+[data-bs-theme="light"] .bg-dark,
+[data-bs-theme="light"] .bg-black {
+    background-color: #ffffff !important;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+[data-bs-theme="light"] .text-light,
+[data-bs-theme="light"] .text-white {
+    color: #212529 !important;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+[data-bs-theme="light"] .border-secondary {
+    border-color: #dee2e6 !important;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
+[data-bs-theme="light"] .text-secondary {
+    color: #6c757d !important;
+}
+
+/* --- 2. Transparent Background Adjustments --- */
+[data-bs-theme="light"] .bg-opacity-25 {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* --- 3. Navbar & Dropdown Fixes --- */
+[data-bs-theme="light"] .navbar.bg-dark {
+    background-color: #ffffff !important;
+    border-bottom-color: #dee2e6 !important;
+}
+
+[data-bs-theme="light"] .navbar-dark .navbar-nav .nav-link {
+    color: #495057 !important;
+}
+
+[data-bs-theme="light"] .navbar-dark .navbar-nav .nav-link:hover,
+[data-bs-theme="light"] .navbar-dark .navbar-nav .nav-link:focus {
+    color: #0dcaf0 !important; 
+}
+
+[data-bs-theme="light"] .navbar-dark .navbar-brand {
+    color: #212529 !important;
+}
+
+[data-bs-theme="light"] .navbar-dark .navbar-toggler-icon {
+    filter: invert(1);
+}
+
+[data-bs-theme="light"] .dropdown-menu-dark {
+    background-color: #ffffff !important;
+    border-color: #dee2e6 !important;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-bs-theme="light"] .dropdown-menu-dark .dropdown-item {
+    color: #212529 !important;
+}
+
+[data-bs-theme="light"] .dropdown-menu-dark .dropdown-item:hover {
+    background-color: #f8f9fa !important;
+    color: #0dcaf0 !important;
+}
+
+[data-bs-theme="light"] .dropdown-menu-dark .dropdown-divider {
+    border-color: #dee2e6 !important;
+}
+
+/* --- 4. Custom Tabs (Settings Page) --- */
+[data-bs-theme="light"] .custom-tabs .nav-link {
+    color: #6c757d !important;
+}
+
+[data-bs-theme="light"] .custom-tabs .nav-link:hover {
+    color: #212529 !important;
+    border-bottom-color: #dee2e6 !important;
+}
+
+[data-bs-theme="light"] .custom-tabs .nav-link.active {
+    color: #212529 !important;
+    border-bottom-color: var(--primary-cyan) !important;
+    background-color: transparent !important;
+}
+
+/* --- 5. Tables & Leaderboard --- */
+[data-bs-theme="light"] .table-dark,
+[data-bs-theme="light"] table.table-dark {
+    --bs-table-bg: #ffffff;
+    --bs-table-striped-bg: #f8f9fa;
+    --bs-table-color: #212529;
+    --bs-table-border-color: #dee2e6;
+    --bs-table-hover-bg: rgba(0, 0, 0, 0.05);
+    color: #212529 !important;
+    background-color: #ffffff !important;
+}
+
+[data-bs-theme="light"] .table-dark th,
+[data-bs-theme="light"] .table-dark td,
+[data-bs-theme="light"] .table-dark tr {
+    background-color: transparent !important;
+    color: #212529 !important;
+    border-color: #dee2e6 !important;
+}
+
+/* Leaderboard custom row colors */
+[data-bs-theme="light"] .table-dark tr[style*="background-color"], 
+[data-bs-theme="light"] .table-dark tr.bg-secondary,
+[data-bs-theme="light"] .table-dark tr.bg-dark {
+    background-color: #e9ecef !important;
+    color: #212529 !important;
+}
+
+[data-bs-theme="light"] .table-dark tr[style*="background-color"] td,
+[data-bs-theme="light"] .table-dark tr.bg-secondary td,
+[data-bs-theme="light"] .table-dark tr.bg-dark td {
+    background-color: transparent !important;
+}
+
+[data-bs-theme="light"] .table-hover > tbody > tr:hover > * {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Current user active row highlight fix */
+[data-bs-theme="light"] .table-dark > tbody > tr.table-active > * {
+    background-color: #e2e3e5 !important;
+    box-shadow: inset 0 0 0 9999px #e2e3e5 !important; 
+    color: #000000 !important;
+}
+
+[data-bs-theme="light"] .table-dark > tbody > tr.table-active:hover > * {
+    background-color: #d3d6d8 !important; 
+    box-shadow: inset 0 0 0 9999px #d3d6d8 !important; 
+    color: #000000 !important;
+}
+
+/* --- 6. Accordion (Curriculum Manager) --- */
+[data-bs-theme="light"] .custom-dark-accordion .accordion-button {
     background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+    color: #212529;
 }
-*/
+
+[data-bs-theme="light"] .custom-dark-accordion .accordion-button:not(.collapsed) {
+    background-color: #e9ecef;
+    color: #0dcaf0;
+    box-shadow: inset 0 -1px 0 rgba(0,0,0,0.1);
+}
+
+[data-bs-theme="light"] .custom-dark-accordion .accordion-button::after {
+    filter: none;
+}

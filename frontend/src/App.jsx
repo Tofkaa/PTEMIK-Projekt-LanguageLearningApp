@@ -28,6 +28,7 @@ import VerifiedRoute from './components/VerifiedRoute.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import Settings from './pages/Settings.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 
 /**
  * VerificationBanner Component
@@ -65,60 +66,62 @@ const VerificationBanner = () => {
  */
 function App() {
   return (
-    <AuthProvider>
-        <NotificationProvider>
-            <Router>
-                <NavigationBar />
-                <VerificationBanner />
-                <GlobalErrorToast />
-                <Routes>
-                    {/* Default route redirects to login */}
-                    <Route path="/" element={<Navigate to="/login" replace />} />
+    <ThemeProvider>
+        <AuthProvider>
+            <NotificationProvider>
+                <Router>
+                    <NavigationBar />
+                    <VerificationBanner />
+                    <GlobalErrorToast />
+                    <Routes>
+                        {/* Default route redirects to login */}
+                        <Route path="/" element={<Navigate to="/login" replace />} />
 
-                    {/* Guest Routes */}
-                    <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
-                    <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
-                    <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
-                    <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
+                        {/* Guest Routes */}
+                        <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+                        <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+                        <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
+                        <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
 
-                    {/* Private Routes */}
-                    <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                        {/* Private Routes */}
+                        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                        
                     
-                
-                    <Route path="/settings" element={<PrivateRoute><Settings/></PrivateRoute>} />
-                    
-                    {/* Classrooms pages  */}
-                    <Route path="/classrooms" element={<VerifiedRoute><ClassroomsPage /></VerifiedRoute>} />
-                    <Route path="/classrooms/:id" element={<VerifiedRoute><ClassroomDetail /></VerifiedRoute>} />
-                    
-                    {/* Assignment Engine  */}
-                    <Route path="/assignment/:id/start" element={<VerifiedRoute><AssignmentStart /></VerifiedRoute>} />
-                    <Route path="/assignment/session/:sessionId/play" element={<VerifiedRoute><AssignmentPlayer /></VerifiedRoute>} />
-                    <Route path="/assignment/:id/submissions" element={<VerifiedRoute><AssignmentSubmissions /></VerifiedRoute>} />
+                        <Route path="/settings" element={<PrivateRoute><Settings/></PrivateRoute>} />
+                        
+                        {/* Classrooms pages  */}
+                        <Route path="/classrooms" element={<VerifiedRoute><ClassroomsPage /></VerifiedRoute>} />
+                        <Route path="/classrooms/:id" element={<VerifiedRoute><ClassroomDetail /></VerifiedRoute>} />
+                        
+                        {/* Assignment Engine  */}
+                        <Route path="/assignment/:id/start" element={<VerifiedRoute><AssignmentStart /></VerifiedRoute>} />
+                        <Route path="/assignment/session/:sessionId/play" element={<VerifiedRoute><AssignmentPlayer /></VerifiedRoute>} />
+                        <Route path="/assignment/:id/submissions" element={<VerifiedRoute><AssignmentSubmissions /></VerifiedRoute>} />
 
-                    {/* Vocabulary pages */}
-                    <Route path="/hub" element={<PrivateRoute><VocabularyHub /></PrivateRoute>} />
-                    <Route path="/vocabulary/practice" element={<PrivateRoute><VocabularyPractice /></PrivateRoute>} />
-                    <Route path="/vocabulary/flashcards" element={<PrivateRoute><FlashcardPractice /></PrivateRoute>} />
-                    
-                    {/* Other pages */}
-                    <Route path="/lesson/:id" element={<PrivateRoute><Lesson /></PrivateRoute>} />
-                    <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-                    
-                    {/* Commuunity */}
-                    <Route path="/friends" element={<VerifiedRoute><Friends /></VerifiedRoute>} />
-                    
-                    <Route path="/verify" element={<VerifyEmail />} />
-                    
-                    {/* Admin pages */}
-                    <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                        {/* Vocabulary pages */}
+                        <Route path="/hub" element={<PrivateRoute><VocabularyHub /></PrivateRoute>} />
+                        <Route path="/vocabulary/practice" element={<PrivateRoute><VocabularyPractice /></PrivateRoute>} />
+                        <Route path="/vocabulary/flashcards" element={<PrivateRoute><FlashcardPractice /></PrivateRoute>} />
+                        
+                        {/* Other pages */}
+                        <Route path="/lesson/:id" element={<PrivateRoute><Lesson /></PrivateRoute>} />
+                        <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+                        
+                        {/* Commuunity */}
+                        <Route path="/friends" element={<VerifiedRoute><Friends /></VerifiedRoute>} />
+                        
+                        <Route path="/verify" element={<VerifyEmail />} />
+                        
+                        {/* Admin pages */}
+                        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
-                    {/* 404 Route: Catch-all for undefined URLs */}
-                    <Route path="*" element={<NotFound />} />
-                </Routes>
-            </Router>
-        </NotificationProvider>
-    </AuthProvider>
+                        {/* 404 Route: Catch-all for undefined URLs */}
+                        <Route path="*" element={<NotFound />} />
+                    </Routes>
+                </Router>
+            </NotificationProvider>
+        </AuthProvider>
+    </ThemeProvider>
   );
 }
 
