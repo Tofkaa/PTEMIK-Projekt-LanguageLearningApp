@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Button, Alert, Spinner, Accordion, Badge, ListGroup, Modal } from 'react-bootstrap';
+import { Card, Form, Button, Alert, Spinner, Accordion, Badge, ListGroup, Modal, Row, Col } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi';
 
 const CurriculumManager = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
+    
     const [topics, setTopics] = useState([]);
     const [isLoadingTopics, setIsLoadingTopics] = useState(true);
     const [previewModal, setPreviewModal] = useState({ show: false, exercise: null });
+
+    const [importLevel, setImportLevel] = useState('FULL_TOPIC'); // FULL_TOPIC, LESSON, EXERCISE
+    const [targetTopicId, setTargetTopicId] = useState('');
+    const [targetLessonId, setTargetLessonId] = useState('');
 
     useEffect(() => {
         fetchTopics();
@@ -20,7 +25,6 @@ const CurriculumManager = () => {
             const response = await adminApi.getAllTopics();
             let data = Array.isArray(response.data) ? response.data : [];
             
-            // Kezdeti stabil rendezés
             data.sort((a, b) => a.topicName.localeCompare(b.topicName));
             data.forEach(topic => {
                 if (topic.lessons) {
@@ -46,20 +50,46 @@ const CurriculumManager = () => {
         }
     };
 
+    // --- Modular Upload ---
     const handleUpload = async () => {
         if (!selectedFile) return;
+
+        // Validáció
+        if (importLevel === 'LESSON' && !targetTopicId) {
+            setMessage({ text: 'Kérlek válaszd ki a cél Témakört!', type: 'warning' });
+            return;
+        }
+        if (importLevel === 'EXERCISE' && !targetLessonId) {
+            setMessage({ text: 'Kérlek válaszd ki a cél Leckét!', type: 'warning' });
+            return;
+        }
+
         setIsLoading(true); setMessage({ text: '', type: '' });
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
                 const jsonData = JSON.parse(e.target.result);
-                await adminApi.importCurriculum(jsonData);
+                
+                if (importLevel === 'FULL_TOPIC') {
+                    await adminApi.importCurriculum(jsonData);
+                } else if (importLevel === 'LESSON') {
+                    await adminApi.importLessons(targetTopicId, jsonData);
+                } else if (importLevel === 'EXERCISE') {
+                    await adminApi.importExercises(targetLessonId, jsonData);
+                }
+
                 setMessage({ text: 'Tananyag sikeresen importálva! 🎉', type: 'success' });
+                window.dispatchEvent(new Event('adminActionOccurred'));
                 setSelectedFile(null);
                 document.getElementById('json-upload-input').value = '';
+               
+                setImportLevel('FULL_TOPIC');
+                setTargetTopicId('');
+                setTargetLessonId('');
+                
                 fetchTopics();
             } catch (error) {
-                setMessage({ text: 'Hiba az importálás során.', type: 'danger', error });
+                setMessage({ text: 'Hiba az importálás során. Ellenőrizd a JSON formátumát!', type: 'danger', error });
             } finally { setIsLoading(false); }
         };
         reader.readAsText(selectedFile);
@@ -69,7 +99,6 @@ const CurriculumManager = () => {
         const nextStatus = !currentStatus;
         if (window.confirm(`Biztosan ${nextStatus ? 'visszaállítod' : 'felfüggeszted'} ezt a(z) ${type} elemet? (${name})`)) {
             try {
-                // LOKÁLIS ÁLLAPOTFRISSÍTÉS - Teljesen kiiktatjuk a UI ugrálást és eltűnést!
                 if (type === 'Témakör') {
                     await adminApi.toggleTopicStatus(id, nextStatus);
                     setTopics(prev => prev.map(t => t.topicId === id ? { ...t, active: nextStatus } : t));
@@ -87,12 +116,13 @@ const CurriculumManager = () => {
                         ...t,
                         lessons: t.lessons ? t.lessons.map(l => ({
                             ...l,
-                            exercises: l.exercises ? l.exercises.map(e => e.exerciseId === id ? { ...e, active: nextStatus } : e) : []
+                            exercises: l.exercises ? l.exercises.map(ex => ex.exerciseId === id ? { ...ex, active: nextStatus } : ex) : []
                         })) : []
                     })));
                 }
                 
                 setMessage({ text: `${type} státusza frissítve!`, type: 'success' });
+                window.dispatchEvent(new Event('adminActionOccurred'));
             } catch (error) {
                 setMessage({ text: `Hiba a(z) ${type} módosításakor.`, type: 'danger', error});
             }
@@ -118,18 +148,92 @@ const CurriculumManager = () => {
         setPreviewModal({ show: true, exercise });
     };
 
+    const availableLessonsForTarget = topics.find(t => t.topicId === targetTopicId)?.lessons || [];
+
     return (
         <div>
             {message.text && <Alert variant={message.type} className="shadow-sm rounded-4">{message.text}</Alert>}
 
             <Card className="bg-dark border-secondary shadow-lg mb-4 rounded-4">
                 <Card.Body className="p-4">
-                    <h5 className="text-info fw-bold mb-3">Tananyag JSON Importálása</h5>
+                    <h5 className="text-info fw-bold mb-4">Tananyag JSON Importálása</h5>
+                    
+                    <Row className="mb-4">
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label className="text-secondary small fw-bold">Mit szeretnél importálni?</Form.Label>
+                                <Form.Select 
+                                    className="bg-dark text-light border-secondary shadow-sm"
+                                    value={importLevel}
+                                    onChange={(e) => {
+                                        setImportLevel(e.target.value);
+                                        setTargetTopicId('');
+                                        setTargetLessonId('');
+                                    }}
+                                >
+                                    <option value="FULL_TOPIC">Új Témakör (Teljes struktúra)</option>
+                                    <option value="LESSON">Új Lecke (Meglévő témakörbe)</option>
+                                    <option value="EXERCISE">Új Feladatok (Meglévő leckéhez)</option>
+                                </Form.Select>
+                            </Form.Group>
+                        </Col>
+
+                        {/* Csak akkor mutatjuk, ha Leckét VAGY Feladatot importál */}
+                        {(importLevel === 'LESSON' || importLevel === 'EXERCISE') && (
+                            <Col md={4}>
+                                <Form.Group>
+                                    <Form.Label className="text-secondary small fw-bold">Cél Témakör</Form.Label>
+                                    <Form.Select 
+                                        className="bg-dark text-light border-secondary shadow-sm"
+                                        value={targetTopicId}
+                                        onChange={(e) => {
+                                            setTargetTopicId(e.target.value);
+                                            setTargetLessonId(''); // Reset lecke ha témakört vált
+                                        }}
+                                    >
+                                        <option value="">-- Válassz Témakört --</option>
+                                        {topics.map(t => (
+                                            <option key={t.topicId} value={t.topicId}>{t.topicName}</option>
+                                        ))}
+                                    </Form.Select>
+                                </Form.Group>
+                            </Col>
+                        )}
+
+                        {/* Csak akkor mutatjuk, ha Feladatot importál */}
+                        {importLevel === 'EXERCISE' && (
+                            <Col md={4}>
+                                <Form.Group>
+                                    <Form.Label className="text-secondary small fw-bold">Cél Lecke</Form.Label>
+                                    <Form.Select 
+                                        className="bg-dark text-light border-secondary shadow-sm"
+                                        value={targetLessonId}
+                                        onChange={(e) => setTargetLessonId(e.target.value)}
+                                        disabled={!targetTopicId}
+                                    >
+                                        <option value="">-- Válassz Leckét --</option>
+                                        {availableLessonsForTarget.map(l => (
+                                           <option key={l.lessonId} value={l.lessonId}>
+                                                {l.title} ({l.difficulty})
+                                            </option>
+                                        ))}
+                                    </Form.Select>
+                                </Form.Group>
+                            </Col>
+                        )}
+                    </Row>
+
                     <Form.Group className="mb-4">
                         <Form.Control id="json-upload-input" type="file" accept=".json" onChange={handleFileChange} className="bg-dark text-light border-secondary rounded-3" />
+                        <Form.Text className="text-secondary">
+                            {importLevel === 'FULL_TOPIC' && "Tölts fel egy JSON array-t, ami TopicImportRequest objektumokat tartalmaz."}
+                            {importLevel === 'LESSON' && "Tölts fel egy JSON array-t, ami LessonImportRequest objektumokat tartalmaz."}
+                            {importLevel === 'EXERCISE' && "Tölts fel egy JSON array-t, ami ExerciseImportRequest objektumokat tartalmaz."}
+                        </Form.Text>
                     </Form.Group>
+
                     <Button variant="info" className="fw-bold px-4 text-dark rounded-pill" onClick={handleUpload} disabled={!selectedFile || isLoading}>
-                        {isLoading ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : 'Feltöltés és Importálás 🚀'}
+                        {isLoading ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : 'Kiválasztott JSON Importálása 🚀'}
                     </Button>
                 </Card.Body>
             </Card>

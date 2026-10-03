@@ -25,6 +25,7 @@ const ClassroomManager = () => {
             try {
                 await adminApi.toggleClassroomStatus(id, nextStatus);
                 setMessage({ text: 'Státusz sikeresen frissítve.', type: 'success' });
+                window.dispatchEvent(new Event('adminActionOccurred'));
                 fetchClassrooms();
             } catch (error) {
                 setMessage({ text: 'Hiba történt a művelet során.', type: 'danger' }, error);

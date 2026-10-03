@@ -47,6 +47,7 @@ const AchievementManager = () => {
                 const jsonData = JSON.parse(e.target.result);
                 await adminApi.importAchievements(jsonData);
                 setMessage({ text: 'Kitüntetések sikeresen importálva! 🏆', type: 'success' });
+                window.dispatchEvent(new Event('adminActionOccurred'));
                 setSelectedFile(null);
                 document.getElementById('achievement-upload-input').value = '';
                 fetchAchievements(); 
@@ -63,8 +64,8 @@ const AchievementManager = () => {
             try {
                 await adminApi.toggleAchievementStatus(id, nextStatus);
                 setMessage({ text: 'Kitüntetés státusza frissítve!', type: 'success' });
+                window.dispatchEvent(new Event('adminActionOccurred'));
                 
-                // LOKÁLIS ÁLLAPOTFRISSÍTÉS: Nincs újratöltés, nincs ugrálás a tábla aljára!
                 setAchievements(prev => prev.map(ach => 
                     ach.achievementId === id ? { ...ach, active: nextStatus } : ach
                 ));

@@ -26,12 +26,11 @@ public class AdminController {
 
     // --- CURRICULUM MANAGEMENT ---
     @PostMapping("/curriculum/import")
-    public ResponseEntity<String> importCurriculum(@RequestBody java.util.List<TopicImportRequest> requests) {
-
+    public ResponseEntity<String> importCurriculum(@RequestBody java.util.List<TopicImportRequest> requests, Authentication auth) {
         for (TopicImportRequest request : requests) {
             curriculumService.importTopicAndLessons(request);
         }
-
+        adminService.logImportAction(auth.getName(), "CURRICULUM_IMPORTED", requests.size() + " teljes témakör importálva.");
         return ResponseEntity.ok("Curriculum imported successfully!");
     }
 
@@ -56,6 +55,28 @@ public class AdminController {
     @GetMapping("/curriculum/topics")
     public ResponseEntity<List<com.languageapp.backend.dto.response.TopicAdminResponse>> getAllTopics() {
         return ResponseEntity.ok(adminService.getAllTopics());
+    }
+
+    @PostMapping("/curriculum/topic/{topicId}/lesson/import")
+    public ResponseEntity<String> importLessonsToTopic(
+            @PathVariable UUID topicId,
+            @RequestBody List<com.languageapp.backend.dto.request.LessonImportRequest> requests,
+            Authentication auth) {
+
+        curriculumService.importLessonsToExistingTopic(topicId, requests);
+        adminService.logImportAction(auth.getName(), "LESSON_IMPORTED", requests.size() + " új lecke importálva egy meglévő témakörhöz.");
+        return ResponseEntity.ok("Lessons imported successfully to topic!");
+    }
+
+    @PostMapping("/curriculum/lesson/{lessonId}/exercise/import")
+    public ResponseEntity<String> importExercisesToLesson(
+            @PathVariable UUID lessonId,
+            @RequestBody List<com.languageapp.backend.dto.request.ExerciseImportRequest> requests,
+            Authentication auth) {
+
+        curriculumService.importExercisesToExistingLesson(lessonId, requests);
+        adminService.logImportAction(auth.getName(), "EXERCISE_IMPORTED", requests.size() + " új feladat importálva egy meglévő leckéhez.");
+        return ResponseEntity.ok("Exercises imported successfully to lesson!");
     }
 
     // --- USER MANAGEMENT ---
@@ -86,8 +107,9 @@ public class AdminController {
 
     // --- ACHIEVEMENT MANAGEMENT ---
     @PostMapping("/achievements/import")
-    public ResponseEntity<String> importAchievements(@RequestBody java.util.List<com.languageapp.backend.entity.Achievement> achievements) {
+    public ResponseEntity<String> importAchievements(@RequestBody java.util.List<com.languageapp.backend.entity.Achievement> achievements, Authentication auth) {
         adminService.importAchievements(achievements);
+        adminService.logImportAction(auth.getName(), "ACHIEVEMENT_IMPORTED", achievements.size() + " új kitüntetés importálva.");
         return ResponseEntity.ok("Achievements imported successfully!");
     }
 

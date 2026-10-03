@@ -17,7 +17,7 @@ const UserManagement = () => {
         try {
             const response = await adminApi.getAllUsers();
             setUsers(response.data);
-            setMessage({ text: '', type: '' }); // Hiba törlése sikeres betöltéskor
+            setMessage({ text: '', type: '' }); 
         } catch (error) {
             console.error("Hiba a felhasználók lekérésekor:", error);
             setMessage({ text: 'Nem sikerült betölteni a felhasználókat. Ellenőrizd a kapcsolatot.', type: 'danger' });
@@ -30,7 +30,8 @@ const UserManagement = () => {
         try {
             await adminApi.updateUserRole(userId, newRole);
             setMessage({ text: 'Jogosultság sikeresen frissítve!', type: 'success' });
-            fetchUsers(); // Táblázat újratöltése a friss adatokkal
+            window.dispatchEvent(new Event('adminActionOccurred'));
+            fetchUsers();
         } catch (error) {
             setMessage({ text: 'Hiba a jogosultság módosításakor.', type: 'danger', error });
         }
@@ -46,6 +47,7 @@ const UserManagement = () => {
             try {
                 await adminApi.toggleUserStatus(userId, isActivating);
                 setMessage({ text: `Felhasználó sikeresen ${isActivating ? 'visszaállítva' : 'felfüggesztve'}.`, type: 'success' });
+                window.dispatchEvent(new Event('adminActionOccurred'));
                 fetchUsers();
             } catch (error) {
                 setMessage({ text: 'Hiba a státusz módosításakor.', type: 'danger' , error});

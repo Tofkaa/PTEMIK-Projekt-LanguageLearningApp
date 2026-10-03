@@ -9,10 +9,23 @@ const SystemLogs = () => {
 
     useEffect(() => {
         fetchLogs();
+
+        // 1. Feliratkozás az egyedi eseményre (Event Listener)
+        const handleAdminAction = () => {
+            fetchLogs(false); // Csendes frissítés spinner nélkül
+        };
+
+        window.addEventListener('adminActionOccurred', handleAdminAction);
+
+        // 2. Takarítás (Cleanup) amikor a komponens megsemmisül
+        return () => {
+            window.removeEventListener('adminActionOccurred', handleAdminAction);
+        };
     }, []);
 
-    const fetchLogs = async () => {
-        setIsLoading(true);
+    // Ha isQuiet paraméter igaz, nem villogtatjuk a felületet (spinner)
+    const fetchLogs = async (isQuiet = false) => {
+        if (!isQuiet) setIsLoading(true);
         try {
             const response = await adminApi.getSystemLogs();
             setLogs(response.data);
@@ -21,24 +34,51 @@ const SystemLogs = () => {
             console.error("Hiba a naplók lekérésekor:", err);
             setError('Nem sikerült betölteni a rendszernaplókat.');
         } finally {
-            setIsLoading(false);
+            if (!isQuiet) setIsLoading(false);
         }
     };
 
-    // Színkódolás a különböző akciótípusokhoz
+    // Kibővített színkódolás a különböző akciótípusokhoz
     const getActionBadge = (actionType) => {
         switch (actionType) {
+            // Felhasználók
             case 'USER_BANNED':
                 return <Badge bg="danger" className="shadow-sm">FELFÜGGESZTÉS 🛑</Badge>;
             case 'USER_UNBANNED':
                 return <Badge bg="success" className="shadow-sm">VISSZAÁLLÍTÁS ♻️</Badge>;
             case 'ROLE_CHANGED':
                 return <Badge bg="warning" text="dark" className="shadow-sm">JOGOSULTSÁG 👑</Badge>;
-            case 'LESSON_ADDED':
+            
+            // Tananyag CMS - Új elemek (Import)
             case 'CURRICULUM_IMPORTED':
-                return <Badge bg="info" text="dark" className="shadow-sm">TARTALOM 📚</Badge>;
-            case 'CLASSROOM_DELETED':
-                return <Badge bg="danger" className="shadow-sm">OSZTÁLY TÖRLÉS 🗑️</Badge>;
+            case 'LESSON_IMPORTED':
+            case 'EXERCISE_IMPORTED':
+                return <Badge bg="info" text="dark" className="shadow-sm">TARTALOM IMPORT 📥</Badge>;
+            
+            // Tananyag CMS - Soft Delete
+            case 'TOPIC_SUSPENDED':
+            case 'LESSON_SUSPENDED':
+            case 'EXERCISE_SUSPENDED':
+                return <Badge bg="danger" className="shadow-sm">TARTALOM LETILTVA 🚫</Badge>;
+            case 'TOPIC_RESTORED':
+            case 'LESSON_RESTORED':
+            case 'EXERCISE_RESTORED':
+                return <Badge bg="success" className="shadow-sm">TARTALOM VISSZAÁLLÍTVA ♻️</Badge>;
+
+            // Kitüntetések
+            case 'ACHIEVEMENT_IMPORTED':
+                return <Badge bg="info" text="dark" className="shadow-sm">KITÜNTETÉS IMPORT 📥</Badge>;
+            case 'ACHIEVEMENT_SUSPENDED':
+                return <Badge bg="danger" className="shadow-sm">KITÜNTETÉS LETILTVA 🚫</Badge>;
+            case 'ACHIEVEMENT_RESTORED':
+                return <Badge bg="success" className="shadow-sm">KITÜNTETÉS VISSZAÁLLÍTVA ♻️</Badge>;
+
+            // Osztálytermek
+            case 'CLASSROOM_BANNED':
+                return <Badge bg="danger" className="shadow-sm">OSZTÁLY FELFÜGGESZTVE 🛑</Badge>;
+            case 'CLASSROOM_RESTORED':
+                return <Badge bg="success" className="shadow-sm">OSZTÁLY VISSZAÁLLÍTVA ♻️</Badge>;
+
             default:
                 return <Badge bg="secondary" className="shadow-sm">{actionType}</Badge>;
         }
@@ -78,7 +118,7 @@ const SystemLogs = () => {
                                 logs.map((log) => (
                                     <tr key={log.logId}>
                                         <td className="text-light px-4 small" style={{ whiteSpace: 'nowrap' }}>
-                                            {new Date(log.loggedAt).toLocaleString('hu-HU')}
+                                            {new Date(log.loggedAt.endsWith('Z') ? log.loggedAt : log.loggedAt + 'Z').toLocaleString('hu-HU')}
                                         </td>
                                         <td>
                                             <div className="fw-bold text-light">{log.admin?.name || 'Ismeretlen'}</div>

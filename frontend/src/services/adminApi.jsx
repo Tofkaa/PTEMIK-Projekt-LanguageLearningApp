@@ -11,6 +11,8 @@ export const adminApi = {
 
     // --- TANANYAG CMS ---
     importCurriculum: (data) => api.post('/admin/curriculum/import', data),
+    importLessons: (topicId, data) => api.post(`/admin/curriculum/topic/${topicId}/lesson/import`, data),
+    importExercises: (lessonId, data) => api.post(`/admin/curriculum/lesson/${lessonId}/exercise/import`, data),
     getAllTopics: () => api.get('/admin/curriculum/topics'),
     toggleTopicStatus: (id, isActive) => api.put(`/admin/curriculum/topic/${id}/status?isActive=${isActive}`),
     toggleLessonStatus: (id, isActive) => api.put(`/admin/curriculum/lesson/${id}/status?isActive=${isActive}`),

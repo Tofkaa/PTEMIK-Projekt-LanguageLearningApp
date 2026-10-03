@@ -6,6 +6,7 @@ import com.languageapp.backend.dto.request.TopicImportRequest;
 import com.languageapp.backend.entity.Exercise;
 import com.languageapp.backend.entity.Lesson;
 import com.languageapp.backend.entity.LessonTopic;
+import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.ExerciseRepository;
 import com.languageapp.backend.repository.LessonRepository;
 import com.languageapp.backend.repository.LessonTopicRepository;
@@ -13,6 +14,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Service responsible for managing curriculum data (Topics, Lessons, Exercises).
@@ -28,14 +32,11 @@ public class CurriculumService {
 
     /**
      * Imports a full curriculum structure (Topic -> Lessons -> Exercises) from a JSON request.
-     * Transactional ensures that if any part fails, the entire import is rolled back to prevent orphaned data.
-     * * @param request The nested DTO containing the curriculum data.
      */
     @Transactional
     public void importTopicAndLessons(TopicImportRequest request) {
         log.info("Starting curriculum import for topic: {}", request.getTopicName());
 
-        // 1. Topic creation and saving
         LessonTopic topic = new LessonTopic();
         topic.setName(request.getTopicName());
         topic.setDescription(request.getDescription());
@@ -43,40 +44,72 @@ public class CurriculumService {
         LessonTopic savedTopic = topicRepository.save(topic);
         log.info("Saved Topic with ID: {}", savedTopic.getTopicId());
 
-        // 2. Iterate through lessons
         if (request.getLessons() != null) {
-            for (LessonImportRequest lessonReq : request.getLessons()) {
-                Lesson lesson = new Lesson();
-                lesson.setTopic(savedTopic); // Assign to topic
-                lesson.setTitle(lessonReq.getTitle());
-                lesson.setDifficulty(lessonReq.getDifficulty());
-                lesson.setDescription(lessonReq.getDescription());
-                lesson.setLanguage(lessonReq.getLanguage());
+            importLessonsInternal(savedTopic, request.getLessons());
+        }
+        log.info("Curriculum import completed successfully.");
+    }
 
-                Lesson savedLesson = lessonRepository.save(lesson);
-                log.info("  Saved Lesson: {} ({})", savedLesson.getTitle(), savedLesson.getDifficulty());
+    /**
+     * Imports new Lessons (and their Exercises) into an EXISTING Topic.
+     */
+    @Transactional
+    public void importLessonsToExistingTopic(UUID topicId, List<LessonImportRequest> lessonRequests) {
+        log.info("Importing {} new lessons to existing topic ID: {}", lessonRequests.size(), topicId);
 
-                // 3. Iterate through exercises
-                if (lessonReq.getExercises() != null) {
-                    for (ExerciseImportRequest exerciseReq : lessonReq.getExercises()) {
-                        Exercise exercise = new Exercise();
-                        exercise.setLesson(savedLesson); // Assign to lesson
-                        exercise.setType(exerciseReq.getType());
+        LessonTopic existingTopic = topicRepository.findById(topicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Topic nem található az importáláshoz!"));
 
-                        exercise.setContent(exerciseReq.getContent());
-                        exercise.setCorrectAnswer(exerciseReq.getCorrectAnswer());
+        importLessonsInternal(existingTopic, lessonRequests);
+    }
 
-                        if (exerciseReq.getImageUrl() != null) {
-                            exercise.setImageUrl(exerciseReq.getImageUrl());
-                        }
+    /**
+     * Imports new Exercises into an EXISTING Lesson.
+     */
+    @Transactional
+    public void importExercisesToExistingLesson(UUID lessonId, List<ExerciseImportRequest> exerciseRequests) {
+        log.info("Importing {} new exercises to existing lesson ID: {}", exerciseRequests.size(), lessonId);
 
-                        exerciseRepository.save(exercise);
-                    }
-                    log.info("    Saved {} exercises for lesson.", lessonReq.getExercises().size());
-                }
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lecke nem található az importáláshoz!"));
+
+        importExercisesInternal(lesson, exerciseRequests);
+    }
+
+    // --- Private Helper Methods for Reusability ---
+
+    private void importLessonsInternal(LessonTopic parentTopic, List<LessonImportRequest> lessonRequests) {
+        for (LessonImportRequest lessonReq : lessonRequests) {
+            Lesson lesson = new Lesson();
+            lesson.setTopic(parentTopic);
+            lesson.setTitle(lessonReq.getTitle());
+            lesson.setDifficulty(lessonReq.getDifficulty());
+            lesson.setDescription(lessonReq.getDescription());
+            lesson.setLanguage(lessonReq.getLanguage());
+
+            Lesson savedLesson = lessonRepository.save(lesson);
+            log.info("  Saved Lesson: {} ({})", savedLesson.getTitle(), savedLesson.getDifficulty());
+
+            if (lessonReq.getExercises() != null) {
+                importExercisesInternal(savedLesson, lessonReq.getExercises());
             }
         }
+    }
 
-        log.info("Curriculum import completed successfully.");
+    private void importExercisesInternal(Lesson parentLesson, List<ExerciseImportRequest> exerciseRequests) {
+        for (ExerciseImportRequest exerciseReq : exerciseRequests) {
+            Exercise exercise = new Exercise();
+            exercise.setLesson(parentLesson);
+            exercise.setType(exerciseReq.getType());
+            exercise.setContent(exerciseReq.getContent());
+            exercise.setCorrectAnswer(exerciseReq.getCorrectAnswer());
+
+            if (exerciseReq.getImageUrl() != null) {
+                exercise.setImageUrl(exerciseReq.getImageUrl());
+            }
+
+            exerciseRepository.save(exercise);
+        }
+        log.info("    Saved {} exercises for lesson.", exerciseRequests.size());
     }
 }

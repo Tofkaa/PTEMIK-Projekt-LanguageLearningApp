@@ -63,7 +63,7 @@ public class AdminService {
         userRepository.save(targetUser);
 
         logAdminAction(admin, "ROLE_CHANGED", targetUserId,
-                "Jogosultság módosítva: " + oldRole + " -> " + newRole.name() + " (" + targetUser.getEmail() + ")");
+                "Jogosultság módosítva: " + oldRole + " -> " + newRole.name() + " (" + targetUser.getEmail() + ") [ID: " + targetUserId + "]");
     }
 
     @Transactional
@@ -78,7 +78,7 @@ public class AdminService {
 
         String action = isActive ? "USER_UNBANNED" : "USER_BANNED";
         logAdminAction(admin, action, targetUserId,
-                "Fiók " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + targetUser.getEmail());
+                "Fiók " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + targetUser.getEmail() + " [ID: " + targetUserId + "]");
     }
 
     private void logAdminAction(User admin, String actionType, UUID targetUserId, String details) {
@@ -88,6 +88,11 @@ public class AdminService {
         log.setTargetUserId(targetUserId);
         log.setDetails(details);
         adminLogRepository.save(log);
+    }
+
+    public void logImportAction(String adminEmail, String actionType, String details) {
+        User admin = userRepository.findByEmail(adminEmail).orElseThrow();
+        logAdminAction(admin, actionType, null, details);
     }
 
     @Transactional
@@ -105,7 +110,8 @@ public class AdminService {
         topicRepository.save(topic);
 
         String action = isActive ? "TOPIC_RESTORED" : "TOPIC_SUSPENDED";
-        logAdminAction(admin, action, null, "Témakör " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + topic.getName());
+        logAdminAction(admin, action, null,
+                "Témakör " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + topic.getName() + " [ID: " + topicId + "]");
     }
 
     @Transactional
@@ -118,7 +124,8 @@ public class AdminService {
         lessonRepository.save(lesson);
 
         String action = isActive ? "LESSON_RESTORED" : "LESSON_SUSPENDED";
-        logAdminAction(admin, action, null, "Lecke " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + lesson.getTitle());
+        logAdminAction(admin, action, null,
+                "Lecke " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + lesson.getTitle() + " (" + lesson.getDifficulty() + ") [ID: " + lessonId + "]");
     }
 
     @Transactional
@@ -131,7 +138,8 @@ public class AdminService {
         exerciseRepository.save(exercise);
 
         String action = isActive ? "EXERCISE_RESTORED" : "EXERCISE_SUSPENDED";
-        logAdminAction(admin, action, null, "Feladat (" + exercise.getType() + ") " + (isActive ? "visszaállítva" : "felfüggesztve"));
+        logAdminAction(admin, action, null,
+                "Feladat (" + exercise.getType() + " - " + exercise.getLesson().getDifficulty() + ") " + (isActive ? "visszaállítva" : "felfüggesztve") + " [ID: " + exerciseId + "]");
     }
 
     @Transactional
@@ -144,7 +152,8 @@ public class AdminService {
         achievementRepository.save(achievement);
 
         String action = isActive ? "ACHIEVEMENT_RESTORED" : "ACHIEVEMENT_SUSPENDED";
-        logAdminAction(admin, action, null, "Kitüntetés " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + achievement.getName());
+        logAdminAction(admin, action, null,
+                "Kitüntetés " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + achievement.getName() + " [ID: " + achievementId + "]");
     }
 
     @Transactional(readOnly = true)
@@ -175,7 +184,7 @@ public class AdminService {
 
         String action = isActive ? "CLASSROOM_RESTORED" : "CLASSROOM_BANNED";
         logAdminAction(admin, action, null,
-                "Osztályterem " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + classroom.getName());
+                "Osztályterem " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + classroom.getName() + " [ID: " + classroomId + "]");
     }
 
     @Transactional(readOnly = true)
