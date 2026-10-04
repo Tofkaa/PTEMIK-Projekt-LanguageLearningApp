@@ -1,5 +1,6 @@
 package com.languageapp.backend.entity;
 
+import com.languageapp.backend.enums.AuthProvider;
 import com.languageapp.backend.enums.DifficultyLevel;
 import com.languageapp.backend.enums.Role;
 import jakarta.persistence.*;
@@ -35,8 +36,17 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    // nullable = true because we integrate oauth2 and by definition users with oauth2
+    // do not have a password, hence we accommodate that solution into the db here
+    @Column(name = "password_hash", nullable = true)
     private String passwordHash;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_provider", nullable = false, length = 20)
+    private AuthProvider authProvider = AuthProvider.LOCAL;
+
+    @Column(name = "provider_id")
+    private String providerId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)

@@ -134,6 +134,36 @@ const Login = () => {
                                     {isLoading ? 'Bejelentkezés folyamatban...' : 'Belépés'}
                                </Button>
                            </Form>
+
+                           <div className="text-center my-4 position-relative">
+                                <hr className="border-secondary opacity-25" />
+                                <span className="bg-transparent text-secondary px-3 position-absolute top-50 start-50 translate-middle" style={{ backgroundColor: 'var(--bs-dark)' }}>
+                                    VAGY
+                                </span>
+                            </div>
+
+                            <div className="d-flex flex-column gap-3 mb-4">
+                                <Button 
+                                    variant="outline-light" 
+                                    className="fw-bold py-2 d-flex align-items-center justify-content-center gap-2"
+                                    onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/google'}
+                                    disabled={isLoading}
+                                >
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" width="20" />
+                                    Belépés Google fiókkal
+                                </Button>
+                                
+                                <Button 
+                                    variant="outline-light" 
+                                    className="fw-bold py-2 d-flex align-items-center justify-content-center gap-2"
+                                    style={{ borderColor: '#5865F2', color: '#5865F2' }}
+                                    onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/discord'}
+                                    disabled={isLoading}
+                                >
+                                    <img src="https://assets-global.website-files.com/6257adef93867e50d84d30e2/636e0a69f118df70ad7828d4_icon_clyde_blurple_RGB.svg" alt="Discord" width="24" />
+                                    Belépés Discord fiókkal
+                                </Button>
+                            </div>
                            
                            <div className="text-center mt-3">
                                <span className="text-light">Nincs még fiókod? </span>

@@ -29,6 +29,7 @@ import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import Settings from './pages/Settings.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
+import OAuth2RedirectHandler from './components/OAuth2RedirectHandler.jsx';
 
 /**
  * VerificationBanner Component
@@ -106,7 +107,8 @@ function App() {
                         {/* Other pages */}
                         <Route path="/lesson/:id" element={<PrivateRoute><Lesson /></PrivateRoute>} />
                         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-                        
+                        <Route path="/oauth2/redirect" element={<OAuth2RedirectHandler />} />
+
                         {/* Commuunity */}
                         <Route path="/friends" element={<VerifiedRoute><Friends /></VerifiedRoute>} />
                         
