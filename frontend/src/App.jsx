@@ -46,19 +46,19 @@ const VerificationBanner = () => {
     const hiddenPaths = ['/assignment/session/', '/lesson/'];
     if (hiddenPaths.some(path => location.pathname.includes(path))) return null;
 
-    return (
-        <Container className="mb-3">
-            <Alert variant="warning" className="d-flex justify-content-between align-items-center shadow-sm py-2 px-3 border-warning rounded-3">
-                <div className="d-flex align-items-center gap-2">
-                    <span className="fs-5">⚠️</span>
-                    <div>
-                        <strong className="d-block text-dark">Kérjük, erősítsd meg az e-mail címedet!</strong>
-                        <span className="small text-dark opacity-75">Egyes funkciók (pl. feladatok beküldése) korlátozva lehetnek, amíg nem kattintasz az e-mailben kapott linkre.</span>
-                    </div>
+   return (
+    <Container className="mb-3">
+        <Alert variant="warning" className="d-flex justify-content-between align-items-center shadow-sm py-2 px-3 border-warning rounded-3">
+            <div className="d-flex align-items-center gap-2">
+                <span className="fs-5">⚠️</span>
+                <div>
+                    <strong className="d-block">Kérjük, erősítsd meg az e-mail címedet!</strong>
+                    <span className="small opacity-75">Egyes funkciók (pl. feladatok beküldése) korlátozva lehetnek, amíg nem kattintasz az e-mailben kapott linkre.</span>
                 </div>
-            </Alert>
-        </Container>
-    );
+            </div>
+        </Alert>
+    </Container>
+);
 };
 
 /**
