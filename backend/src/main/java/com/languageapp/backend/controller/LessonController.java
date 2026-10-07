@@ -99,8 +99,8 @@ public class LessonController {
      * @return A list of all available lessons.
      */
     @GetMapping("/all-for-challenge")
-    public ResponseEntity<List<LessonResponse>> getAllLessonsForChallenge() {
+    public ResponseEntity<List<LessonResponse>> getAllLessonsForChallenge(Authentication authentication) {
         log.info("REST request to get all lessons for challenge dropdown");
-        return ResponseEntity.ok(lessonService.getAllLessonsForChallengeDropdown());
+        return ResponseEntity.ok(lessonService.getAllLessonsForChallengeDropdown(authentication.getName()));
     }
 }

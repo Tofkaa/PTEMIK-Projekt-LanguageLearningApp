@@ -2,11 +2,13 @@ package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.response.ProgressResponse;
 import com.languageapp.backend.dto.response.UserResponse;
+import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.EmailChangeToken;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.DifficultyLevel;
 import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
+import com.languageapp.backend.repository.CourseRepository;
 import com.languageapp.backend.repository.EmailChangeTokenRepository;
 import com.languageapp.backend.repository.ProgressRepository;
 import com.languageapp.backend.repository.UserRepository;
@@ -36,6 +38,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final EmailChangeTokenRepository emailChangeTokenRepository;
     private final EmailService emailService;
+    private final CourseRepository courseRepository;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -61,6 +64,8 @@ public class UserService {
                 .friendCode(user.getFriendCode())
                 .isVerified(user.isVerified())
                 .profilePictureUrl(user.getProfilePictureUrl())
+                .activeCourseId(user.getActiveCourse().getCourseId())
+                .activeCourseCode(user.getActiveCourse().getLanguageCode())
                 .build();
     }
 
@@ -114,6 +119,32 @@ public class UserService {
         userRepository.save(user);
         log.info("User {} updated preferred difficulty to {}", email, newDifficulty);
     }
+
+    @Transactional
+    public UserResponse changeActiveCourse(String email, String courseCode) {
+        if (courseCode == null || courseCode.trim().isEmpty()) {
+            throw new BadRequestException("A kurzus kódja nem lehet üres!");
+        }
+
+        User user = getUserByEmail(email);
+
+        // Check if the active course is already this one
+        if (user.getActiveCourse().getLanguageCode().equalsIgnoreCase(courseCode)) {
+            return getUserProfile(email); // Nothing to do, return the profile
+        }
+
+        Course newCourse = courseRepository.findByLanguageCode(courseCode.toLowerCase())
+                .orElseThrow(() -> new ResourceNotFoundException("Nem található kurzus ezzel a kóddal: " + courseCode));
+
+        user.setActiveCourse(newCourse);
+        userRepository.save(user);
+
+        log.info("User {} successfully changed active course to {}", email, courseCode);
+
+        // Return the updated profile
+        return getUserProfile(email);
+    }
+
     @Transactional
     public String updateProfilePicture(String email, MultipartFile file) {
         User user = getUserByEmail(email);

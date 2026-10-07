@@ -17,7 +17,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "classrooms")
 
-@SQLDelete(sql = "UPDATE users SET is_active = false WHERE user_id=?")
+@SQLDelete(sql = "UPDATE classrooms SET is_active = false WHERE classroom_id=?")
 @SQLRestriction("is_active = true")
 public class Classroom {
 
@@ -35,6 +35,10 @@ public class Classroom {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_id", nullable = false)
     private User teacher;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id", nullable = false)
+    private Course course;
 
     @Column(name = "invite_code", length = 10, unique = true, nullable = false)
     private String inviteCode;

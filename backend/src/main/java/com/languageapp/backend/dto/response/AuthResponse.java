@@ -17,4 +17,6 @@ public class AuthResponse {
     private String userTag;
     private String friendCode;
     boolean isVerified;
+    private UUID activeCourseId;
+    private String activeCourseCode;
 }

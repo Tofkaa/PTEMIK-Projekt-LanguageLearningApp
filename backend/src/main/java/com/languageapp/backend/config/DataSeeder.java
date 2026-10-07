@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -35,24 +37,42 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     public void run(String @NonNull ... args) {
         if (topicRepository.count() == 0) {
-            log.info("Database is empty. Initializing structured seed data from JSON...");
-            seedCurriculumFromJson();
+            log.info("Database is empty. Initializing structured seed data from JSON files...");
+            seedCurriculumFromMultipleJsons();
         }
 
         log.info("Checking and synchronizing achievements...");
         syncAchievementsFromJson();
     }
 
-    private void seedCurriculumFromJson() {
+    /**
+     * Dynamically reads all files from the resources/data/ folder,
+     * whose name starts with 'curriculum-' and ends with '.json'.
+     */
+    private void seedCurriculumFromMultipleJsons() {
         try {
-            InputStream inputStream = new ClassPathResource("data/curriculum-seed.json").getInputStream();
-            List<TopicImportRequest> topics = objectMapper.readValue(inputStream, new TypeReference<List<TopicImportRequest>>() {});
-            for (TopicImportRequest topicReq : topics) {
-                curriculumService.importTopicAndLessons(topicReq);
+            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+            Resource[] resources = resolver.getResources("classpath*:data/curriculum-*.json");
+
+            if (resources.length == 0) {
+                log.warn("Nem található curriculum seed fájl a 'data/' mappában!");
+                return;
+            }
+
+            for (Resource resource : resources) {
+                log.info("Tananyag betöltése fájlból: {}", resource.getFilename());
+                try (InputStream inputStream = resource.getInputStream()) {
+                    List<TopicImportRequest> topics = objectMapper.readValue(inputStream, new TypeReference<List<TopicImportRequest>>() {});
+                    for (TopicImportRequest topicReq : topics) {
+                        curriculumService.importTopicAndLessons(topicReq);
+                    }
+                } catch (Exception e) {
+                    log.error("Hiba a {} fájl beolvasásakor: {}", resource.getFilename(), e.getMessage());
+                }
             }
             log.info("Curriculum seed data initialization completed successfully.");
         } catch (Exception e) {
-            log.error("Failed to seed curriculum from JSON file: {}", e.getMessage(), e);
+            log.error("Failed to locate or read curriculum seed files: {}", e.getMessage(), e);
         }
     }
 
@@ -65,7 +85,6 @@ public class DataSeeder implements CommandLineRunner {
             Set<String> existingNames = existingAchievements.stream()
                     .map(Achievement::getName)
                     .collect(Collectors.toSet());
-
 
             List<Achievement> newAchievements = seedAchievements.stream()
                     .filter(ach -> !existingNames.contains(ach.getName()))

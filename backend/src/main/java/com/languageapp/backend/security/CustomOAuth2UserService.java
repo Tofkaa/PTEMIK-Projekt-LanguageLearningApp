@@ -1,9 +1,11 @@
 package com.languageapp.backend.security;
 
+import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.AuthProvider;
 import com.languageapp.backend.enums.DifficultyLevel;
 import com.languageapp.backend.enums.Role;
+import com.languageapp.backend.repository.CourseRepository;
 import com.languageapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,7 @@ import java.util.Random;
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
+    private final CourseRepository courseRepository;
 
     @Override
     @Transactional
@@ -79,6 +82,10 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             user.setPreferredDifficulty(DifficultyLevel.DYNAMIC);
             user.setVerified(true); // email was verified externally
             user.setLastLogin(LocalDateTime.now());
+
+            Course defaultCourse = courseRepository.findByLanguageCode("en")
+                    .orElseThrow(() -> new RuntimeException("Alapértelmezett kurzus nem található!"));
+            user.setActiveCourse(defaultCourse);
 
             // Friend code and tag generation
             user.setFriendCode(generateUniqueFriendCode());

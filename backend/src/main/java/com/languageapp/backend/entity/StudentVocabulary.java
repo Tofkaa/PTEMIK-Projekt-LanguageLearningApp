@@ -30,6 +30,10 @@ public class StudentVocabulary {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id", nullable = false)
+    private Course course;
+
     /**
      * The target language word or phrase.
      */

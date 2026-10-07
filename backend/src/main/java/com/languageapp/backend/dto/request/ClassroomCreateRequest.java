@@ -11,4 +11,7 @@ public class ClassroomCreateRequest {
     private String name;
 
     private String description;
+
+    @NotBlank(message = "A kurzus kódja nem lehet üres.")
+    private String courseCode;
 }

@@ -1,11 +1,13 @@
 package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.response.UserResponse;
+import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.EmailChangeToken;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.DifficultyLevel;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.BadRequestException;
+import com.languageapp.backend.repository.CourseRepository;
 import com.languageapp.backend.repository.EmailChangeTokenRepository;
 import com.languageapp.backend.repository.ProgressRepository;
 import com.languageapp.backend.repository.UserRepository;
@@ -35,10 +37,10 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private ProgressRepository progressRepository; // Szükséges a UserService konstruktorához
+    private ProgressRepository progressRepository;
 
     @Mock
-    private ImageStorageService imageStorageService; // Ezt mockoljuk, hogy ne hívja a Cloudinary-t
+    private ImageStorageService imageStorageService;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -49,8 +51,25 @@ class UserServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private CourseRepository courseRepository; // ÚJ: Mockoljuk a CourseRepository-t
+
     @InjectMocks
     private UserService userService;
+
+    // Segédmetódus a teszt User létrehozására Course-al
+    private User createTestUserWithCourse(String email) {
+        User user = new User();
+        user.setUserId(UUID.randomUUID());
+        user.setEmail(email);
+
+        Course course = new Course();
+        course.setCourseId(UUID.randomUUID());
+        course.setLanguageCode("en");
+        user.setActiveCourse(course);
+
+        return user;
+    }
 
     @Test
     void updateProfilePicture_ShouldUploadAndSaveUrl() throws Exception {
@@ -58,8 +77,7 @@ class UserServiceTest {
         String testEmail = "diak@gmail.com";
         String expectedUrl = "https://res.cloudinary.com/demo/image/upload/v1234/test.jpg";
 
-        User mockUser = new User();
-        mockUser.setEmail(testEmail);
+        User mockUser = createTestUserWithCourse(testEmail);
 
         // Egy memóriában lévő, fiktív fájl létrehozása
         MockMultipartFile mockFile = new MockMultipartFile(
@@ -89,9 +107,7 @@ class UserServiceTest {
     void updateUserName_ShouldUpdateNameAndGenerateNewFourDigitTag() {
         // 1. Arrange
         String testEmail = "diak@gmail.com";
-        User mockUser = new User();
-        mockUser.setUserId(UUID.randomUUID());
-        mockUser.setEmail(testEmail);
+        User mockUser = createTestUserWithCourse(testEmail);
         mockUser.setName("RegiNev");
         mockUser.setUserTag("1234");
         mockUser.setFriendCode("AB1-CD");
@@ -117,8 +133,7 @@ class UserServiceTest {
     void changePassword_WithCorrectCurrentPassword_ShouldEncodeAndSaveNewPassword() {
         // 1. Arrange
         String testEmail = "diak@gmail.com";
-        User mockUser = new User();
-        mockUser.setEmail(testEmail);
+        User mockUser = createTestUserWithCourse(testEmail);
         mockUser.setPasswordHash("hashed_old_password");
 
         when(userRepository.findByEmail(testEmail)).thenReturn(Optional.of(mockUser));
@@ -138,8 +153,7 @@ class UserServiceTest {
     void changePassword_WithWrongCurrentPassword_ShouldThrowBadRequestException() {
         // 1. Arrange
         String testEmail = "diak@gmail.com";
-        User mockUser = new User();
-        mockUser.setEmail(testEmail);
+        User mockUser = createTestUserWithCourse(testEmail);
         mockUser.setPasswordHash("hashed_old_password");
 
         when(userRepository.findByEmail(testEmail)).thenReturn(Optional.of(mockUser));
@@ -157,9 +171,7 @@ class UserServiceTest {
         // 1. Arrange
         String currentEmail = "diak@gmail.com";
         String newEmail = "uj.diak@gmail.com";
-        User mockUser = new User();
-        mockUser.setUserId(UUID.randomUUID());
-        mockUser.setEmail(currentEmail);
+        User mockUser = createTestUserWithCourse(currentEmail);
         mockUser.setPasswordHash("hashed_password");
 
         when(userRepository.findByEmail(currentEmail)).thenReturn(Optional.of(mockUser));
@@ -188,9 +200,7 @@ class UserServiceTest {
         // 1. Arrange
         String currentEmail = "diak@gmail.com";
         String newEmail = "uj.diak@gmail.com";
-        User mockUser = new User();
-        mockUser.setUserId(UUID.randomUUID());
-        mockUser.setEmail(currentEmail);
+        User mockUser = createTestUserWithCourse(currentEmail);
 
         EmailChangeToken validToken = new EmailChangeToken();
         validToken.setUser(mockUser);
@@ -215,9 +225,7 @@ class UserServiceTest {
     void verifyEmailChange_WithInvalidOtp_ShouldThrowBadRequestException() {
         // 1. Arrange
         String currentEmail = "diak@gmail.com";
-        User mockUser = new User();
-        mockUser.setUserId(UUID.randomUUID());
-        mockUser.setEmail(currentEmail);
+        User mockUser = createTestUserWithCourse(currentEmail);
 
         EmailChangeToken validToken = new EmailChangeToken();
         validToken.setUser(mockUser);
@@ -236,5 +244,50 @@ class UserServiceTest {
         assertEquals(currentEmail, mockUser.getEmail(), "Hibás kód esetén az eredeti e-mailnek kell maradnia");
         verify(userRepository, never()).save(any());
         verify(emailChangeTokenRepository, never()).delete(any());
+    }
+
+    // --- ÚJ TESZT: Nyelvváltás (changeActiveCourse) ---
+    @Test
+    void changeActiveCourse_WithValidCourse_ShouldUpdateAndReturnProfile() {
+        // 1. Arrange
+        String email = "diak@gmail.com";
+        User mockUser = createTestUserWithCourse(email); // Jelenleg 'en'
+        mockUser.setRole(Role.STUDENT);
+        mockUser.setPreferredDifficulty(DifficultyLevel.EASY);
+
+        Course newCourse = new Course();
+        newCourse.setCourseId(UUID.randomUUID());
+        newCourse.setLanguageCode("es");
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(mockUser));
+        when(courseRepository.findByLanguageCode("es")).thenReturn(Optional.of(newCourse));
+        // A save() ne csináljon semmit, csak fusson le
+
+        // 2. Act
+        UserResponse response = userService.changeActiveCourse(email, "es");
+
+        // 3. Assert
+        assertEquals("es", mockUser.getActiveCourse().getLanguageCode());
+        assertEquals("es", response.getActiveCourseCode());
+        verify(userRepository, times(1)).save(mockUser);
+    }
+
+    @Test
+    void changeActiveCourse_SameCourse_ShouldNotHitDatabase() {
+        // 1. Arrange
+        String email = "diak@gmail.com";
+        User mockUser = createTestUserWithCourse(email); // Jelenleg 'en'
+        mockUser.setRole(Role.STUDENT);
+        mockUser.setPreferredDifficulty(DifficultyLevel.EASY);
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(mockUser));
+
+        // 2. Act
+        UserResponse response = userService.changeActiveCourse(email, "en");
+
+        // 3. Assert
+        assertEquals("en", response.getActiveCourseCode());
+        verify(courseRepository, never()).findByLanguageCode(anyString());
+        verify(userRepository, never()).save(any());
     }
 }

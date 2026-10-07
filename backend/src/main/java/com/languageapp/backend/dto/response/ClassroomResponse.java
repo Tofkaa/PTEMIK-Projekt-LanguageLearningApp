@@ -15,5 +15,6 @@ public class ClassroomResponse {
     private String teacherName;
     private LocalDateTime createdAt;
     private int activeMemberCount;
-
+    private UUID courseId;
+    private String courseCode;
 }

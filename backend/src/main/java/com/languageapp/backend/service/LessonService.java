@@ -58,8 +58,10 @@ public class LessonService {
         String targetDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
         log.info("Target difficulty for user {} is set to: {}", userEmail, targetDifficulty);
 
+        UUID activeCourseId = user.getActiveCourse().getCourseId();
+
         // 2. Only get the correct lessons for desired difficulty
-        List<Lesson> tailoredLessons = lessonRepository.findByDifficulty(targetDifficulty)
+        List<Lesson> tailoredLessons = lessonRepository.findByDifficultyAndTopic_Course_CourseId(targetDifficulty, activeCourseId)
                 .stream()
                 .filter(lesson -> lesson.isActive() && lesson.getTopic().isActive())
                 .toList();
@@ -122,8 +124,13 @@ public class LessonService {
      * This is safe because it only reveals the names and IDs, not the lesson content!
      */
     @Transactional(readOnly = true)
-    public List<LessonResponse> getAllLessonsForChallengeDropdown() {
-        return lessonRepository.findAll().stream()
+    public List<LessonResponse> getAllLessonsForChallengeDropdown(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
+
+        UUID activeCourseId = user.getActiveCourse().getCourseId();
+
+        return lessonRepository.findByTopic_Course_CourseId(activeCourseId).stream()
                 .filter(lesson -> lesson.isActive() && lesson.getTopic().isActive())
                 .map(lesson -> new LessonResponse(
                         lesson.getLessonId(),

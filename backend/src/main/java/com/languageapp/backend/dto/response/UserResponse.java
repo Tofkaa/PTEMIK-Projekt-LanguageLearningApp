@@ -28,5 +28,7 @@ public class UserResponse {
     private String friendCode;
     private boolean isVerified;
     private String profilePictureUrl;
+    private UUID activeCourseId;
+    private String activeCourseCode;
 
 }

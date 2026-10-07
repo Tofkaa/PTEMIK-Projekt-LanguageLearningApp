@@ -6,6 +6,7 @@ import com.languageapp.backend.dto.request.DynamicPracticeSubmitRequest;
 import com.languageapp.backend.dto.response.DynamicExerciseDTO;
 import com.languageapp.backend.dto.response.VocabularyDetailDTO;
 import com.languageapp.backend.dto.response.VocabularyResponse;
+import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.StudentVocabulary;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.exception.ForbiddenException;
@@ -41,58 +42,50 @@ public class VocabularyService {
 
         String cleanWord = word.trim().toLowerCase();
 
+        // Fetch the user's currently active course for multi-language support
+        Course activeCourse = user.getActiveCourse();
 
-        Optional<StudentVocabulary> existing = vocabularyRepository.findByUser_UserIdAndWordIgnoreCase(user.getUserId(), cleanWord);
+        // Check if the word already exists in the vocabulary specific to the user's active course
+        Optional<StudentVocabulary> existing = vocabularyRepository.findByUser_UserIdAndCourse_CourseIdAndWordIgnoreCase(user.getUserId(), activeCourse.getCourseId(), cleanWord);
 
         if (existing.isPresent()) {
             StudentVocabulary voc = existing.get();
-            return VocabularyResponse.builder()
-                    .vocabularyId(voc.getVocabularyId())
-                    .word(voc.getWord())
-                    .translation(voc.getTranslation())
-                    .srsLevel(voc.getSrsLevel())
-                    .nextPracticeAt(voc.getNextPracticeAt())
-                    .isNewAddition(false)
-                    .build();
+            return buildVocabularyResponse(voc, false);
         }
 
-        String translation = fetchTranslationFromExternalApi(cleanWord);
+        // Fetch translation dynamically using the active course's language code (e.g., 'es', 'de')
+        String translation = fetchTranslationFromExternalApi(cleanWord, activeCourse.getLanguageCode());
 
         StudentVocabulary newVoc = new StudentVocabulary();
         newVoc.setUser(user);
+
+        // Associate the newly saved word with the user's active course
+        newVoc.setCourse(activeCourse);
         newVoc.setWord(cleanWord);
         newVoc.setTranslation(translation);
         newVoc.setSource(source != null ? source : "DICTIONARY");
 
         newVoc = vocabularyRepository.save(newVoc);
 
-        log.info("New word '{}' added to user {}'s vocabulary", cleanWord, email);
+        log.info("New word '{}' added to user {}'s {} vocabulary", cleanWord, email, activeCourse.getLanguageCode());
 
-        return VocabularyResponse.builder()
-                .vocabularyId(newVoc.getVocabularyId())
-                .word(newVoc.getWord())
-                .translation(newVoc.getTranslation())
-                .srsLevel(newVoc.getSrsLevel())
-                .nextPracticeAt(newVoc.getNextPracticeAt())
-                .isNewAddition(true)
-                .build();
+        return buildVocabularyResponse(newVoc, true);
     }
 
     /**
-     * External API Call for fetching translation from MyMemory API
+     * External API Call for fetching translation from MyMemory API.
+     * Dynamically injects the target course's language code for correct translation pairing.
      */
-    private String fetchTranslationFromExternalApi(String word) {
+    private String fetchTranslationFromExternalApi(String word, String courseCode) {
         try {
             String cleanWord = word.trim().toLowerCase();
-            String url = "https://api.mymemory.translated.net/get?q={word}&langpair=en|hu";
 
-            // optinal for higher rate limit
-            // String url = "https://api.mymemory.translated.net/get?q={word}&langpair=en|hu&de=email@gmail.com";
+            // Construct the dynamic URL using the courseCode variable
+            String url = "https://api.mymemory.translated.net/get?q={word}&langpair=" + courseCode + "|hu";
 
             String response = restTemplate.getForObject(url, String.class, cleanWord);
 
             JsonNode root = objectMapper.readTree(response);
-
             String translatedText = root.path("responseData").path("translatedText").asText();
 
             if (translatedText != null && !translatedText.isEmpty() && !translatedText.contains("MYMEMORY WARNING")) {
@@ -140,54 +133,43 @@ public class VocabularyService {
         voc.setNextPracticeAt(LocalDateTime.now().plusDays(daysToAdd));
         StudentVocabulary updatedVoc = vocabularyRepository.save(voc);
 
-        return VocabularyResponse.builder()
-                .vocabularyId(updatedVoc.getVocabularyId())
-                .word(updatedVoc.getWord())
-                .translation(updatedVoc.getTranslation())
-                .srsLevel(updatedVoc.getSrsLevel())
-                .nextPracticeAt(updatedVoc.getNextPracticeAt())
-                .isNewAddition(false)
-                .build();
+        return buildVocabularyResponse(updatedVoc, false);
     }
 
     /**
      * Retrieves the words that the student needs to repeat up to the current time.
      * Results are in ascending order of next practice time (oldest due first).
+     * Now strictly filtered by the user's actively selected language course.
      */
     @Transactional(readOnly = true)
     public List<VocabularyResponse> getDueVocabularyForToday(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-
         LocalDateTime now = LocalDateTime.now();
 
+        // Query due vocabulary specifically isolated to the active course ID
         List<StudentVocabulary> dueVocabs = vocabularyRepository
-                .findAllByUser_UserIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(user.getUserId(), now);
+                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(user.getUserId(), user.getActiveCourse().getCourseId(), now);
 
         return dueVocabs.stream()
-                .map(voc -> VocabularyResponse.builder()
-                        .vocabularyId(voc.getVocabularyId())
-                        .word(voc.getWord())
-                        .translation(voc.getTranslation())
-                        .srsLevel(voc.getSrsLevel())
-                        .nextPracticeAt(voc.getNextPracticeAt())
-                        .isNewAddition(false)
-                        .build())
+                .map(voc -> buildVocabularyResponse(voc, false))
                 .toList();
     }
 
     /**
      * Returns the entire student dictionary as a key-value (word -> SRS level) map.
      * This optimizes frontend rendering, avoiding unnecessary API calls.
+     * Generates the map exclusively from words belonging to the currently active course.
      */
     @Transactional(readOnly = true)
     public Map<String, Integer> getVocabularyMap(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+        // Fetch words tied to the currently active course
         List<StudentVocabulary> allVocabs = vocabularyRepository
-                .findAllByUser_UserIdOrderByFirstSeenAtDesc(user.getUserId());
+                .findAllByUser_UserIdAndCourse_CourseIdOrderByFirstSeenAtDesc(user.getUserId(), user.getActiveCourse().getCourseId());
 
         return allVocabs.stream()
                 .filter(voc -> voc.getSrsLevel() >= 3)
@@ -199,14 +181,16 @@ public class VocabularyService {
     }
 
     /**
-     * Visszaadja a diák összes mentett szavát részletes SRS adatokkal a Vocabulary Hub számára.
+     * Returns all of the student's saved words with detailed SRS data for Vocabulary Hub.
+     * Added course-level filtering.
      */
     @Transactional(readOnly = true)
     public List<VocabularyDetailDTO> getDetailedVocabularyForUser(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        List<StudentVocabulary> entries = vocabularyRepository.findAllByUser(user);
+        // Fetch dictionary entries specifically for the active course
+        List<StudentVocabulary> entries = vocabularyRepository.findAllByUserAndCourse(user, user.getActiveCourse());
 
         return entries.stream().map(v -> new VocabularyDetailDTO(
                 v.getWord(),
@@ -219,26 +203,32 @@ public class VocabularyService {
 
     /**
      * Add words to user's vocabulary where they did not request the clickabletext help and still got the answer right.
-     * This means the user presumably already knew the meaning well enough to grant them a srs level of 2
+     * This means the user presumably already knew the meaning well enough to grant them a srs level of 2.
+     * The batch process now respects the multi-language boundary.
      */
-      @Transactional
+    @Transactional
     public void addKnownWordsBatch(String email, List<String> words) {
         if (words == null || words.isEmpty()) return;
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+        // Establish context of the current active language course
+        Course activeCourse = user.getActiveCourse();
+
         for (String word : words) {
             String cleanWord = word.trim().toLowerCase();
 
-            if (vocabularyRepository.findByUser_UserIdAndWordIgnoreCase(user.getUserId(), cleanWord).isPresent()) {
+            // Prevent duplicates within the same language course
+            if (vocabularyRepository.findByUser_UserIdAndCourse_CourseIdAndWordIgnoreCase(user.getUserId(), activeCourse.getCourseId(), cleanWord).isPresent()) {
                 continue;
             }
 
-            String translation = fetchTranslationFromExternalApi(cleanWord);
+            String translation = fetchTranslationFromExternalApi(cleanWord, activeCourse.getLanguageCode());
 
             StudentVocabulary newVoc = new StudentVocabulary();
             newVoc.setUser(user);
+            newVoc.setCourse(activeCourse); // Link to course
             newVoc.setWord(cleanWord);
             newVoc.setTranslation(translation);
             newVoc.setSource("AUTO_LEARNED");
@@ -251,7 +241,8 @@ public class VocabularyService {
     }
 
     /**
-     * Generate Dynamic Practice session from due words in the users vocabulary
+     * Generate Dynamic Practice session from due words in the users vocabulary.
+     * Exercises and multiple-choice distractors are generated exclusively from the active course's word pool.
      */
     @Transactional(readOnly = true)
     public List<DynamicExerciseDTO> generateDynamicPracticeSession(String email, int limit) {
@@ -259,16 +250,18 @@ public class VocabularyService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         LocalDateTime now = LocalDateTime.now();
+        UUID courseId = user.getActiveCourse().getCourseId();
 
+        // Fetch due words only from the currently active course
         List<StudentVocabulary> dueWords = vocabularyRepository
-                .findAllByUser_UserIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(user.getUserId(), now);
-
+                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(user.getUserId(), courseId, now);
 
         if (dueWords.size() > limit) {
             dueWords = dueWords.subList(0, limit);
         }
 
-        List<StudentVocabulary> allUserWords = vocabularyRepository.findAllByUser(user);
+        // Fetch all words from the active course to serve as wrong options (distractors)
+        List<StudentVocabulary> allCourseWords = vocabularyRepository.findAllByUserAndCourse(user, user.getActiveCourse());
         List<DynamicExerciseDTO> dynamicExercises = new ArrayList<>();
 
         for (StudentVocabulary item : dueWords) {
@@ -276,7 +269,7 @@ public class VocabularyService {
 
             if (exerciseTypeSelector == 0) {
 
-                List<String> wrongOptions = allUserWords.stream()
+                List<String> wrongOptions = allCourseWords.stream()
                         .filter(w -> !w.getWord().equalsIgnoreCase(item.getWord()))
                         .map(StudentVocabulary::getTranslation)
                         .distinct()
@@ -331,6 +324,10 @@ public class VocabularyService {
         return dynamicExercises;
     }
 
+    /**
+     * Processes practice session submissions, ensuring evaluations and SRS updates
+     * are strictly applied to words belonging to the active course context.
+     */
     @Transactional
     public Map<String, Object> processDynamicPracticeSession(String email, DynamicPracticeSubmitRequest request) {
         User user = userRepository.findByEmail(email)
@@ -340,9 +337,14 @@ public class VocabularyService {
         int totalQuestions = request.getResults().size();
         int earnedXp = 0;
 
+        // Ensure words are updated within the correct language course context
+        UUID courseId = user.getActiveCourse().getCourseId();
+
         for (DynamicPracticeSubmitRequest.AnswerResult result : request.getResults()) {
+
+            // Search for the submitted word specifically within the active course's vocabulary
             Optional<StudentVocabulary> vocOpt = vocabularyRepository
-                    .findByUser_UserIdAndWordIgnoreCase(user.getUserId(), result.getTargetWord());
+                    .findByUser_UserIdAndCourse_CourseIdAndWordIgnoreCase(user.getUserId(), courseId, result.getTargetWord());
 
             if (vocOpt.isPresent()) {
                 StudentVocabulary voc = vocOpt.get();
@@ -396,5 +398,19 @@ public class VocabularyService {
                 "earnedXp", earnedXp,
                 "newStreak", user.getStreak()
         );
+    }
+
+    /**
+     * Helper method to map StudentVocabulary to VocabularyResponse
+     */
+    private VocabularyResponse buildVocabularyResponse(StudentVocabulary voc, boolean isNewAddition) {
+        return VocabularyResponse.builder()
+                .vocabularyId(voc.getVocabularyId())
+                .word(voc.getWord())
+                .translation(voc.getTranslation())
+                .srsLevel(voc.getSrsLevel())
+                .nextPracticeAt(voc.getNextPracticeAt())
+                .isNewAddition(isNewAddition)
+                .build();
     }
 }

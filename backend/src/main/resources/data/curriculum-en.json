@@ -1,5 +1,6 @@
 [
   {
+    "courseCode": "en",
     "topicName": "Alapvető Szókincs",
     "description": "Kezdő angol szavak és kifejezések a mindennapokhoz.",
     "lessons": [
@@ -286,6 +287,7 @@
     ]
   },
   {
+    "courseCode": "en",
     "topicName": "Utazás és Közlekedés",
     "description": "Minden, amire egy külföldi utazás során szükséged lehet.",
     "lessons": [
@@ -541,6 +543,7 @@
     ]
   },
   {
+    "courseCode": "en",
     "topicName": "Ételek és Étterem",
     "description": "Rendelés, fizetés és az ételek megnevezése.",
     "lessons": [

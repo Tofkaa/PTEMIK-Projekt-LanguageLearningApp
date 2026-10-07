@@ -71,8 +71,11 @@ public class User {
     @Column(name = "profile_picture_url", columnDefinition = "TEXT")
     private String profilePictureUrl;
 
-    @Column(name = "preferred_language", nullable = false, length = 10)
-    private String preferredLanguage = "en";
+//    @Column(name = "preferred_language", nullable = false, length = 10)
+//    private String preferredLanguage = "en";
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "active_course_id")
+    private Course activeCourse;
 
     /**
      * User's preferred difficulty level for adaptive learning.

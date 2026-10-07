@@ -50,6 +50,19 @@ public class UserController {
     }
 
     /**
+     * Updates the authenticated user's active learning language (Course).
+     */
+    @PatchMapping("/me/active-course")
+    public ResponseEntity<UserResponse> updateActiveCourse(
+            @RequestParam String courseCode,
+            Authentication authentication) {
+
+        log.info("REST request to change active course to '{}' for user: {}", courseCode, authentication.getName());
+        UserResponse updatedUser = userService.changeActiveCourse(authentication.getName(), courseCode);
+        return ResponseEntity.ok(updatedUser);
+    }
+
+    /**
      * Uploads and updates the authenticated user's profile picture.
      */
     @PostMapping(value = "/me/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

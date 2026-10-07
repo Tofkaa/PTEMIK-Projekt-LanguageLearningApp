@@ -12,4 +12,6 @@ import java.util.UUID;
 public interface LessonTopicRepository extends JpaRepository<LessonTopic, UUID> {
     @Query(value = "SELECT t.* FROM lesson_topics t", nativeQuery = true)
     List<LessonTopic> findAllTopicsIncludingDeleted();
+
+    List<LessonTopic> findByCourse_CourseId(UUID courseId);
 }

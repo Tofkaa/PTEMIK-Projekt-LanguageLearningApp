@@ -3,10 +3,12 @@ package com.languageapp.backend.service;
 import com.languageapp.backend.dto.request.ExerciseImportRequest;
 import com.languageapp.backend.dto.request.LessonImportRequest;
 import com.languageapp.backend.dto.request.TopicImportRequest;
+import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.Exercise;
 import com.languageapp.backend.entity.Lesson;
 import com.languageapp.backend.entity.LessonTopic;
 import com.languageapp.backend.exception.ResourceNotFoundException;
+import com.languageapp.backend.repository.CourseRepository;
 import com.languageapp.backend.repository.ExerciseRepository;
 import com.languageapp.backend.repository.LessonRepository;
 import com.languageapp.backend.repository.LessonTopicRepository;
@@ -29,6 +31,7 @@ public class CurriculumService {
     private final LessonTopicRepository topicRepository;
     private final LessonRepository lessonRepository;
     private final ExerciseRepository exerciseRepository;
+    private final CourseRepository courseRepository;
 
     /**
      * Imports a full curriculum structure (Topic -> Lessons -> Exercises) from a JSON request.
@@ -36,10 +39,15 @@ public class CurriculumService {
     @Transactional
     public void importTopicAndLessons(TopicImportRequest request) {
         log.info("Starting curriculum import for topic: {}", request.getTopicName());
+        String targetCourseCode = request.getCourseCode() != null ? request.getCourseCode() : "en";
+
+        Course course = courseRepository.findByLanguageCode(targetCourseCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Nem található kurzus ezzel a kóddal: " + targetCourseCode));
 
         LessonTopic topic = new LessonTopic();
         topic.setName(request.getTopicName());
         topic.setDescription(request.getDescription());
+        topic.setCourse(course);
 
         LessonTopic savedTopic = topicRepository.save(topic);
         log.info("Saved Topic with ID: {}", savedTopic.getTopicId());

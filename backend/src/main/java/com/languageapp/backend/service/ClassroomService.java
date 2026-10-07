@@ -5,6 +5,7 @@ import com.languageapp.backend.dto.response.ClassroomMemberResponse;
 import com.languageapp.backend.dto.response.ClassroomResponse;
 import com.languageapp.backend.entity.Classroom;
 import com.languageapp.backend.entity.ClassroomMember;
+import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.MembershipStatus;
 import com.languageapp.backend.enums.Role;
@@ -13,6 +14,7 @@ import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.ClassroomMemberRepository;
 import com.languageapp.backend.repository.ClassroomRepository;
+import com.languageapp.backend.repository.CourseRepository;
 import com.languageapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,7 @@ public class ClassroomService {
     private final ClassroomRepository classroomRepository;
     private final ClassroomMemberRepository classroomMemberRepository;
     private final UserRepository userRepository;
+    private final CourseRepository courseRepository;
 
     private static final String INVITE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int INVITE_CODE_LENGTH = 8;
@@ -51,10 +54,14 @@ public class ClassroomService {
             throw new BadRequestException("Only teachers can create classrooms.");
         }
 
+        Course targetCourse = courseRepository.findByLanguageCode(request.getCourseCode().toLowerCase())
+                .orElseThrow(() -> new BadRequestException("Nem található kurzus ezzel a kóddal: " + request.getCourseCode()));
+
         Classroom classroom = new Classroom();
         classroom.setName(request.getName());
         classroom.setDescription(request.getDescription());
         classroom.setTeacher(teacher);
+        classroom.setCourse(targetCourse);
 
         String inviteCode;
         do {
@@ -253,7 +260,9 @@ public class ClassroomService {
                 classroom.getInviteCode(),
                 classroom.getTeacher().getName(),
                 classroom.getCreatedAt(),
-                activeMemberCount
+                activeMemberCount,
+                classroom.getCourse().getCourseId(),
+                classroom.getCourse().getLanguageCode()
         );
     }
 

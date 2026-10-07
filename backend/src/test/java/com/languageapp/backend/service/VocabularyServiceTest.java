@@ -1,6 +1,7 @@
 package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.response.VocabularyResponse;
+import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.StudentVocabulary;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.exception.ForbiddenException;
@@ -37,19 +38,28 @@ class VocabularyServiceTest {
     private UserRepository userRepository;
 
     private User testUser;
+    private Course testCourse;
     private StudentVocabulary testVocabulary;
     private final UUID VOCAB_ID = UUID.randomUUID();
+    private final UUID COURSE_ID = UUID.randomUUID();
     private final String USER_EMAIL = "vau@gmail.com";
 
     @BeforeEach
     void setUp() {
+        // ÚJ: Kurzus beállítása a teszteléshez a többnyelvűség miatt
+        testCourse = new Course();
+        testCourse.setCourseId(COURSE_ID);
+        testCourse.setLanguageCode("en");
+
         testUser = new User();
         testUser.setEmail(USER_EMAIL);
         testUser.setUserId(UUID.randomUUID());
+        testUser.setActiveCourse(testCourse); // A felhasználóhoz kötjük az aktív kurzust
 
         testVocabulary = new StudentVocabulary();
         testVocabulary.setVocabularyId(VOCAB_ID);
         testVocabulary.setUser(testUser);
+        testVocabulary.setCourse(testCourse); // A szó is kap kurzust
         testVocabulary.setWord("apple");
         testVocabulary.setTranslation("alma");
         testVocabulary.setSrsLevel(0);
@@ -77,9 +87,9 @@ class VocabularyServiceTest {
         // Arrange
         when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.of(testUser));
 
-        // A Mockito any() paraméterével jelezzük, hogy bármilyen LocalDateTime-ot elfogadunk a metódushívásnál
-        when(vocabularyRepository.findAllByUser_UserIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(
-                eq(testUser.getUserId()), any(LocalDateTime.class)))
+        // A Mockito any() és eq() paramétereivel jelezzük az új kurzus alapú lekérdezést
+        when(vocabularyRepository.findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(
+                eq(testUser.getUserId()), eq(testCourse.getCourseId()), any(LocalDateTime.class)))
                 .thenReturn(List.of(testVocabulary));
 
         // Act
@@ -104,9 +114,9 @@ class VocabularyServiceTest {
             vocabularyService.getDueVocabularyForToday(unknownEmail);
         }, "Kivételt kell dobnia, ha a felhasználó nem létezik");
 
-        // Ellenőrizzük, hogy ilyenkor biztosan nem futott-e le az adatbázis lekérdezés a szavakra
+        // Ellenőrizzük, hogy ilyenkor biztosan nem futott-e le az adatbázis lekérdezés a szavakra (az új metódusnévvel)
         verify(vocabularyRepository, never())
-                .findAllByUser_UserIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(any(), any());
+                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(any(), any(), any());
     }
 
     @Test
@@ -148,12 +158,15 @@ class VocabularyServiceTest {
         StudentVocabulary lowLevelVocab = new StudentVocabulary();
         lowLevelVocab.setWord("apple");
         lowLevelVocab.setSrsLevel(0);
+        lowLevelVocab.setCourse(testCourse); // Új
 
         StudentVocabulary highLevelVocab = new StudentVocabulary();
         highLevelVocab.setWord("banana");
         highLevelVocab.setSrsLevel(3);
+        highLevelVocab.setCourse(testCourse); // Új
 
-        when(vocabularyRepository.findAllByUser_UserIdOrderByFirstSeenAtDesc(testUser.getUserId()))
+        // Frissített metódushívás a courseId-val
+        when(vocabularyRepository.findAllByUser_UserIdAndCourse_CourseIdOrderByFirstSeenAtDesc(testUser.getUserId(), testCourse.getCourseId()))
                 .thenReturn(List.of(lowLevelVocab, highLevelVocab));
 
         // Act
@@ -178,7 +191,8 @@ class VocabularyServiceTest {
             vocabularyService.getVocabularyMap(unknownEmail);
         }, "Kivételt kell dobnia, ha a felhasználó nem létezik");
 
-        verify(vocabularyRepository, never()).findAllByUser_UserIdOrderByFirstSeenAtDesc(any());
+        // Frissített verify hívás
+        verify(vocabularyRepository, never()).findAllByUser_UserIdAndCourse_CourseIdOrderByFirstSeenAtDesc(any(), any());
     }
 
 }

@@ -1,5 +1,6 @@
 package com.languageapp.backend.repository;
 
+import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.StudentVocabulary;
 import com.languageapp.backend.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,44 +19,36 @@ import java.util.UUID;
 @Repository
 public interface StudentVocabularyRepository extends JpaRepository<StudentVocabulary, UUID> {
 
-    /**
-     * Retrieves the entire saved vocabulary for a specific user, ordered by acquisition date.
-     */
-    List<StudentVocabulary> findAllByUser_UserIdOrderByFirstSeenAtDesc(UUID userId);
+    // --- GLOBÁLIS METÓDUSOK (AchievementService és Tesztek használják) ---
 
-    /**
-     * Checks for the existence of a word in a user's vocabulary to prevent duplicates.
-     */
-    Optional<StudentVocabulary> findByUser_UserIdAndWordIgnoreCase(UUID userId, String word);
-
-    /**
-     * Fetches vocabulary items scheduled for review up to the specified time.
-     */
-    List<StudentVocabulary> findAllByUser_UserIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(UUID userId, LocalDateTime time);
-
-    /**
-     * Counts the number of vocabulary items currently due for review.
-     */
-    long countByUser_UserIdAndNextPracticeAtBefore(UUID userId, LocalDateTime time);
-
-    /**
-     * Retrieves all dictionary entries for the user.
-     */
-    List<StudentVocabulary> findAllByUser(User user);
-
-    /**
-     * Retrieves due (or low SRS level) words for dynamic practice.
-     */
-    @Query("SELECT v FROM StudentVocabulary v WHERE v.user.userId = :userId AND (v.nextPracticeAt <= :now OR v.srsLevel < 3) ORDER BY v.nextPracticeAt ASC")
-    List<StudentVocabulary> findDueOrLowLevelWords(@Param("userId") UUID userId, @Param("now") LocalDateTime now);
-
-    /**
-     * Counts the number of words the student has saved so far.
-     */
     long countByUser_UserId(UUID userId);
 
-    /**
-     * Counts words that reach a given SRS level (or above).
-     */
     long countByUser_UserIdAndSrsLevelGreaterThanEqual(UUID userId, int srsLevel);
+
+    List<StudentVocabulary> findAllByUser(User user);
+
+
+    // --- KURZUS-SPECIFIKUS METÓDUSOK (VocabularyService használja a többnyelvűséghez) ---
+
+    /**
+     * Retrieves the saved vocabulary for a specific user and course, ordered by acquisition date.
+     */
+    List<StudentVocabulary> findAllByUser_UserIdAndCourse_CourseIdOrderByFirstSeenAtDesc(UUID userId, UUID courseId);
+
+    /**
+     * Checks for the existence of a word in a user's active course vocabulary to prevent duplicates.
+     */
+    Optional<StudentVocabulary> findByUser_UserIdAndCourse_CourseIdAndWordIgnoreCase(UUID userId, UUID courseId, String word);
+
+    /**
+     * Fetches vocabulary items scheduled for review up to the specified time for a specific course.
+     */
+    List<StudentVocabulary> findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(UUID userId, UUID courseId, LocalDateTime time);
+
+    /**
+     * Retrieves all dictionary entries for the user filtered by their active course.
+     */
+    List<StudentVocabulary> findAllByUserAndCourse(User user, Course course);
+
+    long countByUser_UserIdAndNextPracticeAtBefore(UUID userId, LocalDateTime time);
 }

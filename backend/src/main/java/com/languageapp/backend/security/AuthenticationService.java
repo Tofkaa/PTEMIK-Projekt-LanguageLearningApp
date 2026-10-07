@@ -3,10 +3,12 @@ package com.languageapp.backend.security;
 import com.languageapp.backend.dto.request.LoginRequest;
 import com.languageapp.backend.dto.request.RegisterRequest;
 import com.languageapp.backend.dto.response.AuthResponse;
+import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.entity.VerificationToken;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.BadRequestException;
+import com.languageapp.backend.repository.CourseRepository;
 import com.languageapp.backend.repository.PasswordResetTokenRepository;
 import com.languageapp.backend.repository.UserRepository;
 import com.languageapp.backend.repository.VerificationTokenRepository;
@@ -40,6 +42,7 @@ public class AuthenticationService {
     private final RefreshTokenService refreshTokenService;
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
+    private final CourseRepository courseRepository;
 
     public record AuthResult(AuthResponse responseDto, String refreshToken) {}
 
@@ -94,6 +97,10 @@ public class AuthenticationService {
         } while (userRepository.existsByNameAndUserTag(request.getName(), generatedTag));
         user.setUserTag(generatedTag);
 
+        Course defaultCourse = courseRepository.findByLanguageCode("en")
+                .orElseThrow(() -> new BadRequestException("Belső szerverhiba: Alapértelmezett kurzus nem található. Kérlek, értesítsd az adminisztrátort!"));
+        user.setActiveCourse(defaultCourse);
+
         userRepository.save(user);
         log.info("User successfully saved to database with ID: {}", user.getUserId());
 
@@ -127,7 +134,9 @@ public class AuthenticationService {
                 user.getRole(),
                 user.getUserTag(),
                 user.getFriendCode(),
-                user.isVerified()
+                user.isVerified(),
+                user.getActiveCourse().getCourseId(),
+                user.getActiveCourse().getLanguageCode()
         );
 
         log.info("Tokens successfully generated for user: {}", user.getEmail());
@@ -246,7 +255,9 @@ public class AuthenticationService {
                 user.getRole(),
                 user.getUserTag(),
                 user.getFriendCode(),
-                user.isVerified()
+                user.isVerified(),
+                user.getActiveCourse().getCourseId(),
+                user.getActiveCourse().getLanguageCode()
         );
 
         log.info("User successfully authenticated: {}", user.getEmail());
@@ -283,7 +294,9 @@ public class AuthenticationService {
                             user.getRole(),
                             user.getUserTag(),
                             user.getFriendCode(),
-                            user.isVerified()
+                            user.isVerified(),
+                            user.getActiveCourse().getCourseId(),
+                            user.getActiveCourse().getLanguageCode()
                     );
                 })
                 .orElseThrow(() -> {
