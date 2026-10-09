@@ -77,11 +77,12 @@ const Dashboard = () => {
         }
     }
 
-    /**
-     * Component Lifecycle: Initialization
+/**
+     * Component Lifecycle: Initialization & Language Change Listener
      */
     useEffect(() => {
         const fetchLessons = async () => {
+            setIsLoading(true);
             try {
                 const response = await api.get('/lessons');
                 setLessons(response.data);
@@ -93,8 +94,12 @@ const Dashboard = () => {
             }
         };
 
-        fetchLessons();
-    }, []); 
+        if (user) {
+            fetchLessons();
+        }
+        
+    
+    }, [user?.activeCourseCode]);
 
     // --- DATA TRANSFORMATION ---
     const groupedLessons = lessons.reduce((acc, lesson) => {

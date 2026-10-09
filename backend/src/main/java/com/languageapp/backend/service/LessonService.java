@@ -6,6 +6,7 @@ import com.languageapp.backend.entity.*;
 import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.ChallengeRepository;
+import com.languageapp.backend.repository.CourseRepository;
 import com.languageapp.backend.repository.LessonRepository;
 import com.languageapp.backend.repository.UserRepository;
 import com.languageapp.backend.repository.ProgressRepository;
@@ -33,13 +34,16 @@ import java.util.UUID;
 public class LessonService {
 
     @Value("${app.security.exercise-salt}")
-   private String exerciseSalt;
+    private String exerciseSalt;
 
     private final LessonRepository lessonRepository;
     private final UserRepository userRepository;
     private final UserDifficultyCalculator userDifficultyCalculator;
     private final ProgressRepository progressRepository;
     private final ChallengeRepository challengeRepository;
+
+    // ÚJ: Szükség lesz a CourseRepository-ra a nyelv alapján történő kereséshez
+    private final CourseRepository courseRepository;
 
     /**
      * Retrieves all lessons filtered by the user's preferred or dynamically calculated difficulty.
@@ -124,13 +128,21 @@ public class LessonService {
      * This is safe because it only reveals the names and IDs, not the lesson content!
      */
     @Transactional(readOnly = true)
-    public List<LessonResponse> getAllLessonsForChallengeDropdown(String userEmail) {
+    public List<LessonResponse> getAllLessonsForChallengeDropdown(String userEmail, String requestedCourseCode) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
 
-        UUID activeCourseId = user.getActiveCourse().getCourseId();
+        UUID targetCourseId;
 
-        return lessonRepository.findByTopic_Course_CourseId(activeCourseId).stream()
+        if (requestedCourseCode != null && !requestedCourseCode.isBlank()) {
+            Course requestedCourse = courseRepository.findByLanguageCode(requestedCourseCode.toLowerCase().trim())
+                    .orElseThrow(() -> new ResourceNotFoundException("A kért kurzus (nyelv) nem található: " + requestedCourseCode));
+            targetCourseId = requestedCourse.getCourseId();
+        } else {
+            targetCourseId = user.getActiveCourse().getCourseId();
+        }
+
+        return lessonRepository.findByTopic_Course_CourseId(targetCourseId).stream()
                 .filter(lesson -> lesson.isActive() && lesson.getTopic().isActive())
                 .map(lesson -> new LessonResponse(
                         lesson.getLessonId(),
@@ -185,7 +197,6 @@ public class LessonService {
                 hash
         );
     }
-
 
     /**
      * SHA-256 based hash generator to support client side validation.

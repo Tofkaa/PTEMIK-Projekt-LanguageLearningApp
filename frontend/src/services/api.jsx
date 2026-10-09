@@ -9,9 +9,14 @@ const api = axios.create({
 });
 
 // --- SEGÉDFÜGGVÉNYEK A TOKEN KEZELÉSHEZ ---
-const getToken = () => sessionStorage.getItem('token') || localStorage.getItem('token');
+const getToken = () => {
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+    if (token === 'undefined' || token === 'null') return null;
+    return token;
+};
 
 const setToken = (token) => {
+    if (!token || token === 'undefined') return; 
     if (sessionStorage.getItem('token')) {
         sessionStorage.setItem('token', token);
     } else {
@@ -78,7 +83,14 @@ api.interceptors.response.use(
 
             try {
                 const refreshResponse = await api.post('/auth/refresh');
-                const newToken = refreshResponse.data.accessToken;
+                
+             
+                const newToken = refreshResponse.data?.accessToken || refreshResponse.data?.token || refreshResponse.data;
+                
+                if (!newToken || typeof newToken !== 'string') {
+                    throw new Error("Érvénytelen token formátum érkezett a refresh végpontról!");
+                }
+
                 setToken(newToken);
                 originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
                 processQueue(null, newToken);
@@ -111,7 +123,6 @@ api.interceptors.response.use(
                 errorMsg = typeof backendMsg === 'string' ? backendMsg : 'Hibás vagy érvénytelen kérés (400).';
             }
 
-            // Kilőjük az egyedi eseményt a React felé
             window.dispatchEvent(new CustomEvent('api-error', { detail: errorMsg }));
         }
 

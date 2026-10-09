@@ -4,6 +4,12 @@ import { Card, Button, Modal, Form, Row, Col, Badge } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 
+const AVAILABLE_COURSES = {
+    'en': { name: 'Angol', flag: '🇬🇧' },
+    'es': { name: 'Spanyol', flag: '🇪🇸' },
+    'de': { name: 'Német', flag: '🇩🇪' }
+};
+
 /**
  * Dashboard component for users with the TEACHER role.
  * Facilitates the creation and overview of managed classrooms.
@@ -11,7 +17,7 @@ import { useNotifications } from '../context/NotificationContext';
 const TeacherClassrooms = () => {
     const [classrooms, setClassrooms] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ name: '', description: '' });
+   const [formData, setFormData] = useState({ name: '', description: '', courseCode: 'en' });
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
     const { notifications } = useNotifications();
@@ -36,7 +42,7 @@ const TeacherClassrooms = () => {
         try {
             await classroomApi.createClassroom(formData);
             setIsModalOpen(false);
-            setFormData({ name: '', description: '' });
+            setFormData({ name: '', description: '', courseCode: 'en' });
             fetchClassrooms(); 
         } catch (error) {
             console.error("Failed to create classroom:", error);
@@ -53,7 +59,7 @@ const TeacherClassrooms = () => {
         );
     }
 
-    return (
+   return (
         <div>
             <div className="mb-4">
                 <Button variant="primary" className="fw-bold px-4" onClick={() => setIsModalOpen(true)}>
@@ -76,14 +82,19 @@ const TeacherClassrooms = () => {
                         const unseenPending = (notifications?.teacherPendingJoinRequestIds || []).filter(id => id.startsWith(room.classroomId) && !viewedTeacherPending.includes(id)).length;
                         const unseenUngraded = (notifications?.teacherUngradedSubmissionIds || []).filter(id => id.startsWith(room.classroomId) && !viewedTeacherUngraded.includes(id)).length;
                         const totalClassroomPings = unseenPending + unseenUngraded;
+                        
+                        const courseData = AVAILABLE_COURSES[room.courseCode] || { name: 'Ismeretlen', flag: '🏳️' };
 
                         return (
                             <Col md={6} lg={4} key={room.classroomId}>
                                 <Card className="h-100 bg-dark text-light border-secondary shadow-sm" style={{ cursor: 'pointer' }}
-                                    onClick={() => navigate(`/classrooms/${room.classroomId}`, { state: { className: room.name, isOwner: true } })}>
+                                   onClick={() => navigate(`/classrooms/${room.classroomId}`, { state: { className: room.name, isOwner: true, courseCode: room.courseCode } })}>
                                     <Card.Body className="d-flex flex-column">
                                         <Card.Title className="fw-bold d-flex justify-content-between align-items-start">
-                                            {room.name}
+                                            <span>
+                                                <span className="me-2" title={`Kurzus: ${courseData.name}`}>{courseData.flag}</span>
+                                                {room.name}
+                                            </span>
                                          
                                             {totalClassroomPings > 0 && (
                                                 <Badge bg="danger" pill className="animate-pulse shadow-sm fs-6">
@@ -91,7 +102,7 @@ const TeacherClassrooms = () => {
                                                 </Badge>
                                             )}
                                         </Card.Title>
-                                        <Card.Text className="text-secondary flex-grow-1" style={{ fontSize: '0.9rem' }}>
+                                        <Card.Text className="text-secondary flex-grow-1 mt-2" style={{ fontSize: '0.9rem' }}>
                                             {room.description}
                                         </Card.Text>
                                     <div className="mt-3 pt-3 border-top border-secondary d-flex justify-content-between align-items-center">
@@ -139,13 +150,34 @@ const TeacherClassrooms = () => {
                                 onChange={(e) => setFormData({...formData, description: e.target.value})}
                             />
                         </Form.Group>
+                        
+                        {/* --- Choose Course --- */}
+                        <Form.Group className="mb-3">
+                            <Form.Label className="text-info fw-bold">Tanított Nyelv (Kurzus)</Form.Label>
+                            <Form.Select 
+                                required
+                                className="bg-dark text-light border-info"
+                                value={formData.courseCode}
+                                onChange={(e) => setFormData({...formData, courseCode: e.target.value})}
+                            >
+                                {Object.entries(AVAILABLE_COURSES).map(([code, data]) => (
+                                    <option key={code} value={code}>
+                                        {data.flag} {data.name}
+                                    </option>
+                                ))}
+                            </Form.Select>
+                            <Form.Text className="text-muted small">
+                                Csak az ehhez a nyelvhez tartozó tananyagok lesznek elérhetőek az osztály számára!
+                            </Form.Text>
+                        </Form.Group>
+
                     </Modal.Body>
                     <Modal.Footer className="border-secondary">
                         <Button variant="outline-light" onClick={() => setIsModalOpen(false)}>
                             Mégse
                         </Button>
                         <Button variant="primary" type="submit" className="fw-bold">
-                            Mentés
+                            Létrehozás
                         </Button>
                     </Modal.Footer>
                 </Form>

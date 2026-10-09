@@ -97,8 +97,9 @@ public class AuthenticationService {
         } while (userRepository.existsByNameAndUserTag(request.getName(), generatedTag));
         user.setUserTag(generatedTag);
 
-        Course defaultCourse = courseRepository.findByLanguageCode("en")
-                .orElseThrow(() -> new BadRequestException("Belső szerverhiba: Alapértelmezett kurzus nem található. Kérlek, értesítsd az adminisztrátort!"));
+        String targetCourseCode = request.getCourseCode() != null ? request.getCourseCode() : "en";
+        Course defaultCourse = courseRepository.findByLanguageCode(targetCourseCode)
+                .orElseThrow(() -> new BadRequestException("Belső szerverhiba: A kiválasztott kurzus nem található!"));
         user.setActiveCourse(defaultCourse);
 
         userRepository.save(user);

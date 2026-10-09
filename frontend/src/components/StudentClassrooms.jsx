@@ -4,6 +4,12 @@ import { Card, Button, Form, Row, Col, Badge, InputGroup } from 'react-bootstrap
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 
+const AVAILABLE_COURSES = {
+    'en': { name: 'Angol', flag: '🇬🇧' },
+    'es': { name: 'Spanyol', flag: '🇪🇸' },
+    'de': { name: 'Német', flag: '🇩🇪' }
+};
+
 /**
  * Dashboard component for users with the STUDENT role.
  * Displays enrolled classrooms and provides functionality to join new ones via an invite code.
@@ -114,6 +120,8 @@ const StudentClassrooms = () => {
                         const unseenResults = (notifications?.studentGradedSessionIds || []).filter(id => id.startsWith(room.classroomId) && !viewedResults.includes(id)).length;
                         const totalClassroomPings = unseenAssignments + unseenResults;
 
+                        const courseData = AVAILABLE_COURSES[room.courseCode] || { name: 'Ismeretlen', flag: '🏳️' };
+
                         return (
                             <Col md={6} lg={4} key={room.classroomId}>
                                 <Card 
@@ -123,14 +131,18 @@ const StudentClassrooms = () => {
                                 >
                                     <Card.Body className="d-flex flex-column">
                                         <Card.Title className="fw-bold text-primary d-flex justify-content-between align-items-start">
-                                            {room.name}
+                                           
+                                            <span>
+                                                <span className="me-2" title={`Kurzus: ${courseData.name}`}>{courseData.flag}</span>
+                                                {room.name}
+                                            </span>
                                             {totalClassroomPings > 0 && (
                                                 <Badge bg="danger" pill className="animate-pulse shadow-sm fs-6">
                                                     {totalClassroomPings}
                                                 </Badge>
                                             )}
                                         </Card.Title>
-                                        <Card.Text className="text-secondary flex-grow-1" style={{ fontSize: '0.9rem' }}>
+                                        <Card.Text className="text-secondary flex-grow-1 mt-2" style={{ fontSize: '0.9rem' }}>
                                             {room.description}
                                         </Card.Text>
                                     <div className="mt-3 pt-3 border-top border-secondary">

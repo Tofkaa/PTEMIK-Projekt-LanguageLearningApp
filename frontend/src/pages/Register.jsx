@@ -4,11 +4,12 @@ import { Form, Button, Card, Container, Row, Col, Alert, ButtonGroup, ToggleButt
 import api from '../services/api.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 
-/**
- * Register Component
- * Responsible for handling new user registration.
- * Includes client-side validation to ensure passwords match before submitting.
- */
+const AVAILABLE_COURSES = {
+    'en': { name: 'Angol', flag: '🇬🇧' },
+    'es': { name: 'Spanyol', flag: '🇪🇸' },
+    'de': { name: 'Német', flag: '🇩🇪' }
+};
+
 const Register = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -17,16 +18,14 @@ const Register = () => {
     const [preferredDifficulty, setPreferredDifficulty] = useState('DYNAMIC');
     const [role, setRole] = useState('STUDENT');
     
+    const [courseCode, setCourseCode] = useState('en');
+    
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRegistered, setIsRegistered] = useState(false);
 
     const navigate = useNavigate();
 
-    /**
-     * Asynchronous handler for form submission.
-     * Validates inputs, executes the registration API call, and manages UI states.
-     */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -37,7 +36,7 @@ const Register = () => {
         }
         
         setIsSubmitting(true);
-        console.log(`Initiating registration attempt for: ${name} (${email}) as ${role}`);
+        console.log(`Initiating registration attempt for: ${name} (${email}) as ${role} for course ${courseCode}`);
 
         try {
             await api.post('/auth/register', { 
@@ -45,7 +44,8 @@ const Register = () => {
                 email, 
                 password,
                 preferredDifficulty,
-                role
+                role,
+                courseCode 
             });
 
             setIsRegistered(true);
@@ -94,7 +94,6 @@ const Register = () => {
         );
     }
 
-    // NORMÁL REGISZTRÁCIÓS ŰRLAP
    return (
         <Container className="mt-5 position-relative">
             <div className="position-absolute top-0 end-0 p-3" style={{ zIndex: 1000 }}>
@@ -163,6 +162,23 @@ const Register = () => {
                                 </Form.Group>
 
                                 <Form.Group className="mb-4 p-3 border border-secondary rounded bg-dark bg-opacity-50 shadow-sm">
+                                    <Form.Label className="text-light fw-bold">🌍 Melyik nyelvet szeretnéd tanulni?</Form.Label>
+                                    <Form.Select 
+                                        value={courseCode}
+                                        onChange={(e) => setCourseCode(e.target.value)}
+                                        className="bg-secondary text-light border-0 shadow-sm"
+                                        style={{ cursor: 'pointer' }}
+                                        disabled={isSubmitting}
+                                    >
+                                        {Object.entries(AVAILABLE_COURSES).map(([code, data]) => (
+                                            <option key={code} value={code}>
+                                                {data.flag} {data.name}
+                                            </option>
+                                        ))}
+                                    </Form.Select>
+                                </Form.Group>
+
+                                <Form.Group className="mb-4 p-3 border border-secondary rounded bg-dark bg-opacity-50 shadow-sm">
                                     <Form.Label className="text-light fw-bold">🧠 Tanulási Mód</Form.Label>
                                     <Form.Select 
                                         value={preferredDifficulty}
@@ -177,7 +193,7 @@ const Register = () => {
                                         <option value="HARD">🔴 Fix: Profi (Csak HARD feladatok)</option>
                                     </Form.Select>
                                     <Form.Text className="text-light opacity-50 small mt-2 d-block">
-                                        A beállítást később a profilodban bármikor módosíthatod.
+                                        Ezeket a beállításokat később a profilodban bármikor módosíthatod.
                                     </Form.Text>
                                 </Form.Group>
 

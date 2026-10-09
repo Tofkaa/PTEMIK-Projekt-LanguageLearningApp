@@ -21,6 +21,8 @@ const TeacherClassroomDetail = () => {
     const location = useLocation();
     
     const classroomName = location.state?.className || 'Osztályterem Kezelése';
+    // ÚJ: Kinyerjük az osztályterem nyelvét a state-ből (fallback: en)
+    const classroomCourseCode = location.state?.courseCode || 'en';
 
     // State definitions
     const [pendingMembers, setPendingMembers] = useState([]);
@@ -164,7 +166,7 @@ const TeacherClassroomDetail = () => {
     
     const openAssignmentModal = async () => {
         try {
-            const res = await lessonApi.getAllLessons();
+            const res = await lessonApi.getAllLessonsForChallenge(classroomCourseCode);
             setLessons(res.data);
             setIsAssignmentModalOpen(true);
         } catch (error) {
@@ -506,7 +508,14 @@ const TeacherClassroomDetail = () => {
                                 <ListGroup variant="flush">
                                     {pendingMembers.map(member => (
                                         <ListGroup.Item key={member.memberId} className="bg-dark text-light border-secondary d-flex justify-content-between">
-                                            <div><div className="fw-bold">{member.studentName || member.name}</div><div className="text-secondary small">{member.email}</div></div>
+                                            {/* JAVÍTÁS: userTag hozzáadása a várakozókhoz is */}
+                                            <div>
+                                                <div className="fw-bold">
+                                                    {member.studentName || member.name}
+                                                    <span className="text-secondary small ms-1">#{member.userTag}</span>
+                                                </div>
+                                                <div className="text-secondary small">{member.email}</div>
+                                            </div>
                                             <div className="d-flex gap-2"><Button variant="success" size="sm" onClick={() => handleModerate(member.userId, true)}>✓</Button><Button variant="outline-danger" size="sm" onClick={() => handleModerate(member.userId, false)}>✕</Button></div>
                                         </ListGroup.Item>
                                     ))}
@@ -710,8 +719,13 @@ const TeacherClassroomDetail = () => {
                 </Tab>
             </Tabs>
 
-            <Modal show={isAssignmentModalOpen} onHide={() => setIsAssignmentModalOpen(false)} size="xl" centered contentClassName="bg-dark text-light border-secondary">
-                <Modal.Header closeButton className="border-secondary" closeVariant="white">
+           <Modal 
+                show={isAssignmentModalOpen} 
+                onHide={() => setIsAssignmentModalOpen(false)} 
+                size="xl" 
+                centered 
+            >
+                <Modal.Header closeButton>
                     <Modal.Title className="fw-bold text-primary">Feladat / Tananyag Összeállítása</Modal.Title>
                 </Modal.Header>
                 <Form onSubmit={handleAssignmentSubmit}>
@@ -719,16 +733,15 @@ const TeacherClassroomDetail = () => {
                         <Row>
                             {/* LEFT: BASICS */}
                             <Col lg={4}>
-                                <div className="p-3 border border-secondary rounded bg-darker mb-3">
+                                <div className="p-3 border rounded mb-3">
                                     <Form.Label className="text-info fw-bold mb-2">Cél:</Form.Label>
                                     <Form.Check type="radio" label="Szigorú Teszt" name="amode" checked={assignmentMode === 'TEST'} onChange={() => setAssignmentMode('TEST')} className="text-danger fw-bold mb-1" />
                                     <Form.Check type="radio" label="Tananyag / Gyakorló" name="amode" checked={assignmentMode === 'PRACTICE'} onChange={() => setAssignmentMode('PRACTICE')} className="text-success fw-bold mb-3" />
                                     
-                                    <Form.Group className="mb-3"><Form.Label className="small text-secondary fw-bold">Cím</Form.Label><Form.Control type="text" required className="bg-dark text-light border-secondary" value={assignmentForm.title} onChange={e => setAssignmentForm({...assignmentForm, title: e.target.value})} /></Form.Group>
-                                    <Form.Group className="mb-3"><Form.Label className="small text-secondary fw-bold">Leírás</Form.Label><Form.Control as="textarea" rows={2} className="bg-dark text-light border-secondary" value={assignmentForm.description} onChange={e => setAssignmentForm({...assignmentForm, description: e.target.value})} /></Form.Group>
-                                    <Form.Group className="mb-3"><Form.Label className="small text-secondary fw-bold">Idő (perc)</Form.Label><Form.Control type="number" 
+                                    <Form.Group className="mb-3"><Form.Label className="small fw-bold">Cím</Form.Label><Form.Control type="text" required value={assignmentForm.title} onChange={e => setAssignmentForm({...assignmentForm, title: e.target.value})} /></Form.Group>
+                                    <Form.Group className="mb-3"><Form.Label className="small fw-bold">Leírás</Form.Label><Form.Control as="textarea" rows={2} value={assignmentForm.description} onChange={e => setAssignmentForm({...assignmentForm, description: e.target.value})} /></Form.Group>
+                                    <Form.Group className="mb-3"><Form.Label className="small fw-bold">Idő (perc)</Form.Label><Form.Control type="number" 
                                             min="1" 
-                                            className="bg-dark text-light border-secondary" 
                                             value={assignmentForm.timeLimitMinutes} 
                                             onChange={e => {
                                                 const val = e.target.value.replace(/\D/g, '');
@@ -742,7 +755,6 @@ const TeacherClassroomDetail = () => {
                                               type="number" 
                                                 min="1"
                                                 placeholder="Üresen hagyva korlátlan" 
-                                                className="bg-dark text-light border-warning" 
                                                 value={assignmentForm.maxAttempts || ''} 
                                                 onChange={e => {
                                                     const val = e.target.value.replace(/\D/g, '');
@@ -752,7 +764,7 @@ const TeacherClassroomDetail = () => {
                                         </Form.Group>
                                     )}
                                     
-                                    <div className="small border-top border-secondary pt-2 mt-2 mb-2">
+                                    <div className="small border-top pt-2 mt-2 mb-2">
                                         <Form.Label className="text-warning fw-bold mb-2">Kérdések kiosztása a diákoknak:</Form.Label>
                                         
                                         <Form.Check 
@@ -761,7 +773,7 @@ const TeacherClassroomDetail = () => {
                                             name="genMode" 
                                             checked={assignmentForm.generationMode === 'FIXED'} 
                                             onChange={() => setAssignmentForm({...assignmentForm, generationMode: 'FIXED'})} 
-                                            className="mb-2 text-light"
+                                            className="mb-2"
                                         />
                                         
                                         <Form.Check 
@@ -774,13 +786,12 @@ const TeacherClassroomDetail = () => {
                                         />
 
                                         {assignmentForm.generationMode === 'RANDOM_SUBSET' && (
-                                            <Form.Group className="mt-2 ms-3 p-2 bg-black bg-opacity-25 rounded border border-info">
+                                            <Form.Group className="mt-2 ms-3 p-2 bg-secondary bg-opacity-10 rounded border border-info">
                                                 <Form.Label className="small text-info fw-bold">Hány kérdést kapjon 1 diák?</Form.Label>
                                                 <Form.Control 
                                                     type="number" 
                                                     min="1"
                                                     max={assignmentForm.exerciseIds.length || 1}
-                                                    className="bg-dark text-light border-info" 
                                                     placeholder={`Max: ${assignmentForm.exerciseIds.length} db`}
                                                     value={assignmentForm.questionCount} 
                                                     onChange={e => {
@@ -788,7 +799,7 @@ const TeacherClassroomDetail = () => {
                                                         setAssignmentForm({...assignmentForm, questionCount: val});
                                                     }}
                                                 />
-                                                <div className="small text-secondary mt-1">
+                                                <div className="small mt-1 opacity-75">
                                                     A rendszer {assignmentForm.exerciseIds.length} db kijelölt kérdésből fog véletlenszerűen sorsolni ennyit minden diáknak.
                                                 </div>
                                             </Form.Group>
@@ -796,7 +807,7 @@ const TeacherClassroomDetail = () => {
                                     </div>
                                    
                                     {assignmentMode === 'TEST' && (
-                                        <div className="small border-top border-secondary pt-2">
+                                        <div className="small border-top pt-2">
                                             <Form.Check type="switch" label="Azonnali visszajelzés" className="mb-1" 
                                                 checked={assignmentForm.hasFeedback} 
                                                 onChange={e => setAssignmentForm({...assignmentForm, hasFeedback: e.target.checked})} />
@@ -815,7 +826,7 @@ const TeacherClassroomDetail = () => {
                                             
                                             {assignmentForm.timeLimitMinutes > 0 && (
                                                 <Form.Check type="switch" label="Késedelmes beadás engedélyezése" 
-                                                    className="mt-2 text-light"
+                                                    className="mt-2"
                                                     checked={assignmentForm.allowLateSubmission} 
                                                     onChange={e => setAssignmentForm({...assignmentForm, allowLateSubmission: e.target.checked})} />
                                             )}
@@ -825,9 +836,9 @@ const TeacherClassroomDetail = () => {
                             </Col>
 
                             {/* MIDDLE: SELECTION */}
-                            <Col lg={4} className="border-start border-secondary">
+                            <Col lg={4} className="border-start">
                                 <h6 className="fw-bold text-info">Válogatás Forrásból</h6>
-                                <Form.Select className="bg-dark text-light border-secondary mb-3" value={selectedLessonId} onChange={handleLessonChange}>
+                                <Form.Select className="mb-3" value={selectedLessonId} onChange={handleLessonChange}>
                                     <option value="">-- Válassz leckét --</option>
                                     {lessons.map(l => <option key={l.lessonId} value={l.lessonId}>[{l.difficulty}] {l.title}</option>)}
                                 </Form.Select>
@@ -836,13 +847,13 @@ const TeacherClassroomDetail = () => {
                                         <Button variant="outline-info" size="sm" className="w-100 mb-2" onClick={handleSelectAllExercises}>Összes kijelölése (ebből a leckéből)</Button>
                                         <div style={{ maxHeight: '350px', overflowY: 'auto' }} className="pe-2 custom-scrollbar">
                                             {availableExercises.map(ex => (
-                                                <div key={ex.exerciseId} className="border-bottom border-secondary py-2">
+                                                <div key={ex.exerciseId} className="border-bottom py-2">
                                                     <div className="d-flex justify-content-between align-items-center">
                                                         <Form.Check id={`ex-${ex.exerciseId}`} label={<span className="small">{ex.content?.question || ex.type}</span>} checked={assignmentForm.exerciseIds.includes(ex.exerciseId)} onChange={() => toggleExerciseSelection(ex)} />
                                                         <Button variant="link" size="sm" className="text-info p-0" onClick={() => togglePreview(ex.exerciseId)}>👁️</Button>
                                                     </div>
                                                     {previewExerciseId === ex.exerciseId && (
-                                                        <div className="mt-1 p-2 bg-dark rounded border border-info small">
+                                                        <div className="mt-1 p-2 bg-secondary bg-opacity-10 rounded border border-info small">
                                                             <strong>Típus:</strong> {ex.type}<br/>
                                                             {ex.content?.options && <div><strong>Opciók:</strong> {ex.content.options.join(", ")}</div>}
                                                         </div>
@@ -855,13 +866,13 @@ const TeacherClassroomDetail = () => {
                             </Col>
 
                             {/* RIGHT: SUMMARY */}
-                            <Col lg={4} className="border-start border-secondary">
+                            <Col lg={4} className="border-start">
                                 <h6 className="fw-bold text-success mb-3">Kiválasztott tartalom ({selectedExercisesData.length} db)</h6>
                                 <div style={{ maxHeight: '450px', overflowY: 'auto' }} className="pe-2 custom-scrollbar">
-                                    {selectedExercisesData.length === 0 ? <p className="text-light small">Még nem választottál feladatot.</p> : (
+                                    {selectedExercisesData.length === 0 ? <p className="small opacity-75">Még nem választottál feladatot.</p> : (
                                         <ListGroup variant="flush">
                                             {selectedExercisesData.map((ex, index) => (
-                                                <ListGroup.Item key={ex.id} className="bg-dark text-light border-secondary d-flex justify-content-between align-items-center p-2">
+                                                <ListGroup.Item key={ex.id} className="d-flex justify-content-between align-items-center p-2 bg-transparent">
                                                     <div className="small overflow-hidden text-truncate" style={{ maxWidth: '80%' }}>{index + 1}. {ex.title}</div>
                                                     <Button variant="outline-danger" size="sm" className="border-0" onClick={() => removeFromSummary(ex.id)}>✕</Button>
                                                 </ListGroup.Item>
@@ -872,13 +883,33 @@ const TeacherClassroomDetail = () => {
                             </Col>
                         </Row>
                         
-                        <Row className="mt-4 border-top border-secondary pt-3 small">
-                            <Col md={6}><Form.Group><Form.Label className="text-secondary fw-bold">Elérhető:</Form.Label><Form.Control type="datetime-local" className="bg-dark text-light border-secondary" value={assignmentForm.availableFrom} onChange={e => setAssignmentForm({...assignmentForm, availableFrom: e.target.value})} /></Form.Group></Col>
-                            <Col md={6}><Form.Group><Form.Label className="text-secondary fw-bold">Határidő:</Form.Label><Form.Control type="datetime-local" className="bg-dark text-light border-secondary" value={assignmentForm.availableUntil} onChange={e => setAssignmentForm({...assignmentForm, availableUntil: e.target.value})} /></Form.Group></Col>
+                        <Row className="mt-4 border-top pt-3 small">
+                            <Col md={6}>
+                                <Form.Group>
+                                    <Form.Label className="fw-bold opacity-75">Elérhető:</Form.Label>
+                                    <Form.Control 
+                                        type="datetime-local" 
+                                        style={{ colorScheme: 'auto' }} 
+                                        value={assignmentForm.availableFrom} 
+                                        onChange={e => setAssignmentForm({...assignmentForm, availableFrom: e.target.value})} 
+                                    />
+                                </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                                <Form.Group>
+                                    <Form.Label className="fw-bold opacity-75">Határidő:</Form.Label>
+                                    <Form.Control 
+                                        type="datetime-local" 
+                                        style={{ colorScheme: 'auto' }} 
+                                        value={assignmentForm.availableUntil} 
+                                        onChange={e => setAssignmentForm({...assignmentForm, availableUntil: e.target.value})} 
+                                    />
+                                </Form.Group>
+                            </Col>
                         </Row>
                     </Modal.Body>
-                    <Modal.Footer className="border-secondary">
-                        <Button variant="outline-light" onClick={() => setIsAssignmentModalOpen(false)}>Mégse</Button>
+                    <Modal.Footer>
+                        <Button variant="outline-secondary" onClick={() => setIsAssignmentModalOpen(false)}>Mégse</Button>
                         <Button variant="primary" 
                             type="submit" 
                             className="fw-bold px-4" 

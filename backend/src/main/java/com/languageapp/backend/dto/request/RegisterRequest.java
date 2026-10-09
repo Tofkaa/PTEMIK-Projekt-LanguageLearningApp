@@ -24,4 +24,6 @@ public class RegisterRequest {
 
     @NotNull(message = "Role must be specified")
     private Role role;
+
+    private String courseCode;
 }

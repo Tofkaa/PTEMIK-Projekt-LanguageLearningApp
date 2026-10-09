@@ -1,5 +1,6 @@
 package com.languageapp.backend.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -75,6 +76,15 @@ public class SecurityConfiguration {
                 // Enforce stateless session management (no server-side HTTP sessions)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            log.warn("Jogosulatlan API hívás blokkolva: {}", request.getRequestURI());
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"message\": \"Unauthorized\"}");
+                        })
                 )
 
                 // Register our custom authentication provider

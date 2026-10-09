@@ -185,7 +185,7 @@ public class EvaluationService {
     }
 
     private void validateUserDifficultyAccess(User user, Lesson lesson, boolean hasStarted) {
-        if ("STUDENT".equals(user.getRole())) {
+        if ("STUDENT".equals(user.getRole().name())) {
             String allowedDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
             if (!lesson.getDifficulty().equals(allowedDifficulty) && !hasStarted) {
                 log.warn("SECURITY ALERT: User {} attempted to SUBMIT restricted difficulty! Requested: {}, Allowed: {}",

@@ -11,6 +11,13 @@ import CryptoJS from 'crypto-js';
 import ClickableText from '../components/ClickableText.jsx';
 
 
+const LANGUAGE_NAMES = {
+        'hu': 'Magyar',
+        'en': 'Angol',
+        'es': 'Spanyol',
+        'de': 'Német'
+    };
+
 const SALT = import.meta.env.VITE_APP_SECURITY_EXERCISE_SALT;
 const generateHash = (input) => {
     if (!input) return "";
@@ -398,7 +405,7 @@ const LessonPlayer = () => {
         );
     }
 
-    // --- PHASE 7: RENDER ACTIVE QUIZ ENGINE ---
+   // --- PHASE 7: RENDER ACTIVE QUIZ ENGINE ---
     const renderExercise = () => {
         if (!currentExercise) return null;
 
@@ -408,8 +415,8 @@ const LessonPlayer = () => {
         
         const getTitle = () => {
             if (type === 'TRANSLATION') {
-                const qLang = content?.questionLang === 'hu' ? 'Magyar' : 'Angol';
-                const aLang = content?.answerLang === 'hu' ? 'Magyar' : 'Angol';
+                const qLang = LANGUAGE_NAMES[content?.questionLang] || content?.questionLang?.toUpperCase() || 'Ismeretlen';
+                const aLang = LANGUAGE_NAMES[content?.answerLang] || content?.answerLang?.toUpperCase() || 'Ismeretlen';
                 return `Fordítás (${qLang} ➔ ${aLang})`;
             }
             switch (type) {
@@ -419,7 +426,6 @@ const LessonPlayer = () => {
                 default: return 'Feladat';
             }
         };
-
         const allowDictionary = content?.questionLang !== 'hu';
 
         return (

@@ -4,8 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import { useEffect, useState } from 'react'; 
 import ThemeToggle from './ThemeToggle.jsx'; 
+
+const AVAILABLE_COURSES = {
+    'en': { name: 'Angol', flag: '🇬🇧' },
+    'es': { name: 'Spanyol', flag: '🇪🇸' },
+    'de': { name: 'Német', flag: '🇩🇪' }
+};
+
+
 const NavigationBar = () => {
-    const { user, logout } = useAuth();
+    const { user, logout , changeLanguage} = useAuth();
     const navigate = useNavigate();
     const { notifications } = useNotifications();
     
@@ -44,6 +52,18 @@ const NavigationBar = () => {
     const communityPings = (notifications?.pendingFriendRequests || 0) + (notifications?.pendingChallenges || 0);
 
     const dueVocabCount = notifications?.dueVocabularyCount || 0;
+
+    const activeCourseCode = user.activeCourseCode || 'en';
+    const activeCourseData = AVAILABLE_COURSES[activeCourseCode] || AVAILABLE_COURSES['en'];
+
+    const handleLanguageChange = async (courseCode) => {
+        try {
+            await changeLanguage(courseCode);
+            
+        } catch (error) {
+            console.error("Sikertelen nyelvváltás", error);
+        }
+    };
                            
     return (
         <Navbar 
@@ -112,7 +132,32 @@ const NavigationBar = () => {
                         <Badge bg="warning" text="dark" className="rounded-pill px-3 py-2 shadow-sm fs-6 d-flex align-items-center gap-1">
                             <span>⭐</span> {user.xp || 0} XP
                         </Badge>
-                                                    
+
+                         <NavDropdown 
+                            className="tour-language-selector mx-2"
+                            title={
+                                <span className="fs-5 d-inline-flex align-items-center" style={{cursor: 'pointer'}} title={`Jelenlegi nyelv: ${activeCourseData.name}`}>
+                                    {activeCourseData.flag}
+                                </span>
+                            } 
+                            id="language-nav-dropdown" 
+                            align="end" 
+                            menuVariant="dark"
+                        >
+                            <NavDropdown.Header className="text-light opacity-75">Nyelv kiválasztása</NavDropdown.Header>
+                            {Object.entries(AVAILABLE_COURSES).map(([code, data]) => (
+                                <NavDropdown.Item 
+                                    key={code} 
+                                    onClick={() => handleLanguageChange(code)}
+                                    
+                                    className={`d-flex align-items-center gap-2 ${activeCourseCode === code ? 'bg-primary text-white fw-bold' : 'text-light'}`}
+                                >
+                                    <span>{data.flag}</span> {data.name}
+                                    {activeCourseCode === code && <span className="ms-auto small">✓</span>}
+                                </NavDropdown.Item>
+                            ))}
+                        </NavDropdown>
+
                         <NavDropdown 
                             className="tour-profile-menu"
                             title={

@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Card, Form, Button, Alert, Spinner, Accordion, Badge, ListGroup, Modal, Row, Col } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi';
 
+const AVAILABLE_COURSES = {
+    'en': { name: 'Angol', flag: '🇬🇧' },
+    'es': { name: 'Spanyol', flag: '🇪🇸' },
+    'de': { name: 'Német', flag: '🇩🇪' }
+};
+
 const CurriculumManager = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -11,9 +17,11 @@ const CurriculumManager = () => {
     const [isLoadingTopics, setIsLoadingTopics] = useState(true);
     const [previewModal, setPreviewModal] = useState({ show: false, exercise: null });
 
-    const [importLevel, setImportLevel] = useState('FULL_TOPIC'); // FULL_TOPIC, LESSON, EXERCISE
+    const [importLevel, setImportLevel] = useState('FULL_TOPIC');
     const [targetTopicId, setTargetTopicId] = useState('');
     const [targetLessonId, setTargetLessonId] = useState('');
+    
+    const [importCourseCode, setImportCourseCode] = useState('en');
 
     useEffect(() => {
         fetchTopics();
@@ -50,11 +58,9 @@ const CurriculumManager = () => {
         }
     };
 
-    // --- Modular Upload ---
     const handleUpload = async () => {
         if (!selectedFile) return;
 
-        // Validáció
         if (importLevel === 'LESSON' && !targetTopicId) {
             setMessage({ text: 'Kérlek válaszd ki a cél Témakört!', type: 'warning' });
             return;
@@ -68,9 +74,14 @@ const CurriculumManager = () => {
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
-                const jsonData = JSON.parse(e.target.result);
+                let jsonData = JSON.parse(e.target.result);
                 
                 if (importLevel === 'FULL_TOPIC') {
+                    if (Array.isArray(jsonData)) {
+                        jsonData = jsonData.map(topic => ({ ...topic, courseCode: importCourseCode }));
+                    } else {
+                        jsonData.courseCode = importCourseCode;
+                    }
                     await adminApi.importCurriculum(jsonData);
                 } else if (importLevel === 'LESSON') {
                     await adminApi.importLessons(targetTopicId, jsonData);
@@ -159,7 +170,7 @@ const CurriculumManager = () => {
                     <h5 className="text-info fw-bold mb-4">Tananyag JSON Importálása</h5>
                     
                     <Row className="mb-4">
-                        <Col md={4}>
+                        <Col md={3}>
                             <Form.Group>
                                 <Form.Label className="text-secondary small fw-bold">Mit szeretnél importálni?</Form.Label>
                                 <Form.Select 
@@ -177,6 +188,26 @@ const CurriculumManager = () => {
                                 </Form.Select>
                             </Form.Group>
                         </Col>
+
+                        {/* Csak Témakör esetén bekérjük a Nyelvet */}
+                        {importLevel === 'FULL_TOPIC' && (
+                            <Col md={3}>
+                                <Form.Group>
+                                    <Form.Label className="text-secondary small fw-bold">Nyelv (Kurzus)</Form.Label>
+                                    <Form.Select 
+                                        className="bg-dark text-light border-secondary shadow-sm"
+                                        value={importCourseCode}
+                                        onChange={(e) => setImportCourseCode(e.target.value)}
+                                    >
+                                        {Object.entries(AVAILABLE_COURSES).map(([code, data]) => (
+                                            <option key={code} value={code}>
+                                                {data.flag} {data.name}
+                                            </option>
+                                        ))}
+                                    </Form.Select>
+                                </Form.Group>
+                            </Col>
+                        )}
 
                         {/* Csak akkor mutatjuk, ha Leckét VAGY Feladatot importál */}
                         {(importLevel === 'LESSON' || importLevel === 'EXERCISE') && (

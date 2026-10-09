@@ -18,12 +18,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Security filter that intercepts all incoming HTTP requests to validate JWT access tokens.
- * <p>
- * Ensures that requests to protected endpoints contain a valid Bearer token.
- * If valid, it populates the Spring Security context with the authenticated user's details.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -31,6 +25,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/api/auth/");
+    }
 
     @Override
     protected void doFilterInternal(
@@ -41,64 +41,60 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String authHeader = request.getHeader("Authorization");
 
-
         if (authHeader == null && request.getRequestURI().endsWith("/stream")) {
             String tokenParam = request.getParameter("token");
             if (tokenParam != null) {
                 authHeader = "Bearer " + tokenParam;
             }
         }
-        // ---------------------------------------------------------------
 
-        // 1. Skip filtering if the Authorization header is missing or does not start with "Bearer "
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Extract the raw JWT from the header
         final String jwt = authHeader.substring(7);
 
+        if (jwt.isBlank() || "null".equals(jwt) || "undefined".equals(jwt)) {
+            log.warn("Invalid literal string passed as JWT token.");
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
-            // 2. Extract the username from the token
-            // This might throw a JwtException if the token is expired or malformed
             final String userEmail = jwtService.extractUsername(jwt);
 
-            // 3. If a username is found and the user is not already authenticated in the current context
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                // Load user details from the database
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
-                // 4. Validate the token against the loaded user details
                 if (jwtService.isTokenValid(jwt, userDetails)) {
-
-                    log.debug("JWT token successfully validated for user: {}", userEmail);
-
-                    // 5. Create a trusted Spring Security authentication token
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
+                            userDetails, null, userDetails.getAuthorities()
                     );
-
-                    // Add request details (e.g., IP address, session ID) to the auth token
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                    // 6. Set the authentication in the Security Context
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
         } catch (JwtException e) {
-            // Catching JWT parsing/validation exceptions gracefully
             log.warn("JWT Authentication failed for request {}: {}", request.getRequestURI(), e.getMessage());
-            // We do NOT set the authentication. The request will proceed as anonymous,
-            // and Spring Security will natively block access to protected endpoints.
+            SecurityContextHolder.clearContext();
+
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"message\": \"Invalid or expired JWT token.\"}");
+            return;
+
         } catch (Exception e) {
             log.error("An unexpected error occurred during JWT authentication filtering", e);
+            SecurityContextHolder.clearContext();
+
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"message\": \"An unexpected error occurred.\"}");
+            return;
         }
 
-        // 7. Continue the filter chain execution
         filterChain.doFilter(request, response);
     }
 }

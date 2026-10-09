@@ -1,0 +1,627 @@
+[
+  {
+    "courseCode": "es",
+    "topicName": "Vocabulario Básico",
+    "description": "Kezdő spanyol szavak és kifejezések a mindennapokhoz.",
+    "lessons": [
+      {
+        "title": "Gyümölcsök és Színek",
+        "difficulty": "EASY",
+        "description": "Tanuld meg az alapvető gyümölcsöket képek segítségével.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "IMAGE_CHOICE",
+            "content": {
+              "question": "Válaszd ki a képhez illő spanyol szót!",
+              "options": ["Manzana", "Plátano", "Uva"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Manzana" },
+            "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Manzana+%F0%9F%8D%8E"
+          },
+          {
+            "type": "IMAGE_CHOICE",
+            "content": {
+              "question": "Válaszd ki a képhez illő spanyol szót!",
+              "options": ["Manzana", "Plátano", "Uva"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Plátano" },
+            "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Pl%C3%A1tano+%F0%9F%8D%8C"
+          }
+        ]
+      },
+      {
+        "title": "Gyümölcsök és Színek",
+        "difficulty": "MEDIUM",
+        "description": "Feleletválasztós kérdések és könnyű fordítások.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "¿De qué color es un plátano maduro?",
+              "options": ["Rojo", "Azul", "Amarillo"],
+              "questionLang": "es",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Amarillo" }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Az alma piros.",
+              "hint": "alma = manzana, piros = rojo/roja",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "La manzana es roja." }
+          },
+          {
+            "type": "WORD_BANK",
+            "content": {
+              "question": "Az alma piros.",
+              "options": ["La", "es", "roja", "manzana", "el", "azul"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "La manzana es roja" }
+          }
+        ]
+      },
+      {
+        "title": "Gyümölcsök és Színek",
+        "difficulty": "HARD",
+        "description": "Kizárólag gépeléses fordítási feladatok.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Szeretem a zöld almát és a sárga banánt.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Me gusta la manzana verde y el plátano amarillo." }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "A kedvenc gyümölcsöm a szőlő.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Mi fruta favorita es la uva." }
+          }
+        ]
+      },
+      {
+        "title": "Családtagok",
+        "difficulty": "EASY",
+        "description": "A szűk család azonosítása spanyolul.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "Hogy mondod: 'Anya'?",
+              "options": ["Padre", "Madre", "Hermano"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Madre" }
+          },
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "Hogy mondod: 'Testvér (fiú)'?",
+              "options": ["Hermana", "Hermano", "Tío"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Hermano" }
+          }
+        ]
+      },
+      {
+        "title": "Családtagok",
+        "difficulty": "MEDIUM",
+        "description": "Bővített család és egyszerű mondatok.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "El hermano de tu madre es tu...",
+              "options": ["Tío", "Tía", "Primo"],
+              "questionLang": "es",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Tío" }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Ő az én nővérem.",
+              "hint": "nővér/húg = hermana",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Ella es mi hermana." }
+          },
+          {
+            "type": "WORD_BANK",
+            "content": {
+              "question": "Ő az én nővérem.",
+              "options": ["Ella", "es", "mi", "hermana", "Él", "hermano"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Ella es mi hermana" }
+          }
+        ]
+      },
+      {
+        "title": "Családtagok",
+        "difficulty": "HARD",
+        "description": "Komplex családi kapcsolatok fordítása gépeléssel.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "A nagybátyám felesége az én nagynéném.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "La esposa de mi tío es mi tía." }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Van két fiútestvérem és egy lánytestvérem.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Tengo dos hermanos y una hermana." }
+          }
+        ]
+      },
+      {
+        "title": "Állatok",
+        "difficulty": "EASY",
+        "description": "Háziállatok felismerése képről.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "IMAGE_CHOICE",
+            "content": {
+              "question": "Melyik állat van a képen?",
+              "options": ["Gato", "Perro", "Pájaro"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Perro" },
+            "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Perro+%F0%9F%90%B6"
+          },
+          {
+            "type": "IMAGE_CHOICE",
+            "content": {
+              "question": "Melyik állat van a képen?",
+              "options": ["Gato", "Perro", "Pez"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Gato" },
+            "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Gato+%F0%9F%90%B1"
+          }
+        ]
+      },
+      {
+        "title": "Állatok",
+        "difficulty": "MEDIUM",
+        "description": "Állatok tulajdonságai és fordítás.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "¿Qué animal puede volar?",
+              "options": ["Perro", "Pájaro", "Pez"],
+              "questionLang": "es",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Pájaro" }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "A kutya nagy.",
+              "hint": "nagy = grande",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "El perro es grande." }
+          },
+          {
+            "type": "WORD_BANK",
+            "content": {
+              "question": "A kutya nagy.",
+              "options": ["El", "perro", "es", "grande", "pequeño", "gato"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "El perro es grande" }
+          }
+        ]
+      },
+      {
+        "title": "Állatok",
+        "difficulty": "HARD",
+        "description": "Állatok leírása gépeléssel.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "A macska alszik a kanapén.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "El gato está durmiendo en el sofá." }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "A madarak énekelnek a fákon.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Los pájaros están cantando en los árboles." }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "courseCode": "es",
+    "topicName": "Viajes y Transporte",
+    "description": "Minden, amire egy külföldi utazás során szükséged lehet.",
+    "lessons": [
+      {
+        "title": "Repülőtéri Alapok",
+        "difficulty": "EASY",
+        "description": "Tájékozódás a repülőtéren képekkel.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "IMAGE_CHOICE",
+            "content": {
+              "question": "Mit látsz a képen?",
+              "options": ["Tren", "Avión", "Autobús"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Avión" },
+            "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Avión+%E2%9C%88%EF%B8%8F"
+          },
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "¿Dónde facturas tu equipaje?",
+              "options": ["Puerta de embarque", "Mostrador de facturación", "Baño"],
+              "questionLang": "es",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Mostrador de facturación" }
+          }
+        ]
+      },
+      {
+        "title": "Repülőtéri Alapok",
+        "difficulty": "MEDIUM",
+        "description": "Repülőtéri kifejezések közepes szinten.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "Necesitas este documento para un vuelo internacional.",
+              "options": ["Billete", "Pasaporte", "Recibo"],
+              "questionLang": "es",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Pasaporte" }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Hol van a csomagom?",
+              "hint": "csomag = equipaje / maleta",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "¿Dónde está mi equipaje?" }
+          }
+        ]
+      },
+      {
+        "title": "Repülőtéri Alapok",
+        "difficulty": "HARD",
+        "description": "Repülőtéri szituációk mesterfokon.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "A gépünk késik két órát.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Nuestro vuelo está retrasado dos horas." }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Kérem, mutassa meg az útlevelét és a beszállókártyáját.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Por favor, muestre su pasaporte y tarjeta de embarque." }
+          }
+        ]
+      },
+      {
+        "title": "Szálloda és Foglalás",
+        "difficulty": "EASY",
+        "description": "Szállodai alapfogalmak.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "IMAGE_CHOICE",
+            "content": {
+              "question": "Mi van a képen?",
+              "options": ["Llave", "Mapa", "Billete"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Llave" },
+            "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Hotel+Llave+%F0%9F%97%9D%EF%B8%8F"
+          },
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "El lugar donde duermes en un hotel se llama...",
+              "options": ["Recepción", "Habitación", "Ascensor"],
+              "questionLang": "es",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Habitación" }
+          }
+        ]
+      },
+      {
+        "title": "Szálloda és Foglalás",
+        "difficulty": "MEDIUM",
+        "description": "Recepciós kommunikáció.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "Me gustaría ___ una habitación por dos noches.",
+              "options": ["reservar", "comprar", "vender"],
+              "questionLang": "es",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "reservar" }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Van szabad szobájuk?",
+              "hint": "szabad szoba = habitación disponible",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "¿Tienen una habitación disponible?" }
+          }
+        ]
+      },
+      {
+        "title": "Szálloda és Foglalás",
+        "difficulty": "HARD",
+        "description": "Panaszok és speciális kérések.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "A légkondicionáló nem működik a szobámban.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "El aire acondicionado no funciona en mi habitación." }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Kérhetnék egy extra takarót és két párnát?",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "¿Podría tener una manta extra y dos almohadas?" }
+          }
+        ]
+      },
+      {
+        "title": "Útbaigazítás",
+        "difficulty": "EASY",
+        "description": "Irányok felismerése.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "IMAGE_CHOICE",
+            "content": {
+              "question": "Melyik ez az irány?",
+              "options": ["Derecha", "Izquierda", "Recto"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Izquierda" },
+            "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Izquierda+%E2%AC%85%EF%B8%8F"
+          },
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "Hogy mondod: 'Jobbra'?",
+              "options": ["Izquierda", "Derecha", "Atrás"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Derecha" }
+          }
+        ]
+      },
+      {
+        "title": "Útbaigazítás",
+        "difficulty": "MEDIUM",
+        "description": "Kérdezzük meg az utat.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "Disculpe, ¿cómo llego ___ la estación de tren?",
+              "options": ["a", "en", "por"],
+              "questionLang": "es",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "a" }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Menjen egyenesen.",
+              "hint": "egyenesen = todo recto",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Vaya todo recto." }
+          }
+        ]
+      },
+      {
+        "title": "Útbaigazítás",
+        "difficulty": "HARD",
+        "description": "Komplex útvonalak fordítása.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Forduljon balra a következő saroknál, majd menjen egyenesen.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Gire a la izquierda en la siguiente esquina, luego vaya todo recto." }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "A gyógyszertár a szupermarkettel szemben van.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "La farmacia está enfrente del supermercado." }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "courseCode": "es",
+    "topicName": "Comida y Restaurante",
+    "description": "Rendelés, fizetés és az ételek megnevezése.",
+    "lessons": [
+      {
+        "title": "Alapvető Élelmiszerek",
+        "difficulty": "EASY",
+        "description": "Ételek felismerése.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "IMAGE_CHOICE",
+            "content": {
+              "question": "Mit látsz a képen?",
+              "options": ["Agua", "Pan", "Carne"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Pan" },
+            "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Pan+%F0%9F%8D%9E"
+          },
+          {
+            "type": "IMAGE_CHOICE",
+            "content": {
+              "question": "Mit látsz a képen?",
+              "options": ["Café", "Agua", "Té"],
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Agua" },
+            "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Agua+%F0%9F%A5%A4"
+          }
+        ]
+      },
+      {
+        "title": "Alapvető Élelmiszerek",
+        "difficulty": "MEDIUM",
+        "description": "Kifejezések az asztalnál.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "MULTIPLE_CHOICE",
+            "content": {
+              "question": "Me gustaría un ___ de agua.",
+              "options": ["trozo", "vaso", "plato"],
+              "questionLang": "es",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "vaso" }
+          },
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Kérek egy kávét.",
+              "hint": "kérek = me gustaría / quiero",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Me gustaría un café." }
+          }
+        ]
+      },
+      {
+        "title": "Alapvető Élelmiszerek",
+        "difficulty": "HARD",
+        "description": "Főzés és konyhai műveletek.",
+        "language": "es",
+        "exercises": [
+          {
+            "type": "TRANSLATION",
+            "content": {
+              "question": "Vágd fel a hagymát és süsd meg egy kevés olajon.",
+              "questionLang": "hu",
+              "answerLang": "es"
+            },
+            "correctAnswer": { "answer": "Corta la cebolla y fríela en un poco de aceite." }
+          }
+        ]
+      }
+    ]
+  }
+]

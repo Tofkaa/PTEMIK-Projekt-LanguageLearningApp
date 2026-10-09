@@ -85,7 +85,7 @@ public class AuthController {
                 .secure(true)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Strict")
+                .sameSite("Lax")
                 .build();
 
         log.info("User: {} successfully logged out, cookie invalidated.", loggedOutUser);
@@ -118,7 +118,7 @@ public class AuthController {
                 .secure(true)
                 .path("/")
                 .maxAge(maxAgeInSeconds)
-                .sameSite("Strict")
+                .sameSite("Lax")
                 .build();
     }
 }

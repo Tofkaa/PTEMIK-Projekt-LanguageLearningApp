@@ -11,6 +11,12 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext'
 import { formatToLocalDisplay } from '../utils/dateUtils';
 
+const AVAILABLE_COURSES = {
+    'en': { name: 'Angol', flag: '🇬🇧' },
+    'es': { name: 'Spanyol', flag: '🇪🇸' },
+    'de': { name: 'Német', flag: '🇩🇪' }
+};
+
 /**
  * @component
  * @returns {React.ReactElement} A list of historical challenge records.
@@ -28,10 +34,6 @@ const ChallengeHistory = () => {
 
     /**
      * Fetches the user's closed challenges from the API.
-     * 
-     * @async
-     * @function fetchHistory
-     * @param {boolean} [isInitialLoad=false] - Whether to display the global spinner during fetch.
      */
     const fetchHistory = async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);       
@@ -50,9 +52,6 @@ const ChallengeHistory = () => {
 
     /**
      * Generates the appropriate UI badge based on the challenge status and the winner.
-     * 
-     * @param {Object} challenge - The challenge data object from the backend.
-     * @returns {React.ReactElement|null} The React Bootstrap Badge component.
      */
     const getResultBadge = (challenge) => {
         if (challenge.status === 'DECLINED') return <Badge bg="danger">Elutasítva ❌</Badge>;
@@ -86,6 +85,9 @@ const ChallengeHistory = () => {
                     const iAmChallenger = challenge.challengerName === user?.name;
                     const opponentName = iAmChallenger ? challenge.opponentName : challenge.challengerName;
 
+                    const courseCode = challenge.language || challenge.courseCode || 'en'; 
+                    const courseData = AVAILABLE_COURSES[courseCode] || { name: 'Ismeretlen', flag: '🏳️' };
+
                     return (
                         <Col md={12} key={challenge.challengeId} className="mb-3">
                             <Card className="bg-dark border-secondary shadow-sm opacity-75">
@@ -95,6 +97,8 @@ const ChallengeHistory = () => {
                                             ⚔️ Ellenfél: <strong className="text-info">{opponentName}</strong>
                                         </h6>
                                         <div className="text-light small">
+                                           
+                                            <span title={courseData.name} className="me-2">{courseData.flag}</span>
                                             Lecke: {challenge.lessonTitle} ({challenge.difficulty})
                                         </div>
                                         <div className="text-secondary small mt-1">

@@ -96,11 +96,14 @@ public class LessonController {
      * Retrieves basic metadata for all lessons regardless of difficulty.
      * Safe endpoint designed specifically for populating the Challenge creation dropdown menu.
      *
+     * @param courseCode (Optional) Specifies the language course for the dropdown. Defaults to user's active course if omitted.
      * @return A list of all available lessons.
      */
     @GetMapping("/all-for-challenge")
-    public ResponseEntity<List<LessonResponse>> getAllLessonsForChallenge(Authentication authentication) {
-        log.info("REST request to get all lessons for challenge dropdown");
-        return ResponseEntity.ok(lessonService.getAllLessonsForChallengeDropdown(authentication.getName()));
+    public ResponseEntity<List<LessonResponse>> getAllLessonsForChallenge(
+            @RequestParam(required = false) String courseCode,
+            Authentication authentication) {
+        log.info("REST request to get all lessons for challenge dropdown. Requested course: {}", courseCode);
+        return ResponseEntity.ok(lessonService.getAllLessonsForChallengeDropdown(authentication.getName(), courseCode));
     }
 }

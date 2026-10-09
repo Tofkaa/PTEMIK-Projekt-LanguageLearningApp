@@ -9,6 +9,13 @@ import { Card, Button, Spinner, Alert, Badge, Row, Col, Modal, Form } from 'reac
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
+
+const AVAILABLE_COURSES = {
+    'en': { name: 'Angol', flag: '🇬🇧' },
+    'es': { name: 'Spanyol', flag: '🇪🇸' },
+    'de': { name: 'Német', flag: '🇩🇪' }
+};
 
 /**
  * @component
@@ -16,6 +23,7 @@ import { useNotifications } from '../context/NotificationContext';
  */
 const FriendList = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [friends, setFriends] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -23,16 +31,26 @@ const FriendList = () => {
 
     const [showModal, setShowModal] = useState(false);
     const [selectedFriend, setSelectedFriend] = useState(null);
+
+    const [challengeCourse, setChallengeCourse] = useState(user?.activeCourseCode || 'en');
     const [lessons, setLessons] = useState([]);
     const [selectedLesson, setSelectedLesson] = useState('');
+    const [fetchingLessons, setFetchingLessons] = useState(false);
+
     const [expiresIn, setExpiresIn] = useState(3);
     const [challengeLoading, setChallengeLoading] = useState(false);
     const [challengeError, setChallengeError] = useState('');
 
     useEffect(() => {
         fetchFriends(true);
-        fetchLessons(); // Prepare lessons for selection 
     }, [notifications.totalFriends]);
+
+    // Automatikusan frissítjük a leckék listáját, ha a modal nyitva van és nyelvet vált
+    useEffect(() => {
+        if (showModal) {
+            fetchLessonsForChallenge(challengeCourse);
+        }
+    }, [challengeCourse, showModal]);
 
     const fetchFriends = async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);
@@ -49,21 +67,41 @@ const FriendList = () => {
         }
     };
 
-    const fetchLessons = async () => {
+    const fetchLessonsForChallenge = async (courseCode) => {
+        setFetchingLessons(true);
         try {
-            const response = await api.get('/lessons/all-for-challenge');
-            setLessons(response.data || []);
+
+            const response = await api.get('/lessons/all-for-challenge', {
+                params: { courseCode: courseCode }
+            });
+            
+            const fetchedLessons = response.data || [];
+            
+            const filteredLessons = fetchedLessons.filter(l => 
+                !l.language || l.language === courseCode || l.courseCode === courseCode
+            );
+
+            const displayLessons = filteredLessons.length > 0 ? filteredLessons : fetchedLessons;
+            
+            setLessons(displayLessons);
+            
+            if (displayLessons.length > 0) {
+                setSelectedLesson(displayLessons[0].lessonId);
+            } else {
+                setSelectedLesson('');
+            }
         } catch (err) {
             console.error("Nem sikerült lekérni a leckéket a kihíváshoz", err);
+        } finally {
+            setFetchingLessons(false);
         }
     };
 
     const handleOpenChallenge = (friend) => {
         setSelectedFriend(friend);
         setChallengeError('');
-        if (lessons.length > 0) {
-            setSelectedLesson(lessons[0].lessonId);
-        }
+        // Alapértelmezetten a felhasználó aktív nyelvével indítjuk a modalt
+        setChallengeCourse(user?.activeCourseCode || 'en');
         setShowModal(true);
     };
 
@@ -75,9 +113,6 @@ const FriendList = () => {
     /**
      * Initiates a new challenge by creating a DRAFT state in the backend.
      * Automatically redirects the user to the LessonPlayer upon success, attaching the bypass ID.
-     * * @async
-     * @function handleStartChallenge
-     * @throws Will display an error alert if the API request fails.
      */
     const handleStartChallenge = async () => {
         if (!selectedLesson) {
@@ -95,17 +130,14 @@ const FriendList = () => {
                 expiresInDays: expiresIn
             };
 
-            // 1. Create the DRAFT challenge via backend API
             const response = await api.post('/challenges/create', payload);
             const challengeId = response.data.challengeId;
 
             if (refreshNotifications) {
                 refreshNotifications();
             }
-            // 2. Clean up modal state
             setShowModal(false);
 
-            // 3. Redirect to the Lesson Player with the bypass challengeId attached to the URL
             navigate(`/lesson/${selectedLesson}?challengeId=${challengeId}`);
 
         } catch (err) {
@@ -115,13 +147,6 @@ const FriendList = () => {
         }
     };
 
-    /**
-     * Handles the removal of a friend connection.
-     * Prompts the user for confirmation before sending the DELETE request.
-     * * @async
-     * @param {string} friendshipId 
-     * @param {string} friendName 
-     */
     const handleRemoveFriend = async (friendshipId, friendName) => {
         if (window.confirm(`Biztosan törlöd ${friendName} felhasználót a barátaid közül?`)) {
             try {
@@ -203,24 +228,49 @@ const FriendList = () => {
                     {challengeError && <Alert variant="danger">{challengeError}</Alert>}
                     
                     <Form>
+                        {/* 1. LÉPÉS: NYELV KIVÁLASZTÁSA */}
                         <Form.Group className="mb-3">
-                            <Form.Label className="text-muted fw-bold">1. Melyik leckéből hívod ki?</Form.Label>
+                            <Form.Label className="text-muted fw-bold">1. Milyen nyelven szeretnél párbajozni?</Form.Label>
                             <Form.Select 
                                 className="bg-secondary text-light border-secondary shadow-none"
-                                value={selectedLesson}
-                                onChange={(e) => setSelectedLesson(e.target.value)}
-                                disabled={challengeLoading}
+                                value={challengeCourse}
+                                onChange={(e) => setChallengeCourse(e.target.value)}
+                                disabled={challengeLoading || fetchingLessons}
                             >
-                                {lessons.map(lesson => (
-                                    <option key={lesson.lessonId} value={lesson.lessonId}>
-                                        {lesson.title} ({lesson.difficulty})
+                                {Object.entries(AVAILABLE_COURSES).map(([code, data]) => (
+                                    <option key={code} value={code}>
+                                        {data.flag} {data.name}
                                     </option>
                                 ))}
                             </Form.Select>
                         </Form.Group>
 
+                        {/* 2. LÉPÉS: LECKE KIVÁLASZTÁSA */}
+                        <Form.Group className="mb-3">
+                            <Form.Label className="text-muted fw-bold">2. Melyik leckéből hívod ki?</Form.Label>
+                            <Form.Select 
+                                className="bg-secondary text-light border-secondary shadow-none"
+                                value={selectedLesson}
+                                onChange={(e) => setSelectedLesson(e.target.value)}
+                                disabled={challengeLoading || fetchingLessons || lessons.length === 0}
+                            >
+                                {fetchingLessons ? (
+                                    <option value="">Leckék betöltése...</option>
+                                ) : lessons.length === 0 ? (
+                                    <option value="">-- Nincs elérhető lecke ezen a nyelven --</option>
+                                ) : (
+                                    lessons.map(lesson => (
+                                        <option key={lesson.lessonId} value={lesson.lessonId}>
+                                            {lesson.title} ({lesson.difficulty})
+                                        </option>
+                                    ))
+                                )}
+                            </Form.Select>
+                        </Form.Group>
+
+                        {/* 3. LÉPÉS: LEJÁRATI IDŐ */}
                         <Form.Group className="mb-4">
-                            <Form.Label className="text-muted fw-bold">2. Meddig érvényes a kihívás?</Form.Label>
+                            <Form.Label className="text-muted fw-bold">3. Meddig érvényes a kihívás?</Form.Label>
                             <Form.Select 
                                 className="bg-secondary text-light border-secondary shadow-none"
                                 value={expiresIn}
@@ -247,7 +297,7 @@ const FriendList = () => {
                     <Button variant="secondary" onClick={handleCloseModal} disabled={challengeLoading}>
                         Mégse
                     </Button>
-                    <Button variant="info" className="fw-bold" onClick={handleStartChallenge} disabled={challengeLoading || lessons.length === 0}>
+                    <Button variant="info" className="fw-bold" onClick={handleStartChallenge} disabled={challengeLoading || fetchingLessons || lessons.length === 0}>
                         {challengeLoading ? 'Készülés...' : 'Játék Indítása! 🚀'}
                     </Button>
                 </Modal.Footer>

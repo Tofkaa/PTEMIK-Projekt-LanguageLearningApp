@@ -39,6 +39,8 @@ public class DataSeeder implements CommandLineRunner {
         if (topicRepository.count() == 0) {
             log.info("Database is empty. Initializing structured seed data from JSON files...");
             seedCurriculumFromMultipleJsons();
+        } else {
+            log.info("Curriculum data already exists. Skipping seeder to prevent duplicates.");
         }
 
         log.info("Checking and synchronizing achievements...");

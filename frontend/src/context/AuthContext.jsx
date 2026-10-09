@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import api from '../services/api';
 import { vocabularyApi } from '../services/vocabularyApi';
-
+import { userApi } from '../services/userApi';
 /**
  * Global Authentication Context
  * Provides a centralized state for user data and authentication methods.
@@ -100,6 +100,19 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const changeLanguage = async (courseCode) => {
+        try {
+            const response = await userApi.changeActiveCourse(courseCode);
+            setUser(response.data);
+            await fetchVocabularyMap();
+            console.log(`Sikeres nyelvváltás: ${courseCode}`);
+            return true;
+        } catch (error) {
+            console.error("Hiba a nyelvváltás során:", error);
+            throw error;
+        }
+    };
+
     // Display a loading spinner while verifying the token on initial mount
     if (loading) {
         return (
@@ -113,7 +126,7 @@ export const AuthProvider = ({ children }) => {
 
     // Provide the authentication state and methods to the rest of the application
     return (
-        <AuthContext.Provider value={{ user,setUser, login, logout, vocabularyMap }}>
+        <AuthContext.Provider value={{ user,setUser, login, logout, vocabularyMap, changeLanguage }}>
             {children}
         </AuthContext.Provider>
     );

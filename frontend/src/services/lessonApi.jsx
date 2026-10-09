@@ -6,5 +6,11 @@ import api from './api';
 export const lessonApi = {
   
     getAllLessons: () => api.get('/lessons/all-for-challenge'),
-    getLessonExercises: (lessonId) => api.get(`/lessons/${lessonId}/exercises`)
+    getLessonExercises: (lessonId) => api.get(`/lessons/${lessonId}/exercises`),
+    getAllLessonsForChallenge: (courseCode) => {
+        return api.get('/lessons/all-for-challenge', {
+            params: { courseCode: courseCode }
+        });
+    }
+
 };
