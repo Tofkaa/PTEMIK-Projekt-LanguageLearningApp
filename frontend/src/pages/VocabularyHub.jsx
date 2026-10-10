@@ -110,7 +110,7 @@ const VocabularyHub = () => {
                 <Table responsive hover variant="dark" className="align-middle mb-0 text-center">
                     <thead>
                         <tr className="text-secondary text-uppercase fs-7" style={{ letterSpacing: '1px' }}>
-                            <th className="py-3 text-start ps-4">Célszó (Angol)</th>
+                            <th className="py-3 text-start ps-4">Célszó (Idegen nyelv)</th>
                             <th className="py-3 text-start">Jelentés (Magyar)</th>
                             <th className="py-3">SRS Szint</th>
                             <th className="py-3 pe-4">Következő Ismétlés</th>
