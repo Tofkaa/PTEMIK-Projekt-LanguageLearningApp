@@ -100,7 +100,7 @@ public class LessonService {
             throw new ForbiddenException("Ez a lecke jelenleg nem elérhető.");
         }
 
-        if ("STUDENT".equals(user.getRole())) {
+        if (user.getRole() != null && "STUDENT".equals(user.getRole().name())) {
             // --- BYPASS LOGIKA ---
             if (challengeId != null) {
                 Challenge challenge = challengeRepository.findById(challengeId)
