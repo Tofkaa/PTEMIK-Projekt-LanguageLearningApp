@@ -161,6 +161,16 @@ const CurriculumManager = () => {
 
     const availableLessonsForTarget = topics.find(t => t.topicId === targetTopicId)?.lessons || [];
 
+    // --- Témakörök csoportosítása nyelvek (courseCode) szerint ---
+    const groupedTopics = topics.reduce((acc, topic) => {
+        const code = topic.courseCode || 'en'; // Fallback
+        if (!acc[code]) {
+            acc[code] = [];
+        }
+        acc[code].push(topic);
+        return acc;
+    }, {});
+
     return (
         <div>
             {message.text && <Alert variant={message.type} className="shadow-sm rounded-4">{message.text}</Alert>}
@@ -224,7 +234,9 @@ const CurriculumManager = () => {
                                     >
                                         <option value="">-- Válassz Témakört --</option>
                                         {topics.map(t => (
-                                            <option key={t.topicId} value={t.topicId}>{t.topicName}</option>
+                                            <option key={t.topicId} value={t.topicId}>
+                                                [{AVAILABLE_COURSES[t.courseCode || 'en']?.flag}] {t.topicName}
+                                            </option>
                                         ))}
                                     </Form.Select>
                                 </Form.Group>
@@ -269,97 +281,112 @@ const CurriculumManager = () => {
                 </Card.Body>
             </Card>
 
-            <h5 className="text-light fw-bold mb-3">Meglévő Tananyagok (Kezelés)</h5>
+            <h4 className="text-light fw-bold mb-4">Meglévő Tananyagok (Kezelés)</h4>
+            
             {isLoadingTopics ? (
                 <div className="text-center py-4"><Spinner animation="border" variant="info" /></div>
             ) : topics.length === 0 ? (
                 <p className="text-secondary">Nincs még elérhető tananyag az adatbázisban.</p>
             ) : (
-                <Accordion className="border-secondary custom-dark-accordion">
-                    {topics.map((topic, index) => (
-                        <Accordion.Item eventKey={index.toString()} key={topic.topicId} className={`bg-dark border-secondary mb-3 rounded-4 overflow-hidden shadow-sm`}>
-                            <Accordion.Header className={!topic.active ? 'opacity-75 bg-danger bg-opacity-10' : ''}>
-                                <div className="d-flex w-100 justify-content-between align-items-center pe-3">
-                                    <span className="text-light fw-bold fs-5">
-                                        📘 {topic.topicName} {!topic.active && <Badge bg="danger" className="ms-3 fs-6">Felfüggesztve</Badge>}
-                                    </span>
-                                    <Button 
-                                        variant={topic.active ? "outline-danger" : "outline-success"} 
-                                        size="sm" 
-                                        className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" 
-                                        onClick={(e) => { e.stopPropagation(); handleStatusToggle(topic.topicId, 'Témakör', topic.topicName, topic.active); }}
-                                    >
-                                        <span>{topic.active ? '🛑' : '♻️'}</span> {topic.active ? 'Témakör Felfüggesztése' : 'Témakör Visszaállítása'}
-                                    </Button>
-                                </div>
-                            </Accordion.Header>
-                            <Accordion.Body className={`bg-dark text-light border-top border-secondary p-4 ${!topic.active ? 'bg-danger bg-opacity-10' : ''}`}>
+                Object.entries(groupedTopics).map(([courseCode, courseTopics]) => {
+                    const courseData = AVAILABLE_COURSES[courseCode] || { name: 'Ismeretlen', flag: '🏳️' };
+                    
+                    return (
+                        <div key={courseCode} className="mb-5">
+                            {/* Csoport Fejléc */}
+                            <h5 className="text-info fw-bold mb-3 border-bottom border-secondary pb-2 d-flex align-items-center">
+                                <span className="fs-3 me-2">{courseData.flag}</span> 
+                                {courseData.name} Kurzus ({courseTopics.length} témakör)
+                            </h5>
+                            
+                            <Accordion className="border-secondary custom-dark-accordion">
+                                {courseTopics.map((topic) => (
+                                    <Accordion.Item eventKey={topic.topicId} key={topic.topicId} className={`bg-dark border-secondary mb-3 rounded-4 overflow-hidden shadow-sm`}>
+                                        <Accordion.Header className={!topic.active ? 'opacity-75 bg-danger bg-opacity-10' : ''}>
+                                            <div className="d-flex w-100 justify-content-between align-items-center pe-3">
+                                                <span className="text-light fw-bold fs-5">
+                                                    📘 {topic.topicName} {!topic.active && <Badge bg="danger" className="ms-3 fs-6">Felfüggesztve</Badge>}
+                                                </span>
+                                                <Button 
+                                                    variant={topic.active ? "outline-danger" : "outline-success"} 
+                                                    size="sm" 
+                                                    className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" 
+                                                    onClick={(e) => { e.stopPropagation(); handleStatusToggle(topic.topicId, 'Témakör', topic.topicName, topic.active); }}
+                                                >
+                                                    <span>{topic.active ? '🛑' : '♻️'}</span> {topic.active ? 'Témakör Felfüggesztése' : 'Témakör Visszaállítása'}
+                                                </Button>
+                                            </div>
+                                        </Accordion.Header>
+                                        <Accordion.Body className={`bg-dark text-light border-top border-secondary p-4 ${!topic.active ? 'bg-danger bg-opacity-10' : ''}`}>
 
-                                {topic.lessons && topic.lessons.length > 0 ? (
-                                    <div className="d-flex flex-column gap-4">
-                                        {topic.lessons.map(lesson => (
-                                            <Card key={lesson.lessonId} className={`bg-transparent border border-secondary shadow-sm rounded-4 ${!lesson.active ? 'bg-danger bg-opacity-10' : ''}`}>
-                                                <Card.Header className="d-flex justify-content-between align-items-center bg-black bg-opacity-25 border-bottom border-secondary py-3 px-4">
-                                                    <div>
-                                                        <span className="fw-bold text-info fs-5 me-3">📄 {lesson.title}</span>
-                                                        <Badge bg={getDifficultyBadge(lesson.difficulty)} pill>{lesson.difficulty}</Badge>
-                                                        {!lesson.active && <Badge bg="danger" className="ms-3 fs-6">Felfüggesztve</Badge>}
-                                                    </div>
-                                                    <Button 
-                                                        variant={lesson.active ? "outline-danger" : "outline-success"} 
-                                                        size="sm" 
-                                                        className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" 
-                                                        onClick={() => handleStatusToggle(lesson.lessonId, 'Lecke', lesson.title, lesson.active)}
-                                                    >
-                                                        <span>{lesson.active ? '🛑' : '♻️'}</span> {lesson.active ? 'Felfüggesztés' : 'Visszaállítás'}
-                                                    </Button>
-                                                </Card.Header>
-                                                <Card.Body className="p-0">
-                                                    <ListGroup variant="flush">
-                                                        {lesson.exercises?.map(exercise => (
-                                                            <ListGroup.Item key={exercise.exerciseId} className={`bg-transparent border-bottom border-secondary border-opacity-50 text-light d-flex flex-wrap justify-content-between align-items-center py-3 px-4 ${!exercise.active ? 'bg-danger bg-opacity-10' : ''}`}>
-                                                                <div className="d-flex align-items-center text-truncate pe-3 mb-2 mb-md-0">
-                                                                    <Badge bg="info" text="dark" pill className="me-3 px-3 py-2 fw-bold" style={{ minWidth: '130px' }}>
-                                                                        🧩 {exercise.type}
-                                                                    </Badge>
-                                                                    <span className="text-secondary text-truncate" title={getPreview(exercise.content)}>
-                                                                        {getPreview(exercise.content)}
-                                                                    </span>
-                                                                    {!exercise.active && <Badge bg="danger" className="ms-3">Felfüggesztve</Badge>}
+                                            {topic.lessons && topic.lessons.length > 0 ? (
+                                                <div className="d-flex flex-column gap-4">
+                                                    {topic.lessons.map(lesson => (
+                                                        <Card key={lesson.lessonId} className={`bg-transparent border border-secondary shadow-sm rounded-4 ${!lesson.active ? 'bg-danger bg-opacity-10' : ''}`}>
+                                                            <Card.Header className="d-flex justify-content-between align-items-center bg-black bg-opacity-25 border-bottom border-secondary py-3 px-4">
+                                                                <div>
+                                                                    <span className="fw-bold text-info fs-5 me-3">📄 {lesson.title}</span>
+                                                                    <Badge bg={getDifficultyBadge(lesson.difficulty)} pill>{lesson.difficulty}</Badge>
+                                                                    {!lesson.active && <Badge bg="danger" className="ms-3 fs-6">Felfüggesztve</Badge>}
                                                                 </div>
-                                                                
-                                                                <div className="d-flex align-items-center gap-3 flex-shrink-0">
-                                                                    <Button variant="outline-info" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" onClick={() => handleShowPreview(exercise)}>
-                                                                        <span>👁️</span> Megtekintés
-                                                                    </Button>
-                                                                    <Button 
-                                                                        variant={exercise.active ? "outline-danger" : "outline-success"} 
-                                                                        size="sm" 
-                                                                        className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" 
-                                                                        onClick={() => handleStatusToggle(exercise.exerciseId, 'Feladat', exercise.type, exercise.active)}
-                                                                    >
-                                                                        <span>{exercise.active ? '🛑' : '♻️'}</span> {exercise.active ? 'Felfüggesztés' : 'Visszaállítás'}
-                                                                    </Button>
-                                                                </div>
-                                                            </ListGroup.Item>
-                                                        ))}
-                                                        {(!lesson.exercises || lesson.exercises.length === 0) && (
-                                                            <ListGroup.Item className="bg-transparent border-0 text-secondary text-center py-4 fst-italic">
-                                                                Nincsenek feladatok a leckében.
-                                                            </ListGroup.Item>
-                                                        )}
-                                                    </ListGroup>
-                                                </Card.Body>
-                                            </Card>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-secondary text-center mb-0 fst-italic">Nincsenek leckék ebben a témakörben.</p>
-                                )}
-                            </Accordion.Body>
-                        </Accordion.Item>
-                    ))}
-                </Accordion>
+                                                                <Button 
+                                                                    variant={lesson.active ? "outline-danger" : "outline-success"} 
+                                                                    size="sm" 
+                                                                    className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" 
+                                                                    onClick={() => handleStatusToggle(lesson.lessonId, 'Lecke', lesson.title, lesson.active)}
+                                                                >
+                                                                    <span>{lesson.active ? '🛑' : '♻️'}</span> {lesson.active ? 'Felfüggesztés' : 'Visszaállítás'}
+                                                                </Button>
+                                                            </Card.Header>
+                                                            <Card.Body className="p-0">
+                                                                <ListGroup variant="flush">
+                                                                    {lesson.exercises?.map(exercise => (
+                                                                        <ListGroup.Item key={exercise.exerciseId} className={`bg-transparent border-bottom border-secondary border-opacity-50 text-light d-flex flex-wrap justify-content-between align-items-center py-3 px-4 ${!exercise.active ? 'bg-danger bg-opacity-10' : ''}`}>
+                                                                            <div className="d-flex align-items-center text-truncate pe-3 mb-2 mb-md-0">
+                                                                                <Badge bg="info" text="dark" pill className="me-3 px-3 py-2 fw-bold" style={{ minWidth: '130px' }}>
+                                                                                    🧩 {exercise.type}
+                                                                                </Badge>
+                                                                                <span className="text-secondary text-truncate" title={getPreview(exercise.content)}>
+                                                                                    {getPreview(exercise.content)}
+                                                                                </span>
+                                                                                {!exercise.active && <Badge bg="danger" className="ms-3">Felfüggesztve</Badge>}
+                                                                            </div>
+                                                                            
+                                                                            <div className="d-flex align-items-center gap-3 flex-shrink-0">
+                                                                                <Button variant="outline-info" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" onClick={() => handleShowPreview(exercise)}>
+                                                                                    <span>👁️</span> Megtekintés
+                                                                                </Button>
+                                                                                <Button 
+                                                                                    variant={exercise.active ? "outline-danger" : "outline-success"} 
+                                                                                    size="sm" 
+                                                                                    className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" 
+                                                                                    onClick={() => handleStatusToggle(exercise.exerciseId, 'Feladat', exercise.type, exercise.active)}
+                                                                                >
+                                                                                    <span>{exercise.active ? '🛑' : '♻️'}</span> {exercise.active ? 'Felfüggesztés' : 'Visszaállítás'}
+                                                                                </Button>
+                                                                            </div>
+                                                                        </ListGroup.Item>
+                                                                    ))}
+                                                                    {(!lesson.exercises || lesson.exercises.length === 0) && (
+                                                                        <ListGroup.Item className="bg-transparent border-0 text-secondary text-center py-4 fst-italic">
+                                                                            Nincsenek feladatok a leckében.
+                                                                        </ListGroup.Item>
+                                                                    )}
+                                                                </ListGroup>
+                                                            </Card.Body>
+                                                        </Card>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-secondary text-center mb-0 fst-italic">Nincsenek leckék ebben a témakörben.</p>
+                                            )}
+                                        </Accordion.Body>
+                                    </Accordion.Item>
+                                ))}
+                            </Accordion>
+                        </div>
+                    );
+                })
             )}
 
             {/* FELADAT ELŐNÉZET MODAL */}

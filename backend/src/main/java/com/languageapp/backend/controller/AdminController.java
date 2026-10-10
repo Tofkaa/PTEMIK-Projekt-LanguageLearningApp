@@ -1,8 +1,6 @@
 package com.languageapp.backend.controller;
 
 import com.languageapp.backend.dto.request.TopicImportRequest;
-import com.languageapp.backend.entity.AdminLog;
-import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.service.AdminService;
 import com.languageapp.backend.service.CurriculumService;
@@ -79,9 +77,9 @@ public class AdminController {
         return ResponseEntity.ok("Exercises imported successfully to lesson!");
     }
 
-    // --- USER MANAGEMENT ---
+
     @GetMapping("/users")
-    public ResponseEntity<List<User>> getAllUsers() {
+    public ResponseEntity<List<AdminService.UserAdminDTO>> getAllUsers() {
         return ResponseEntity.ok(adminService.getAllUsers());
     }
 

@@ -10,6 +10,7 @@ import java.util.UUID;
 public class TopicAdminResponse {
     private UUID topicId;
     private String topicName;
+    private String courseCode;
     private boolean isActive;
     private List<LessonDto> lessons;
 

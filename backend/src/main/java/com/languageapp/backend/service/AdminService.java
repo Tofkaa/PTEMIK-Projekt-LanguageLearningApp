@@ -10,8 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,9 +27,21 @@ public class AdminService {
     private final ExerciseRepository exerciseRepository;
     private final ClassroomRepository classroomRepository;
 
+    public record UserAdminDTO(UUID userId, String name, String userTag, String email, LocalDateTime createdAt, boolean active, Role role) {}
+
     @Transactional(readOnly = true)
-    public List<User> getAllUsers() {
-        return userRepository.findAllUsersIncludingDeleted();
+    public List<UserAdminDTO> getAllUsers() {
+        return userRepository.findAllUsersIncludingDeleted().stream()
+                .map(u -> new UserAdminDTO(
+                        u.getUserId(),
+                        u.getName(),
+                        u.getUserTag() != null ? u.getUserTag() : "0000",
+                        u.getEmail(),
+                        u.getCreatedAt() != null ? u.getCreatedAt() : LocalDateTime.now(),
+                        u.isActive(),
+                        u.getRole()
+                ))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -49,7 +63,7 @@ public class AdminService {
 
                     return dto;
                 })
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -169,7 +183,7 @@ public class AdminService {
                         .teacherName(c.getTeacher().getName())
                         .teacherEmail(c.getTeacher().getEmail())
                         .build()
-        ).collect(java.util.stream.Collectors.toList());
+        ).collect(Collectors.toList());
     }
 
     @Transactional
@@ -193,6 +207,7 @@ public class AdminService {
                 com.languageapp.backend.dto.response.TopicAdminResponse.builder()
                         .topicId(topic.getTopicId())
                         .topicName(topic.getName())
+                        .courseCode(topic.getCourse() != null ? topic.getCourse().getLanguageCode() : "en")
                         .isActive(topic.isActive())
                         .lessons(topic.getLessons().stream().map(lesson ->
                                 com.languageapp.backend.dto.response.TopicAdminResponse.LessonDto.builder()
@@ -208,11 +223,11 @@ public class AdminService {
                                                         .correctAnswer(exercise.getCorrectAnswer())
                                                         .isActive(exercise.isActive())
                                                         .build()
-                                        ).collect(java.util.stream.Collectors.toList()))
+                                        ).collect(Collectors.toList()))
                                         .build()
-                        ).collect(java.util.stream.Collectors.toList()))
+                        ).collect(Collectors.toList()))
                         .build()
-        ).collect(java.util.stream.Collectors.toList());
+        ).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Badge, Button, Form, Spinner, Alert, InputGroup } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi'; 
+import { useAuth } from '../../context/AuthContext'; 
 
 const UserManagement = () => {
+    const { user: currentUser } = useAuth(); 
     const [users, setUsers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -108,10 +110,16 @@ const UserManagement = () => {
                         {filteredUsers.length === 0 ? (
                             <tr><td colSpan="5" className="text-center text-light py-4">Nincs találat.</td></tr>
                         ) : (
-                            filteredUsers.map(u => (
-                              <tr key={u.userId} className={!u.active ? 'opacity-75 bg-danger bg-opacity-10' : ''}>
+                            filteredUsers.map(u => {
+                                const isSelf = u.userId === currentUser?.userId;
+
+                                return (
+                                <tr key={u.userId} className={!u.active ? 'opacity-75 bg-danger bg-opacity-10' : ''}>
                                     <td>
-                                        <div className="fw-bold text-light">{u.name} <span className="text-secondary small">#{u.userTag}</span></div>
+                                        <div className="fw-bold text-light">
+                                            {u.name} <span className="text-secondary small">#{u.userTag}</span>
+                                            {isSelf && <Badge bg="primary" className="ms-2">TE VAGY</Badge>}
+                                        </div>
                                         <div className="text-light small">{u.email}</div>
                                     </td>
                                     <td className="small text-secondary">
@@ -125,13 +133,14 @@ const UserManagement = () => {
                                         )}
                                     </td>
                                     <td className="text-center">
-                                        {/* Színkódolt jogosultság váltó */}
                                         <Form.Select 
                                             size="sm" 
                                             className={`bg-dark text-${getRoleBadgeColor(u.role)} border-${getRoleBadgeColor(u.role)} fw-bold shadow-sm`}
                                             value={u.role.replace('ROLE_', '')}
                                             onChange={(e) => handleRoleChange(u.userId, e.target.value)}
-                                            style={{ width: '110px', cursor: 'pointer', margin: '0 auto' }}
+                                            style={{ width: '110px', cursor: isSelf ? 'not-allowed' : 'pointer', margin: '0 auto' }}
+                                            disabled={isSelf}
+                                            title={isSelf ? "Saját magad jogosultságát nem módosíthatod!" : ""}
                                         >
                                             <option value="STUDENT" className="text-info bg-dark fw-bold">Diák</option>
                                             <option value="TEACHER" className="text-warning bg-dark fw-bold">Tanár</option>
@@ -140,17 +149,31 @@ const UserManagement = () => {
                                     </td>
                                     <td className="text-end">
                                         {u.active ? (
-                                            <Button variant="outline-danger" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" onClick={() => handleStatusToggle(u.userId, u.active)}>
+                                            <Button 
+                                                variant="outline-danger" 
+                                                size="sm" 
+                                                className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" 
+                                                onClick={() => handleStatusToggle(u.userId, u.active)}
+                                                disabled={isSelf}
+                                                title={isSelf ? "Saját magadat nem függesztheted fel!" : ""}
+                                            >
                                                 <span>🛑</span> Felfüggesztés
                                             </Button>
                                         ) : (
-                                            <Button variant="outline-success" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" onClick={() => handleStatusToggle(u.userId, u.active)}>
+                                            <Button 
+                                                variant="outline-success" 
+                                                size="sm" 
+                                                className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" 
+                                                onClick={() => handleStatusToggle(u.userId, u.active)}
+                                                disabled={isSelf}
+                                            >
                                                 <span>♻️</span> Visszaállítás
                                             </Button>
                                         )}
                                     </td>
                                 </tr>
-                            ))
+                            )
+                        })
                         )}
                     </tbody>
                 </Table>
