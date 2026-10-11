@@ -840,7 +840,7 @@ const TeacherClassroomDetail = () => {
                                 <h6 className="fw-bold text-info">Válogatás Forrásból</h6>
                                 <Form.Select className="mb-3" value={selectedLessonId} onChange={handleLessonChange}>
                                     <option value="">-- Válassz leckét --</option>
-                                    {lessons.map(l => <option key={l.lessonId} value={l.lessonId}>[{l.difficulty}] {l.title}</option>)}
+                                    {lessons.map(l => <option key={l.lessonId} value={l.lessonId}>[{l.orderIndex ? `${l.orderIndex}. lecke` : ''}] {l.title}</option>)}
                                 </Form.Select>
                                 {availableExercises.length > 0 && (
                                     <>
@@ -849,7 +849,19 @@ const TeacherClassroomDetail = () => {
                                             {availableExercises.map(ex => (
                                                 <div key={ex.exerciseId} className="border-bottom py-2">
                                                     <div className="d-flex justify-content-between align-items-center">
-                                                        <Form.Check id={`ex-${ex.exerciseId}`} label={<span className="small">{ex.content?.question || ex.type}</span>} checked={assignmentForm.exerciseIds.includes(ex.exerciseId)} onChange={() => toggleExerciseSelection(ex)} />
+                                                        <Form.Check 
+                                                        id={`ex-${ex.exerciseId}`} 
+                                                        label={
+                                                            <span className="small d-flex align-items-center gap-2">
+                                                                {ex.difficulty === 'EASY' && <span className="badge bg-success" style={{ fontSize: '0.65rem' }}>EASY</span>}
+                                                                {ex.difficulty === 'MEDIUM' && <span className="badge bg-warning text-dark" style={{ fontSize: '0.65rem' }}>MEDIUM</span>}
+                                                                {ex.difficulty === 'HARD' && <span className="badge bg-danger" style={{ fontSize: '0.65rem' }}>HARD</span>}
+                                                                <span>{ex.content?.question || ex.type}</span>
+                                                            </span>
+                                                        } 
+                                                        checked={assignmentForm.exerciseIds.includes(ex.exerciseId)} 
+                                                        onChange={() => toggleExerciseSelection(ex)} 
+                                                    />
                                                         <Button variant="link" size="sm" className="text-info p-0" onClick={() => togglePreview(ex.exerciseId)}>👁️</Button>
                                                     </div>
                                                     {previewExerciseId === ex.exerciseId && (

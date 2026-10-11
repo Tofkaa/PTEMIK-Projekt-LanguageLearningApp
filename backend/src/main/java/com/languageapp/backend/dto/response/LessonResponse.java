@@ -17,8 +17,10 @@ public class LessonResponse {
     private UUID lessonId;
     private String topicName;
     private String title;
-    private String difficulty;
+    private Integer orderIndex;
     private String language;
     private String description;
     private boolean isCompleted;
+    private String completedDifficulty;
+    private String difficulty;
 }

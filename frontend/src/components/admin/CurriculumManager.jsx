@@ -325,8 +325,7 @@ const CurriculumManager = () => {
                                                         <Card key={lesson.lessonId} className={`bg-transparent border border-secondary shadow-sm rounded-4 ${!lesson.active ? 'bg-danger bg-opacity-10' : ''}`}>
                                                             <Card.Header className="d-flex justify-content-between align-items-center bg-black bg-opacity-25 border-bottom border-secondary py-3 px-4">
                                                                 <div>
-                                                                    <span className="fw-bold text-info fs-5 me-3">📄 {lesson.title}</span>
-                                                                    <Badge bg={getDifficultyBadge(lesson.difficulty)} pill>{lesson.difficulty}</Badge>
+                                                                    <span className="fw-bold text-info fs-5 me-3">📄 {lesson.title} (Sorszám: {lesson.orderIndex})</span>
                                                                     {!lesson.active && <Badge bg="danger" className="ms-3 fs-6">Felfüggesztve</Badge>}
                                                                 </div>
                                                                 <Button 
@@ -343,9 +342,10 @@ const CurriculumManager = () => {
                                                                     {lesson.exercises?.map(exercise => (
                                                                         <ListGroup.Item key={exercise.exerciseId} className={`bg-transparent border-bottom border-secondary border-opacity-50 text-light d-flex flex-wrap justify-content-between align-items-center py-3 px-4 ${!exercise.active ? 'bg-danger bg-opacity-10' : ''}`}>
                                                                             <div className="d-flex align-items-center text-truncate pe-3 mb-2 mb-md-0">
-                                                                                <Badge bg="info" text="dark" pill className="me-3 px-3 py-2 fw-bold" style={{ minWidth: '130px' }}>
+                                                                               <Badge bg="info" text="dark" pill className="me-3 px-3 py-2 fw-bold" style={{ minWidth: '130px' }}>
                                                                                     🧩 {exercise.type}
                                                                                 </Badge>
+                                                                                <Badge bg={getDifficultyBadge(exercise.difficulty)} pill className="me-3">{exercise.difficulty}</Badge>
                                                                                 <span className="text-secondary text-truncate" title={getPreview(exercise.content)}>
                                                                                     {getPreview(exercise.content)}
                                                                                 </span>

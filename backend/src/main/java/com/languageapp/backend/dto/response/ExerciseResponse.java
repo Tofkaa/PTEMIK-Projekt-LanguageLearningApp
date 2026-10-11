@@ -20,7 +20,7 @@ public class ExerciseResponse {
     private UUID exerciseId;
     private UUID lessonId;
     private String type;
-
+    private String difficulty;
     private Map<String, Object> content;
 
     private String audioUrl;

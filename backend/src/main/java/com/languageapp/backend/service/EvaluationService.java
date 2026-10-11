@@ -45,13 +45,13 @@ public class EvaluationService {
     private final AssignmentSessionRepository sessionRepository;
     private final StreakService streakService;
 
-
     /**
      * Orchestrates the entire submission process for a completed lesson.
      * Validates security, calculates scores and XP, updates the Daily Streak, and saves the final result.
      *
      * @param userId   The ID of the user submitting the lesson.
      * @param lessonId The ID of the lesson being submitted.
+     * @param challengeId Optional challenge ID.
      * @param request  The payload containing time taken and all answers.
      * @return LessonSubmitResponse containing the evaluation results for the frontend.
      */
@@ -65,46 +65,47 @@ public class EvaluationService {
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
 
-        // OPTIMIZATION: Fetch the user's progress exactly once to minimize database overhead.
-        var existingProgressOpt = progressRepository.findByUserUserIdAndLessonLessonId(userId, lessonId);
-        boolean hasStarted = existingProgressOpt.isPresent();
+        Challenge challenge = null;
+        String currentAttemptDifficulty;
 
-        // SECURE CHALLENGE BYPASS LOGIC
-        // If a challengeId is provided, bypass the standard adaptive difficulty restrictions,
-        // but strictly verify that the user is an active participant in this specific challenge
-        // and that the requested lesson matches the challenge's target lesson.
+        // --- SECURE CHALLENGE BYPASS LOGIC & DIFFICULTY DETERMINATION ---
         if (challengeId != null) {
-            Challenge challenge = challengeRepository.findById(challengeId)
-                    .orElseThrow(() -> new ForbiddenException("Biztonsági hiba: A megadott kihívás nem létezik!"));
+            challenge = challengeRepository.findById(challengeId)
+                    .orElseThrow(() -> new ForbiddenException("Security error: The specified challenge does not exist!"));
 
             boolean isChallenger = challenge.getChallenger().getUserId().equals(userId);
             boolean isOpponent = challenge.getOpponent().getUserId().equals(userId);
 
             if (!isChallenger && !isOpponent) {
-                log.warn("SECURITY ALERT: User {} próbált beküldeni egy idegen kihívást (ID: {})!", user.getEmail(), challengeId);
-                throw new ForbiddenException("Biztonsági hiba: Nem vagy résztvevője ennek a kihívásnak!");
+                log.warn("SECURITY ALERT: User {} attempted to submit an external challenge (ID: {})!", user.getEmail(), challengeId);
+                throw new ForbiddenException("Security error: You are not a participant in this challenge!");
             }
 
             if (!challenge.getLesson().getLessonId().equals(lessonId)) {
-                log.warn("SECURITY ALERT: User {} manipulálta a lecke ID-t a beküldésnél!", user.getEmail());
-                throw new ForbiddenException("Biztonsági hiba: Ez a kihívás nem a kért leckéhez tartozik!");
+                log.warn("SECURITY ALERT: User {} manipulated the lesson ID during submission!", user.getEmail());
+                throw new ForbiddenException("Security error: This challenge does not belong to the requested lesson!");
             }
 
-            log.info("Difficulty check securely BYPASSED for SUBMIT in challenge ID: {}", challengeId);
+            log.info("Difficulty securely overridden by challenge ID: {}", challengeId);
+            currentAttemptDifficulty = challenge.getTargetDifficulty();
+        } else {
+            // Standard gameplay: Use current adaptive difficulty
+            currentAttemptDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
         }
-         else {
-            // Standard gameplay: Execute adaptive difficulty validations.
-            validateUserDifficultyAccess(user, lesson, hasStarted);
-        }
 
+        // Fetch progress specifically mapped to the current difficulty level
+        var existingProgressOpt = progressRepository.findByUserUserIdAndLessonLessonIdAndCompletedDifficulty(userId, lessonId, currentAttemptDifficulty);
 
-        List<Exercise> exercises = lesson.getExercises();
-        int totalQuestions = exercises.size();
+        // Filter the exercises that were actually evaluated in this session
+        List<Exercise> activeExercises = lesson.getExercises().stream()
+                .filter(ex -> currentAttemptDifficulty.equals(ex.getDifficulty()) && ex.isActive())
+                .toList();
 
+        int totalQuestions = activeExercises.size();
         List<MistakeDTO> mistakes = new ArrayList<>();
 
         // Calculate the score and dynamic XP (accounting for retries)
-        EvaluationDetails details = calculateEvaluationDetails(exercises, request, mistakes);
+        EvaluationDetails details = calculateEvaluationDetails(activeExercises, request, mistakes);
         int correctAnswersCount = details.getCorrectCount();
         int potentialXp = details.getPotentialXp();
 
@@ -116,6 +117,7 @@ public class EvaluationService {
             Progress newProgress = new Progress();
             newProgress.setUser(user);
             newProgress.setLesson(lesson);
+            newProgress.setCompletedDifficulty(currentAttemptDifficulty); // NEW: Track difficulty level in progress
             newProgress.setHighestScore(0);
             newProgress.setIsCompleted(false);
             return newProgress;
@@ -124,40 +126,41 @@ public class EvaluationService {
         int xpEarned = 0;
 
         // --- 1. XP ALLOCATION LOGIC ---
-        // Only award XP if the user passed and hadn't already completed this lesson in the past
+        // Only award XP if the user passed and hadn't already completed this lesson (at this difficulty) in the past
         if (passed && !progress.getIsCompleted()) {
             xpEarned = potentialXp;
             user.setXp(user.getXp() + xpEarned);
             log.info("User {} earned {} XP. Total XP: {}", user.getEmail(), xpEarned, user.getXp());
         } else if (passed && progress.getIsCompleted()) {
-            log.debug("User {} already completed this lesson. No new XP awarded.", user.getEmail());
+            log.debug("User {} already completed this lesson at this difficulty. No new XP awarded.", user.getEmail());
         }
 
         // --- 2. GAMIFICATION: DAILY STREAK ENGINE ---
-        // Runs on every successful lesson completion (even practice/repeats) to encourage daily engagement.
         if (passed) {
             streakService.updateActivity(user);
         }
 
-        Challenge challenge = null;
-        if (challengeId != null) {
-            challenge = challengeRepository.findById(challengeId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Challenge nem található."));
+        // --- 3. DYNAMIC DIFFICULTY EVALUATION ---
+        String oldDifficulty = currentAttemptDifficulty;
+        String newDifficulty = currentAttemptDifficulty;
+        boolean isLevelUp = false;
+        boolean isLevelDown = false;
+
+        
+        if (challenge == null) {
+            oldDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
         }
 
-        // --- 3. DYNAMIC DIFFICULTY EVALUATION ---
-        // 1. Save the old difficulty BEFORE saving the Result
-        String oldDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
 
-        // Save historical result and update ongoing progress
-        Result savedResult = saveResult(user, lesson, request, correctAnswersCount, totalQuestions, score, challenge);
+        Result savedResult = saveResult(user, lesson, request, correctAnswersCount, totalQuestions, score, challenge, currentAttemptDifficulty);
         updateProgress(progress, score, passed);
 
-        // 2. Calculate the new difficulty AFTER saving the Result
-        String newDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
 
-        boolean isLevelUp = checkLevelUp(oldDifficulty, newDifficulty);
-        boolean isLevelDown = checkLevelDown(oldDifficulty, newDifficulty);
+        if (challenge == null) {
+            newDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+            isLevelUp = checkLevelUp(oldDifficulty, newDifficulty);
+            isLevelDown = checkLevelDown(oldDifficulty, newDifficulty);
+        }
 
         // --- THE EVALUATION ENGINE TRIGGER ---
         if (challengeId != null) {
@@ -165,7 +168,6 @@ public class EvaluationService {
         }
 
         String feedback = passed ? "Congratulations! You passed the lesson." : "Keep practicing! You can do better.";
-
         achievementService.checkAndAwardAchievements(user, score);
 
         return LessonSubmitResponse.builder()
@@ -177,22 +179,11 @@ public class EvaluationService {
                 .passed(passed)
                 .feedback(feedback)
                 .mistakes(mistakes)
-                .newStreak(user.getStreak() != null ? user.getStreak() : 0) // Attach final streak for the frontend
+                .newStreak(user.getStreak() != null ? user.getStreak() : 0)
                 .newDifficulty(newDifficulty)
                 .isLevelUp(isLevelUp)
                 .isLevelDown(isLevelDown)
                 .build();
-    }
-
-    private void validateUserDifficultyAccess(User user, Lesson lesson, boolean hasStarted) {
-        if ("STUDENT".equals(user.getRole().name())) {
-            String allowedDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
-            if (!lesson.getDifficulty().equals(allowedDifficulty) && !hasStarted) {
-                log.warn("SECURITY ALERT: User {} attempted to SUBMIT restricted difficulty! Requested: {}, Allowed: {}",
-                        user.getEmail(), lesson.getDifficulty(), allowedDifficulty);
-                throw new ForbiddenException("Access denied : you cant access this difficulty!");
-            }
-        }
     }
 
     // --- CORE EVALUATION LOGIC ---
@@ -216,14 +207,12 @@ public class EvaluationService {
                 .collect(Collectors.groupingBy(ExerciseSubmission::getExerciseId));
 
         for (Exercise exercise : exercises) {
-            // Only evaluate if the backend has a definitive correct answer for this exercise
             if (exercise.getCorrectAnswer() != null && exercise.getCorrectAnswer().containsKey("answer")) {
                 String rawExpected = String.valueOf(exercise.getCorrectAnswer().get("answer"));
                 String cleanExpected = normalizeText(rawExpected);
 
                 List<ExerciseSubmission> subs = subsByExercise.getOrDefault(exercise.getExerciseId(), new ArrayList<>());
 
-                // Separate the first attempt from a potential retry attempt based on the frontend flag
                 ExerciseSubmission firstAttempt = subs.stream().filter(s -> !s.isRetry()).findFirst().orElse(null);
                 ExerciseSubmission retryAttempt = subs.stream().filter(ExerciseSubmission::isRetry).findFirst().orElse(null);
 
@@ -233,7 +222,7 @@ public class EvaluationService {
                 if (firstCorrect) {
                     // CASE 1: Flawless execution. Award a point and full XP.
                     correctCount++;
-                    potentialXp += XP_PER_CORRECT_ANSWER; // +10 XP
+                    potentialXp += XP_PER_CORRECT_ANSWER;
                 } else {
                     // Log the mistake for the frontend Summary Screen using the initial wrong answer
                     String questionText = exercise.getContent() != null && exercise.getContent().containsKey("question")
@@ -250,7 +239,7 @@ public class EvaluationService {
                             // The user learned from the mistake. Count it towards passing the lesson.
                             correctCount++;
                             // Apply penalty: award only half XP for requiring a second attempt.
-                            potentialXp += (XP_PER_CORRECT_ANSWER / 2); // +5 XP
+                            potentialXp += (XP_PER_CORRECT_ANSWER / 2);
                         }
                     }
                 }
@@ -259,10 +248,6 @@ public class EvaluationService {
         return new EvaluationDetails(correctCount, potentialXp);
     }
 
-    /**
-     * Internal Data Transfer Object (DTO) to hold the results of the complex
-     * answer evaluation process, including the penalty-adjusted XP.
-     */
     @lombok.Data
     @lombok.AllArgsConstructor
     public static class EvaluationDetails {
@@ -271,22 +256,23 @@ public class EvaluationService {
     }
 
     private Result saveResult(User user, Lesson lesson, LessonSubmitRequest request,
-                              int correctCount, int totalCount, int score, Challenge challenge) {
+                              int correctCount, int totalCount, int score, Challenge challenge, String difficulty) {
         Result result = new Result();
         result.setUser(user);
         result.setLesson(lesson);
+        result.setDifficulty(difficulty);
         result.setScore(score);
         result.setTimeTaken(request.getTimeTakenSeconds());
         result.setSubmittedAt(LocalDateTime.now());
         result.setCorrectAnswersCount(correctCount);
         result.setTotalQuestionsCount(totalCount);
         result.setIsTestResult(false);
-        result.setIsChallengeResult(false);
         result.setIsChallengeResult(challenge != null);
         result.setChallenge(challenge);
 
         return resultRepository.save(result);
     }
+
     private int getDifficultyRank(String difficulty) {
         if (difficulty == null) return 0;
         return switch (difficulty) {
@@ -324,10 +310,6 @@ public class EvaluationService {
         progressRepository.save(progress);
     }
 
-    /**
-     * Normalizes a string for comparison by removing all punctuation,
-     * converting to lowercase, and collapsing multiple spaces into a single space.
-     */
     private String normalizeText(String input) {
         if (input == null || input.isBlank() || "null".equals(input)) {
             return "";
@@ -352,19 +334,16 @@ public class EvaluationService {
         String normExpected = normalizeText(rawExpected);
         String normUser = normalizeText(userAnswer);
 
-        // Perfect match
         if (normExpected.equals(normUser)) {
             return ExerciseCheckResponse.builder()
                     .isCorrect(true).isAlmostCorrect(false)
-                    .feedbackMessage("Tökéletes! ✅").build();
+                    .feedbackMessage("Perfect! ✅").build();
         }
 
-        // Almost correct check
         boolean isAlmostCorrect = false;
-        String feedbackMsg = "Helytelen! Semmi baj, menjünk tovább. ❌";
+        String feedbackMsg = "Incorrect! No worries, let's keep going. ❌";
 
         if ("WORD_BANK".equals(exercise.getType())) {
-            // WORDBANK: only 1 item in the wrong place?
             List<String> expectedWords = List.of(normExpected.split(" "));
             List<String> userWords = List.of(normUser.split(" "));
 
@@ -375,28 +354,24 @@ public class EvaluationService {
                 }
                 if (misplaced > 0 && misplaced <= 2) {
                     isAlmostCorrect = true;
-                    feedbackMsg = "Majdnem jó! Csak a szórendet keverted meg egy kicsit. 🔄";
+                    feedbackMsg = "Almost right! You just mixed up the word order a bit. 🔄";
                 }
             }
         } else {
-            // TYPING: Levenshtein distance
             int distance = calculateLevenshteinDistance(normExpected, normUser);
             if (distance <= 2 && normExpected.length() > 4) {
                 isAlmostCorrect = true;
-                feedbackMsg = "Majdnem jó! Csak valahol elírtad egy kicsit. ✍️";
+                feedbackMsg = "Almost right! Looks like a small typo. ✍️";
             }
         }
 
-        // Build response
         return ExerciseCheckResponse.builder()
                 .isCorrect(false)
                 .isAlmostCorrect(isAlmostCorrect)
-                //.correctAnswer(null)
                 .feedbackMessage(feedbackMsg)
                 .build();
     }
 
-    // Levenshtein algorithm
     private int calculateLevenshteinDistance(String a, String b) {
         int[][] dp = new int[a.length() + 1][b.length() + 1];
         for (int i = 0; i <= a.length(); i++) {
@@ -404,7 +379,7 @@ public class EvaluationService {
                 if (i == 0) dp[i][j] = j;
                 else if (j == 0) dp[i][j] = i;
                 else dp[i][j] = min(dp[i - 1][j - 1] +
-                            costOfSubstitution(a.charAt(i - 1), b.charAt(j - 1)),
+                                    costOfSubstitution(a.charAt(i - 1), b.charAt(j - 1)),
                             dp[i - 1][j] + 1, dp[i][j - 1] + 1);
             }
         }
@@ -415,5 +390,4 @@ public class EvaluationService {
     private int min(int a, int b, int c) {
         return Math.min(Math.min(a, b), c);
     }
-
 }

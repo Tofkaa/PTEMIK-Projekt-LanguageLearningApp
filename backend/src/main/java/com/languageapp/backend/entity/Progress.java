@@ -28,6 +28,9 @@ public class Progress {
     @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
 
+    @Column(name = "completed_difficulty", length = 50)
+    private String completedDifficulty;
+
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 

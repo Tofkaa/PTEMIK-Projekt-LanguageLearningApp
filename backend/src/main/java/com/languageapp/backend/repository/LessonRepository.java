@@ -13,13 +13,7 @@ public interface LessonRepository extends JpaRepository<Lesson, UUID> {
 
     List<Lesson> findByTopicTopicId(UUID topicId);
 
-    @Query("SELECT l.title AS lessonTitle, l.difficulty AS difficulty, COUNT(r.resultId) AS completionCount, AVG(r.timeTaken) AS averageTimeTaken " +
-            "FROM Lesson l " +
-            "LEFT JOIN Result r ON r.lesson.lessonId = l.lessonId " +
-            "GROUP BY l.lessonId, l.title, l.difficulty")
-    List<com.languageapp.backend.dto.projection.LessonPerformanceDTO> getLessonPerformanceStats();
-
-    List<Lesson> findByDifficultyAndTopic_Course_CourseId(String difficulty, UUID courseId);
+    List<Lesson> findByTopic_Course_CourseIdOrderByTopic_TopicIdAscOrderIndexAsc(UUID courseId);
 
     List<Lesson> findByTopic_Course_CourseId(UUID courseId);
 }

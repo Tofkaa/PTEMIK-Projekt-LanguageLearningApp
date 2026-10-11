@@ -35,8 +35,8 @@ public class Lesson {
     @Column(nullable = false)
     private String title;
 
-    @Column(length = 50)
-    private String difficulty;
+    @Column(name = "order_index")
+    private Integer orderIndex;
 
     @Column(length = 10)
     private String language;

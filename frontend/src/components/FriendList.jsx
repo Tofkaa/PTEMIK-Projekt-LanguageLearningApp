@@ -33,6 +33,7 @@ const FriendList = () => {
     const [selectedFriend, setSelectedFriend] = useState(null);
 
     const [challengeCourse, setChallengeCourse] = useState(user?.activeCourseCode || 'en');
+    const [challengeDifficulty, setChallengeDifficulty] = useState('MEDIUM');
     const [lessons, setLessons] = useState([]);
     const [selectedLesson, setSelectedLesson] = useState('');
     const [fetchingLessons, setFetchingLessons] = useState(false);
@@ -127,7 +128,8 @@ const FriendList = () => {
             const payload = {
                 opponentId: selectedFriend.friendId,
                 lessonId: selectedLesson,
-                expiresInDays: expiresIn
+                expiresInDays: expiresIn,
+                difficulty: challengeDifficulty
             };
 
             const response = await api.post('/challenges/create', payload);
@@ -245,9 +247,24 @@ const FriendList = () => {
                             </Form.Select>
                         </Form.Group>
 
-                        {/* 2. LÉPÉS: LECKE KIVÁLASZTÁSA */}
+                        {/* 2. LÉPÉS: NEHÉZSÉG KIVÁLASZTÁSA */}
                         <Form.Group className="mb-3">
-                            <Form.Label className="text-muted fw-bold">2. Melyik leckéből hívod ki?</Form.Label>
+                            <Form.Label className="text-muted fw-bold">2. Milyen nehézségi szinten párbajozzatok?</Form.Label>
+                            <Form.Select 
+                                className="bg-secondary text-light border-secondary shadow-none"
+                                value={challengeDifficulty}
+                                onChange={(e) => setChallengeDifficulty(e.target.value)}
+                                disabled={challengeLoading}
+                            >
+                                <option value="EASY">Könnyű (EASY)</option>
+                                <option value="MEDIUM">Közepes (MEDIUM)</option>
+                                <option value="HARD">Nehéz (HARD)</option>
+                            </Form.Select>
+                        </Form.Group>
+
+                        {/* 3. LÉPÉS: LECKE KIVÁLASZTÁSA */}
+                        <Form.Group className="mb-3">
+                            <Form.Label className="text-muted fw-bold">3. Melyik leckéből hívod ki?</Form.Label>
                             <Form.Select 
                                 className="bg-secondary text-light border-secondary shadow-none"
                                 value={selectedLesson}
@@ -261,16 +278,16 @@ const FriendList = () => {
                                 ) : (
                                     lessons.map(lesson => (
                                         <option key={lesson.lessonId} value={lesson.lessonId}>
-                                            {lesson.title} ({lesson.difficulty})
+                                            {lesson.title}
                                         </option>
                                     ))
                                 )}
                             </Form.Select>
                         </Form.Group>
 
-                        {/* 3. LÉPÉS: LEJÁRATI IDŐ */}
+                        {/* 4. LÉPÉS: LEJÁRATI IDŐ */}
                         <Form.Group className="mb-4">
-                            <Form.Label className="text-muted fw-bold">3. Meddig érvényes a kihívás?</Form.Label>
+                            <Form.Label className="text-muted fw-bold">4. Meddig érvényes a kihívás?</Form.Label>
                             <Form.Select 
                                 className="bg-secondary text-light border-secondary shadow-none"
                                 value={expiresIn}

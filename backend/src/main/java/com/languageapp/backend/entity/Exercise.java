@@ -20,7 +20,6 @@ import java.util.UUID;
 @Table(name = "exercises")
 
 @SQLDelete(sql = "UPDATE exercises SET is_active = false WHERE exercise_id=?")
-//@SQLRestriction("is_active = true")
 public class Exercise {
 
     @Id
@@ -32,6 +31,9 @@ public class Exercise {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
+
+    @Column(length = 50, nullable = false)
+    private String difficulty;
 
     @Column(nullable = false, length = 50)
     private String type;

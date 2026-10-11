@@ -33,9 +33,6 @@ public class CurriculumService {
     private final ExerciseRepository exerciseRepository;
     private final CourseRepository courseRepository;
 
-    /**
-     * Imports a full curriculum structure (Topic -> Lessons -> Exercises) from a JSON request.
-     */
     @Transactional
     public void importTopicAndLessons(TopicImportRequest request) {
         log.info("Starting curriculum import for topic: {}", request.getTopicName());
@@ -58,9 +55,6 @@ public class CurriculumService {
         log.info("Curriculum import completed successfully.");
     }
 
-    /**
-     * Imports new Lessons (and their Exercises) into an EXISTING Topic.
-     */
     @Transactional
     public void importLessonsToExistingTopic(UUID topicId, List<LessonImportRequest> lessonRequests) {
         log.info("Importing {} new lessons to existing topic ID: {}", lessonRequests.size(), topicId);
@@ -71,9 +65,6 @@ public class CurriculumService {
         importLessonsInternal(existingTopic, lessonRequests);
     }
 
-    /**
-     * Imports new Exercises into an EXISTING Lesson.
-     */
     @Transactional
     public void importExercisesToExistingLesson(UUID lessonId, List<ExerciseImportRequest> exerciseRequests) {
         log.info("Importing {} new exercises to existing lesson ID: {}", exerciseRequests.size(), lessonId);
@@ -84,19 +75,16 @@ public class CurriculumService {
         importExercisesInternal(lesson, exerciseRequests);
     }
 
-    // --- Private Helper Methods for Reusability ---
-
     private void importLessonsInternal(LessonTopic parentTopic, List<LessonImportRequest> lessonRequests) {
         for (LessonImportRequest lessonReq : lessonRequests) {
             Lesson lesson = new Lesson();
             lesson.setTopic(parentTopic);
             lesson.setTitle(lessonReq.getTitle());
-            lesson.setDifficulty(lessonReq.getDifficulty());
+            lesson.setOrderIndex(lessonReq.getOrderIndex());
             lesson.setDescription(lessonReq.getDescription());
             lesson.setLanguage(lessonReq.getLanguage());
 
             Lesson savedLesson = lessonRepository.save(lesson);
-            log.info("  Saved Lesson: {} ({})", savedLesson.getTitle(), savedLesson.getDifficulty());
 
             if (lessonReq.getExercises() != null) {
                 importExercisesInternal(savedLesson, lessonReq.getExercises());
@@ -109,6 +97,7 @@ public class CurriculumService {
             Exercise exercise = new Exercise();
             exercise.setLesson(parentLesson);
             exercise.setType(exerciseReq.getType());
+            exercise.setDifficulty(exerciseReq.getDifficulty());
             exercise.setContent(exerciseReq.getContent());
             exercise.setCorrectAnswer(exerciseReq.getCorrectAnswer());
 
@@ -118,6 +107,5 @@ public class CurriculumService {
 
             exerciseRepository.save(exercise);
         }
-        log.info("    Saved {} exercises for lesson.", exerciseRequests.size());
     }
 }

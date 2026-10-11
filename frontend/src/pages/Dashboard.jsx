@@ -216,8 +216,8 @@ const Dashboard = () => {
                                                                         </Card.Text>
                                                                         
                                                                         <div className="d-flex justify-content-between align-items-center mt-auto pt-3 border-top border-secondary border-opacity-25">
-                                                                            {getDifficultyBadge(lesson.difficulty)}
-                                                                            <Button 
+                                                                            {lesson.completedDifficulty ? getDifficultyBadge(lesson.completedDifficulty) : <Badge bg="secondary" pill>Nincs elkezdve</Badge>}
+                                                                            <Button
                                                                                 variant={lesson.completed ? "outline-success" : "info"} 
                                                                                 size="sm" 
                                                                                 className="rounded-pill px-4 fw-bold"

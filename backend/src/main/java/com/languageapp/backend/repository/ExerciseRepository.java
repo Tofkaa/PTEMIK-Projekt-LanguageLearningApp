@@ -11,4 +11,6 @@ import java.util.UUID;
 public interface ExerciseRepository extends JpaRepository<Exercise, UUID> {
 
     List<Exercise> findByLessonLessonId(UUID lessonId);
+
+    List<Exercise> findByLessonLessonIdAndDifficulty(UUID lessonId, String difficulty);
 }

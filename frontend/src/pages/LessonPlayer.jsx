@@ -22,11 +22,7 @@ const SALT = import.meta.env.VITE_APP_SECURITY_EXERCISE_SALT;
 const generateHash = (input) => {
     if (!input) return "";
    
-    const normalized = input
-        .replace(/[!"#$%&'()*+,\-./:;<=>?@[\]^_`{|}~]/g, '')
-        .toLowerCase()
-        .replace(/\s+/g, ' ')
-        .trim();
+    const normalized = input.toLowerCase().trim();
    
     return CryptoJS.SHA256(normalized + SALT).toString(CryptoJS.enc.Hex);
 };

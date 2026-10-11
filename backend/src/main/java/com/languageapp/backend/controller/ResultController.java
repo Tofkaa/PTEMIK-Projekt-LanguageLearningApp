@@ -35,8 +35,8 @@ public class ResultController {
 
         // 3. Map to DTO for frontend
         List<RecentResultResponse> response = recentResults.stream().map(r -> RecentResultResponse.builder()
-                .lessonTitle(r.getLesson().getTitle()) // Ha nálad getName() van a Lesson entitásban, cseréld arra!
-                .difficulty(r.getLesson().getDifficulty())
+                .lessonTitle(r.getLesson().getTitle())
+                .difficulty(r.getDifficulty())
                 .score(r.getScore())
                 .correctAnswers(r.getCorrectAnswersCount())
                 .totalQuestions(r.getTotalQuestionsCount())

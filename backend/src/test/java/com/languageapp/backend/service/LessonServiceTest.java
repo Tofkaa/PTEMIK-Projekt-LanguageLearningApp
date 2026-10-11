@@ -28,6 +28,8 @@ class LessonServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private ChallengeRepository challengeRepository;
     @Mock private CourseRepository courseRepository;
+    @Mock private UserDifficultyCalculator userDifficultyCalculator;
+    @Mock private ProgressRepository progressRepository;
 
     @InjectMocks
     private LessonService lessonService;
@@ -47,6 +49,7 @@ class LessonServiceTest {
         student = new User();
         student.setUserId(UUID.randomUUID());
         student.setEmail("diak@test.com");
+        student.setRole(Role.STUDENT); // Enum kezelés stringgé alakításhoz ha szükséges!
         student.setActiveCourse(course);
 
         LessonTopic topic = new LessonTopic();
@@ -63,18 +66,22 @@ class LessonServiceTest {
         exercise.setActive(true);
         exercise.setLesson(lesson);
         exercise.setCorrectAnswer(Map.of("answer", "alma"));
+        exercise.setDifficulty("EASY");
 
         lesson.setExercises(List.of(exercise));
     }
 
     @Test
     void getExercisesByLessonId_ShouldHashCorrectAnswers() {
+        // Alapértelmezett nehézség (EASY) visszaadása a kalkulátortól
+        when(userDifficultyCalculator.determineTargetDifficulty(any())).thenReturn("EASY");
+
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
         when(lessonRepository.findById(lesson.getLessonId())).thenReturn(Optional.of(lesson));
 
         List<ExerciseResponse> responses = lessonService.getExercisesByLessonId(lesson.getLessonId(), student.getEmail(), null);
 
-        assertEquals(1, responses.size());
+        assertEquals(1, responses.size(), "A megfelelő nehézségű feladatnak be kell kerülnie a válaszba.");
         ExerciseResponse response = responses.get(0);
 
         assertNotNull(response.getAnswerHash());
@@ -88,6 +95,10 @@ class LessonServiceTest {
         challenge.setChallenger(student);
         challenge.setOpponent(new User());
         challenge.setLesson(lesson);
+        challenge.setTargetDifficulty("EASY"); // Beállítjuk a kihívás nehézségét
+
+        // Mockok: a normál szűrés helyett a Challenge szintet használja
+        when(userDifficultyCalculator.determineTargetDifficulty(any())).thenReturn("EASY");
 
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
         when(lessonRepository.findById(lesson.getLessonId())).thenReturn(Optional.of(lesson));
@@ -110,6 +121,9 @@ class LessonServiceTest {
         challenge.setChallenger(otherChallenger);
         challenge.setOpponent(otherOpponent);
         challenge.setLesson(lesson);
+
+        // A kalkulátor hívása kötelező a service-ben
+        when(userDifficultyCalculator.determineTargetDifficulty(any())).thenReturn("EASY");
 
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
         when(lessonRepository.findById(lesson.getLessonId())).thenReturn(Optional.of(lesson));

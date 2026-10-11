@@ -11,5 +11,8 @@ import java.util.UUID;
 @Repository
 public interface ProgressRepository extends JpaRepository<Progress, UUID> {
     List<Progress> findByUserUserId(UUID userId);
+
     Optional<Progress> findByUserUserIdAndLessonLessonId(UUID userId, UUID lessonId);
+
+    Optional<Progress> findByUserUserIdAndLessonLessonIdAndCompletedDifficulty(UUID userId, UUID lessonId, String difficulty);
 }

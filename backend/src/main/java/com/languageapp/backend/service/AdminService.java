@@ -139,7 +139,7 @@ public class AdminService {
 
         String action = isActive ? "LESSON_RESTORED" : "LESSON_SUSPENDED";
         logAdminAction(admin, action, null,
-                "Lecke " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + lesson.getTitle() + " (" + lesson.getDifficulty() + ") [ID: " + lessonId + "]");
+                "Lecke " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + lesson.getTitle() + " [ID: " + lessonId + "]");
     }
 
     @Transactional
@@ -153,7 +153,7 @@ public class AdminService {
 
         String action = isActive ? "EXERCISE_RESTORED" : "EXERCISE_SUSPENDED";
         logAdminAction(admin, action, null,
-                "Feladat (" + exercise.getType() + " - " + exercise.getLesson().getDifficulty() + ") " + (isActive ? "visszaállítva" : "felfüggesztve") + " [ID: " + exerciseId + "]");
+                "Feladat (" + exercise.getType() + " - " + exercise.getDifficulty() + ") " + (isActive ? "visszaállítva" : "felfüggesztve") + " [ID: " + exerciseId + "]");
     }
 
     @Transactional
@@ -213,12 +213,13 @@ public class AdminService {
                                 com.languageapp.backend.dto.response.TopicAdminResponse.LessonDto.builder()
                                         .lessonId(lesson.getLessonId())
                                         .title(lesson.getTitle())
-                                        .difficulty(lesson.getDifficulty())
+                                        .orderIndex(lesson.getOrderIndex())
                                         .isActive(lesson.isActive())
                                         .exercises(lesson.getExercises().stream().map(exercise ->
                                                 com.languageapp.backend.dto.response.TopicAdminResponse.ExerciseDto.builder()
                                                         .exerciseId(exercise.getExerciseId())
                                                         .type(exercise.getType())
+                                                        .difficulty(exercise.getDifficulty())
                                                         .content(exercise.getContent())
                                                         .correctAnswer(exercise.getCorrectAnswer())
                                                         .isActive(exercise.isActive())

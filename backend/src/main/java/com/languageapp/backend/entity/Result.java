@@ -41,6 +41,8 @@ public class Result {
     @Column(name = "is_challenge_result")
     private Boolean isChallengeResult = false;
 
+    @Column(length = 50)
+    private String difficulty;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "challenge_id")

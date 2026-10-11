@@ -19,7 +19,7 @@ public class TopicAdminResponse {
     public static class LessonDto {
         private UUID lessonId;
         private String title;
-        private String difficulty;
+        private Integer orderIndex;
         private boolean isActive;
         private List<ExerciseDto> exercises;
     }
@@ -29,6 +29,7 @@ public class TopicAdminResponse {
     public static class ExerciseDto {
         private UUID exerciseId;
         private String type;
+        private String difficulty;
         private Object content;
         private Object correctAnswer;
         private boolean isActive;

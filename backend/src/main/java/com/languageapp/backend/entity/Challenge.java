@@ -41,6 +41,9 @@ public class Challenge {
     @JoinColumn(name = "winner_id")
     private User winner;
 
+    @Column(name = "target_difficulty", length = 50)
+    private String targetDifficulty;
+
     @Column(name = "start_time")
     private LocalDateTime startTime;
 

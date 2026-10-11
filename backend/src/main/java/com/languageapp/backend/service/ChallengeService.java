@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -36,13 +35,8 @@ public class ChallengeService {
     private final FriendshipService friendshipService;
     private final ResultRepository resultRepository;
     private final SseService sseService;
+    private final UserDifficultyCalculator userDifficultyCalculator;
 
-    /**
-     * Initializes a new challenge in DRAFT mode. Verifies friendship and sets the expiration timer.
-     * * @param challengerId The UUID of the user initiating the challenge.
-     * @param request The request payload containing opponent and lesson IDs.
-     * @return ChallengeCreateResponse containing the generated Challenge ID.
-     */
     @Transactional
     public ChallengeCreateResponse createDraftChallenge(UUID challengerId, ChallengeCreateRequest request) {
         User challenger = userRepository.findById(challengerId)
@@ -71,12 +65,16 @@ public class ChallengeService {
         challenge.setOpponent(opponent);
         challenge.setLesson(lesson);
 
+        String targetDiff = (request.getDifficulty() != null && !request.getDifficulty().isBlank())
+                ? request.getDifficulty()
+                : userDifficultyCalculator.determineTargetDifficulty(challenger);
+        challenge.setTargetDifficulty(targetDiff);
+
         challenge.setStatus(ChallengeStatus.DRAFT);
         challenge.setStartTime(LocalDateTime.now());
         challenge.setEndTime(LocalDateTime.now().plusDays(days));
 
         challenge = challengeRepository.save(challenge);
-
         return new ChallengeCreateResponse(
                 challenge.getChallengeId(),
                 challenge.getStatus().name(),
@@ -84,13 +82,6 @@ public class ChallengeService {
         );
     }
 
-    /**
-     * Fetches active challenges for a user. Filters visibility based on the user's role:
-     * Challengers can see their DRAFTs, Opponents can only see PENDING challenges.
-     *
-     * @param currentUserId The UUID of the authenticated user.
-     * @return List of formatted ChallengeDTOs for the frontend UI.
-     */
     @Transactional(readOnly = true)
     public List<ChallengeDTO> getActiveChallenges(UUID currentUserId) {
         return challengeRepository.findByChallengerUserIdOrOpponentUserId(currentUserId, currentUserId)
@@ -108,7 +99,7 @@ public class ChallengeService {
                             challenge.getChallenger().getName(),
                             challenge.getOpponent().getName(),
                             challenge.getLesson().getTitle(),
-                            challenge.getLesson().getDifficulty(),
+                            challenge.getTargetDifficulty(),
                             challenge.getStatus().name(),
                             isMyTurn,
                             challenge.getEndTime(),
@@ -120,22 +111,11 @@ public class ChallengeService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * The core Challenge Evaluation Engine. Triggered automatically by the EvaluationService
-     * upon lesson completion. Manages the state machine transitions (DRAFT -> PENDING -> COMPLETED)
-     * and calculates the winner based on Score and Time-taken (tie-breaker).
-     *
-     * @param challengeId The UUID of the active challenge.
-     * @param currentUserId The user who just completed the lesson.
-     * @param currentScore The score achieved by the user.
-     * @param currentTimeTaken The time taken in seconds.
-     */
     @Transactional
     public void processChallengeResult(UUID challengeId, UUID currentUserId, int currentScore, int currentTimeTaken) {
         Challenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Kihívás nem található."));
 
-        // CASE 1 Challenger finished the lesson (DRAFT -> PENDING)
         if (challenge.getStatus() == ChallengeStatus.DRAFT && challenge.getChallenger().getUserId().equals(currentUserId)) {
             log.info("Challenger finished! Changing status to PENDING for challenge: {}", challengeId);
             challenge.setStatus(ChallengeStatus.PENDING);
@@ -146,7 +126,6 @@ public class ChallengeService {
             return;
         }
 
-        // Case 2 Challenged finished the lesson (PENDING -> COMPLETED + Evaluation)
         if (challenge.getStatus() == ChallengeStatus.PENDING && challenge.getOpponent().getUserId().equals(currentUserId)) {
             log.info("Opponent finished! Evaluating challenge: {}", challengeId);
 
@@ -184,13 +163,6 @@ public class ChallengeService {
         }
     }
 
-    /**
-     * Retrieves the user's historical challenges (Completed, Declined, or Expired)
-     * sorted by the most recent expiration date.
-     *
-     * @param currentUserId The UUID of the authenticated user.
-     * @return List of historical ChallengeDTOs including winner information.
-     */
     @Transactional(readOnly = true)
     public List<ChallengeDTO> getChallengeHistory(UUID currentUserId) {
         return challengeRepository.findByChallengerUserIdOrOpponentUserId(currentUserId, currentUserId)
@@ -199,7 +171,6 @@ public class ChallengeService {
                         c.getStatus() == ChallengeStatus.DECLINED ||
                         c.getStatus() == ChallengeStatus.EXPIRED)
                 .map(challenge -> {
-                   // Get winner name, null if tie
                     String winnerName = null;
                     if (challenge.getWinner() != null) {
                         winnerName = challenge.getWinner().getName();
@@ -213,7 +184,7 @@ public class ChallengeService {
                             challenge.getChallenger().getName(),
                             challenge.getOpponent().getName(),
                             challenge.getLesson().getTitle(),
-                            challenge.getLesson().getDifficulty(),
+                            challenge.getTargetDifficulty(),
                             challenge.getStatus().name(),
                             false,
                             challenge.getEndTime(),
@@ -222,7 +193,7 @@ public class ChallengeService {
                             winnerName
                     );
                 })
-                .sorted((c1, c2) -> c2.getExpiresAt().compareTo(c1.getExpiresAt())) // Legfrissebbek elöl
+                .sorted((c1, c2) -> c2.getExpiresAt().compareTo(c1.getExpiresAt()))
                 .collect(Collectors.toList());
     }
 }

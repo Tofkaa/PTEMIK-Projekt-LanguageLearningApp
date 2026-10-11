@@ -40,8 +40,7 @@ public class UserDifficultyCalculator {
         UUID activeCourseId = user.getActiveCourse().getCourseId();
 
         List<Result> recentResults = resultRepository
-                .findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdOrderBySubmittedAtDesc(user.getUserId(), activeCourseId);
-
+                .findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseOrderBySubmittedAtDesc(user.getUserId(), activeCourseId);
         // Default to EASY if the user has no prior history IN THIS SPECIFIC COURSE
         if (recentResults.isEmpty()) {
             return DifficultyLevel.EASY.name();
@@ -50,15 +49,16 @@ public class UserDifficultyCalculator {
         // 2. Calculate the weighted average of recent scores
         double weightedScore = calculateWeightedAverage(recentResults);
 
-        // 3. Determine the difficulty of the most recently completed lesson
-        String lastDifficulty = recentResults.getFirst().getLesson() != null
-                ? recentResults.getFirst().getLesson().getDifficulty()
+        // 3. Determine the difficulty directly from the most recent Result entity
+        String lastDifficulty = recentResults.getFirst().getDifficulty() != null
+                ? recentResults.getFirst().getDifficulty()
                 : "MEDIUM";
 
         log.debug("Adaptive Eval -> User: {}, Course: {}, Last Difficulty: {}, Weighted Score: {}",
                 user.getEmail(), user.getActiveCourse().getLanguageCode(), lastDifficulty, String.format("%.2f", weightedScore));
 
-        long totalLifetimeAttempts = resultRepository.countByUserUserIdAndLesson_Topic_Course_CourseId(user.getUserId(), activeCourseId);
+        long totalLifetimeAttempts = resultRepository
+                .countByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalse(user.getUserId(), activeCourseId);
 
         return calculateNextDifficulty(lastDifficulty, weightedScore, (int) totalLifetimeAttempts);
     }

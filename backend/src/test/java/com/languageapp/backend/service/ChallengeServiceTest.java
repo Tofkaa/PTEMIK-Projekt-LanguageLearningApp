@@ -43,6 +43,9 @@ class ChallengeServiceTest {
     private ResultRepository resultRepository;
     @Mock
     private SseService sseService;
+    @Mock
+    private UserDifficultyCalculator userDifficultyCalculator;
+
 
     @InjectMocks
     private ChallengeService challengeService;
@@ -98,6 +101,7 @@ class ChallengeServiceTest {
 
         when(challengeRepository.save(any(Challenge.class))).thenAnswer(i -> i.getArguments()[0]);
 
+        when(userDifficultyCalculator.determineTargetDifficulty(any(User.class))).thenReturn("MEDIUM");
         // Act
         ChallengeCreateResponse response = challengeService.createDraftChallenge(challenger.getUserId(), request);
 
@@ -113,7 +117,6 @@ class ChallengeServiceTest {
         assertEquals(opponent, savedChallenge.getOpponent());
         assertEquals(ChallengeStatus.DRAFT, savedChallenge.getStatus());
     }
-
     // --- 2. TESZT: Új kihívás létrehozása idegennel (Kivételt kell dobnia) ---
     @Test
     void createDraftChallenge_NotFriends_ThrowsException() {

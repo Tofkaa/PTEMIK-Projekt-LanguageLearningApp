@@ -8,4 +8,5 @@ public class ChallengeCreateRequest {
     private UUID opponentId;
     private UUID lessonId;
     private int expiresInDays;
+    private String difficulty;
 }
