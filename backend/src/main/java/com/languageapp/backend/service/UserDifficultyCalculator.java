@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Advanced Dynamic Difficulty Calculator.
@@ -32,15 +33,16 @@ public class UserDifficultyCalculator {
      */
     public String determineTargetDifficulty(User user) {
         // 1. Check for manual difficulty override
-        if (!"DYNAMIC".equals(user.getPreferredDifficulty().name())) return user
-                .getPreferredDifficulty()
-                .name();
+        if (!"DYNAMIC".equals(user.getPreferredDifficulty().name())) {
+            return user.getPreferredDifficulty().name();
+        }
 
-        // Fetch the 5 most recent results to analyze the learning trend
+        UUID activeCourseId = user.getActiveCourse().getCourseId();
+
         List<Result> recentResults = resultRepository
-                .findTop5ByUserUserIdOrderBySubmittedAtDesc(user.getUserId());
+                .findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdOrderBySubmittedAtDesc(user.getUserId(), activeCourseId);
 
-        // Default to EASY if the user has no prior history
+        // Default to EASY if the user has no prior history IN THIS SPECIFIC COURSE
         if (recentResults.isEmpty()) {
             return DifficultyLevel.EASY.name();
         }
@@ -53,14 +55,11 @@ public class UserDifficultyCalculator {
                 ? recentResults.getFirst().getLesson().getDifficulty()
                 : "MEDIUM";
 
-        log.debug("Adaptive Eval -> User: {}, Last Difficulty: {}, Weighted Score: {}",
-                user.getEmail(), lastDifficulty, String.format("%.2f", weightedScore));
+        log.debug("Adaptive Eval -> User: {}, Course: {}, Last Difficulty: {}, Weighted Score: {}",
+                user.getEmail(), user.getActiveCourse().getLanguageCode(), lastDifficulty, String.format("%.2f", weightedScore));
 
-        // 4. Fetch the absolute total of lifetime attempts to control progression pacing
-        long totalLifetimeAttempts = resultRepository.countByUserUserId(user.getUserId());
+        long totalLifetimeAttempts = resultRepository.countByUserUserIdAndLesson_Topic_Course_CourseId(user.getUserId(), activeCourseId);
 
-        // Pass the WMA (based on the last 5 results) and the lifetime attempts
-        // to the hysteresis engine to enforce minimum practice requirements per level
         return calculateNextDifficulty(lastDifficulty, weightedScore, (int) totalLifetimeAttempts);
     }
 

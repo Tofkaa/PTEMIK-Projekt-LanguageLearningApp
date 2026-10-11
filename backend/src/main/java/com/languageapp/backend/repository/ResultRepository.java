@@ -27,6 +27,10 @@ public interface ResultRepository extends JpaRepository<Result, UUID> {
 
     Optional<Result> findFirstByUserUserIdOrderBySubmittedAtDesc(UUID userId);
 
+    List<Result> findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdOrderBySubmittedAtDesc(UUID userId, UUID courseId);
+
+    long countByUserUserIdAndLesson_Topic_Course_CourseId(UUID userId, UUID courseId);
+
     /**
      * Retrieves a specific user's result for a given challenge.
      * Crucial for the evaluation engine to compare scores between challenger and opponent.
