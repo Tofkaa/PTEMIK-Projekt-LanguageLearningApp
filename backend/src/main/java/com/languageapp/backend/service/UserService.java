@@ -343,22 +343,24 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteAndAnonymizeMyAccount(String email) {
+    public void deleteAndAnonymizeMyAccount(String email, String password) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User nem található."));
 
-        // 1. Kapcsolatok azonnali törlése (Barátságok)
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new BadRequestException("A megadott jelszó hibás!");
+        }
+
         friendshipRepository.deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
 
-        // 2. Személyes adatok felülírása felismerhetetlenre
+
         user.setName("Törölt Felhasználó");
         user.setEmail("deleted_" + UUID.randomUUID() + "@languageapp.com");
         user.setPasswordHash("DELETED");
         user.setUserTag("0000");
 
-        // 3. Fiók inaktiválása
+
         user.setActive(false);
-        user.setRole(Role.DELETED); // Vagy hagyhatod simán USER-en, de az isActive = false megakadályozza a belépést
 
         userRepository.save(user);
 

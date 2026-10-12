@@ -13,7 +13,7 @@ const AVAILABLE_COURSES = {
 const Register = () => {
     const [name, setName] = useState(sessionStorage.getItem('reg_name') || '');
     const [email, setEmail] = useState(sessionStorage.getItem('reg_email') || '');
-   const [password, setPassword] = useState('');
+    const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [preferredDifficulty, setPreferredDifficulty] = useState(sessionStorage.getItem('reg_preferredDifficulty') || 'DYNAMIC');
     const [role, setRole] = useState(sessionStorage.getItem('reg_role') || 'STUDENT');

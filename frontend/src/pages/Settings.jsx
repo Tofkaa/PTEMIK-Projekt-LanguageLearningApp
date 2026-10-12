@@ -45,7 +45,8 @@ const Settings = () => {
     
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [deleteConfirmation, setDeleteConfirmation] = useState('');
+    const [deletePassword, setDeletePassword] = useState('');
+    const [deleteConfirmPassword, setDeleteConfirmPassword] = useState('');
     const [deleteMessage, setDeleteMessage] = useState({ type: '', text: '' });
 
 
@@ -317,8 +318,8 @@ const Settings = () => {
 
     // --- GDPR: SOFT DELETE ---
     const handleDeleteAccount = async () => {
-        if (deleteConfirmation !== 'TÖRLÉS') {
-            setDeleteMessage({ type: 'danger', text: 'Kérlek, gépeld be pontosan a "TÖRLÉS" szót (csupa nagybetűvel) a megerősítéshez.' });
+        if (!deletePassword || deletePassword !== deleteConfirmPassword) {
+            setDeleteMessage({ type: 'danger', text: 'A megadott jelszavak nem egyeznek vagy üresek!' });
             return;
         }
 
@@ -326,13 +327,15 @@ const Settings = () => {
         setDeleteMessage({ type: '', text: '' });
 
         try {
-            await api.delete('/users/me'); 
+            await api.delete('/users/me', { data: { password: deletePassword } }); 
+            
             setShowDeleteModal(false);
             logout(); 
             navigate('/login');
         } catch (error) {
             console.error("Fiók törlése hiba:", error);
-            setDeleteMessage({ type: 'danger', text: 'Hiba történt a fióktörlés során. Kérlek, próbáld újra.' });
+            const errorMsg = error.response?.data?.message || error.response?.data || 'Hiba történt a fióktörlés során.';
+            setDeleteMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hibás jelszó vagy hálózati hiba.' });
         } finally {
             setIsDeleting(false);
         }
@@ -668,7 +671,8 @@ const Settings = () => {
                                     variant="danger" 
                                     className="fw-bold px-4" 
                                     onClick={() => {
-                                        setDeleteConfirmation('');
+                                        setDeletePassword('');
+                                        setDeleteConfirmPassword('');
                                         setDeleteMessage({type:'', text:''});
                                         setShowDeleteModal(true);
                                     }}
@@ -727,7 +731,7 @@ const Settings = () => {
                 </Modal.Footer>
             </Modal>
             {/* --- GDPR: ACCOUNT DELETION CONFIRMATION  MODAL --- */}
-            <Modal show={showDeleteModal} onHide={() => !isDeleting && setShowDeleteModal(false)} centered backdrop="static" contentClassName="bg-dark text-light border-danger">
+           <Modal show={showDeleteModal} onHide={() => !isDeleting && setShowDeleteModal(false)} centered backdrop="static" contentClassName="bg-dark text-light border-danger">
                 <Modal.Header closeButton closeVariant="white" className="border-secondary bg-danger bg-opacity-25">
                     <Modal.Title className="fw-bold text-danger">⚠️ Fiók Törlése</Modal.Title>
                 </Modal.Header>
@@ -736,17 +740,26 @@ const Settings = () => {
                     
                     <p className="fs-5">Biztosan törölni szeretnéd a fiókodat?</p>
                     <p className="text-secondary small">
-                        Ez a művelet <strong>VÉGLEGES</strong> és nem vonható vissza! Minden személyes adatod anonimizálva lesz.
+                        Ez a művelet <strong>VÉGLEGES</strong> és nem vonható vissza! Személyes adataid azonnal törlődnek. 
+                        A folytatáshoz kérlek, erősítsd meg a jelenlegi jelszavaddal.
                     </p>
                     
                     <Form.Group className="mt-4">
-                        <Form.Label className="text-light opacity-75 small">Kérlek, gépeld be a lenti mezőbe, hogy <strong className="text-light">TÖRLÉS</strong> a folytatáshoz.</Form.Label>
+                        <Form.Label className="text-light opacity-75 small">Jelszó</Form.Label>
                         <Form.Control 
-                            type="text" 
-                            placeholder="TÖRLÉS" 
-                            className="bg-secondary bg-opacity-25 text-light border-danger text-center fw-bold fs-4 tracking-wide"
-                            value={deleteConfirmation}
-                            onChange={(e) => setDeleteConfirmation(e.target.value)}
+                            type="password" 
+                            className="bg-secondary bg-opacity-25 text-light border-danger mb-3"
+                            value={deletePassword}
+                            onChange={(e) => setDeletePassword(e.target.value)}
+                            disabled={isDeleting}
+                            autoComplete="off"
+                        />
+                        <Form.Label className="text-light opacity-75 small">Jelszó megerősítése</Form.Label>
+                        <Form.Control 
+                            type="password" 
+                            className="bg-secondary bg-opacity-25 text-light border-danger"
+                            value={deleteConfirmPassword}
+                            onChange={(e) => setDeleteConfirmPassword(e.target.value)}
                             disabled={isDeleting}
                             autoComplete="off"
                         />
@@ -756,7 +769,12 @@ const Settings = () => {
                     <Button variant="outline-secondary" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>
                         Mégse
                     </Button>
-                    <Button variant="danger" className="fw-bold px-4" onClick={handleDeleteAccount} disabled={isDeleting || deleteConfirmation !== 'TÖRLÉS'}>
+                    <Button 
+                        variant="danger" 
+                        className="fw-bold px-4" 
+                        onClick={handleDeleteAccount} 
+                        disabled={isDeleting || !deletePassword || !deleteConfirmPassword}
+                    >
                         {isDeleting ? <><Spinner size="sm" className="me-2" />Törlés folyamatban...</> : 'Igen, törlöm a fiókom!'}
                     </Button>
                 </Modal.Footer>
