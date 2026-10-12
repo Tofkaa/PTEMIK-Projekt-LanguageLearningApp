@@ -44,4 +44,6 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
     int countByFriendUserIdAndStatus(UUID friendId, FriendshipStatus status);
 
     int countByUserUserIdAndStatus(UUID userId, FriendshipStatus friendshipStatus);
+
+    void deleteByUserUserIdOrFriendUserId(UUID userId1, UUID userId2);
 }

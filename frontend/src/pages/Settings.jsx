@@ -41,7 +41,22 @@ const Settings = () => {
     const [isProcessingEmail, setIsProcessingEmail] = useState(false);
     const [emailMessage, setEmailMessage] = useState({ type: '', text: '' });
 
+    const [isExporting, setIsExporting] = useState(false);
     
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteConfirmation, setDeleteConfirmation] = useState('');
+    const [deleteMessage, setDeleteMessage] = useState({ type: '', text: '' });
+
+
+    // --- TABS LOGIC ---
+    const [activeTab, setActiveTab] = useState(sessionStorage.getItem('settingsActiveTab') || 'account');
+
+    const handleTabChange = (tabKey) => {
+        setActiveTab(tabKey);
+        sessionStorage.setItem('settingsActiveTab', tabKey);
+    };
+
     // --- IMAGE UPLOAD LOGIC ---
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -268,6 +283,61 @@ const Settings = () => {
         }
     };
 
+    // --- GDPR: DATA EXPORT ---
+    const handleExportData = async () => {
+        setIsExporting(true);
+        try {
+            const response = await api.get('/users/me/export');
+            
+            // 1. JSON formatting
+            const dataStr = JSON.stringify(response.data, null, 2);
+            
+            // 2. Blob creation in memory
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            
+            // 3. Click to download
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `my_languageapp_data_${user.name.replace(/\s+/g, '_')}.json`;
+            document.body.appendChild(link);
+            link.click();
+            
+            // 4. Cleanup
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+        } catch (error) {
+            console.error("Adat letöltés hiba:", error);
+            alert("Nem sikerült letölteni az adatokat. Kérlek, próbáld újra később.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    // --- GDPR: SOFT DELETE ---
+    const handleDeleteAccount = async () => {
+        if (deleteConfirmation !== 'TÖRLÉS') {
+            setDeleteMessage({ type: 'danger', text: 'Kérlek, gépeld be pontosan a "TÖRLÉS" szót (csupa nagybetűvel) a megerősítéshez.' });
+            return;
+        }
+
+        setIsDeleting(true);
+        setDeleteMessage({ type: '', text: '' });
+
+        try {
+            await api.delete('/users/me'); 
+            setShowDeleteModal(false);
+            logout(); 
+            navigate('/login');
+        } catch (error) {
+            console.error("Fiók törlése hiba:", error);
+            setDeleteMessage({ type: 'danger', text: 'Hiba történt a fióktörlés során. Kérlek, próbáld újra.' });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     if (!user) return null;
 
     return (
@@ -280,7 +350,12 @@ const Settings = () => {
 
             <Card className="bg-dark border-0 shadow-lg rounded-4">
                 <Card.Body className="p-0">
-                    <Tabs defaultActiveKey="account" className="custom-tabs border-secondary p-3 pb-0" variant="underline">
+                    <Tabs 
+                        activeKey={activeTab} 
+                        onSelect={handleTabChange} 
+                        className="custom-tabs border-secondary p-3 pb-0" 
+                        variant="underline"
+                    >
                         
                         {/* 1. TAB: Account information */}
                         <Tab eventKey="account" title="Fiókadatok" className="p-4">
@@ -535,10 +610,77 @@ const Settings = () => {
                                 </Button>
                             </Form>
                         </Tab>
+
+                        {/* 4. TAB: GDPR */}
+                        <Tab eventKey="privacy" title="Adatvédelem" className="p-4">
+                            <h5 className="fw-bold text-info mb-3">🛡️ Adatvédelmi Beállítások</h5>
+                            <p className="text-secondary small mb-4">
+                                Itt kezelheted a GDPR-hoz kapcsolódó jogaidat: letöltheted a rendszerben tárolt adataidat, vagy véglegesen törölheted a fiókodat.
+                            </p>
+
+                           {/* Legal docs */}
+                            <div className="mb-4 pb-4 border-bottom border-secondary">
+                                <h6 className="text-light fw-bold">Jogi dokumentumok</h6>
+                                <p className="text-secondary small mb-3">
+                                    Bármikor újraolvashatod a szolgáltatás használatára vonatkozó szabályzatokat.
+                                </p>
+                                <div className="d-flex gap-3 flex-wrap">
+                                    <Button 
+                                        variant="outline-secondary" 
+                                        size="sm" 
+                                        className="fw-bold text-light"
+                                        onClick={() => navigate('/terms')}
+                                    >
+                                        📄 Általános Szerződési Feltételek
+                                    </Button>
+                                    <Button 
+                                        variant="outline-secondary" 
+                                        size="sm" 
+                                        className="fw-bold text-light"
+                                        onClick={() => navigate('/privacy')}
+                                    >
+                                        🔒 Adatkezelési Tájékoztató
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="mb-5 pb-4 border-bottom border-secondary">
+                                <h6 className="text-light fw-bold">Adataim Letöltése</h6>
+                                <p className="text-secondary small">
+                                    Kérj egy teljes másolatot a fiókodról, a tanulási előzményeidről és a profiladataidról, amelyeket gépileg olvasható JSON formátumban kapsz meg.
+                                </p>
+                                <Button 
+                                    variant="outline-info" 
+                                    className="fw-bold px-4" 
+                                    onClick={handleExportData}
+                                    disabled={isExporting}
+                                >
+                                    {isExporting ? <><Spinner size="sm" className="me-2" />Letöltés folyamatban...</> : '📥 Adat letöltése (.json)'}
+                                </Button>
+                            </div>
+
+                            <div>
+                                <h6 className="text-danger fw-bold">Fiók Törlése</h6>
+                                <p className="text-secondary small">
+                                    A fiókod és a személyes adataid (PII) véglegesen törlésre kerülnek. A tanulási eredményeid név nélkül (anonimizálva) megmaradnak, hogy az osztálytermek és a közösség statisztikái ne sérüljenek. <strong className="text-light">Ez a művelet nem vonható vissza!</strong>
+                                </p>
+                                <Button 
+                                    variant="danger" 
+                                    className="fw-bold px-4" 
+                                    onClick={() => {
+                                        setDeleteConfirmation('');
+                                        setDeleteMessage({type:'', text:''});
+                                        setShowDeleteModal(true);
+                                    }}
+                                >
+                                    🗑️ Fiók végleges törlése
+                                </Button>
+                            </div>
+                        </Tab>
                     </Tabs>
                 </Card.Body>
             </Card>
-            {/* --- PROFILKÉP VÁGÓ ÉS NAGYÍTÓ MODAL --- */}
+            {/* --- PROFILE PICTURE CROPPING AND ZOOMING MODAL --- */}
             <Modal show={showCropModal} onHide={handleCloseCropModal} centered backdrop="static" contentClassName="bg-dark text-light border-secondary">
                 <Modal.Header closeButton closeVariant="white" className="border-secondary">
                     <Modal.Title className="fw-bold text-info">Profilkép beállítása</Modal.Title>
@@ -581,6 +723,41 @@ const Settings = () => {
                     </Button>
                     <Button variant="info" className="fw-bold text-dark px-4" onClick={handleCropAndUpload} disabled={isUploadingImage}>
                         {isUploadingImage ? <><Spinner size="sm" className="me-2" />Feltöltés...</> : 'Kivágás és Mentés'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+            {/* --- GDPR: ACCOUNT DELETION CONFIRMATION  MODAL --- */}
+            <Modal show={showDeleteModal} onHide={() => !isDeleting && setShowDeleteModal(false)} centered backdrop="static" contentClassName="bg-dark text-light border-danger">
+                <Modal.Header closeButton closeVariant="white" className="border-secondary bg-danger bg-opacity-25">
+                    <Modal.Title className="fw-bold text-danger">⚠️ Fiók Törlése</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="p-4">
+                    {deleteMessage.text && <Alert variant={deleteMessage.type} className="fw-bold mb-3">{deleteMessage.text}</Alert>}
+                    
+                    <p className="fs-5">Biztosan törölni szeretnéd a fiókodat?</p>
+                    <p className="text-secondary small">
+                        Ez a művelet <strong>VÉGLEGES</strong> és nem vonható vissza! Minden személyes adatod anonimizálva lesz.
+                    </p>
+                    
+                    <Form.Group className="mt-4">
+                        <Form.Label className="text-light opacity-75 small">Kérlek, gépeld be a lenti mezőbe, hogy <strong className="text-light">TÖRLÉS</strong> a folytatáshoz.</Form.Label>
+                        <Form.Control 
+                            type="text" 
+                            placeholder="TÖRLÉS" 
+                            className="bg-secondary bg-opacity-25 text-light border-danger text-center fw-bold fs-4 tracking-wide"
+                            value={deleteConfirmation}
+                            onChange={(e) => setDeleteConfirmation(e.target.value)}
+                            disabled={isDeleting}
+                            autoComplete="off"
+                        />
+                    </Form.Group>
+                </Modal.Body>
+                <Modal.Footer className="border-secondary">
+                    <Button variant="outline-secondary" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>
+                        Mégse
+                    </Button>
+                    <Button variant="danger" className="fw-bold px-4" onClick={handleDeleteAccount} disabled={isDeleting || deleteConfirmation !== 'TÖRLÉS'}>
+                        {isDeleting ? <><Spinner size="sm" className="me-2" />Törlés folyamatban...</> : 'Igen, törlöm a fiókom!'}
                     </Button>
                 </Modal.Footer>
             </Modal>

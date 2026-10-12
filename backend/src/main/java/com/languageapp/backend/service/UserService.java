@@ -2,16 +2,12 @@ package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.response.ProgressResponse;
 import com.languageapp.backend.dto.response.UserResponse;
-import com.languageapp.backend.entity.Course;
-import com.languageapp.backend.entity.EmailChangeToken;
-import com.languageapp.backend.entity.User;
+import com.languageapp.backend.entity.*;
 import com.languageapp.backend.enums.DifficultyLevel;
+import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
-import com.languageapp.backend.repository.CourseRepository;
-import com.languageapp.backend.repository.EmailChangeTokenRepository;
-import com.languageapp.backend.repository.ProgressRepository;
-import com.languageapp.backend.repository.UserRepository;
+import com.languageapp.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,7 +18,7 @@ import java.io.IOException;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
 
 /**
  * Service handling user profile and progress retrieval.
@@ -39,6 +35,8 @@ public class UserService {
     private final EmailChangeTokenRepository emailChangeTokenRepository;
     private final EmailService emailService;
     private final CourseRepository courseRepository;
+    private final ResultRepository resultRepository;
+    private final FriendshipRepository friendshipRepository;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -298,5 +296,72 @@ public class UserService {
 
         emailChangeTokenRepository.delete(token);
         log.info("User successfully changed email from {} to {}", oldEmail, user.getEmail());
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> exportUserData(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User nem található."));
+
+        Map<String, Object> exportData = new LinkedHashMap<>();
+
+        // 1. Personal data
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("userId", user.getUserId());
+        profile.put("name", user.getName());
+        profile.put("email", user.getEmail());
+        profile.put("userTag", user.getUserTag());
+        profile.put("registeredAt", user.getCreatedAt());
+        profile.put("xp", user.getXp());
+        profile.put("streak", user.getStreak());
+        exportData.put("profile", profile);
+
+        // 2. Learning results
+        List<Result> results = resultRepository.findByUserUserId(user.getUserId());
+        List<Map<String, Object>> resultData = results.stream().map(r -> {
+            Map<String, Object> res = new HashMap<>();
+            res.put("lessonTitle", r.getLesson().getTitle());
+            res.put("difficulty", r.getDifficulty());
+            res.put("score", r.getScore());
+            res.put("submittedAt", r.getSubmittedAt());
+            return res;
+        }).toList();
+        exportData.put("learningResults", resultData);
+
+        // 3. Progress
+        List<Progress> progress = progressRepository.findByUserUserId(user.getUserId());
+        List<Map<String, Object>> progressData = progress.stream().map(p -> {
+            Map<String, Object> prog = new HashMap<>();
+            prog.put("lessonTitle", p.getLesson().getTitle());
+            prog.put("isCompleted", p.getIsCompleted());
+            prog.put("completedDifficulty", p.getCompletedDifficulty());
+            return prog;
+        }).toList();
+        exportData.put("progress", progressData);
+
+        return exportData;
+    }
+
+    @Transactional
+    public void deleteAndAnonymizeMyAccount(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User nem található."));
+
+        // 1. Kapcsolatok azonnali törlése (Barátságok)
+        friendshipRepository.deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
+
+        // 2. Személyes adatok felülírása felismerhetetlenre
+        user.setName("Törölt Felhasználó");
+        user.setEmail("deleted_" + UUID.randomUUID() + "@languageapp.com");
+        user.setPasswordHash("DELETED");
+        user.setUserTag("0000");
+
+        // 3. Fiók inaktiválása
+        user.setActive(false);
+        user.setRole(Role.DELETED); // Vagy hagyhatod simán USER-en, de az isActive = false megakadályozza a belépést
+
+        userRepository.save(user);
+
+        log.info("GDPR Anonymization completed for user ID: {}", user.getUserId());
     }
 }

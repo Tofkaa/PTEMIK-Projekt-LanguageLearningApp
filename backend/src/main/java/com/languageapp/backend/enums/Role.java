@@ -7,5 +7,6 @@ package com.languageapp.backend.enums;
 public enum Role {
     STUDENT,
     TEACHER,
-    ADMIN
+    ADMIN,
+    DELETED
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Form, Button, Card, Container, Row, Col, Alert, ButtonGroup, ToggleButton } from 'react-bootstrap';
 import api from '../services/api.jsx';
@@ -11,20 +11,30 @@ const AVAILABLE_COURSES = {
 };
 
 const Register = () => {
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [name, setName] = useState(sessionStorage.getItem('reg_name') || '');
+    const [email, setEmail] = useState(sessionStorage.getItem('reg_email') || '');
+   const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [preferredDifficulty, setPreferredDifficulty] = useState('DYNAMIC');
-    const [role, setRole] = useState('STUDENT');
+    const [preferredDifficulty, setPreferredDifficulty] = useState(sessionStorage.getItem('reg_preferredDifficulty') || 'DYNAMIC');
+    const [role, setRole] = useState(sessionStorage.getItem('reg_role') || 'STUDENT');
+    const [courseCode, setCourseCode] = useState(sessionStorage.getItem('reg_courseCode') || 'en');
     
-    const [courseCode, setCourseCode] = useState('en');
+    const [acceptTerms, setAcceptTerms] = useState(sessionStorage.getItem('reg_acceptTerms') === 'true');
     
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRegistered, setIsRegistered] = useState(false);
 
     const navigate = useNavigate();
+
+    useEffect(() => {
+        sessionStorage.setItem('reg_name', name);
+        sessionStorage.setItem('reg_email', email);
+        sessionStorage.setItem('reg_preferredDifficulty', preferredDifficulty);
+        sessionStorage.setItem('reg_role', role);
+        sessionStorage.setItem('reg_courseCode', courseCode);
+        sessionStorage.setItem('reg_acceptTerms', acceptTerms.toString());
+    }, [name, email, password, confirmPassword, preferredDifficulty, role, courseCode, acceptTerms]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -45,10 +55,20 @@ const Register = () => {
                 password,
                 preferredDifficulty,
                 role,
-                courseCode 
+                courseCode ,
+                acceptTerms
             });
 
             setIsRegistered(true);
+
+            sessionStorage.removeItem('reg_name');
+            sessionStorage.removeItem('reg_email');
+            sessionStorage.removeItem('reg_password');
+            sessionStorage.removeItem('reg_confirmPassword');
+            sessionStorage.removeItem('reg_preferredDifficulty');
+            sessionStorage.removeItem('reg_role');
+            sessionStorage.removeItem('reg_courseCode');
+            sessionStorage.removeItem('reg_acceptTerms');
 
         } catch (err) {
             console.error("Registration error:", err);
@@ -195,6 +215,22 @@ const Register = () => {
                                     <Form.Text className="text-light opacity-50 small mt-2 d-block">
                                         Ezeket a beállításokat később a profilodban bármikor módosíthatod.
                                     </Form.Text>
+                                </Form.Group>
+
+                                <Form.Group className="mb-4 text-start" controlId="formBasicCheckbox">
+                                    <Form.Check 
+                                        type="checkbox" 
+                                        className="text-light"
+                                        required
+                                        disabled={isSubmitting}
+                                        checked={acceptTerms}
+                                        onChange={(e) => setAcceptTerms(e.target.checked)}
+                                        label={
+                                            <span className="small">
+                                                Elolvastam és elfogadom az <Link to="/terms" className="text-info fw-bold">Általános Szerződési Feltételeket</Link> és az <Link to="/privacy" className="text-info fw-bold">Adatkezelési Tájékoztatót</Link>.
+                                            </span>
+                                        } 
+                                    />
                                 </Form.Group>
 
                                 <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold" disabled={isSubmitting}>

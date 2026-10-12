@@ -79,6 +79,10 @@ public class AuthenticationService {
         user.setRole(request.getRole() != null ? request.getRole() : Role.STUDENT);
         log.info("Registering {} user with email: {}...", user.getRole(), request.getEmail());
 
+        if (Boolean.TRUE.equals(request.getAcceptTerms())) {
+            user.setTermsAcceptedAt(LocalDateTime.now());
+        }
+
         String generatedFriendCode;
         do {
             generatedFriendCode = generateFriendCode();

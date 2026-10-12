@@ -30,6 +30,8 @@ import ResetPassword from './pages/ResetPassword.jsx';
 import Settings from './pages/Settings.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import OAuth2RedirectHandler from './components/OAuth2RedirectHandler.jsx';
+import Terms from './pages/Terms.jsx';
+import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
 
 /**
  * VerificationBanner Component
@@ -83,7 +85,9 @@ function App() {
                         <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
                         <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
                         <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
-
+                        <Route path="/terms" element={<Terms />} />
+                        <Route path="/privacy" element={<PrivacyPolicy />} />
+                        
                         {/* Private Routes */}
                         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
                         
