@@ -1,58 +1,96 @@
 package com.languageapp.backend.service;
 
+import jakarta.annotation.PreDestroy;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-/**
- * Service responsible for managing Server-Sent Events (SSE) connections.
- * It maintains active client connections and dispatches real-time ping events
- * to specific users when their notification state changes.
- */
+@Slf4j
 @Service
 public class SseService {
 
-    /**
-     * Thread-safe map to store active SSE emitters.
-     * Key: User's email address.
-     * Value: The active SseEmitter object for that user.
-     */
-    private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
-    /**
-     * Subscribes a user to the SSE stream.
-     * * @param email The email address of the authenticated user.
-     * @return SseEmitter instance keeping the connection open.
-     */
+    private final Map<String, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
+
+    private final ScheduledExecutorService heartbeatScheduler = Executors.newSingleThreadScheduledExecutor();
+
+    public SseService() {
+
+        heartbeatScheduler.scheduleAtFixedRate(this::sendHeartbeatToAll, 25, 25, TimeUnit.SECONDS);
+    }
+
     public SseEmitter subscribe(String email) {
-        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE); // Infinite timeout
-        emitters.put(email, emitter);
+        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
-        // Remove emitter from the map when the connection is closed or fails
-        emitter.onCompletion(() -> emitters.remove(email));
-        emitter.onTimeout(() -> emitters.remove(email));
-        emitter.onError((e) -> emitters.remove(email));
+        List<SseEmitter> userEmitters = emitters.computeIfAbsent(email, k -> new CopyOnWriteArrayList<>());
+        userEmitters.add(emitter);
+
+        Runnable removeCallback = () -> removeEmitter(email, emitter);
+        emitter.onCompletion(removeCallback);
+        emitter.onTimeout(() -> {
+            emitter.complete();
+            removeCallback.run();
+        });
+        emitter.onError((e) -> removeCallback.run());
+
+
+        try {
+            emitter.send(SseEmitter.event().name("connected").data("ok"));
+        } catch (IOException e) {
+            removeEmitter(email, emitter);
+        }
 
         return emitter;
     }
 
-    /**
-     * Sends a real-time update signal (ping) to a specific user.
-     * This prompts the client application to fetch the latest notification data.
-     * * @param targetEmail The email address of the user who should receive the ping.
-     */
     public void sendPing(String targetEmail) {
-        SseEmitter emitter = emitters.get(targetEmail);
-        if (emitter != null) {
+        List<SseEmitter> userEmitters = emitters.get(targetEmail);
+        if (userEmitters == null || userEmitters.isEmpty()) {
+            return;
+        }
+
+        for (SseEmitter emitter : userEmitters) {
             try {
                 emitter.send(SseEmitter.event().name("ping").data("update"));
-            } catch (IOException e) {
-                // If sending fails (e.g., client disconnected abruptly), clean up the dead emitter
-                emitters.remove(targetEmail);
+            } catch (Exception e) {
+                removeEmitter(targetEmail, emitter);
             }
         }
+    }
+
+    private void sendHeartbeatToAll() {
+        emitters.forEach((email, userEmitters) -> {
+            for (SseEmitter emitter : userEmitters) {
+                try {
+                    emitter.send(SseEmitter.event().comment("heartbeat"));
+                } catch (Exception e) {
+                    removeEmitter(email, emitter);
+                }
+            }
+        });
+    }
+
+    private void removeEmitter(String email, SseEmitter emitter) {
+        List<SseEmitter> userEmitters = emitters.get(email);
+        if (userEmitters != null) {
+            userEmitters.remove(emitter);
+            if (userEmitters.isEmpty()) {
+                emitters.remove(email, userEmitters);
+            }
+        }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        heartbeatScheduler.shutdownNow();
     }
 }

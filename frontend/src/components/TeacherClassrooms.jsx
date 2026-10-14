@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import  { useState, useEffect, useCallback } from 'react';
 import { classroomApi } from '../services/classroomApi';
 import { Card, Button, Modal, Form, Row, Col, Badge } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
+import { getUnseenIds } from '../utils/viewedStore';
 
 const AVAILABLE_COURSES = {
     'en': { name: 'Angol', flag: '🇬🇧' },
@@ -15,27 +17,41 @@ const AVAILABLE_COURSES = {
  * Facilitates the creation and overview of managed classrooms.
  */
 const TeacherClassrooms = () => {
+    const { user } = useAuth();
     const [classrooms, setClassrooms] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
-   const [formData, setFormData] = useState({ name: '', description: '', courseCode: 'en' });
+    const [formData, setFormData] = useState({ name: '', description: '', courseCode: 'en' });
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
     const { notifications } = useNotifications();
-    useEffect(() => {
-        fetchClassrooms();
-    }, []);
 
-    const fetchClassrooms = async () => {
+    const fetchClassrooms = useCallback(async (silent = false) => {
         try {
-            setIsLoading(true);
+            if (!silent) setIsLoading(true);
             const response = await classroomApi.getTeacherClassrooms();
             setClassrooms(response.data);
         } catch (error) {
             console.error("Failed to fetch classrooms:", error);
         } finally {
-            setIsLoading(false);
+            if (!silent) setIsLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchClassrooms(false);
+    }, [fetchClassrooms]);
+
+    const pingTrigger = JSON.stringify([
+        notifications?.teacherPendingJoinRequestIds,
+        notifications?.teacherUngradedSubmissionIds
+    ]);
+
+    useEffect(() => {
+        if (!isLoading) {
+            fetchClassrooms(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pingTrigger]);
 
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -43,7 +59,7 @@ const TeacherClassrooms = () => {
             await classroomApi.createClassroom(formData);
             setIsModalOpen(false);
             setFormData({ name: '', description: '', courseCode: 'en' });
-            fetchClassrooms(); 
+            fetchClassrooms(true);
         } catch (error) {
             console.error("Failed to create classroom:", error);
         }
@@ -59,7 +75,10 @@ const TeacherClassrooms = () => {
         );
     }
 
-   return (
+    const allUnseenPending = getUnseenIds('viewedTeacherPending', user?.userId, notifications?.teacherPendingJoinRequestIds);
+    const allUnseenUngraded = getUnseenIds('viewedTeacherUngraded', user?.userId, notifications?.teacherUngradedSubmissionIds);
+
+    return (
         <div>
             <div className="mb-4">
                 <Button variant="primary" className="fw-bold px-4" onClick={() => setIsModalOpen(true)}>
@@ -76,11 +95,9 @@ const TeacherClassrooms = () => {
                     </Col>
                 ) : (
                     classrooms.map(room => {
-                        const viewedTeacherPending = JSON.parse(localStorage.getItem('viewedTeacherPending') || '[]');
-                        const viewedTeacherUngraded = JSON.parse(localStorage.getItem('viewedTeacherUngraded') || '[]');
-
-                        const unseenPending = (notifications?.teacherPendingJoinRequestIds || []).filter(id => id.startsWith(room.classroomId) && !viewedTeacherPending.includes(id)).length;
-                        const unseenUngraded = (notifications?.teacherUngradedSubmissionIds || []).filter(id => id.startsWith(room.classroomId) && !viewedTeacherUngraded.includes(id)).length;
+                        const prefix = `${room.classroomId}:`;
+                        const unseenPending = allUnseenPending.filter(id => id.startsWith(prefix)).length;
+                        const unseenUngraded = allUnseenUngraded.filter(id => id.startsWith(prefix)).length;
                         const totalClassroomPings = unseenPending + unseenUngraded;
                         
                         const courseData = AVAILABLE_COURSES[room.courseCode] || { name: 'Ismeretlen', flag: '🏳️' };
@@ -105,21 +122,22 @@ const TeacherClassrooms = () => {
                                         <Card.Text className="text-secondary flex-grow-1 mt-2" style={{ fontSize: '0.9rem' }}>
                                             {room.description}
                                         </Card.Text>
-                                    <div className="mt-3 pt-3 border-top border-secondary d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <span className="text-secondary me-2" style={{ fontSize: '0.85rem' }}>Kód:</span>
-                                            <Badge bg="warning" text="dark" className="fw-bold px-2 py-1">
-                                                {room.inviteCode}
+                                        <div className="mt-3 pt-3 border-top border-secondary d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span className="text-secondary me-2" style={{ fontSize: '0.85rem' }}>Kód:</span>
+                                                <Badge bg="warning" text="dark" className="fw-bold px-2 py-1">
+                                                    {room.inviteCode}
+                                                </Badge>
+                                            </div>
+                                            <Badge bg="info" text="dark">
+                                                {room.activeMemberCount} diák
                                             </Badge>
                                         </div>
-                                        <Badge bg="info" text="dark">
-                                            {room.activeMemberCount} diák
-                                        </Badge>
-                                    </div>
-                                </Card.Body>
-                            </Card>
-                        </Col>
-                    )})
+                                    </Card.Body>
+                                </Card>
+                            </Col>
+                        );
+                    })
                 )}
             </Row>
 

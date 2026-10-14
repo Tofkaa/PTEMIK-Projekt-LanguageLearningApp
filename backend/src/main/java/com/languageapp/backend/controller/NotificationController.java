@@ -51,10 +51,10 @@ public class NotificationController {
         User user = userRepository.findByEmail(authentication.getName()).orElseThrow();
         java.util.UUID userId = user.getUserId();
 
-        int pendingFriends = friendshipRepository.countByFriendUserIdAndStatus(userId, com.languageapp.backend.enums.FriendshipStatus.PENDING);
-        int pendingChallenges = challengeRepository.countByOpponentUserIdAndStatus(userId, com.languageapp.backend.enums.ChallengeStatus.PENDING);
-        int totalFriends = friendshipRepository.countByFriendUserIdAndStatus(userId, com.languageapp.backend.enums.FriendshipStatus.ACCEPTED)
-                + friendshipRepository.countByUserUserIdAndStatus(userId, com.languageapp.backend.enums.FriendshipStatus.ACCEPTED);
+        int pendingFriends = friendshipRepository.countByFriendUserIdAndStatus(userId, FriendshipStatus.PENDING);
+        int pendingChallenges = challengeRepository.countByOpponentUserIdAndStatus(userId, ChallengeStatus.PENDING);
+        int totalFriends = friendshipRepository.countByFriendUserIdAndStatus(userId, FriendshipStatus.ACCEPTED)
+                + friendshipRepository.countByUserUserIdAndStatus(userId, FriendshipStatus.ACCEPTED);
         int totalHistory = challengeRepository.countHistoryForUser(userId);
         int dueVocabCount = (int) studentVocabularyRepository.countByUser_UserIdAndNextPracticeAtBefore(userId, LocalDateTime.now());
 
@@ -63,45 +63,49 @@ public class NotificationController {
         java.util.List<String> sActiveIds = new java.util.ArrayList<>();
         java.util.List<String> sGradedIds = new java.util.ArrayList<>();
 
-        try {
-            // TANÁR 1: Várakozó diákok (classroomId:userId)
-            classroomMemberRepository.findAll().stream()
-                    .filter(m -> m.getClassroom().getTeacher().getUserId().equals(userId) && m.getStatus() == com.languageapp.backend.enums.MembershipStatus.PENDING)
-                    .forEach(m -> tPendingIds.add(m.getClassroom().getClassroomId() + ":" + m.getUser().getUserId()));
+        // 1. TANÁR: Várakozó diákok (classroomId:userId)
+        classroomMemberRepository.findAll().stream()
+                .filter(m -> m.getClassroom().getTeacher().getUserId().equals(userId) && m.getStatus() == MembershipStatus.PENDING)
+                .forEach(m -> tPendingIds.add(m.getClassroom().getClassroomId() + ":" + m.getUser().getUserId()));
 
-            // TANÁR 2: Értékeletlen feladatok (classroomId:assignmentId)
-            sessionRepository.findAll().stream()
-                    .filter(s -> s.getAssignment().getClassroom().getTeacher().getUserId().equals(userId) && !s.isGraded() && s.getFinishedAt() != null)
-                    .forEach(s -> tUngradedIds.add(s.getAssignment().getClassroom().getClassroomId() + ":" + s.getAssignment().getAssignmentId()));
+        // 2. TANÁR: Értékeletlen beadások SESSION szinten (classroomId:assignmentId:sessionId)
+        sessionRepository.findAll().stream()
+                .filter(s -> s.getAssignment().getClassroom().getTeacher().getUserId().equals(userId) && !s.isGraded() && s.getFinishedAt() != null)
+                .forEach(s -> tUngradedIds.add(
+                        s.getAssignment().getClassroom().getClassroomId() + ":" +
+                                s.getAssignment().getAssignmentId() + ":" +
+                                s.getSessionId()
+                ));
 
-            // DIÁK 1: Új értékelések (classroomId:assignmentId)
-            sessionRepository.findAll().stream()
-                    .filter(s -> s.getUser().getUserId().equals(userId) && s.isGraded())
-                    .forEach(s -> sGradedIds.add(s.getAssignment().getClassroom().getClassroomId() + ":" + s.getAssignment().getAssignmentId()));
+        // 3. DIÁK: Új értékelések SESSION szinten (classroomId:assignmentId:sessionId)
+        sessionRepository.findAll().stream()
+                .filter(s -> s.getUser().getUserId().equals(userId) && s.isGraded())
+                .forEach(s -> sGradedIds.add(
+                        s.getAssignment().getClassroom().getClassroomId() + ":" +
+                                s.getAssignment().getAssignmentId() + ":" +
+                                s.getSessionId()
+                ));
 
-            // DIÁK 2: Aktív feladatok (classroomId:assignmentId)
-            classroomMemberRepository.findAllByUser_UserIdAndStatus(userId, com.languageapp.backend.enums.MembershipStatus.ACCEPTED)
-                    .forEach(m -> {
-                        assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(m.getClassroom().getClassroomId())
-                                .forEach(a -> {
-                                    boolean hasFinished = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userId)
-                                            .stream().anyMatch(session -> session.getFinishedAt() != null);
+        // 4. DIÁK: Aktív feladatok (classroomId:assignmentId)
+        classroomMemberRepository.findAllByUser_UserIdAndStatus(userId, MembershipStatus.ACCEPTED)
+                .forEach(m -> {
+                    assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(m.getClassroom().getClassroomId())
+                            .forEach(a -> {
+                                boolean hasFinished = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userId)
+                                        .stream().anyMatch(session -> session.getFinishedAt() != null);
 
-                                    boolean isExpired = a.getAvailableUntil() != null && a.getAvailableUntil().isBefore(java.time.LocalDateTime.now());
+                                boolean isExpired = a.getAvailableUntil() != null && a.getAvailableUntil().isBefore(LocalDateTime.now());
 
-                                    if (!hasFinished && !isExpired) {
-                                        sActiveIds.add(a.getClassroom().getClassroomId() + ":" + a.getAssignmentId());
-                                    }
-                                });
-                    });
-
-        } catch (Exception e) {
-            System.err.println("Notification Summary Error: " + e.getMessage());
-        }
+                                if (!hasFinished && !isExpired) {
+                                    sActiveIds.add(a.getClassroom().getClassroomId() + ":" + a.getAssignmentId());
+                                }
+                            });
+                });
 
         return ResponseEntity.ok(new NotificationSummaryDTO(
                 pendingFriends, pendingChallenges, totalFriends, totalHistory,
-                tPendingIds, tUngradedIds, sActiveIds, sGradedIds, 1L, dueVocabCount
+                tPendingIds, tUngradedIds, sActiveIds, sGradedIds,
+                System.currentTimeMillis(), dueVocabCount
         ));
     }
 

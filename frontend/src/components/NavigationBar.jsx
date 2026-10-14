@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import { useEffect, useState } from 'react'; 
 import ThemeToggle from './ThemeToggle.jsx'; 
+import { getUnseenIds, getScopedCounter, setScopedCounter } from '../utils/viewedStore.js';
 
 const AVAILABLE_COURSES = {
     'en': { name: 'Angol', flag: '🇬🇧' },
@@ -29,33 +30,30 @@ const NavigationBar = () => {
         };
     }, []);
 
-    const handleLogout = () => {
-        localStorage.removeItem('viewedAssignments');
-        localStorage.removeItem('viewedResults');
+  const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
     if (!user) return null;
 
-    const viewedAssignments = JSON.parse(localStorage.getItem('viewedAssignments') || '[]');
-    const viewedResults = JSON.parse(localStorage.getItem('viewedResults') || '[]');
-    const viewedTeacherPending = JSON.parse(localStorage.getItem('viewedTeacherPending') || '[]');
-    const viewedTeacherUngraded = JSON.parse(localStorage.getItem('viewedTeacherUngraded') || '[]');
-
-    const unseenAssignments = (notifications?.studentActiveAssignmentIds || []).filter(id => !viewedAssignments.includes(id)).length;
-    const unseenResults = (notifications?.studentGradedSessionIds || []).filter(id => !viewedResults.includes(id)).length;
-    const unseenTeacherPending = (notifications?.teacherPendingJoinRequestIds || []).filter(id => !viewedTeacherPending.includes(id)).length;
-    const unseenTeacherUngraded = (notifications?.teacherUngradedSubmissionIds || []).filter(id => !viewedTeacherUngraded.includes(id)).length;
+    const unseenAssignments = getUnseenIds('viewedAssignments', user.userId, notifications?.studentActiveAssignmentIds).length;
+    const unseenResults = getUnseenIds('viewedResults', user.userId, notifications?.studentGradedSessionIds).length;
+    const unseenTeacherPending = getUnseenIds('viewedTeacherPending', user.userId, notifications?.teacherPendingJoinRequestIds).length;
+    const unseenTeacherUngraded = getUnseenIds('viewedTeacherUngraded', user.userId, notifications?.teacherUngradedSubmissionIds).length;
 
     const classroomPings = unseenAssignments + unseenResults + unseenTeacherPending + unseenTeacherUngraded;
-    const communityPings = (notifications?.pendingFriendRequests || 0) + (notifications?.pendingChallenges || 0);
-
-    const dueVocabCount = notifications?.dueVocabularyCount || 0;
+    const communityPings = (notifications?.pendingFriends || 0) + (notifications?.pendingChallenges || 0);
 
     const activeCourseCode = user.activeCourseCode || 'en';
     const activeCourseData = AVAILABLE_COURSES[activeCourseCode] || AVAILABLE_COURSES['en'];
+    const rawDueVocabCount = notifications?.dueVocabularyCount || 0;
+    const seenDueVocabCount = getScopedCounter('seenDueVocabCount', user.userId);
+    if (rawDueVocabCount < seenDueVocabCount) {
+        setScopedCounter('seenDueVocabCount', user.userId, rawDueVocabCount);
+    }
 
+    const dueVocabCount = rawDueVocabCount > seenDueVocabCount ? rawDueVocabCount : 0;
     const handleLanguageChange = async (courseCode) => {
         try {
             await changeLanguage(courseCode);

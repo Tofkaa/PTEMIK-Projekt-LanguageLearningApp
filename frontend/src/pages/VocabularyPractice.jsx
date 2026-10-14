@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Container, Card, Button, ProgressBar, Spinner, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api.jsx';
+import { useNotifications } from '../context/NotificationContext.jsx';
 
 const VocabularyPractice = () => {
     const navigate = useNavigate();
-    
+    const { refreshNotifications } = useNotifications();
     const [exercises, setExercises] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
@@ -70,6 +71,9 @@ const VocabularyPractice = () => {
                         timeTakenSeconds: timeTaken
                     });
                     setSessionSummary(response.data); 
+                    if (refreshNotifications) {
+                        refreshNotifications();
+                    }
                 } catch (err) {
                     console.error("Hiba az eredmények mentésekor:", err);
                 } finally {

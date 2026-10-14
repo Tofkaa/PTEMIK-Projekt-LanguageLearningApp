@@ -1,30 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, ProgressBar } from 'react-bootstrap';
 import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
+import { getUnseenIds, markAsViewed } from '../utils/viewedStore';
 import { parseServerDate, formatToLocalDisplay } from '../utils/dateUtils';
 import ExercisePreviewCard from '../components/ExercisePreviewCard';
 
-/**
- * Dashboard component for students to view and interact with a specific classroom.
- * Handles the display of active/completed assignments, classmates, and personal statistics.
- * Integrates centralized timezone-safe date utilities and notification ping clearance.
- * 
- * @component
- */
 const StudentClassroomDetail = () => {
     const { id: classroomId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const { user } = useAuth();
+    const { notifications } = useNotifications();
     
     const classroomName = location.state?.className || 'Osztályterem';
 
-    // --- STATE MANAGEMENT ---
     const [assignments, setAssignments] = useState([]);
     const [classmates, setClassmates] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    const [activeMainTab, setActiveMainTab] = useState('assignments');
+    const [activeSubTab, setActiveSubTab] = useState('active');
 
     const [studentSessions, setStudentSessions] = useState([]);
     const [isResultModalOpen, setIsResultModalOpen] = useState(false);
@@ -32,55 +31,20 @@ const StudentClassroomDetail = () => {
 
     const [expandedPreviewId, setExpandedPreviewId] = useState(null);
     const [stats, setStats] = useState(null);
-
-    const { notifications } = useNotifications();
-
     const [currentTime] = useState(() => Date.now());
-    
-    /**
-     * Updates localStorage with viewed notification IDs and dispatches an event 
-     * to update the notification badges globally.
-     * 
-     * @param {string} storageKey - The key under which the viewed IDs are stored.
-     * @param {Array<string>} idsToMark - The array of specific IDs to mark as seen.
-     */
-    const markAsViewed = (storageKey, idsToMark) => {
-        if (!idsToMark || idsToMark.length === 0) return;
-        const stringIds = idsToMark.map(id => String(id));
-        const seen = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        const updated = [...new Set([...seen, ...stringIds])];
-        localStorage.setItem(storageKey, JSON.stringify(updated));
-        
-        window.dispatchEvent(new Event('local-storage-update'));
-    };
 
-    const viewedAssignments = JSON.parse(localStorage.getItem('viewedAssignments') || '[]');
-    const viewedResults = JSON.parse(localStorage.getItem('viewedResults') || '[]');
+    // Az adott osztályteremhez tartozó olvasatlan elemek kiszűrése
+    const classroomActiveIds = (notifications?.studentActiveAssignmentIds || []).filter(id => id.startsWith(`${classroomId}:`));
+    const classroomGradedIds = (notifications?.studentGradedSessionIds || []).filter(id => id.startsWith(`${classroomId}:`));
 
-    const unseenAssignmentsList = (notifications?.studentActiveAssignmentIds || []).filter(id => id.startsWith(classroomId) && !viewedAssignments.includes(id));
-    const unseenResultsList = (notifications?.studentGradedSessionIds || []).filter(id => id.startsWith(classroomId) && !viewedResults.includes(id));
+    const unseenAssignmentsList = getUnseenIds('viewedAssignments', user?.userId, classroomActiveIds);
+    const unseenResultsList = getUnseenIds('viewedResults', user?.userId, classroomGradedIds);
 
-    const pingTrigger = (notifications?.studentActiveAssignmentIds?.length || 0) + (notifications?.studentGradedSessionIds?.length || 0);
+    // Pontos pingTrigger: ha bármelyik ID kicserélődik vagy új session érkezik, azonnal észleli
+    const pingTrigger = JSON.stringify([classroomActiveIds, classroomGradedIds]);
 
-    // Fetch data when component mounts or a relevant SSE ping arrives
-    useEffect(() => {
-        fetchClassroomData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [classroomId, pingTrigger]);
-
-    // Automatically clear active assignment pings upon loading the assignments
-    useEffect(() => {
-        if (activeAssignments && activeAssignments.length > 0 && unseenAssignmentsList.length > 0) {
-            markAsViewed('viewedAssignments', activeAssignments.map(a => `${classroomId}:${a.assignmentId}`));
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [assignments]);
-    
-    /**
-     * Fetches assignments, members, and personal statistics for the classroom.
-     */
-    const fetchClassroomData = async () => {
-        setIsLoading(true);
+    const fetchClassroomData = useCallback(async (silent = false) => {
+        if (!silent) setIsLoading(true);
         try {
             const [assignmentsRes, membersRes, statsRes] = await Promise.all([
                 assignmentApi.getClassroomAssignments(classroomId),
@@ -93,16 +57,36 @@ const StudentClassroomDetail = () => {
         } catch (error) {
             console.error("Hiba az adatok lekérésekor:", error);
         } finally {
-            setIsLoading(false);
+            if (!silent) setIsLoading(false);
         }
-    };
+    }, [classroomId]);
 
-    // --- ASSIGNMENT FILTERING LOGIC ---
+    // Első betöltéskor spinnerrel, ping érkezésekor csendben (silent = true) frissítünk
+    useEffect(() => {
+        fetchClassroomData(false);
+    }, [fetchClassroomData]);
+
+    useEffect(() => {
+        if (!isLoading) {
+            fetchClassroomData(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pingTrigger]);
+
+    // Olvasottság automatikus jelölése az éppen nyitott fül alapján
+    useEffect(() => {
+        if (isLoading || activeMainTab !== 'assignments') return;
+
+        if (activeSubTab === 'active' && unseenAssignmentsList.length > 0) {
+            markAsViewed('viewedAssignments', user?.userId, unseenAssignmentsList);
+        } else if (activeSubTab === 'completed' && unseenResultsList.length > 0) {
+            markAsViewed('viewedResults', user?.userId, unseenResultsList);
+        }
+    }, [isLoading, activeMainTab, activeSubTab, unseenAssignmentsList, unseenResultsList, user?.userId]);
 
     const activeAssignments = assignments.filter(a => {
         if (a.completed) return false; 
         const availableUntil = parseServerDate(a.availableUntil);
-        // Compare UTC millis safely
         if (availableUntil && availableUntil.getTime() <= currentTime) return false;
         return true;
     });
@@ -114,11 +98,15 @@ const StudentClassroomDetail = () => {
         return false;
     });
 
-    // --- EVENT HANDLERS ---
+    const hasUnseenResultForAssignment = (assignmentId) => {
+        const prefix = `${classroomId}:${assignmentId}:`;
+        return unseenResultsList.some(id => id.startsWith(prefix));
+    };
 
     const handleViewResult = (assignment) => {
-        const combinedId = `${classroomId}:${assignment.assignmentId}`;
-        markAsViewed('viewedResults', [combinedId]);
+        const prefix = `${classroomId}:${assignment.assignmentId}:`;
+        const matchingIds = unseenResultsList.filter(id => id.startsWith(prefix));
+        markAsViewed('viewedResults', user?.userId, matchingIds);
         openStudentResultModal(assignment);
     };
 
@@ -136,7 +124,6 @@ const StudentClassroomDetail = () => {
     const togglePreview = (id) => {
         setExpandedPreviewId(prev => prev === id ? null : id);
     };
-
     // --- RENDER HELPERS ---
 
     if (isLoading) {
@@ -156,20 +143,12 @@ const StudentClassroomDetail = () => {
                 <h2 className="fw-bold m-0 text-primary">{classroomName}</h2>
             </div>
 
-            <Tabs defaultActiveKey="assignments" className="mb-4 custom-dark-tabs">
-                
+           <Tabs activeKey={activeMainTab} onSelect={(k) => setActiveMainTab(k)} className="mb-4 custom-dark-tabs">
                 {/* STUDENT ASSIGNMENTS TAB */}
                 <Tab eventKey="assignments" title={<span className="fw-bold">📝 Feladatok</span>}>
                     
                     {/* ACTIVE AND COMPLETED ASSIGNMENTS */}
-                   <Tabs defaultActiveKey="active" className="mt-3 mb-3 border-secondary" 
-                          onSelect={(key) => {
-                              if (key === 'active') {
-                                  markAsViewed('viewedAssignments', activeAssignments.map(a => `${classroomId}:${a.assignmentId}`));
-                              } else if (key === 'completed') {
-                                  markAsViewed('viewedResults', completedAssignments.filter(a => a.hasGradedSession).map(a => `${classroomId}:${a.assignmentId}`));
-                              }
-                          }}>
+                 <Tabs activeKey={activeSubTab} onSelect={(k) => setActiveSubTab(k)} className="mt-3 mb-3 border-secondary">
                         
                         {/* 1. ACTIVE TODOS */}
                         <Tab eventKey="active" title={
@@ -255,7 +234,7 @@ const StudentClassroomDetail = () => {
                                                 <div className="d-flex justify-content-between align-items-start mb-2">
                                                     <Card.Title className="fw-bold m-0 text-light">{a.title}</Card.Title>
                                                     
-                                                    {unseenResultsList.includes(`${classroomId}:${a.assignmentId}`) ? (
+                                                   {hasUnseenResultForAssignment(a.assignmentId) ? (
                                                         <Badge bg="success" className="animate-pulse shadow-sm border border-light">✉️ Új Értékelés!</Badge>
                                                     ) : (
                                                         a.completed ? <Badge bg="secondary">Befejezve</Badge> : <Badge bg="secondary">Lejárt</Badge>

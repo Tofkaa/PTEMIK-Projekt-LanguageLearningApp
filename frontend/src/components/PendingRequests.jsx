@@ -4,10 +4,11 @@
  * Integrates with the global NotificationContext to update the UI instantly upon action.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Spinner, Alert } from 'react-bootstrap';
 import api from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
+
 
 /**
  * @component
@@ -17,30 +18,26 @@ const PendingRequests = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const isFirstLoad = useRef(true);
     
-    // Húzzuk be a refreshNotifications-t is!
     const { notifications, refreshNotifications } = useNotifications();
 
     useEffect(() => {
-        fetchPendingRequests(true); 
+        fetchPendingRequests(isFirstLoad.current);
+        isFirstLoad.current = false;
     }, [notifications.pendingFriends]);
 
-    /**
-     * Fetches the latest pending friend requests from the server.
-     * Uses a timestamp parameter to bypass aggressive browser caching.
-     * @param {boolean} isInitialLoad - Determines if the global spinner should be shown.
-     */
     const fetchPendingRequests = async (isInitialLoad = false) => {
         if (isInitialLoad) setLoading(true);
 
         try {
-            // CACHE BUSTING: Biztosítjuk, hogy mindig friss adatot kérjen a hálózatról!
             const response = await api.get('/friendships/requests/pending', {
-                params: { _t: new Date().getTime() }
+                params: { _t: Date.now() }
             });
             setRequests(response.data || []);
         } catch (err) {
-            if (isInitialLoad) setMessage({ type: 'danger', text: 'Nem sikerült betölteni a kérelmeket.', err });
+            console.error("Hiba a kérelmek betöltésekor:", err);
+            if (isInitialLoad) setMessage({ type: 'danger', text: 'Nem sikerült betölteni a kérelmeket.' });
         } finally {
             if (isInitialLoad) setLoading(false);
         }

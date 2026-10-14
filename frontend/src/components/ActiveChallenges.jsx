@@ -5,7 +5,7 @@
  * and accurately handles timestamp display via centralized utilities.
  */
 
-import { useState, useEffect} from 'react';
+import { useRef, useState, useEffect} from 'react';
 import { Card, Button, Spinner, Alert, Row, Col } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -23,10 +23,12 @@ const ActiveChallenges = () => {
     const [challenges, setChallenges] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const isFirstLoad = useRef(true);
     const { notifications } = useNotifications();
 
     useEffect(() => {
-       fetchChallenges(true); 
+        fetchChallenges(isFirstLoad.current);
+        isFirstLoad.current = false;
     }, [notifications.pendingChallenges]);
 
     /**
@@ -36,16 +38,17 @@ const ActiveChallenges = () => {
      * @function fetchChallenges
      * @param {boolean} [isInitialLoad=false] - Determines if the loading spinner should be triggered.
      */
-    const fetchChallenges = async (isInitialLoad = false) => {
-        if(isInitialLoad) setLoading(true);
+   const fetchChallenges = async (isInitialLoad = false) => {
+        if (isInitialLoad) setLoading(true);
         
         try {
             const response = await api.get('/challenges/active', {
-                params: { _t: new Date().getTime() } 
+                params: { _t: Date.now() } 
             });
             setChallenges(response.data || []);
         } catch (err) {
-           if (isInitialLoad) setError('Nem sikerült betölteni az aktív kihívásokat.', err);
+            console.error("Hiba az aktív kihívások betöltésekor:", err);
+            if (isInitialLoad) setError('Nem sikerült betölteni az aktív kihívásokat.');
         } finally {
             if (isInitialLoad) setLoading(false);
         }

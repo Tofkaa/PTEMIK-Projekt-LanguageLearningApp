@@ -7,6 +7,8 @@ import { lessonApi } from '../services/lessonApi';
 import { useNotifications } from '../context/NotificationContext';
 import { parseServerDate, formatToLocalDisplay, formatToUtcForServer } from '../utils/dateUtils';
 import ExercisePreviewCard from '../components/ExercisePreviewCard';
+import { useAuth } from '../context/AuthContext';
+import { getUnseenIds, markAsViewed } from '../utils/viewedStore';
 
 /**
  * Dashboard component for teachers to manage a specific classroom.
@@ -40,6 +42,9 @@ const TeacherClassroomDetail = () => {
     const [stats, setStats] = useState(null);
     const [advancedStats, setAdvancedStats] = useState(null);
     const [expandedMistakeIndex, setExpandedMistakeIndex] = useState(null);
+
+    const { user } = useAuth();
+    const [activeMainTab, setActiveMainTab] = useState('assignments');
 
     const toggleMistakePreview = (index) => {
         setExpandedMistakeIndex(prev => prev === index ? null : index);
@@ -79,8 +84,8 @@ const TeacherClassroomDetail = () => {
     /**
      * Fetches core classroom data including members, assignments, and statistics.
      */
-    const fetchDashboardData = useCallback(async () => {
-        setIsLoading(true);
+   const fetchDashboardData = useCallback(async (silent = false) => {
+        if (!silent) setIsLoading(true);
         try {
             const [pendingRes, acceptedRes, assignmentsRes] = await Promise.all([
                 classroomApi.getMembers(classroomId, 'PENDING'),
@@ -96,50 +101,47 @@ const TeacherClassroomDetail = () => {
 
             const advStatsRes = await assignmentApi.getAdvancedClassroomStatistics(classroomId);
             setAdvancedStats(advStatsRes.data);
-
         } catch (error) {
             console.error("Hiba az adatok lekérésekor:", error);
         } finally {
-            setIsLoading(false);
+            if (!silent) setIsLoading(false);
         }
     }, [classroomId]);
 
-    const pingTrigger = (notifications?.teacherUngradedSubmissions || 0) + (notifications?.teacherPendingJoinRequests || 0);
+    const classroomPendingIds = (notifications?.teacherPendingJoinRequestIds || []).filter(id => id.startsWith(`${classroomId}:`));
+    const classroomUngradedIds = (notifications?.teacherUngradedSubmissionIds || []).filter(id => id.startsWith(`${classroomId}:`));
+
+    const unseenPendingList = getUnseenIds('viewedTeacherPending', user?.userId, classroomPendingIds);
+    const unseenUngradedList = getUnseenIds('viewedTeacherUngraded', user?.userId, classroomUngradedIds);
+
+    // JAVÍTVA: Valódi DTO mezőnevek figyelése
+    const pingTrigger = JSON.stringify([classroomPendingIds, classroomUngradedIds]);
 
     useEffect(() => {
-        fetchDashboardData();
-    }, [fetchDashboardData, pingTrigger]);
+        fetchDashboardData(false);
+    }, [fetchDashboardData]);
 
-    // LocalStorage handlers for notification states
-    const viewedTeacherPending = JSON.parse(localStorage.getItem('viewedTeacherPending') || '[]');
-    const viewedTeacherUngraded = JSON.parse(localStorage.getItem('viewedTeacherUngraded') || '[]');
+    useEffect(() => {
+        if (!isLoading) {
+            fetchDashboardData(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pingTrigger]);
 
-    /**
-     * Marks specific notification IDs as viewed within the browser's local storage.
-     * 
-     * @param {string} storageKey - The key to access in localStorage.
-     * @param {Array<string>} idsToMark - Array of IDs to append to the viewed list.
-     */
-    const markAsViewed = (storageKey, idsToMark) => {
-        if (!idsToMark || idsToMark.length === 0) return;
-        const stringIds = idsToMark.map(id => String(id));
-        const seen = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        const updated = [...new Set([...seen, ...stringIds])];
-        localStorage.setItem(storageKey, JSON.stringify(updated));
-        window.dispatchEvent(new Event('local-storage-update'));
-    };
+    // Ha a tanár a "Tagság kezelése" fülön áll, minden érkező kérelmet azonnal olvasottnak jelölünk
+    useEffect(() => {
+        if (!isLoading && activeMainTab === 'members' && unseenPendingList.length > 0) {
+            markAsViewed('viewedTeacherPending', user?.userId, unseenPendingList);
+        }
+    }, [isLoading, activeMainTab, unseenPendingList, user?.userId]);
 
-    const unseenPendingList = (notifications?.teacherPendingJoinRequestIds || []).filter(id => id.startsWith(classroomId) && !viewedTeacherPending.includes(id));
-    const unseenUngradedList = (notifications?.teacherUngradedSubmissionIds || []).filter(id => id.startsWith(classroomId) && !viewedTeacherUngraded.includes(id));
-
-    /**
-     * Navigates the teacher to the grading interface and clears the related notification ping.
-     * 
-     * @param {Object} assignment - The selected assignment object.
-     */
     const handleViewSubmissions = (assignment) => {
-        markAsViewed('viewedTeacherUngraded', [`${classroomId}:${assignment.assignmentId}`]);
-        navigate(`/assignment/${assignment.assignmentId}/submissions`, { state: { assignmentTitle: assignment.title, classroomName: classroomName, timeLimitMinutes: assignment.timeLimitMinutes } });
+        const prefix = `${classroomId}:${assignment.assignmentId}:`.toLowerCase();
+        const matchingIds = unseenUngradedList.filter(id => id.toLowerCase().startsWith(prefix));
+        markAsViewed('viewedTeacherUngraded', user?.userId, matchingIds);
+        navigate(`/assignment/${assignment.assignmentId}/submissions`, {
+            state: { assignmentTitle: assignment.title, classroomName: classroomName, timeLimitMinutes: assignment.timeLimitMinutes }
+        });
     };
 
     // --- MEMBER MANAGEMENT ---
@@ -148,7 +150,7 @@ const TeacherClassroomDetail = () => {
      * Accepts or rejects a pending join request.
      */
     const handleModerate = async (studentId, approve) => {
-        try { await classroomApi.moderateMember(classroomId, studentId, approve); fetchDashboardData(); }
+        try { await classroomApi.moderateMember(classroomId, studentId, approve); fetchDashboardData(true); }
         catch (error) { console.error("Hiba a moderálás során:", error); }
     };
 
@@ -157,7 +159,7 @@ const TeacherClassroomDetail = () => {
      */
     const handleKick = async (studentId) => {
         if (window.confirm("Biztosan el akarod távolítani ezt a diákot az osztályból?")) {
-            try { await classroomApi.kickMember(classroomId, studentId); fetchDashboardData(); }
+            try { await classroomApi.kickMember(classroomId, studentId); fetchDashboardData(true); }
             catch (error) { console.error("Hiba a diák eltávolításakor:", error); }
         }
     };
@@ -191,7 +193,7 @@ const TeacherClassroomDetail = () => {
         if (window.confirm("Biztosan törölni szeretnéd ezt a feladatot? Figyelem: Ha már vannak diákok, akik elkezdték vagy beküldték, az ő eredményeik is véglegesen elvesznek!")) {
             try {
                 await assignmentApi.deleteAssignment(assignmentId);
-                fetchDashboardData();
+                fetchDashboardData(true);
             } catch (error) {
                 console.error("Hiba a feladat törlésekor:", error);
                 alert("Nem sikerült törölni a feladatot.");
@@ -321,9 +323,9 @@ const TeacherClassroomDetail = () => {
         return until && until.getTime() <= currentTime;
     });
 
-    const hasUngradedSubmission = (assignmentId) => {
-        const targetId = `${classroomId}:${assignmentId}`.toLowerCase();
-        return unseenUngradedList.some(id => id.toLowerCase() === targetId);
+   const hasUngradedSubmission = (assignmentId) => {
+        const prefix = `${classroomId}:${assignmentId}:`.toLowerCase();
+        return unseenUngradedList.some(id => id.toLowerCase().startsWith(prefix));
     };
 
     const activeUngradedCount = activeAssignments.filter(a => hasUngradedSubmission(a.assignmentId)).length;
@@ -437,12 +439,7 @@ const TeacherClassroomDetail = () => {
                 </div>
             </div>
 
-            <Tabs defaultActiveKey="assignments" className="mb-4 custom-dark-tabs"
-                  onSelect={(key) => {
-                      if (key === 'members' && unseenPendingList.length > 0) {
-                          markAsViewed('viewedTeacherPending', pendingMembers.map(m => `${classroomId}:${m.userId}`));
-                      }
-                  }}>
+          <Tabs activeKey={activeMainTab} onSelect={(key) => setActiveMainTab(key)} className="mb-4 custom-dark-tabs">
 
                 <Tab eventKey="assignments" title={
                     <span className="fw-bold">

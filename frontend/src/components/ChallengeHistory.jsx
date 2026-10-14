@@ -43,8 +43,9 @@ const ChallengeHistory = () => {
                 params: { _t: new Date().getTime() }
             });
             setHistory(response.data || []);
-        } catch (err) {
-           if (isInitialLoad) setError('Nem sikerült betölteni az előzményeket.', err);
+       } catch (err) {
+            console.error("Előzmények betöltési hiba:", err);
+            if (isInitialLoad) setError('Nem sikerült betölteni az előzményeket.');
         } finally {
            if (isInitialLoad) setLoading(false);
         }

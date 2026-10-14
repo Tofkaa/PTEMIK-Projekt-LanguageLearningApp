@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Container, Card, Table, Button, Form, Spinner, Badge, Row, Col } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import { useNotifications } from '../context/NotificationContext.jsx';
+import { setScopedCounter } from '../utils/viewedStore.js';
 
 const VocabularyHub = () => {
     const navigate = useNavigate();
@@ -9,6 +12,14 @@ const VocabularyHub = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterLevel, setFilterLevel] = useState('ALL');
+    const { user } = useAuth();
+    const { notifications } = useNotifications();
+
+    useEffect(() => {
+    if (user?.userId && notifications?.dueVocabularyCount != null) {
+        setScopedCounter('seenDueVocabCount', user.userId, notifications.dueVocabularyCount);
+    }
+    }, [user?.userId, notifications?.dueVocabularyCount]);
 
     useEffect(() => {
         fetchVocabularyHub();

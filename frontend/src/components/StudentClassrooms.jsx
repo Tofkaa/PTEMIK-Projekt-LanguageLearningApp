@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { classroomApi } from '../services/classroomApi';
 import { Card, Button, Form, Row, Col, Badge, InputGroup } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
+import { getUnseenIds } from '../utils/viewedStore';
 
 const AVAILABLE_COURSES = {
     'en': { name: 'Angol', flag: '🇬🇧' },
@@ -15,6 +17,7 @@ const AVAILABLE_COURSES = {
  * Displays enrolled classrooms and provides functionality to join new ones via an invite code.
  */
 const StudentClassrooms = () => {
+    const { user } = useAuth();
     const [classrooms, setClassrooms] = useState([]);
     const [inviteCode, setInviteCode] = useState('');
     const [statusMessage, setStatusMessage] = useState({ text: '', type: '' });
@@ -22,21 +25,33 @@ const StudentClassrooms = () => {
     const navigate = useNavigate();
     const { notifications } = useNotifications(); 
 
-    useEffect(() => {
-        fetchClassrooms();
-    }, []);
-
-    const fetchClassrooms = async () => {
+    const fetchClassrooms = useCallback(async (silent = false) => {
         try {
-            setIsLoading(true);
+            if (!silent) setIsLoading(true);
             const response = await classroomApi.getStudentClassrooms();
             setClassrooms(response.data);
         } catch (error) {
             console.error("Failed to fetch classrooms:", error);
         } finally {
-            setIsLoading(false);
+            if (!silent) setIsLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchClassrooms(false);
+    }, [fetchClassrooms]);
+
+    const pingTrigger = JSON.stringify([
+        notifications?.studentActiveAssignmentIds,
+        notifications?.studentGradedSessionIds
+    ]);
+
+    useEffect(() => {
+        if (!isLoading) {
+            fetchClassrooms(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pingTrigger]);
 
     const handleJoin = async (e) => {
         e.preventDefault();
@@ -66,6 +81,9 @@ const StudentClassrooms = () => {
             </div>
         );
     }
+
+    const allUnseenAssignments = getUnseenIds('viewedAssignments', user?.userId, notifications?.studentActiveAssignmentIds);
+    const allUnseenResults = getUnseenIds('viewedResults', user?.userId, notifications?.studentGradedSessionIds);
 
     return (
         <div>
@@ -111,13 +129,10 @@ const StudentClassrooms = () => {
                         </div>
                     </Col>
                 ) : (
-                   classrooms.map(room => {
-                       
-                        const viewedAssignments = JSON.parse(localStorage.getItem('viewedAssignments') || '[]');
-                        const viewedResults = JSON.parse(localStorage.getItem('viewedResults') || '[]');
-
-                        const unseenAssignments = (notifications?.studentActiveAssignmentIds || []).filter(id => id.startsWith(room.classroomId) && !viewedAssignments.includes(id)).length;
-                        const unseenResults = (notifications?.studentGradedSessionIds || []).filter(id => id.startsWith(room.classroomId) && !viewedResults.includes(id)).length;
+                    classrooms.map(room => {
+                        const prefix = `${room.classroomId}:`;
+                        const unseenAssignments = allUnseenAssignments.filter(id => id.startsWith(prefix)).length;
+                        const unseenResults = allUnseenResults.filter(id => id.startsWith(prefix)).length;
                         const totalClassroomPings = unseenAssignments + unseenResults;
 
                         const courseData = AVAILABLE_COURSES[room.courseCode] || { name: 'Ismeretlen', flag: '🏳️' };
@@ -131,7 +146,6 @@ const StudentClassrooms = () => {
                                 >
                                     <Card.Body className="d-flex flex-column">
                                         <Card.Title className="fw-bold text-primary d-flex justify-content-between align-items-start">
-                                           
                                             <span>
                                                 <span className="me-2" title={`Kurzus: ${courseData.name}`}>{courseData.flag}</span>
                                                 {room.name}
@@ -145,14 +159,15 @@ const StudentClassrooms = () => {
                                         <Card.Text className="text-secondary flex-grow-1 mt-2" style={{ fontSize: '0.9rem' }}>
                                             {room.description}
                                         </Card.Text>
-                                    <div className="mt-3 pt-3 border-top border-secondary">
-                                        <span className="text-secondary" style={{ fontSize: '0.85rem' }}>Tanár: </span>
-                                        <span className="fw-bold text-light">{room.teacherName}</span>
-                                    </div>
-                                </Card.Body>
-                            </Card>
-                        </Col>
-                   )})
+                                        <div className="mt-3 pt-3 border-top border-secondary">
+                                            <span className="text-secondary" style={{ fontSize: '0.85rem' }}>Tanár: </span>
+                                            <span className="fw-bold text-light">{room.teacherName}</span>
+                                        </div>
+                                    </Card.Body>
+                                </Card>
+                            </Col>
+                        );
+                    })
                 )}
             </Row>
         </div>

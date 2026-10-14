@@ -4,86 +4,106 @@
  * utilizing a hybrid approach of Server-Sent Events (SSE) and periodic polling.
  */
 
-import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import api from '../services/api';
 import { useAuth } from './AuthContext';
+import { pruneViewedStore } from '../utils/viewedStore';
 
 const NotificationContext = createContext();
 
+const EMPTY_NOTIFICATIONS = {
+    total: 0,
+    pendingFriends: 0,
+    pendingFriendRequests: 0,
+    pendingChallenges: 0,
+    totalFriends: 0,
+    totalAcceptedFriends: 0,
+    totalHistory: 0,
+    totalHistoryItems: 0,
+    teacherPendingJoinRequestIds: [],
+    teacherUngradedSubmissionIds: [],
+    studentActiveAssignmentIds: [],
+    studentGradedSessionIds: [],
+    lastPingTime: 0,
+    dueVocabularyCount: 0
+};
+
+
+const mapSummaryData = (data) => ({
+    ...EMPTY_NOTIFICATIONS,
+    ...data,
+    total: data.total || 0,
+    pendingFriends: data.pendingFriendRequests || 0,
+    pendingFriendRequests: data.pendingFriendRequests || 0,
+    pendingChallenges: data.pendingChallenges || 0,
+    totalFriends: data.totalAcceptedFriends || 0,
+    totalAcceptedFriends: data.totalAcceptedFriends || 0,
+    totalHistory: data.totalHistoryItems || 0,
+    totalHistoryItems: data.totalHistoryItems || 0,
+    teacherPendingJoinRequestIds: data.teacherPendingJoinRequestIds || [],
+    teacherUngradedSubmissionIds: data.teacherUngradedSubmissionIds || [],
+    studentActiveAssignmentIds: data.studentActiveAssignmentIds || [],
+    studentGradedSessionIds: data.studentGradedSessionIds || [],
+    dueVocabularyCount: data.dueVocabularyCount || 0
+});
+
 export const NotificationProvider = ({ children }) => {
     const { user } = useAuth();
-    
-    // Kezdeti állapot minden új és régi mezővel felkészítve
-    const [notifications, setNotifications] = useState({ 
-        total: 0, 
-        pendingFriends: 0, 
-        pendingChallenges: 0,
-        totalFriends: 0,
-        totalHistory: 0,
-        teacherPendingJoinRequestIds: [],
-        teacherUngradedSubmissionIds: [],
-        studentActiveAssignmentIds: [],
-        studentGradedSessionIds: [],
-        lastPingTime: 0,
-        dueVocabularyCount: 0 // <-- Új mező hozzáadva
-    });
+    const userId = user?.userId;
 
-   /**
-     * Manuális frissítést indító függvény
+    const [notifications, setNotifications] = useState(EMPTY_NOTIFICATIONS);
+    const requestCounterRef = useRef(0);
+
+    /**
+     * Manuális és automatikus frissítést indító függvény
      */
     const fetchSummary = useCallback(async () => {
-        if (!user) return;
+        if (!userId) return;
+        const currentToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!currentToken || currentToken === 'null') return;
+
+        const requestId = ++requestCounterRef.current;
+
         try {
             const response = await api.get('/notifications/summary', {
-                params: { _t: new Date().getTime() }
+                params: { _t: Date.now() }
             });
+
+            if (requestId !== requestCounterRef.current) return;
+
             const data = response.data;
-            
-            setNotifications({
-                ...data, 
-                // Visszafelé kompatibilitás a régi komponensek miatt:
-                total: data.total || 0,
-                pendingFriends: data.pendingFriendRequests || 0, 
-                pendingChallenges: data.pendingChallenges || 0,
-                totalFriends: data.totalAcceptedFriends || 0,
-                totalHistory: data.totalHistoryItems || 0,
-                dueVocabularyCount: data.dueVocabularyCount || 0 // <-- Új mező rögzítése
-            });
+            pruneViewedStore(userId, data);
+            setNotifications(mapSummaryData(data));
         } catch (error) {
-            console.error("Értesítések lekérése sikertelen", error);
+            if (error.response?.status !== 403) {
+                console.error("Értesítések lekérése sikertelen", error);
+            }
         }
-    }, [user]);
+    }, [userId]);
 
-   useEffect(() => {
-        if (!user) return;
+    useEffect(() => {
+        if (!userId) return;
 
-        let isMounted = true; 
+        let isMounted = true;
 
-        // SSE / Polling által használt betöltő
         const loadInitialData = async () => {
             const currentToken = localStorage.getItem('token') || sessionStorage.getItem('token');
             if (!currentToken || currentToken === 'null') return;
 
+            const requestId = ++requestCounterRef.current;
+
             try {
                 const response = await api.get('/notifications/summary', {
-                    params: { _t: new Date().getTime() }
+                    params: { _t: Date.now() }
                 });
-                
-                if (isMounted) {
+
+                if (isMounted && requestId === requestCounterRef.current) {
                     const data = response.data;
-                    // Itt is alkalmazzuk a mindent áteresztő beállítást!
-                    setNotifications({
-                        ...data,
-                        total: data.total || 0,
-                        pendingFriends: data.pendingFriendRequests || 0,
-                        pendingChallenges: data.pendingChallenges || 0,
-                        totalFriends: data.totalAcceptedFriends || 0,
-                        totalHistory: data.totalHistoryItems || 0,
-                        dueVocabularyCount: data.dueVocabularyCount || 0 // <-- Új mező rögzítése
-                    });
+                    pruneViewedStore(userId, data);
+                    setNotifications(mapSummaryData(data));
                 }
             } catch (error) {
-                 if (error.response?.status !== 403) {
+                if (error.response?.status !== 403) {
                     console.error("Értesítések lekérése sikertelen", error);
                 }
             }
@@ -98,20 +118,17 @@ export const NotificationProvider = ({ children }) => {
             eventSource = new EventSource(`http://localhost:8080/api/notifications/stream?token=${token}`);
 
             eventSource.addEventListener("ping", () => {
-                console.log("Ping érkezett! Adatok frissítése...");
-                loadInitialData(); 
+                loadInitialData();
             });
 
             eventSource.onerror = () => {
-                eventSource.close();
+                console.warn("SSE kapcsolat megszakadt, újracsatlakozás várható...");
             };
-        } else {
-            console.log("SSE csatlakozás várakozásra áll (token frissítés vagy hiány).");
         }
 
         const intervalId = setInterval(() => {
             loadInitialData();
-        }, 60000); 
+        }, 60000);
 
         const handleFocus = () => {
             loadInitialData();
@@ -120,24 +137,15 @@ export const NotificationProvider = ({ children }) => {
 
         return () => {
             isMounted = false;
-            if (eventSource) eventSource.close(); 
-            clearInterval(intervalId); 
-            window.removeEventListener('focus', handleFocus); 
-            // Takarításnál is nullázzuk az új mezőket
-            setNotifications({ 
-                total: 0, pendingFriends: 0, pendingChallenges: 0, totalFriends: 0, totalHistory: 0,
-                teacherPendingJoinRequests: 0, teacherUngradedSubmissions: 0, studentActiveAssignmentIds: [], studentGradedSessionIds: [], lastPingTime: 0,
-                dueVocabularyCount: 0 // <-- Új mező nullázása
-            });
+            requestCounterRef.current++;
+            if (eventSource) eventSource.close();
+            clearInterval(intervalId);
+            window.removeEventListener('focus', handleFocus);
+            setNotifications(EMPTY_NOTIFICATIONS);
         };
-    }, [user]);
+    }, [userId]);
 
-    // Üres fallback state beállítása, ha kijelentkezik a user
-    const activeNotifications = user ? notifications : { 
-        total: 0, pendingFriends: 0, pendingChallenges: 0,
-        teacherPendingJoinRequests: 0, teacherUngradedSubmissions: 0, studentActiveAssignmentIds: [], studentGradedSessionIds: [], lastPingTime: 0,
-        dueVocabularyCount: 0 
-    };
+    const activeNotifications = user ? notifications : EMPTY_NOTIFICATIONS;
 
     return (
         <NotificationContext.Provider value={{ notifications: activeNotifications, refreshNotifications: fetchSummary }}>

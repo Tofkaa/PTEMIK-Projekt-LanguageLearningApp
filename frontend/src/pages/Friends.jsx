@@ -14,44 +14,42 @@ import ChallengeHistory from '../components/ChallengeHistory';
 import { useNotifications } from '../context/NotificationContext';
 import { useState, useEffect } from 'react';
 import Leaderboard from '../components/Leaderboard';
+import { useAuth } from '../context/AuthContext';
+import { getScopedCounter, setScopedCounter } from '../utils/viewedStore';
 
 /**
  * @component
  * @returns {React.ReactElement} The Community/Friends dashboard view.
  */
 const Friends = () => {
-    const {notifications} = useNotifications();
+    const { user } = useAuth();
+    const { notifications } = useNotifications();
     const [activeTab, setActiveTab] = useState('list');
 
-    
-    const seenFriendsCount = parseInt(localStorage.getItem('seenFriendsCount') || '0');
-    const seenHistoryCount = parseInt(localStorage.getItem('seenHistoryCount') || '0');
+    const seenFriendsCount = getScopedCounter('seenFriendsCount', user?.userId);
+    const seenHistoryCount = getScopedCounter('seenHistoryCount', user?.userId);
 
     const hasNewFriend = notifications.totalFriends > seenFriendsCount;
     const hasNewHistory = notifications.totalHistory > seenHistoryCount;
 
-
     const handleTabSelect = (key) => {
         setActiveTab(key);
-        
-     
         if (key === 'list' && notifications?.totalFriends != null) {
-            localStorage.setItem('seenFriendsCount', notifications.totalFriends.toString());
+            setScopedCounter('seenFriendsCount', user?.userId, notifications.totalFriends);
         }
         if (key === 'history' && notifications?.totalHistory != null) {
-            localStorage.setItem('seenHistoryCount', notifications.totalHistory.toString());
+            setScopedCounter('seenHistoryCount', user?.userId, notifications.totalHistory);
         }
     };
 
- 
     useEffect(() => {
         if (activeTab === 'list' && notifications?.totalFriends != null) {
-            localStorage.setItem('seenFriendsCount', notifications.totalFriends.toString());
+            setScopedCounter('seenFriendsCount', user?.userId, notifications.totalFriends);
         }
         if (activeTab === 'history' && notifications?.totalHistory != null) {
-            localStorage.setItem('seenHistoryCount', notifications.totalHistory.toString());
+            setScopedCounter('seenHistoryCount', user?.userId, notifications.totalHistory);
         }
-    }, [notifications?.totalFriends, notifications?.totalHistory, activeTab]);
+    }, [notifications?.totalFriends, notifications?.totalHistory, activeTab, user?.userId]);
     return (
         <Container className="py-5">
             <Row className="justify-content-center">
