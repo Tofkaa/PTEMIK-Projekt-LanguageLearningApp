@@ -30,5 +30,5 @@ public class UserResponse {
     private String profilePictureUrl;
     private UUID activeCourseId;
     private String activeCourseCode;
-
+    private String authProvider;
 }

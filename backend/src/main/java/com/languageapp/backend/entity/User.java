@@ -21,8 +21,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "users")
 
-@SQLDelete(sql = "UPDATE users SET is_active = false WHERE user_id=?")
-@SQLRestriction("is_active = true")
+//@SQLDelete(sql = "UPDATE users SET is_active = false WHERE user_id=?")
+//@SQLRestriction("is_active = true")
 public class User {
 
     @Id

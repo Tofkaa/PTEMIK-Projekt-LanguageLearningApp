@@ -37,6 +37,7 @@ public class UserService {
     private final CourseRepository courseRepository;
     private final ResultRepository resultRepository;
     private final FriendshipRepository friendshipRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -64,6 +65,7 @@ public class UserService {
                 .profilePictureUrl(user.getProfilePictureUrl())
                 .activeCourseId(user.getActiveCourse().getCourseId())
                 .activeCourseCode(user.getActiveCourse().getLanguageCode())
+                .authProvider(user.getAuthProvider() != null ? user.getAuthProvider().name() : "LOCAL")
                 .build();
     }
 
@@ -343,23 +345,38 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteAndAnonymizeMyAccount(String email, String password) {
+    public void deleteAndAnonymizeMyAccount(String email, String confirmationInput) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User nem található."));
 
-        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            throw new BadRequestException("A megadott jelszó hibás!");
+        boolean isLocalWithPassword = user.getAuthProvider() == com.languageapp.backend.enums.AuthProvider.LOCAL
+                && user.getPasswordHash() != null;
+
+        if (isLocalWithPassword) {
+            if (confirmationInput == null || !passwordEncoder.matches(confirmationInput, user.getPasswordHash())) {
+                throw new BadRequestException("A megadott jelszó hibás!");
+            }
+        } else {
+            if (!"TÖRLÉS".equals(confirmationInput)) {
+                throw new BadRequestException("Kérlek, írd be pontosan a 'TÖRLÉS' szót a megerősítéshez!");
+            }
         }
 
+
         friendshipRepository.deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
+        refreshTokenRepository.deleteByUserUserId(user.getUserId());
+        emailChangeTokenRepository.deleteByUser_UserId(user.getUserId());
 
 
         user.setName("Törölt Felhasználó");
         user.setEmail("deleted_" + UUID.randomUUID() + "@languageapp.com");
         user.setPasswordHash("DELETED");
         user.setUserTag("0000");
+        user.setFriendCode(null);
+        user.setProfilePictureUrl(null);
+        user.setProviderId(null);
 
-
+        user.setVerified(false);
         user.setActive(false);
 
         userRepository.save(user);

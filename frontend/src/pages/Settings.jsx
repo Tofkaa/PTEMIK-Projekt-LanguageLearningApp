@@ -8,6 +8,7 @@ import getCroppedImg from '../utils/cropImage.js';
 
 const Settings = () => {
     const { user, setUser, logout } = useAuth();
+    const isOAuthUser = user?.authProvider && user.authProvider !== 'LOCAL';
     const navigate = useNavigate();
 
     // --- STATES ---
@@ -317,25 +318,30 @@ const Settings = () => {
     };
 
     // --- GDPR: SOFT DELETE ---
-    const handleDeleteAccount = async () => {
-        if (!deletePassword || deletePassword !== deleteConfirmPassword) {
-            setDeleteMessage({ type: 'danger', text: 'A megadott jelszavak nem egyeznek vagy üresek!' });
-            return;
+   const handleDeleteAccount = async () => {
+        if (!isOAuthUser) {
+            if (!deletePassword || deletePassword !== deleteConfirmPassword) {
+                setDeleteMessage({ type: 'danger', text: 'A megadott jelszavak nem egyeznek vagy üresek!' });
+                return;
+            }
+        } else {
+            if (deletePassword !== 'TÖRLÉS') {
+                setDeleteMessage({ type: 'danger', text: 'Kérlek, gépeld be pontosan a "TÖRLÉS" szót!' });
+                return;
+            }
         }
 
         setIsDeleting(true);
         setDeleteMessage({ type: '', text: '' });
 
         try {
-            await api.delete('/users/me', { data: { password: deletePassword } }); 
-            
+            await api.delete('/users/me', { data: { password: deletePassword } });
             setShowDeleteModal(false);
-            logout(); 
-            navigate('/login');
+            await logout(true); 
         } catch (error) {
             console.error("Fiók törlése hiba:", error);
             const errorMsg = error.response?.data?.message || error.response?.data || 'Hiba történt a fióktörlés során.';
-            setDeleteMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hibás jelszó vagy hálózati hiba.' });
+            setDeleteMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hibás megerősítés vagy hálózati hiba.' });
         } finally {
             setIsDeleting(false);
         }
@@ -745,24 +751,43 @@ const Settings = () => {
                     </p>
                     
                     <Form.Group className="mt-4">
-                        <Form.Label className="text-light opacity-75 small">Jelszó</Form.Label>
-                        <Form.Control 
-                            type="password" 
-                            className="bg-secondary bg-opacity-25 text-light border-danger mb-3"
-                            value={deletePassword}
-                            onChange={(e) => setDeletePassword(e.target.value)}
-                            disabled={isDeleting}
-                            autoComplete="off"
-                        />
-                        <Form.Label className="text-light opacity-75 small">Jelszó megerősítése</Form.Label>
-                        <Form.Control 
-                            type="password" 
-                            className="bg-secondary bg-opacity-25 text-light border-danger"
-                            value={deleteConfirmPassword}
-                            onChange={(e) => setDeleteConfirmPassword(e.target.value)}
-                            disabled={isDeleting}
-                            autoComplete="off"
-                        />
+                        {!isOAuthUser ? (
+                            <>
+                                <Form.Label className="text-light opacity-75 small">Jelszó</Form.Label>
+                                <Form.Control 
+                                    type="password" 
+                                    className="bg-secondary bg-opacity-25 text-light border-danger mb-3"
+                                    value={deletePassword}
+                                    onChange={(e) => setDeletePassword(e.target.value)}
+                                    disabled={isDeleting}
+                                    autoComplete="off"
+                                />
+                                <Form.Label className="text-light opacity-75 small">Jelszó megerősítése</Form.Label>
+                                <Form.Control 
+                                    type="password" 
+                                    className="bg-secondary bg-opacity-25 text-light border-danger"
+                                    value={deleteConfirmPassword}
+                                    onChange={(e) => setDeleteConfirmPassword(e.target.value)}
+                                    disabled={isDeleting}
+                                    autoComplete="off"
+                                />
+                            </>
+                        ) : (
+                            <>
+                                <Form.Label className="text-light opacity-75 small">
+                                    Mivel {user.authProvider} fiókkal léptél be, a megerősítéshez gépeld be: <strong className="text-light">TÖRLÉS</strong>
+                                </Form.Label>
+                                <Form.Control 
+                                    type="text" 
+                                    placeholder="TÖRLÉS"
+                                    className="bg-secondary bg-opacity-25 text-light border-danger text-center fw-bold fs-5"
+                                    value={deletePassword}
+                                    onChange={(e) => setDeletePassword(e.target.value)}
+                                    disabled={isDeleting}
+                                    autoComplete="off"
+                                />
+                            </>
+                        )}
                     </Form.Group>
                 </Modal.Body>
                 <Modal.Footer className="border-secondary">
@@ -773,7 +798,7 @@ const Settings = () => {
                         variant="danger" 
                         className="fw-bold px-4" 
                         onClick={handleDeleteAccount} 
-                        disabled={isDeleting || !deletePassword || !deleteConfirmPassword}
+                        disabled={isDeleting || (!isOAuthUser ? (!deletePassword || !deleteConfirmPassword) : deletePassword !== 'TÖRLÉS')}
                     >
                         {isDeleting ? <><Spinner size="sm" className="me-2" />Törlés folyamatban...</> : 'Igen, törlöm a fiókom!'}
                     </Button>

@@ -9,6 +9,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.util.HtmlUtils;
 
 import java.time.OffsetDateTime;
 import java.util.stream.Collectors;
@@ -140,6 +141,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
+    @ExceptionHandler(org.springframework.security.authentication.DisabledException.class)
+    public ResponseEntity<ErrorResponse> handleDisabledException(
+            org.springframework.security.authentication.DisabledException ex,
+            HttpServletRequest request) {
+
+        log.warn("Disabled account login attempt at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse errorResponse = buildErrorResponse(
+                HttpStatus.FORBIDDEN,
+                "Ez a felhasználói fiók fel lett függesztve vagy törölve lett.",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
+
     /**
      * Creates a standardized {@link ErrorResponse} object.
      */
@@ -148,12 +165,14 @@ public class GlobalExceptionHandler {
             String message,
             String path) {
 
+        String safePath = path != null ? HtmlUtils.htmlEscape(path) : null;
+
         return new ErrorResponse(
                 OffsetDateTime.now(),
                 status.value(),
                 status.getReasonPhrase(),
                 message,
-                path
+                safePath
         );
     }
 }

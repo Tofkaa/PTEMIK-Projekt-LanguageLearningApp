@@ -83,11 +83,13 @@ export const AuthProvider = ({ children }) => {
      * Calls the backend to invalidate the HttpOnly refresh token cookie,
      * then clears the local access token and user state.
      */
-    const logout = async () => {
+    const logout = async (skipServerCall = false) => {
         try {
-            // 1. Request the backend to invalidate the HttpOnly Refresh Token cookie
-            await api.post('/auth/logout');
-            console.log("Successful server-side logout.");
+            if (!skipServerCall) {
+                // 1. Request the backend to invalidate the HttpOnly Refresh Token cookie
+                await api.post('/auth/logout');
+                console.log("Successful server-side logout.");
+            }
         } catch (error) {
             console.error("Error during server-side logout:", error);
         } finally {
