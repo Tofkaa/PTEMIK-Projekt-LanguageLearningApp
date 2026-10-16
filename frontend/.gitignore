@@ -29,4 +29,5 @@ dist-ssr
 .env.*.local
 
 # SSL certificates
-ssl/
+ssl/*
+!ssl/README.md

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Badge, Spinner, Alert, Card } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi';
+import { formatToLocalTimestamp } from '../../utils/dateUtils';
 
 const SystemLogs = () => {
     const [logs, setLogs] = useState([]);
@@ -118,7 +119,7 @@ const SystemLogs = () => {
                                 logs.map((log) => (
                                     <tr key={log.logId}>
                                         <td className="text-light px-4 small" style={{ whiteSpace: 'nowrap' }}>
-                                            {new Date(log.loggedAt.endsWith('Z') ? log.loggedAt : log.loggedAt + 'Z').toLocaleString('hu-HU')}
+                                            {formatToLocalTimestamp(log.loggedAt)}
                                         </td>
                                         <td>
                                             <div className="fw-bold text-light">{log.admin?.name || 'Ismeretlen'}</div>

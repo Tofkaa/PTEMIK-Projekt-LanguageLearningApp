@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { OverlayTrigger, Popover, Spinner, Badge } from 'react-bootstrap';
 import { vocabularyApi } from '../services/vocabularyApi';
+import { formatToLocalDisplay } from '../utils/dateUtils';
 
 /**
 * Interactive word component. Retrieves on click and displays the translation in a Bootstrap Popover 
@@ -82,7 +83,7 @@ const SmartWord = ({ word, queryWord, disabled = false, source = 'LESSON', prelo
                             
                             {!translationData.isHint && translationData.nextPracticeAt && (
                                 <span title="Következő ismétlés">
-                                    📅 {new Date(translationData.nextPracticeAt).toLocaleDateString('hu-HU')}
+                                    📅 {formatToLocalDisplay(translationData.nextPracticeAt, false)}
                                 </span>
                             )}
                         </div>

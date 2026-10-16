@@ -15,10 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
-
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
 import java.util.*;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Service handling user profile and progress retrieval.
@@ -27,6 +27,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class UserService {
+    private final Clock clock;
 
     private final UserRepository userRepository;
     private final ProgressRepository progressRepository;
@@ -259,7 +260,7 @@ public class UserService {
         token.setUser(user);
         token.setNewEmail(normalizedNewEmail);
         token.setOtpCode(otpCode);
-        token.setExpiryDate(LocalDateTime.now().plusMinutes(15));
+        token.setExpiryDate(clock.instant().plus(15, ChronoUnit.MINUTES));
 
         emailChangeTokenRepository.save(token);
 
@@ -278,7 +279,7 @@ public class UserService {
         EmailChangeToken token = emailChangeTokenRepository.findByUser_UserId(user.getUserId())
                 .orElseThrow(() -> new BadRequestException("Nincs folyamatban lévő e-mail módosítási kérés!"));
 
-        if (token.getExpiryDate().isBefore(LocalDateTime.now())) {
+        if (!clock.instant().isBefore(token.getExpiryDate())) {
             emailChangeTokenRepository.delete(token);
             throw new BadRequestException("Az ellenőrző kód lejárt! Kérlek, indítsd újra a folyamatot.");
         }

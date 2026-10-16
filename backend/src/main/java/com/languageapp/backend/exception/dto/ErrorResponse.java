@@ -2,14 +2,12 @@ package com.languageapp.backend.exception.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 @Data
 @AllArgsConstructor
 public class ErrorResponse {
-    private OffsetDateTime timestamp;
+    private Instant timestamp;
     private int status;
     private String error;
     private String message;

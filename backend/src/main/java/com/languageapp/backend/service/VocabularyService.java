@@ -18,8 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class VocabularyService {
+    private final Clock clock;
 
     private final StudentVocabularyRepository vocabularyRepository;
     private final UserRepository userRepository;
@@ -112,7 +114,7 @@ public class VocabularyService {
             throw new ForbiddenException("Nincs jogosultságod módosítani ezt a szót");
         }
 
-        voc.setLastPracticedAt(LocalDateTime.now());
+        voc.setLastPracticedAt(clock.instant());
 
         if (isCorrect) {
             voc.setSrsLevel(Math.min(6, voc.getSrsLevel() + 1));
@@ -130,7 +132,7 @@ public class VocabularyService {
             default -> 90;
         };
 
-        voc.setNextPracticeAt(LocalDateTime.now().plusDays(daysToAdd));
+        voc.setNextPracticeAt(clock.instant().plus(daysToAdd, ChronoUnit.DAYS));
         StudentVocabulary updatedVoc = vocabularyRepository.save(voc);
 
         return buildVocabularyResponse(updatedVoc, false);
@@ -146,11 +148,11 @@ public class VocabularyService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = clock.instant();
 
         // Query due vocabulary specifically isolated to the active course ID
         List<StudentVocabulary> dueVocabs = vocabularyRepository
-                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(user.getUserId(), user.getActiveCourse().getCourseId(), now);
+                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(user.getUserId(), user.getActiveCourse().getCourseId(), now);
 
         return dueVocabs.stream()
                 .map(voc -> buildVocabularyResponse(voc, false))
@@ -233,8 +235,8 @@ public class VocabularyService {
             newVoc.setTranslation(translation);
             newVoc.setSource("AUTO_LEARNED");
             newVoc.setSrsLevel(2);
-            newVoc.setNextPracticeAt(LocalDateTime.now().plusDays(3));
-            newVoc.setLastPracticedAt(LocalDateTime.now());
+            newVoc.setNextPracticeAt(clock.instant().plus(3, ChronoUnit.DAYS));
+            newVoc.setLastPracticedAt(clock.instant());
 
             vocabularyRepository.save(newVoc);
         }
@@ -249,12 +251,12 @@ public class VocabularyService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = clock.instant();
         UUID courseId = user.getActiveCourse().getCourseId();
 
         // Fetch due words only from the currently active course
         List<StudentVocabulary> dueWords = vocabularyRepository
-                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(user.getUserId(), courseId, now);
+                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(user.getUserId(), courseId, now);
 
         if (dueWords.size() > limit) {
             dueWords = dueWords.subList(0, limit);
@@ -348,16 +350,16 @@ public class VocabularyService {
 
             if (vocOpt.isPresent()) {
                 StudentVocabulary voc = vocOpt.get();
-                voc.setLastPracticedAt(LocalDateTime.now());
+                voc.setLastPracticedAt(clock.instant());
 
                 // Anti-Cheat protection: if the user manages to bypass the systems intended usage functions and practice ahead of time
                 // meaning the due date is in the future, we ignore it and do not update their srs level
-                if (voc.getNextPracticeAt() != null && voc.getNextPracticeAt().isAfter(LocalDateTime.now())) {
+                if (voc.getNextPracticeAt() != null && voc.getNextPracticeAt().isAfter(clock.instant())) {
                     log.warn("User {} tried to practice word '{}' ahead of time. Ignoring SRS update.", email, voc.getWord());
                     continue;
                 }
 
-                voc.setLastPracticedAt(LocalDateTime.now());
+                voc.setLastPracticedAt(clock.instant());
                 if (result.isCorrect()) {
                     correctCount++;
                     earnedXp += 2;
@@ -377,7 +379,7 @@ public class VocabularyService {
                     default -> 90;
                 };
 
-                voc.setNextPracticeAt(LocalDateTime.now().plusDays(daysToAdd));
+                voc.setNextPracticeAt(clock.instant().plus(daysToAdd, ChronoUnit.DAYS));
                 vocabularyRepository.save(voc);
             }
         }

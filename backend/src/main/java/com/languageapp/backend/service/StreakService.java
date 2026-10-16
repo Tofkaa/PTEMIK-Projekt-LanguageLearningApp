@@ -7,9 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.Clock;
 
 /**
  * Service responsible for managing user streaks and daily activity tracking.
@@ -19,6 +19,7 @@ import java.time.ZoneId;
 @Service
 @RequiredArgsConstructor
 public class StreakService {
+    private final Clock clock;
 
     private final UserRepository userRepository;
 
@@ -31,7 +32,7 @@ public class StreakService {
     @Transactional
     public void updateActivity(User user) {
         // Enforce a strict timezone to prevent exploits where users change their phone clocks
-        LocalDate today = LocalDate.now(ZoneId.of("Europe/Budapest"));
+        LocalDate today = LocalDate.now(clock.withZone(ZoneId.of("Europe/Budapest")));
         LocalDate lastActivity = user.getLastActivityDate();
 
         if (lastActivity == null) {
@@ -63,7 +64,7 @@ public class StreakService {
     @Transactional
     public void resetExpiredStreaks() {
         log.info("Starting scheduled night-job: Streak reset...");
-        LocalDate yesterday = LocalDate.now(ZoneId.of("Europe/Budapest")).minusDays(1);
+        LocalDate yesterday = LocalDate.now(clock.withZone(ZoneId.of("Europe/Budapest"))).minusDays(1);
 
         int resetCount = userRepository.resetExpiredStreaks(yesterday);
 

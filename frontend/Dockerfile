@@ -18,8 +18,7 @@ FROM nginx:alpine
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# SSL tanúsítványok bemásolása az Nginx konténerbe
-COPY ssl /etc/nginx/ssl
+# Local SSL files are mounted read-only by Docker Compose at runtime.
 
 COPY --from=build /app/dist /usr/share/nginx/html
 

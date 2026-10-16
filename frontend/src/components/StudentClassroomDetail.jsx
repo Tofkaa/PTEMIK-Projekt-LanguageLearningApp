@@ -7,6 +7,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import { getUnseenIds, markAsViewed } from '../utils/viewedStore';
 import { parseServerDate, formatToLocalDisplay } from '../utils/dateUtils';
+import { useCurrentTime } from '../hooks/useCurrentTime';
 import ExercisePreviewCard from '../components/ExercisePreviewCard';
 
 const StudentClassroomDetail = () => {
@@ -31,7 +32,7 @@ const StudentClassroomDetail = () => {
 
     const [expandedPreviewId, setExpandedPreviewId] = useState(null);
     const [stats, setStats] = useState(null);
-    const [currentTime] = useState(() => Date.now());
+    const currentTime = useCurrentTime();
 
     // Az adott osztályteremhez tartozó olvasatlan elemek kiszűrése
     const classroomActiveIds = (notifications?.studentActiveAssignmentIds || []).filter(id => id.startsWith(`${classroomId}:`));

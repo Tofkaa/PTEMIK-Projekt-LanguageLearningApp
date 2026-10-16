@@ -10,9 +10,8 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
-
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Getter
@@ -63,13 +62,13 @@ public class User {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name = "last_login")
-    private LocalDateTime lastLogin;
+    private Instant lastLogin;
 
     @Column(name = "terms_accepted_at")
-    private LocalDateTime termsAcceptedAt;
+    private Instant termsAcceptedAt;
 
     @Column(name = "profile_picture_url", columnDefinition = "TEXT")
     private String profilePictureUrl;
@@ -95,7 +94,7 @@ public class User {
     private String friendCode;
 
     /**
-     * Tracks the exact local date when the user last completed a valid learning activity.
+     * Budapest calendar date of the user's last valid learning activity.
      * Used by the scheduled Cron job to evaluate streak expirations.
      */
     @Column(name = "last_activity_date")

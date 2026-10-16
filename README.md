@@ -1,5 +1,8 @@
 TESZTELÉSRE:
 
+Helyi HTTPS és az oktatói gépeken szükséges tanúsítványgenerálás:
+[Helyi HTTPS beállítása](docs/local-https.md).
+
 -root .env tartalma: 
 DB_USER=app_user
 DB_PASSWORD=app_password

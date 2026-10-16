@@ -2,7 +2,7 @@ package com.languageapp.backend.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @Builder
@@ -12,5 +12,5 @@ public class RecentResultResponse {
     private int score;
     private int correctAnswers;
     private int totalQuestions;
-    private LocalDateTime submittedAt;
+    private Instant submittedAt;
 }

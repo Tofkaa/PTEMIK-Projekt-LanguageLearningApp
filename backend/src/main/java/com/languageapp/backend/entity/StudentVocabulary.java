@@ -5,8 +5,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -59,25 +58,26 @@ public class StudentVocabulary {
     private int srsLevel = 0;
 
     @Column(name = "first_seen_at", nullable = false, updatable = false)
-    private LocalDateTime firstSeenAt;
+    private Instant firstSeenAt;
 
     @Column(name = "last_practiced_at")
-    private LocalDateTime lastPracticedAt;
+    private Instant lastPracticedAt;
 
     /**
      * The scheduled date and time for the next review session.
      */
     @Column(name = "next_practice_at", nullable = false)
-    private LocalDateTime nextPracticeAt;
+    private Instant nextPracticeAt;
 
     /**
      * Initializes default timestamps before persisting a new entity.
      */
     @PrePersist
     protected void onCreate() {
-        this.firstSeenAt = LocalDateTime.now();
+        Instant now = Instant.now();
+        this.firstSeenAt = now;
         if (this.nextPracticeAt == null) {
-            this.nextPracticeAt = LocalDateTime.now();
+            this.nextPracticeAt = now;
         }
     }
 }

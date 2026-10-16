@@ -7,8 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,12 +42,12 @@ public interface StudentVocabularyRepository extends JpaRepository<StudentVocabu
     /**
      * Fetches vocabulary items scheduled for review up to the specified time for a specific course.
      */
-    List<StudentVocabulary> findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(UUID userId, UUID courseId, LocalDateTime time);
+    List<StudentVocabulary> findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(UUID userId, UUID courseId, Instant time);
 
     /**
      * Retrieves all dictionary entries for the user filtered by their active course.
      */
     List<StudentVocabulary> findAllByUserAndCourse(User user, Course course);
 
-    long countByUser_UserIdAndNextPracticeAtBefore(UUID userId, LocalDateTime time);
+    long countByUser_UserIdAndNextPracticeAtLessThanEqual(UUID userId, Instant time);
 }

@@ -18,16 +18,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChallengeService {
+    private final Clock clock;
 
     private final ChallengeRepository challengeRepository;
     private final UserRepository userRepository;
@@ -72,8 +73,8 @@ public class ChallengeService {
         challenge.setTargetDifficulty(targetDiff);
 
         challenge.setStatus(ChallengeStatus.DRAFT);
-        challenge.setStartTime(LocalDateTime.now());
-        challenge.setEndTime(LocalDateTime.now().plusDays(days));
+        challenge.setStartTime(clock.instant());
+        challenge.setEndTime(clock.instant().plus(days, ChronoUnit.DAYS));
 
         challenge = challengeRepository.save(challenge);
         return new ChallengeCreateResponse(
@@ -152,7 +153,7 @@ public class ChallengeService {
 
             challenge.setWinner(winner);
             challenge.setStatus(ChallengeStatus.COMPLETED);
-            challenge.setCompletedAt(LocalDateTime.now());
+            challenge.setCompletedAt(clock.instant());
 
             if (winner != null) {
                 winner.setXp(winner.getXp() + 50);

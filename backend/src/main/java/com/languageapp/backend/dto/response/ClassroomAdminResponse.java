@@ -2,7 +2,7 @@ package com.languageapp.backend.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -12,7 +12,7 @@ public class ClassroomAdminResponse {
     private String name;
     private String description;
     private String inviteCode;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     private boolean isActive;
 
     private String teacherName;

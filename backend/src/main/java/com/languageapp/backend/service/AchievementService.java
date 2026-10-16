@@ -10,12 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.time.Clock;
 
 /**
  * Core business logic for the Gamification Engine.
@@ -26,6 +25,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AchievementService {
+    private final Clock clock;
 
     private final AchievementRepository achievementRepository;
     private final UserAchievementRepository userAchievementRepository;
@@ -177,7 +177,7 @@ public class AchievementService {
         UserAchievement newAward = new UserAchievement();
         newAward.setUser(user);
         newAward.setAchievement(achievement);
-        newAward.setAchievedAt(LocalDateTime.now());
+        newAward.setAchievedAt(clock.instant());
 
         userAchievementRepository.save(newAward);
         log.info("🏆 Gamification: New achievement unlocked for user: {}, Achievement: {}", user.getEmail(), achievement.getName());

@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Getter
@@ -32,13 +32,13 @@ public class Progress {
     private String completedDifficulty;
 
     @Column(name = "completed_at")
-    private LocalDateTime completedAt;
+    private Instant completedAt;
 
     @Column(name = "highest_score")
     private Integer highestScore;
 
     @Column(name = "last_attempt_at")
-    private LocalDateTime lastAttemptAt;
+    private Instant lastAttemptAt;
 
     @Column(name = "is_completed")
     private Boolean isCompleted = false;

@@ -14,8 +14,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.LocalDateTime;
+import org.mockito.Spy;
+import java.time.Instant;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,6 +30,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class VocabularyServiceTest {
+    @Spy private Clock clock = Clock.fixed(Instant.parse("2026-10-16T16:00:00Z"), ZoneOffset.UTC);
 
     @Mock
     private StudentVocabularyRepository vocabularyRepository;
@@ -63,7 +67,7 @@ class VocabularyServiceTest {
         testVocabulary.setWord("apple");
         testVocabulary.setTranslation("alma");
         testVocabulary.setSrsLevel(0);
-        testVocabulary.setNextPracticeAt(LocalDateTime.now());
+        testVocabulary.setNextPracticeAt(clock.instant());
     }
 
     @Test
@@ -77,7 +81,7 @@ class VocabularyServiceTest {
 
         // Assert
         assertEquals(1, response.getSrsLevel(), "Az SRS szintnek 1-re kell nőnie");
-        assertTrue(response.getNextPracticeAt().isAfter(LocalDateTime.now().plusHours(23)),
+        assertTrue(response.getNextPracticeAt().isAfter(clock.instant().plus(23, ChronoUnit.HOURS)),
                 "A következő gyakorlásnak kb. 1 nap múlva kell lennie");
         verify(vocabularyRepository, times(1)).save(testVocabulary);
     }
@@ -88,8 +92,8 @@ class VocabularyServiceTest {
         when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.of(testUser));
 
         // A Mockito any() és eq() paramétereivel jelezzük az új kurzus alapú lekérdezést
-        when(vocabularyRepository.findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(
-                eq(testUser.getUserId()), eq(testCourse.getCourseId()), any(LocalDateTime.class)))
+        when(vocabularyRepository.findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(
+                eq(testUser.getUserId()), eq(testCourse.getCourseId()), any(Instant.class)))
                 .thenReturn(List.of(testVocabulary));
 
         // Act
@@ -116,7 +120,7 @@ class VocabularyServiceTest {
 
         // Ellenőrizzük, hogy ilyenkor biztosan nem futott-e le az adatbázis lekérdezés a szavakra (az új metódusnévvel)
         verify(vocabularyRepository, never())
-                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtBeforeOrderByNextPracticeAtAsc(any(), any(), any());
+                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(any(), any(), any());
     }
 
     @Test
@@ -132,7 +136,7 @@ class VocabularyServiceTest {
         // Assert
         assertEquals(0, response.getSrsLevel(), "Hibás válasz esetén a szintnek le kell nullázódnia");
         // Mivel 0-s szintnél 0 napot adunk hozzá, a nextPracticeAt a jelenlegi időponthoz nagyon közeli kell legyen
-        assertTrue(response.getNextPracticeAt().isBefore(LocalDateTime.now().plusMinutes(1)));
+        assertTrue(response.getNextPracticeAt().isBefore(clock.instant().plus(1, ChronoUnit.MINUTES)));
     }
 
     @Test

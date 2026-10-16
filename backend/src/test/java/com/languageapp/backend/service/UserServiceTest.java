@@ -17,10 +17,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.Spy;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,6 +35,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
+    @Spy private Clock clock = Clock.fixed(Instant.parse("2026-10-16T16:00:00Z"), ZoneOffset.UTC);
 
     @Mock
     private UserRepository userRepository;
@@ -189,7 +193,7 @@ class UserServiceTest {
         EmailChangeToken savedToken = tokenCaptor.getValue();
         assertEquals(newEmail, savedToken.getNewEmail());
         assertEquals(6, savedToken.getOtpCode().length(), "Az OTP kódnak 6 karakteresnek kell lennie");
-        assertTrue(savedToken.getExpiryDate().isAfter(LocalDateTime.now()));
+        assertTrue(savedToken.getExpiryDate().isAfter(clock.instant()));
 
         verify(emailService, times(1)).sendEmailChangeOtp(eq(newEmail), eq(savedToken.getOtpCode()));
         verify(emailService, times(1)).sendEmailChangeSecurityAlert(eq(currentEmail), eq(newEmail));
@@ -206,7 +210,7 @@ class UserServiceTest {
         validToken.setUser(mockUser);
         validToken.setNewEmail(newEmail);
         validToken.setOtpCode("123456");
-        validToken.setExpiryDate(LocalDateTime.now().plusMinutes(10));
+        validToken.setExpiryDate(clock.instant().plus(10, ChronoUnit.MINUTES));
 
         when(userRepository.findByEmail(currentEmail)).thenReturn(Optional.of(mockUser));
         when(emailChangeTokenRepository.findByUser_UserId(mockUser.getUserId())).thenReturn(Optional.of(validToken));
@@ -231,7 +235,7 @@ class UserServiceTest {
         validToken.setUser(mockUser);
         validToken.setNewEmail("uj.diak@gmail.com");
         validToken.setOtpCode("123456");
-        validToken.setExpiryDate(LocalDateTime.now().plusMinutes(10));
+        validToken.setExpiryDate(clock.instant().plus(10, ChronoUnit.MINUTES));
 
         when(userRepository.findByEmail(currentEmail)).thenReturn(Optional.of(mockUser));
         when(emailChangeTokenRepository.findByUser_UserId(mockUser.getUserId())).thenReturn(Optional.of(validToken));

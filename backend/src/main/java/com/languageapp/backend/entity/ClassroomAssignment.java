@@ -7,8 +7,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -60,10 +59,10 @@ public class ClassroomAssignment {
     private Integer maxAttempts;
 
     @Column(name = "available_from")
-    private LocalDateTime availableFrom;
+    private Instant availableFrom;
 
     @Column(name = "available_until")
-    private LocalDateTime availableUntil;
+    private Instant availableUntil;
 
     @Column(name = "time_limit_minutes")
     private Integer timeLimitMinutes;
@@ -87,7 +86,7 @@ public class ClassroomAssignment {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;

@@ -12,8 +12,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.LocalDateTime;
+import org.mockito.Spy;
+import java.time.Instant;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +38,8 @@ class AssignmentServiceTest {
     @Mock private EvaluationService evaluationService;
     @Mock private StreakService streakService;
     @Mock private SseService sseService;
+    private static final Instant NOW = Instant.parse("2026-10-16T16:00:00Z");
+    @Spy private Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
     @InjectMocks
     private AssignmentService assignmentService;
@@ -98,7 +103,7 @@ class AssignmentServiceTest {
         assignment.setExercises(allExercises);
         assignment.setGenerationMode("RANDOM_SUBSET");
         assignment.setQuestionCount(2); // <-- A LÉNYEG
-        assignment.setAvailableFrom(LocalDateTime.now().minusDays(1)); // Már elérhető
+        assignment.setAvailableFrom(NOW.minus(1, ChronoUnit.DAYS)); // Már elérhető
 
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
         when(assignmentRepository.findById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
@@ -130,5 +135,55 @@ class AssignmentServiceTest {
 
         assertTrue(exception.getMessage().contains("Access denied"), "Biztonsági hibát kell dobnia jogosulatlan hozzáférésnél!");
         verify(sessionRepository, never()).save(any()); // Biztosan nem hozott létre sessiont
+    }
+
+    @Test
+    void startAssignment_BeforeStart_ShouldRejectWithoutCreatingSession() {
+        assignment.setAvailableFrom(NOW.plusSeconds(1));
+        when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
+        when(assignmentRepository.findById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+        when(classroomMemberRepository.existsByClassroom_ClassroomIdAndUser_UserId(
+                classroom.getClassroomId(), student.getUserId())).thenReturn(true);
+
+        assertThrows(BadRequestException.class, () ->
+                assignmentService.startAssignment(assignment.getAssignmentId(), student.getEmail()));
+        verify(sessionRepository, never()).save(any());
+    }
+
+    @Test
+    void startAssignment_ExactlyAtStart_ShouldAllowStarting() {
+        assignment.setAvailableFrom(NOW);
+        assignment.setExercises(new ArrayList<>());
+        when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
+        when(assignmentRepository.findById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+        when(classroomMemberRepository.existsByClassroom_ClassroomIdAndUser_UserId(
+                classroom.getClassroomId(), student.getUserId())).thenReturn(true);
+        when(sessionRepository.save(any(AssignmentSession.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        assertNotNull(assignmentService.startAssignment(assignment.getAssignmentId(), student.getEmail()));
+        verify(sessionRepository).save(any(AssignmentSession.class));
+    }
+
+    @Test
+    void getActiveAssignments_ShouldPassClockInstantToRepository() {
+        when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
+        when(assignmentRepository.findActiveAssignmentsForStudent(student.getUserId(), NOW)).thenReturn(List.of());
+
+        assertTrue(assignmentService.getActiveAssignmentsForStudent(student.getEmail()).isEmpty());
+        verify(assignmentRepository).findActiveAssignmentsForStudent(student.getUserId(), NOW);
+    }
+
+    @Test
+    void createAssignment_EmptyOrReversedWindow_ShouldRejectBeforeSaving() {
+        when(classroomRepository.findById(classroom.getClassroomId())).thenReturn(Optional.of(classroom));
+        AssignmentCreateRequest request = new AssignmentCreateRequest();
+        request.setAvailableFrom(NOW);
+        request.setAvailableUntil(NOW);
+        assertThrows(BadRequestException.class, () -> assignmentService.createAssignment(
+                classroom.getClassroomId(), request, teacher.getEmail()));
+        request.setAvailableUntil(NOW.minusSeconds(1));
+        assertThrows(BadRequestException.class, () -> assignmentService.createAssignment(
+                classroom.getClassroomId(), request, teacher.getEmail()));
+        verify(assignmentRepository, never()).save(any());
     }
 }

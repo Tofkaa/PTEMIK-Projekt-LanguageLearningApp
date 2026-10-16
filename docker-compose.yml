@@ -45,6 +45,8 @@ services:
         - VITE_APP_SECURITY_EXERCISE_SALT=${VITE_APP_SECURITY_EXERCISE_SALT}
     image: languageapp-frontend
     container_name: languageapp-frontend
+    volumes:
+      - ./frontend/ssl:/etc/nginx/ssl:ro
     depends_on:
       - backend
     ports:

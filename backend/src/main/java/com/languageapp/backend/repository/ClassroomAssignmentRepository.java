@@ -5,9 +5,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.UUID;
+import java.time.Instant;
 
 /**
  * Repository for managing classroom assignments and their metadata.
@@ -25,13 +25,15 @@ public interface ClassroomAssignmentRepository extends JpaRepository<ClassroomAs
      * Checks for valid membership and ensures the current time falls within the allowed window.
      *
      * @param userId The ID of the student
+     * @param now The current instant; start is inclusive and end is exclusive
      * @return List of assignments that are currently open for submission
      */
     @Query("SELECT a FROM ClassroomAssignment a " +
             "JOIN ClassroomMember cm ON cm.classroom = a.classroom " +
             "WHERE cm.user.userId = :userId " +
             "AND cm.status = 'ACCEPTED' " +
-            "AND (a.availableFrom IS NULL OR a.availableFrom <= CURRENT_TIMESTAMP) " +
-            "AND (a.availableUntil IS NULL OR a.availableUntil >= CURRENT_TIMESTAMP)")
-    List<ClassroomAssignment> findActiveAssignmentsForStudent(@Param("userId") UUID userId);
+            "AND (a.availableFrom IS NULL OR a.availableFrom <= :now) " +
+            "AND (a.availableUntil IS NULL OR a.availableUntil > :now)")
+    List<ClassroomAssignment> findActiveAssignmentsForStudent(@Param("userId") UUID userId,
+                                                           @Param("now") Instant now);
 }

@@ -3,8 +3,7 @@ package com.languageapp.backend.dto.response;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -14,7 +13,7 @@ public class AdminLogResponse {
     private AdminUserDto admin;
     private String actionType;
     private String details;
-    private LocalDateTime loggedAt;
+    private Instant loggedAt;
 
     @Data
     @AllArgsConstructor

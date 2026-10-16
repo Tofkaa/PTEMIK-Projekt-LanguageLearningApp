@@ -40,7 +40,7 @@ const ChallengeHistory = () => {
         
         try {
             const response = await api.get('/challenges/history', {
-                params: { _t: new Date().getTime() }
+                params: { _t: Date.now() }
             });
             setHistory(response.data || []);
        } catch (err) {

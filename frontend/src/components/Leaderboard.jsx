@@ -38,7 +38,7 @@ const Leaderboard = ({defaultScope = 'global'}) => {
         setError('');
         try {
             const response = await api.get(`/leaderboard/${scope}`, {
-                params: { sortBy: sortBy, _t: new Date().getTime() }
+                params: { sortBy: sortBy, _t: Date.now() }
             });
             setPlayers(response.data || []);
         } catch (err) {

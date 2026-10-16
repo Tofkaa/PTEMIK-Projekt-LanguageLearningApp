@@ -5,7 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Getter
@@ -31,5 +31,5 @@ public class UserAchievement {
 
     @CreationTimestamp
     @Column(name = "achieved_at", nullable = false, updatable = false)
-    private LocalDateTime achievedAt;
+    private Instant achievedAt;
 }

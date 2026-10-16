@@ -22,9 +22,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 import java.util.UUID;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Service responsible for user authentication and registration logic.
@@ -33,6 +33,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AuthenticationService {
+    private final Clock clock;
 
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
@@ -80,7 +81,7 @@ public class AuthenticationService {
         log.info("Registering {} user with email: {}...", user.getRole(), request.getEmail());
 
         if (Boolean.TRUE.equals(request.getAcceptTerms())) {
-            user.setTermsAcceptedAt(LocalDateTime.now());
+            user.setTermsAcceptedAt(clock.instant());
         }
 
         String generatedFriendCode;
@@ -113,7 +114,7 @@ public class AuthenticationService {
         VerificationToken verificationToken = new VerificationToken();
         verificationToken.setToken(tokenStr);
         verificationToken.setUser(user);
-        verificationToken.setExpiryDate(LocalDateTime.now().plusHours(24));
+        verificationToken.setExpiryDate(clock.instant().plus(24, ChronoUnit.HOURS));
         verificationTokenRepository.save(verificationToken);
 
         emailService.sendVerificationEmail(user.getEmail(), user.getName(), tokenStr);
@@ -125,7 +126,7 @@ public class AuthenticationService {
                 .authorities("ROLE_" + user.getRole().name())
                 .build();
 
-        user.setLastLogin(LocalDateTime.now());
+        user.setLastLogin(clock.instant());
         userRepository.save(user);
 
         String jwtToken = jwtService.generateToken(userDetails);
@@ -156,7 +157,7 @@ public class AuthenticationService {
         VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
                 .orElseThrow(() -> new BadRequestException("Érvénytelen vagy lejárt token!"));
 
-        if (verificationToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+        if (!clock.instant().isBefore(verificationToken.getExpiryDate())) {
             verificationTokenRepository.delete(verificationToken);
             throw new BadRequestException("A megerősítő link lejárt. Kérlek, igényelj újat a profilodban.");
         }
@@ -185,7 +186,7 @@ public class AuthenticationService {
             com.languageapp.backend.entity.PasswordResetToken resetToken = new com.languageapp.backend.entity.PasswordResetToken();
             resetToken.setToken(tokenStr);
             resetToken.setUser(user);
-            resetToken.setExpiryDate(LocalDateTime.now().plusHours(1));
+            resetToken.setExpiryDate(clock.instant().plus(1, ChronoUnit.HOURS));
 
             passwordResetTokenRepository.save(resetToken);
 
@@ -205,7 +206,7 @@ public class AuthenticationService {
         com.languageapp.backend.entity.PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
                 .orElseThrow(() -> new BadRequestException("Érvénytelen vagy már felhasznált token!"));
 
-        if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+        if (!clock.instant().isBefore(resetToken.getExpiryDate())) {
             passwordResetTokenRepository.delete(resetToken);
             throw new BadRequestException("A jelszóvisszaállító link lejárt. Kérlek, igényelj újat.");
         }
@@ -244,7 +245,7 @@ public class AuthenticationService {
                     return new BadRequestException("Invalid login credentials.");
                 });
 
-        user.setLastLogin(LocalDateTime.now());
+        user.setLastLogin(clock.instant());
         userRepository.save(user);
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();

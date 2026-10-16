@@ -9,15 +9,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.time.Clock;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ChallengeScheduler {
+    private final Clock clock;
 
     private final ChallengeRepository challengeRepository;
     private final UserRepository userRepository;
@@ -27,13 +27,13 @@ public class ChallengeScheduler {
      * (Cron expression: second, minute, hour, day, month, day of the week)
      * "0 0 * * * *" = at exactly the 0th minute of every hour, second 0.
      */
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 0 * * * *", zone = "UTC")
     @Transactional
     public void closeExpiredChallenges() {
         log.info("Cron Job indítva: Lejárt kihívások keresése...");
 
         List<ChallengeStatus> activeStatuses = Arrays.asList(ChallengeStatus.DRAFT, ChallengeStatus.PENDING);
-        List<Challenge> expiredChallenges = challengeRepository.findByStatusInAndEndTimeBefore(activeStatuses, LocalDateTime.now());
+        List<Challenge> expiredChallenges = challengeRepository.findByStatusInAndEndTimeLessThanEqual(activeStatuses, clock.instant());
 
         if (expiredChallenges.isEmpty()) {
             return;

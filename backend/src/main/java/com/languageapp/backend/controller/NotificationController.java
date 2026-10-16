@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.Clock;
 
 /**
  * REST Controller handling real-time notifications and summary data fetching.
@@ -37,6 +37,7 @@ public class NotificationController {
     private final StudentVocabularyRepository studentVocabularyRepository;
 
     private final SseService sseService;
+    private final Clock clock;
 
     /**
      * Aggregates and returns the user's notification state (Derived State).
@@ -50,13 +51,14 @@ public class NotificationController {
     public ResponseEntity<NotificationSummaryDTO> getSummary(Authentication authentication) {
         User user = userRepository.findByEmail(authentication.getName()).orElseThrow();
         java.util.UUID userId = user.getUserId();
+        Instant now = clock.instant();
 
         int pendingFriends = friendshipRepository.countByFriendUserIdAndStatus(userId, FriendshipStatus.PENDING);
         int pendingChallenges = challengeRepository.countByOpponentUserIdAndStatus(userId, ChallengeStatus.PENDING);
         int totalFriends = friendshipRepository.countByFriendUserIdAndStatus(userId, FriendshipStatus.ACCEPTED)
                 + friendshipRepository.countByUserUserIdAndStatus(userId, FriendshipStatus.ACCEPTED);
         int totalHistory = challengeRepository.countHistoryForUser(userId);
-        int dueVocabCount = (int) studentVocabularyRepository.countByUser_UserIdAndNextPracticeAtBefore(userId, LocalDateTime.now());
+        int dueVocabCount = (int) studentVocabularyRepository.countByUser_UserIdAndNextPracticeAtLessThanEqual(userId, clock.instant());
 
         java.util.List<String> tPendingIds = new java.util.ArrayList<>();
         java.util.List<String> tUngradedIds = new java.util.ArrayList<>();
@@ -94,7 +96,7 @@ public class NotificationController {
                                 boolean hasFinished = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userId)
                                         .stream().anyMatch(session -> session.getFinishedAt() != null);
 
-                                boolean isExpired = a.getAvailableUntil() != null && a.getAvailableUntil().isBefore(LocalDateTime.now());
+                                boolean isExpired = a.getAvailableUntil() != null && !now.isBefore(a.getAvailableUntil());
 
                                 if (!hasFinished && !isExpired) {
                                     sActiveIds.add(a.getClassroom().getClassroomId() + ":" + a.getAssignmentId());
@@ -105,7 +107,7 @@ public class NotificationController {
         return ResponseEntity.ok(new NotificationSummaryDTO(
                 pendingFriends, pendingChallenges, totalFriends, totalHistory,
                 tPendingIds, tUngradedIds, sActiveIds, sGradedIds,
-                System.currentTimeMillis(), dueVocabCount
+                now.toEpochMilli(), dueVocabCount
         ));
     }
 

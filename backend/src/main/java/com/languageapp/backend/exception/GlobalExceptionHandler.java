@@ -3,6 +3,7 @@ package com.languageapp.backend.exception;
 import com.languageapp.backend.exception.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -10,9 +11,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.util.HtmlUtils;
-
-import java.time.OffsetDateTime;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import java.util.stream.Collectors;
+import java.time.Clock;
 
 /**
  * Global exception handler for REST controllers.
@@ -23,7 +24,19 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @ControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+    private final Clock clock;
+
+    /** Invalid timestamp formats are client errors, including missing UTC offsets. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableRequest(
+            HttpMessageNotReadableException ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "Invalid request body. Timestamps must use ISO 8601 with Z or an explicit offset.",
+                request.getRequestURI()));
+    }
 
     /**
      * Handles {@link ResourceNotFoundException}.
@@ -168,7 +181,7 @@ public class GlobalExceptionHandler {
         String safePath = path != null ? HtmlUtils.htmlEscape(path) : null;
 
         return new ErrorResponse(
-                OffsetDateTime.now(),
+                clock.instant(),
                 status.value(),
                 status.getReasonPhrase(),
                 message,

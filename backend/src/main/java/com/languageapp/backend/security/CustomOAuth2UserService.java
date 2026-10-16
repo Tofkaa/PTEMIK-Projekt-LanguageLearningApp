@@ -15,16 +15,16 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.time.Clock;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
+    private final Clock clock;
 
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
@@ -81,7 +81,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             user.setRole(Role.STUDENT);
             user.setPreferredDifficulty(DifficultyLevel.DYNAMIC);
             user.setVerified(true); // email was verified externally
-            user.setLastLogin(LocalDateTime.now());
+            user.setLastLogin(clock.instant());
 
             Course defaultCourse = courseRepository.findByLanguageCode("en")
                     .orElseThrow(() -> new RuntimeException("Alapértelmezett kurzus nem található!"));

@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Spinner, Alert } from 'react-bootstrap';
 import api from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
+import { formatToLocalDisplay } from '../utils/dateUtils';
 
 
 /**
@@ -94,7 +95,7 @@ const PendingRequests = () => {
                                         {request.senderName} <span className="text-info opacity-75">#{request.senderTag}</span>
                                     </h6>
                                     <small className="text-light">
-                                        {new Date(request.sentAt).toLocaleDateString('hu-HU')}
+                                        {formatToLocalDisplay(request.sentAt, false)}
                                     </small>
                                 </div>
                                 <div className="d-flex gap-2">

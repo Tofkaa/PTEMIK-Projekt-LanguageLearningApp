@@ -3,7 +3,7 @@ package com.languageapp.backend.dto.response;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -18,8 +18,8 @@ public class AssignmentResponse {
     private String description;
     private boolean isTest;
     private Integer timeLimitMinutes;
-    private LocalDateTime availableFrom;
-    private LocalDateTime availableUntil;
+    private Instant availableFrom;
+    private Instant availableUntil;
     private int exerciseCount;
     private boolean isRandomized;
     private boolean allowRetries;

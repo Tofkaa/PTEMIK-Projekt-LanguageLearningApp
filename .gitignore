@@ -1,2 +1,9 @@
 # Titkosított Docker környezeti változók
 .env
+
+# Local database backups
+*.dump
+
+# Machine-local development certificate authorities
+rootCA.pem
+rootCA-key.pem

@@ -5,6 +5,7 @@ import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
 import { setScopedCounter } from '../utils/viewedStore.js';
+import { formatToLocalTimestamp } from '../utils/dateUtils';
 
 const VocabularyHub = () => {
     const navigate = useNavigate();
@@ -139,7 +140,7 @@ const VocabularyHub = () => {
                                         </Badge>
                                     </td>
                                     <td className="pe-4 text-secondary small">
-                                        {item.nextPracticeAt ? new Date(item.nextPracticeAt).toLocaleString('hu-HU') : 'Azonnal esedékes'}
+                                        {item.nextPracticeAt ? formatToLocalTimestamp(item.nextPracticeAt) : 'Azonnal esedékes'}
                                     </td>
                                 </tr>
                             ))

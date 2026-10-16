@@ -2,8 +2,7 @@ package com.languageapp.backend.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -13,6 +12,6 @@ public class VocabularyResponse {
     private String word;
     private String translation;
     private int srsLevel;
-    private LocalDateTime nextPracticeAt;
+    private Instant nextPracticeAt;
     private boolean isNewAddition;
 }

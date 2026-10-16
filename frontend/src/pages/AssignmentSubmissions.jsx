@@ -8,7 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Card, Button, Badge, Table, Modal, Form, Spinner, Row, Col, Alert } from 'react-bootstrap';
 import { assignmentApi } from '../services/assignmentApi';
-import { formatToLocalDisplay } from '../utils/dateUtils';
+import { formatToLocalDisplay, parseServerDate } from '../utils/dateUtils';
 import ExercisePreviewCard from '../components/ExercisePreviewCard';
 
 /**
@@ -40,8 +40,11 @@ const AssignmentSubmissions = () => {
     const getLateInfo = (session) => {
         if (!timeLimitMinutes || !session?.startedAt || !session?.finishedAt) return null;
         
-        const start = new Date(session.startedAt).getTime();
-        const end = new Date(session.finishedAt).getTime();
+        const startDate = parseServerDate(session.startedAt);
+        const endDate = parseServerDate(session.finishedAt);
+        if (!startDate || !endDate) return '-';
+        const start = startDate.getTime();
+        const end = endDate.getTime();
         
         const takenMs = end - start;
         const limitMs = timeLimitMinutes * 60 * 1000;

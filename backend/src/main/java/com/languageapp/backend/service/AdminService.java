@@ -9,8 +9,8 @@ import com.languageapp.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AdminService {
+    private final Clock clock;
 
     private final UserRepository userRepository;
     private final AdminLogRepository adminLogRepository;
@@ -27,7 +28,7 @@ public class AdminService {
     private final ExerciseRepository exerciseRepository;
     private final ClassroomRepository classroomRepository;
 
-    public record UserAdminDTO(UUID userId, String name, String userTag, String email, LocalDateTime createdAt, boolean active, Role role) {}
+    public record UserAdminDTO(UUID userId, String name, String userTag, String email, Instant createdAt, boolean active, Role role) {}
 
     @Transactional(readOnly = true)
     public List<UserAdminDTO> getAllUsers() {
@@ -37,7 +38,7 @@ public class AdminService {
                         u.getName(),
                         u.getUserTag() != null ? u.getUserTag() : "0000",
                         u.getEmail(),
-                        u.getCreatedAt() != null ? u.getCreatedAt() : LocalDateTime.now(),
+                        u.getCreatedAt() != null ? u.getCreatedAt() : clock.instant(),
                         u.isActive(),
                         u.getRole()
                 ))

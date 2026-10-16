@@ -3,7 +3,7 @@ package com.languageapp.backend.dto.response;
 import com.languageapp.backend.entity.Exercise;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,7 +15,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class AssignmentStartResponse {
     private UUID sessionId;
-    private LocalDateTime startedAt;
+    private Instant startedAt;
     private Integer timeLimitMinutes;
     private boolean allowRetries;
     private boolean hasFeedback;

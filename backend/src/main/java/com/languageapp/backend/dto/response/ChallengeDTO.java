@@ -2,7 +2,7 @@ package com.languageapp.backend.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -20,8 +20,8 @@ public class ChallengeDTO {
     @JsonProperty("isMyTurn")
     private boolean isMyTurn;
 
-    private LocalDateTime expiresAt;
-    private LocalDateTime startTime;
-    private LocalDateTime completedAt;
+    private Instant expiresAt;
+    private Instant startTime;
+    private Instant completedAt;
     private String winnerName;
 }

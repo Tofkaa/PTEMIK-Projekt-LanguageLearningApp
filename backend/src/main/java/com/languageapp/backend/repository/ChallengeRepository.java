@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.UUID;
 
@@ -18,7 +17,7 @@ public interface ChallengeRepository extends JpaRepository<Challenge, UUID> {
     /**
      * Looks up expired challenges.
      */
-    List<Challenge> findByStatusInAndEndTimeBefore(List<ChallengeStatus> statuses, java.time.LocalDateTime time);
+    List<Challenge> findByStatusInAndEndTimeLessThanEqual(List<ChallengeStatus> statuses, java.time.Instant time);
 
     int countByOpponentUserIdAndStatus(UUID opponentId, ChallengeStatus status);
 

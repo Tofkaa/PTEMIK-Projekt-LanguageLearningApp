@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Badge, Button, Form, Spinner, Alert, InputGroup } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi'; 
+import { formatToLocalDisplay } from '../../utils/dateUtils';
 import { useAuth } from '../../context/AuthContext'; 
 
 const UserManagement = () => {
@@ -123,7 +124,7 @@ const UserManagement = () => {
                                         <div className="text-light small">{u.email}</div>
                                     </td>
                                     <td className="small text-secondary">
-                                        {new Date(u.createdAt).toLocaleDateString('hu-HU')}
+                                        {formatToLocalDisplay(u.createdAt, false)}
                                     </td>
                                     <td className="text-center">
                                         {u.active ? (

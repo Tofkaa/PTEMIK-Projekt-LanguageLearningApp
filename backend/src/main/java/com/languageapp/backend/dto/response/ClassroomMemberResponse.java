@@ -3,7 +3,7 @@ package com.languageapp.backend.dto.response;
 import com.languageapp.backend.enums.MembershipStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -15,5 +15,5 @@ public class ClassroomMemberResponse {
     private String studentEmail;
     private String userTag;
     private MembershipStatus status;
-    private LocalDateTime joinedAt;
+    private Instant joinedAt;
 }

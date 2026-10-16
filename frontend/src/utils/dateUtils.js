@@ -6,23 +6,27 @@
  */
 
 /**
- * Parses raw date data from the backend into a safe, local timezone-aware Date object.
+ * Parses a server timestamp into a Date representing the same instant.
+ * Local timezone conversion happens only when formatting for display.
  * 
  * @param {Array|string} dateData - The raw date payload from the Spring Boot backend.
- * @returns {Date|null} A standard JavaScript Date object adjusted to local time.
+ * @returns {Date|null} The represented instant, or null for missing/invalid data.
  */
 export const parseServerDate = (dateData) => {
     if (!dateData) return null;
     
     // Fallback for older array-based Jackson serialization
     if (Array.isArray(dateData)) {
-        return new Date(Date.UTC(dateData[0], dateData[1] - 1, dateData[2], dateData[3] || 0, dateData[4] || 0, dateData[5] || 0));
+        const date = new Date(Date.UTC(dateData[0], dateData[1] - 1, dateData[2], dateData[3] || 0, dateData[4] || 0, dateData[5] || 0, Math.floor((dateData[6] || 0) / 1_000_000)));
+        return Number.isNaN(date.getTime()) ? null : date;
     }
     
     // Standard ISO-8601 parsing
-    const str = String(dateData);
-    // Ensure the UTC 'Z' flag is present for the browser engine
-    return new Date(str.endsWith('Z') ? str : str + 'Z'); 
+    const str = String(dateData).trim();
+    // Older endpoints still return timezone-less UTC values during migration.
+    const hasTimeZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(str);
+    const date = new Date(hasTimeZone ? str : str + 'Z');
+    return Number.isNaN(date.getTime()) ? null : date;
 };
 
 /**
@@ -43,6 +47,12 @@ export const formatToLocalDisplay = (dateData, includeTime = true) => {
     return date.toLocaleString('hu-HU', options);
 };
 
+/** Full local date and time, including seconds, for logs and activity details. */
+export const formatToLocalTimestamp = (dateData) => {
+    const date = parseServerDate(dateData);
+    return date ? date.toLocaleString('hu-HU') : 'N/A';
+};
+
 /**
  * Converts a local datetime-local input string to a standard UTC ISO string.
  * Used exclusively before API POST/PUT requests.
@@ -52,13 +62,22 @@ export const formatToLocalDisplay = (dateData, includeTime = true) => {
  */
 export const formatToUtcForServer = (localDateStr) => {
     if (!localDateStr) return null;
+    const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(localDateStr);
+    if (!parts) throw new RangeError('Érvénytelen helyi dátum vagy időpont.');
     const localDate = new Date(localDateStr);
-    return localDate.toISOString().substring(0, 19);
+    const expected = parts.slice(1, 7).map(value => Number(value || 0));
+    const actual = [localDate.getFullYear(), localDate.getMonth() + 1, localDate.getDate(),
+        localDate.getHours(), localDate.getMinutes(), localDate.getSeconds()];
+    // Reject impossible dates and spring DST gaps rather than silently moving them.
+    if (actual.some((value, index) => value !== expected[index])) {
+        throw new RangeError('Ez a helyi időpont nem létezik. Ellenőrizd a dátumot és az óraátállítást.');
+    }
+    return localDate.toISOString();
 };
 
 /**
- * A bulletproof countdown timer logic based on UNIX epoch milliseconds.
- * Immune to user timezone changes or manual OS clock manipulation.
+ * Calculates remaining time using epoch milliseconds. Timezone-independent,
+ * but dependent on the client's system clock; the server applies submission policy.
  * 
  * @param {Array|string} serverStartedAt - UTC start time of the session.
  * @param {number} timeLimitMinutes - The allowed duration in minutes.
@@ -69,6 +88,7 @@ export const getRemainingTimeMs = (serverStartedAt, timeLimitMinutes) => {
     
     const limitMs = timeLimitMinutes * 60 * 1000;
     const startDate = parseServerDate(serverStartedAt);
+    if (!startDate) return null;
     const startMs = startDate.getTime(); 
     
     return Math.max(0, limitMs - (Date.now() - startMs));

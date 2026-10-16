@@ -5,7 +5,8 @@ import { classroomApi } from '../services/classroomApi';
 import { assignmentApi } from '../services/assignmentApi';
 import { lessonApi } from '../services/lessonApi';
 import { useNotifications } from '../context/NotificationContext';
-import { parseServerDate, formatToLocalDisplay, formatToUtcForServer } from '../utils/dateUtils';
+import { parseServerDate, formatToLocalDisplay, formatToLocalTimestamp, formatToUtcForServer } from '../utils/dateUtils';
+import { useCurrentTime } from '../hooks/useCurrentTime';
 import ExercisePreviewCard from '../components/ExercisePreviewCard';
 import { useAuth } from '../context/AuthContext';
 import { getUnseenIds, markAsViewed } from '../utils/viewedStore';
@@ -52,7 +53,7 @@ const TeacherClassroomDetail = () => {
 
     const { notifications } = useNotifications();
 
-     const [currentTime] = useState(() => Date.now()); 
+     const currentTime = useCurrentTime();
 
     /**
      * @typedef {Object} AssignmentFormState
@@ -257,30 +258,30 @@ const TeacherClassroomDetail = () => {
         if (isSubmitting) return; 
         setIsSubmitting(true);
 
-        const payload = {
-            title: assignmentForm.title,
-            description: assignmentForm.description,
-            isTest: assignmentMode === 'TEST',
-            hasFeedback: assignmentMode === 'TEST' ? assignmentForm.hasFeedback : true,
-            allowDictionary: assignmentMode === 'TEST' ? assignmentForm.allowDictionary : true,
-            allowLateSubmission: assignmentMode === 'TEST' ? assignmentForm.allowLateSubmission : true,
-            randomized: assignmentForm.isRandomized,
-            allowRetries: assignmentMode === 'TEST' ? assignmentForm.allowRetries : true,
-            maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
-            timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
-            
-            availableFrom: formatToUtcForServer(assignmentForm.availableFrom),
-            availableUntil: formatToUtcForServer(assignmentForm.availableUntil),
-            
-            exerciseIds: assignmentForm.exerciseIds,
+        try {
+            const payload = {
+                title: assignmentForm.title,
+                description: assignmentForm.description,
+                isTest: assignmentMode === 'TEST',
+                hasFeedback: assignmentMode === 'TEST' ? assignmentForm.hasFeedback : true,
+                allowDictionary: assignmentMode === 'TEST' ? assignmentForm.allowDictionary : true,
+                allowLateSubmission: assignmentMode === 'TEST' ? assignmentForm.allowLateSubmission : true,
+                randomized: assignmentForm.isRandomized,
+                allowRetries: assignmentMode === 'TEST' ? assignmentForm.allowRetries : true,
+                maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
+                timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
 
-            generationMode: assignmentForm.generationMode,
-            questionCount: assignmentForm.generationMode === 'RANDOM_SUBSET' && assignmentForm.questionCount 
-                            ? parseInt(assignmentForm.questionCount) 
-                            : null
-        };
+                availableFrom: formatToUtcForServer(assignmentForm.availableFrom),
+                availableUntil: formatToUtcForServer(assignmentForm.availableUntil),
 
-       try {
+                exerciseIds: assignmentForm.exerciseIds,
+
+                generationMode: assignmentForm.generationMode,
+                questionCount: assignmentForm.generationMode === 'RANDOM_SUBSET' && assignmentForm.questionCount
+                                ? parseInt(assignmentForm.questionCount)
+                                : null
+            };
+
             await assignmentApi.createAssignment(classroomId, payload);
             setIsAssignmentModalOpen(false);
             setAssignmentForm({
@@ -295,7 +296,7 @@ const TeacherClassroomDetail = () => {
             fetchDashboardData(); 
         } catch (error) {
             console.error("Hiba a feladat kiosztásakor:", error);
-            alert(error.response?.data?.message || "Hiba történt a mentés során.");
+            alert(error.response?.data?.message || (error instanceof RangeError ? error.message : "Hiba történt a mentés során."));
         } finally {
             setIsSubmitting(false); 
         }
@@ -527,7 +528,7 @@ const TeacherClassroomDetail = () => {
                                 <ListGroup variant="flush">
                                     {acceptedMembers.map(member => (
                                         <ListGroup.Item key={member.memberId} className="bg-dark text-light border-secondary d-flex justify-content-between">
-                                            <div><div className="fw-bold">{member.studentName || member.name} <span className="text-light small">#{member.userTag}</span></div><div className="text-secondary small">Belépett: {new Date(member.joinedAt).toLocaleDateString()}</div></div>
+                                            <div><div className="fw-bold">{member.studentName || member.name} <span className="text-light small">#{member.userTag}</span></div><div className="text-secondary small">Belépett: {formatToLocalDisplay(member.joinedAt, false)}</div></div>
                                             <Button variant="outline-danger" size="sm" onClick={() => handleKick(member.userId)}>Kirúgás</Button>
                                         </ListGroup.Item>
                                     ))}
@@ -590,7 +591,7 @@ const TeacherClassroomDetail = () => {
                                                             </Badge>
                                                         </td>
                                                         <td className="text-secondary small">
-                                                            {s.lastActivity !== "Nincs adat" ? new Date(s.lastActivity).toLocaleString('hu-HU') : "Még nem kezdte el"}
+                                                            {s.lastActivity !== "Nincs adat" ? formatToLocalTimestamp(s.lastActivity) : "Még nem kezdte el"}
                                                         </td>
                                                     </tr>
                                                 ))}

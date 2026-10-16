@@ -14,8 +14,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.languageapp.backend.dto.request.ExerciseSubmission;
 import com.languageapp.backend.enums.MembershipStatus;
-
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +39,7 @@ public class AssignmentService {
     private final AssignmentSessionRepository sessionRepository;
     private final EvaluationService evaluationService;
     private final StreakService streakService;
+    private final Clock clock;
 
     private final SseService sseService;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -59,6 +61,11 @@ public class AssignmentService {
 
         if (!classroom.getTeacher().getEmail().equals(teacherEmail)) {
             throw new BadRequestException("Unauthorized to create assignments in this classroom.");
+        }
+
+        if (request.getAvailableFrom() != null && request.getAvailableUntil() != null
+                && !request.getAvailableFrom().isBefore(request.getAvailableUntil())) {
+            throw new BadRequestException("A határidőnek a kezdési időpont után kell lennie.");
         }
 
         ClassroomAssignment assignment = new ClassroomAssignment();
@@ -116,7 +123,7 @@ public class AssignmentService {
     @Transactional(readOnly = true)
     public List<AssignmentResponse> getActiveAssignmentsForStudent(String email) {
         User student = userRepository.findByEmail(email).orElseThrow();
-        return assignmentRepository.findActiveAssignmentsForStudent(student.getUserId())
+        return assignmentRepository.findActiveAssignmentsForStudent(student.getUserId(), clock.instant())
                 .stream()
                 .map(a -> mapToResponse(a, email))
                 .toList();
@@ -146,7 +153,7 @@ public class AssignmentService {
             throw new BadRequestException("Access denied: Not a member of this classroom.");
         }
 
-        if (assignment.getAvailableFrom() != null && LocalDateTime.now().isBefore(assignment.getAvailableFrom())) {
+        if (assignment.getAvailableFrom() != null && clock.instant().isBefore(assignment.getAvailableFrom())) {
             throw new BadRequestException("Ez a feladat még nem elérhető!");
         }
 
@@ -170,7 +177,7 @@ public class AssignmentService {
             session = new AssignmentSession();
             session.setAssignment(assignment);
             session.setUser(user);
-            session.setStartedAt(LocalDateTime.now());
+            session.setStartedAt(clock.instant());
             session = sessionRepository.save(session);
             log.info("Student {} started attempt {} for assignment {}", email, completedCount + 1, assignmentId);
         }
@@ -225,8 +232,8 @@ public class AssignmentService {
         // a rendszer csak logol, de feldolgozza és LEZÁRJA a tesztet, hogy ne ragadjon be örökre.
         Integer limit = session.getAssignment().getTimeLimitMinutes();
         if (limit != null && limit > 0) {
-            LocalDateTime deadline = session.getStartedAt().plusMinutes(limit + 2);
-            if (LocalDateTime.now().isAfter(deadline)) {
+            Instant deadline = session.getStartedAt().plus(limit + 2, ChronoUnit.MINUTES);
+            if (clock.instant().isAfter(deadline)) {
                 log.warn("Late submission for user {}. Accepting to prevent session lock.", email);
             }
         }
@@ -259,7 +266,7 @@ public class AssignmentService {
         int correctCount = details.getCorrectCount();
         int finalScore = totalExercises == 0 ? 0 : (int) Math.round(((double) correctCount / totalExercises) * 100);
 
-        session.setFinishedAt(LocalDateTime.now());
+        session.setFinishedAt(clock.instant());
         session.setFinalScore(finalScore);
 
         List<AssignmentSessionResponse.AnswerDetail> detailedAnswers = new ArrayList<>();

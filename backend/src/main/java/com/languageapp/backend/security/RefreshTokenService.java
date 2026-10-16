@@ -11,12 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.time.Clock;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +30,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenService {
+    private final Clock clock;
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
@@ -62,7 +62,7 @@ public class RefreshTokenService {
 
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
-        refreshToken.setExpiryDate(LocalDateTime.now().plus(refreshTokenDurationMs, ChronoUnit.MILLIS));
+        refreshToken.setExpiryDate(clock.instant().plus(refreshTokenDurationMs, ChronoUnit.MILLIS));
 
         // Csak a hash-t mentjük!
         refreshToken.setTokenHash(hashToken(rawToken));
@@ -83,7 +83,7 @@ public class RefreshTokenService {
      */
     @Transactional
     public RefreshToken verifyExpiration(RefreshToken token) {
-        if (token.getExpiryDate().isBefore(LocalDateTime.now())) {
+        if (!clock.instant().isBefore(token.getExpiryDate())) {
             log.warn("Refresh token expired for user ID: {}. Deleting from database.", token.getUser().getUserId());
             refreshTokenRepository.delete(token);
 

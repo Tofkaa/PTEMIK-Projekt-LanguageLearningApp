@@ -13,10 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.time.Clock;
 
 /**
  * Service responsible for evaluating user submissions for lessons.
@@ -28,6 +27,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class EvaluationService {
+    private final Clock clock;
 
     private static final int PASSING_SCORE_THRESHOLD = 60;
     private static final int XP_PER_CORRECT_ANSWER = 10;
@@ -263,7 +263,7 @@ public class EvaluationService {
         result.setDifficulty(difficulty);
         result.setScore(score);
         result.setTimeTaken(request.getTimeTakenSeconds());
-        result.setSubmittedAt(LocalDateTime.now());
+        result.setSubmittedAt(clock.instant());
         result.setCorrectAnswersCount(correctCount);
         result.setTotalQuestionsCount(totalCount);
         result.setIsTestResult(false);
@@ -296,7 +296,7 @@ public class EvaluationService {
     }
 
     private void updateProgress(Progress progress, int score, boolean passed) {
-        progress.setLastAttemptAt(LocalDateTime.now());
+        progress.setLastAttemptAt(clock.instant());
 
         if (score > progress.getHighestScore()) {
             progress.setHighestScore(score);
@@ -304,7 +304,7 @@ public class EvaluationService {
 
         if (passed && !progress.getIsCompleted()) {
             progress.setIsCompleted(true);
-            progress.setCompletedAt(LocalDateTime.now());
+            progress.setCompletedAt(clock.instant());
         }
 
         progressRepository.save(progress);

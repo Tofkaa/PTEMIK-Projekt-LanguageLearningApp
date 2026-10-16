@@ -7,15 +7,17 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
-
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.time.Clock;
+import java.time.Instant;
 
 /**
  * Service responsible for JSON Web Token (JWT) operations.
@@ -25,7 +27,9 @@ import java.util.function.Function;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class JwtService {
+    private final Clock clock;
 
     @Value("${jwt.secret}")
     private String secretKey;
@@ -57,11 +61,12 @@ public class JwtService {
         // Add the user's primary authority (role) to the token payload
         extraClaims.put("role", userDetails.getAuthorities().iterator().next().getAuthority());
 
+        Instant now = clock.instant();
         String token = Jwts.builder()
                 .claims(extraClaims)
                 .subject(userDetails.getUsername())
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusMillis(jwtExpiration)))
                 .signWith(getSigningKey())
                 .compact();
 
@@ -105,10 +110,10 @@ public class JwtService {
      * Checks if the given token has expired.
      *
      * @param token the JWT string
-     * @return true if the expiration date is before the current time
+     * @return true once the expiration instant is reached
      */
     private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        return !clock.instant().isBefore(extractExpiration(token).toInstant());
     }
 
     /**
@@ -145,6 +150,7 @@ public class JwtService {
     private Claims extractAllClaims(String token) {
         try {
             return Jwts.parser()
+                    .clock(() -> Date.from(clock.instant()))
                     .verifyWith(getSigningKey())
                     .build()
                     .parseSignedClaims(token)
