@@ -4,7 +4,7 @@
  * Manages the modal state and submission logic for Draft Challenge creation.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Spinner, Alert, Badge, Row, Col, Modal, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -42,11 +42,13 @@ const FriendList = () => {
     const [challengeLoading, setChallengeLoading] = useState(false);
     const [challengeError, setChallengeError] = useState('');
 
+   const isFirstLoad = useRef(true);
+
     useEffect(() => {
-        fetchFriends(true);
+        fetchFriends(isFirstLoad.current);
+        isFirstLoad.current = false;
     }, [notifications.totalFriends]);
 
-    // Automatikusan frissítjük a leckék listáját, ha a modal nyitva van és nyelvet vált
     useEffect(() => {
         if (showModal) {
             fetchLessonsForChallenge(challengeCourse);
@@ -58,11 +60,12 @@ const FriendList = () => {
         
         try {
             const response = await api.get('/friendships/accepted', {
-                params: { _t: new Date().getTime() }
+                params: { _t: Date.now() }
             });
             setFriends(response.data || []);
         } catch (err) {
-            if (isInitialLoad) setError('Nem sikerült betölteni a barátlistát.', err);
+            console.error("Hiba a barátlista betöltésekor:", err);
+            if (isInitialLoad) setError('Nem sikerült betölteni a barátlistát.');
         } finally {
             if (isInitialLoad) setLoading(false);
         }

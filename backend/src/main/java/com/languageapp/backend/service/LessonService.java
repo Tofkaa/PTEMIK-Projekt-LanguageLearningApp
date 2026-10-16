@@ -124,17 +124,6 @@ public class LessonService {
             throw new ForbiddenException("This lesson is currently unavailable.");
         }
 
-        // ÚJ LOGIKA: Tanárok és Adminok megkapják a lecke ÖSSZES aktív feladatát szűrés nélkül!
-        if (Role.TEACHER.equals(user.getRole()) || Role.ADMIN.equals(user.getRole())) {
-            return lesson.getExercises().stream()
-                    .filter(Exercise::isActive)
-                    .map(this::mapToExerciseResponse)
-                    .toList();
-        }
-
-        // Diákok esetén marad az adaptív (vagy Challenge alapú) szűrés
-        String currentDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
-
         if (challengeId != null) {
             Challenge challenge = challengeRepository.findById(challengeId)
                     .orElseThrow(() -> new ForbiddenException("Challenge does not exist!"));
@@ -148,14 +137,34 @@ public class LessonService {
                 throw new ForbiddenException("This challenge belongs to a different lesson!");
             }
 
-            currentDifficulty = challenge.getTargetDifficulty();
+            String challengeDifficulty = challenge.getTargetDifficulty();
+            if (challengeDifficulty == null || challengeDifficulty.isBlank() || "DYNAMIC".equalsIgnoreCase(challengeDifficulty)) {
+                challengeDifficulty = userDifficultyCalculator.determineTargetDifficulty(challenge.getChallenger());
+            }
+
+            final String finalChallengeDiff = challengeDifficulty.trim();
+
+            return lesson.getExercises().stream()
+                    .filter(Exercise::isActive)
+                    .filter(exercise -> finalChallengeDiff.equalsIgnoreCase(exercise.getDifficulty()))
+                    .map(this::mapToExerciseResponse)
+                    .toList();
         }
 
-        final String finalTargetDifficulty = currentDifficulty;
+
+        if (Role.TEACHER.equals(user.getRole()) || Role.ADMIN.equals(user.getRole())) {
+            return lesson.getExercises().stream()
+                    .filter(Exercise::isActive)
+                    .map(this::mapToExerciseResponse)
+                    .toList();
+        }
+
+
+        final String finalTargetDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
 
         return lesson.getExercises().stream()
                 .filter(Exercise::isActive)
-                .filter(exercise -> finalTargetDifficulty.equals(exercise.getDifficulty()))
+                .filter(exercise -> finalTargetDifficulty.equalsIgnoreCase(exercise.getDifficulty()))
                 .map(this::mapToExerciseResponse)
                 .toList();
     }

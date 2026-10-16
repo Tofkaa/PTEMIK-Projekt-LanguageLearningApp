@@ -65,8 +65,9 @@ public class ChallengeService {
         challenge.setOpponent(opponent);
         challenge.setLesson(lesson);
 
-        String targetDiff = (request.getDifficulty() != null && !request.getDifficulty().isBlank())
-                ? request.getDifficulty()
+        String reqDiff = request.getDifficulty() != null ? request.getDifficulty().trim().toUpperCase() : "";
+        String targetDiff = (!reqDiff.isBlank() && !"DYNAMIC".equals(reqDiff))
+                ? reqDiff
                 : userDifficultyCalculator.determineTargetDifficulty(challenger);
         challenge.setTargetDifficulty(targetDiff);
 
