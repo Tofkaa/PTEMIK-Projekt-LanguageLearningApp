@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col, Alert, Toast, ToastContainer } from 'react-bootstrap';
+import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col } from 'react-bootstrap';
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
@@ -9,6 +9,11 @@ import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx
 import { useNotifications } from '../context/NotificationContext.jsx';
 import CryptoJS from 'crypto-js';
 import ClickableText from '../components/ClickableText.jsx';
+import LearningFeedback from '../components/LearningFeedback.jsx';
+import LanguageText from '../components/LanguageText.jsx';
+import TranslationHint from '../components/TranslationHint.jsx';
+import DurationText from '../components/DurationText.jsx';
+import useStageFocus from '../hooks/useStageFocus';
 
 
 const LANGUAGE_NAMES = {
@@ -54,6 +59,10 @@ const LessonPlayer = () => {
 
     const [feedback, setFeedback] = useState(null);
     const [isChecking, setIsChecking] = useState(false); 
+    const [checkError, setCheckError] = useState(null);
+    const [submissionError, setSubmissionError] = useState(null);
+    const headingRef = useStageFocus(lessonResult ? 'result' : submissionError ? 'submission-error' : error ? 'error'
+        : isLoading ? 'loading' : isSubmitting ? 'submitting' : `question-${currentIndex}`);
 
     const [renderedWords, setRenderedWords] = useState([]);
     const [clickedWords, setClickedWords] = useState(new Set());
@@ -69,14 +78,14 @@ const LessonPlayer = () => {
                     : `/lessons/${lessonId}/exercises`;
                 const response = await api.get(endpoint);
                 if (response.data.length === 0) {
-                    setError("No exercises found for this lesson.");
+                    setError('Ehhez a leckéhez nem található feladat.');
                 } else {
                     setExercises(response.data);
                     setStartTime(Date.now());
                 }
             } catch (err) {
                 console.error("Error fetching exercises:", err);
-                setError("Failed to connect to the server.");
+                setError('Nem sikerült betölteni a feladatokat.');
             } finally {
                 setIsLoading(false);
             }
@@ -95,16 +104,11 @@ const LessonPlayer = () => {
         return () => clearInterval(timer);
     }, [startTime, isSubmitting, lessonResult]);
 
-    const formatTime = (totalSeconds) => {
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    };
 
     const progressPercentage = exercises.length > 0 ? (currentIndex / exercises.length) * 100 : 0;
     const currentExercise = exercises[currentIndex];
     
-    const isInputDisabled = feedback && feedback.type !== 'warning';
+    const isInputDisabled = isChecking || isSubmitting || !!(feedback && feedback.type !== 'warning');
 
     const handleAutoAddWords = () => {
         const unclicked = renderedWords.filter(w => !clickedWords.has(w));
@@ -117,6 +121,8 @@ const LessonPlayer = () => {
 
    // --- PHASE 2: IMMEDIATE FEEDBACK & NEXT QUESTION ---
     const handleCheckOrNext = async () => {
+        if (isChecking || isSubmitting || !currentAnswer.trim()) return;
+        setCheckError(null);
         if (!feedback || feedback.type === 'warning') {
             setIsChecking(true);
             
@@ -144,7 +150,7 @@ const LessonPlayer = () => {
                     }
                 } catch (err) {
                     console.error("Hiba a backend ellenőrzés során:", err);
-                    finalizeAnswerAndMove();
+                    setCheckError('Nem sikerült ellenőrizni a választ. A válaszod megmaradt, próbáld újra.');
                 } finally {
                     setIsChecking(false);
                 }
@@ -154,11 +160,11 @@ const LessonPlayer = () => {
                     const localHash = generateHash(currentAnswer);
                     if (localHash === currentExercise.answerHash) {
                         // Perfect match
-                        setFeedback({ type: 'success', msg: 'Tökéletes! ✅' });
+                        setFeedback({ type: 'success', msg: <>Tökéletes! <span aria-hidden="true">✅</span></> });
                        handleAutoAddWords();
                     } else {
                         // Faulty answer
-                        setFeedback({ type: 'danger', msg: 'Helytelen! Semmi baj, menjünk tovább. ❌' });
+                        setFeedback({ type: 'danger', msg: <>Helytelen! Semmi baj, menjünk tovább. <span aria-hidden="true">❌</span></> });
                         
                         if (!currentExercise.isRetry) {
                             setExercises(prev => [...prev, { ...currentExercise, isRetry: true }]);
@@ -166,7 +172,7 @@ const LessonPlayer = () => {
                     }
                 } catch (err) {
                     console.error("Hiba a lokális hash ellenőrzés során:", err);
-                    finalizeAnswerAndMove();
+                    setCheckError('Nem sikerült ellenőrizni a választ. A válaszod megmaradt, próbáld újra.');
                 } finally {
                     setIsChecking(false);
                 }
@@ -203,6 +209,7 @@ const LessonPlayer = () => {
     // --- PHASE 3: SUBMIT TO BACKEND ---
     const submitLesson = async (finalAnswers) => {
         setIsSubmitting(true);
+        setSubmissionError(null);
         const payload = {
             timeTakenSeconds: elapsedTime,
             answers: finalAnswers
@@ -234,7 +241,7 @@ const LessonPlayer = () => {
             }
         } catch (err) {
             console.error("Submission error:", err);
-            setError("An error occurred while submitting your answers.");
+            setSubmissionError('Nem sikerült beküldeni a válaszokat.');
         } finally {
             setIsSubmitting(false);
         }
@@ -263,9 +270,9 @@ const LessonPlayer = () => {
                             border: `4px solid ${isPassed ? '#198754' : '#dc3545'}`
                         }}
                     >
-                        {isPassed ? '🏆' : '💔'}
+                        <span aria-hidden="true">{isPassed ? '🏆' : '💔'}</span>
                     </div>
-                    <h1 className="fw-bold display-5 mb-2">{isPassed ? 'Sikeres Lecke!' : 'Gyakorolj még egy kicsit!'}</h1>
+                    <h1 ref={headingRef} tabIndex={-1} className="fw-bold display-5 mb-2">{isPassed ? 'Sikeres Lecke!' : 'Gyakorolj még egy kicsit!'}</h1>
                     <p className="text-light opacity-75 fs-5 fst-italic">"{lessonResult.feedback}"</p>
                 </div>
 
@@ -277,9 +284,9 @@ const LessonPlayer = () => {
                             backgroundColor: 'rgba(255, 193, 7, 0.15)'
                         }}
                     >
-                        <span className="fs-1">🔥</span>
+                        <span aria-hidden="true" className="fs-1">🔥</span>
                         <div className="text-start">
-                            <h4 className="text-warning fw-bold mb-1">Szintet léptél!</h4>
+                            <h2 className="h4 text-warning fw-bold mb-1">Szintet léptél!</h2>
                             <p className="text-light opacity-75 mb-0 small">
                                 Kiválóan teljesítesz! A rendszer <strong className="text-warning">{lessonResult.newDifficulty}</strong> szintre kapcsolt.
                             </p>
@@ -295,9 +302,9 @@ const LessonPlayer = () => {
                             backgroundColor: 'rgba(255, 255, 255, 0.05)'
                         }}
                     >
-                        <span className="fs-1">📉</span>
+                        <span aria-hidden="true" className="fs-1">📉</span>
                         <div className="text-start">
-                            <h4 className="text-secondary fw-bold mb-1">Kicsit visszavettünk a tempóból</h4>
+                            <h2 className="h4 text-secondary fw-bold mb-1">Kicsit visszavettünk a tempóból</h2>
                             <p className="text-light opacity-75 mb-0 small">
                                 A rendszer <strong className="text-light">{lessonResult.newDifficulty}</strong> szintre állított, hogy nyugodtan gyakorolhass.
                             </p>
@@ -307,62 +314,69 @@ const LessonPlayer = () => {
 
                 <Card className="shadow-lg border-0 bg-dark text-light p-3 rounded-4 w-100 mb-4" style={{ maxWidth: '600px' }}>
                     <Card.Body>
-                        <Row className="text-center mb-4 g-3">
-                            <Col xs={4}>
-                                <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
-                                    <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Pontosság</h6>
-                                    <h3 className={displayAccuracy >= 60 ? 'text-success fw-bold mb-0' : 'text-warning fw-bold mb-0'}>
+                        <Row className="lesson-result-stats text-center mb-4 g-3">
+                            <Col>
+                                <dl className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 mb-0 d-flex flex-column justify-content-center">
+                                    <dt className="text-body-secondary text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Pontosság</dt>
+                                    <dd className={`h3 fw-bold mb-0 ${displayAccuracy >= 60 ? 'text-success' : 'text-warning'}`}>
                                         {displayAccuracy}%
-                                    </h3>
-                                </div>
+                                    </dd>
+                                </dl>
                             </Col>
-                            <Col xs={4}>
-                                <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
-                                    <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Idő</h6>
-                                    <h3 className="text-info fw-bold mb-0">
-                                        {formatTime(elapsedTime)}
-                                    </h3>
-                                </div>
+                            <Col>
+                                <dl className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 mb-0 d-flex flex-column justify-content-center">
+                                    <dt className="text-body-secondary text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>Idő</dt>
+                                    <dd className="h3 text-info fw-bold mb-0">
+                                        <DurationText seconds={elapsedTime} />
+                                    </dd>
+                                </dl>
                             </Col>
-                            <Col xs={4}>
-                                <div className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 d-flex flex-column justify-content-center">
-                                    <h6 className="text-light opacity-75 text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>XP</h6>
+                            <Col>
+                                <dl className="p-3 bg-secondary bg-opacity-25 rounded-4 border border-secondary h-100 mb-0 d-flex flex-column justify-content-center">
+                                    <dt className="text-body-secondary text-uppercase fw-bold mb-2" style={{ fontSize: '0.75rem', letterSpacing: '1px' }}>XP</dt>
+                                    <dd className="mb-0">
                                     {isAlreadyCompleted ? (
                                         <>
-                                            <h4 className="text-secondary fw-bold mb-0">0⭐</h4>
+                                            <p className="h4 text-secondary fw-bold mb-0">0<span aria-hidden="true">⭐</span></p>
                                             <span className="text-info mt-1 d-block" style={{ fontSize: '0.70rem', fontWeight: 'bold' }}>Már teljesítve</span>
                                         </>
                                     ) : (
                                         <>
-                                            <h3 className="text-warning fw-bold mb-0">+{lessonResult.xpEarned}⭐</h3>
+                                            <p className="h3 text-warning fw-bold mb-0">+{lessonResult.xpEarned}<span aria-hidden="true">⭐</span></p>
                                             {lostXp > 0 && <span className="text-danger mt-1 d-block" style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>-{lostXp} XP (hibák)</span>}
                                         </>
                                     )}
-                                </div>
+                                    </dd>
+                                </dl>
                             </Col>
                         </Row>
 
-                        <div className="d-flex justify-content-between align-items-center p-3 mb-4 bg-black bg-opacity-25 rounded-3 border border-secondary">
+                        <div className="d-flex flex-wrap gap-2 justify-content-between align-items-center p-3 mb-4 bg-black bg-opacity-25 rounded-3 border border-secondary">
                             <span className="text-light fw-bold">Helyes válaszok (próbálkozásokkal)</span>
                             <span className="fs-5 fw-bold text-info">
-                                {totalCorrectAnswers} <span className="text-light opacity-50 fs-6">/ {totalAttempts}</span>
+                                <span aria-hidden="true">{totalCorrectAnswers} <span className="text-body-secondary fs-6">/ {totalAttempts}</span></span>
+                                <span lang="hu" className="visually-hidden">{totalAttempts} próbálkozásból {totalCorrectAnswers} helyes válasz</span>
                             </span>
                         </div>
 
                         {lessonResult.mistakes && lessonResult.mistakes.length > 0 && (
                             <div className="mt-4 text-start">
-                                <h5 className="text-warning fw-bold mb-3 border-bottom border-secondary pb-2">Hibák áttekintése:</h5>
-                                {lessonResult.mistakes.map((mistake, idx) => (
-                                    <div key={idx} className="bg-black bg-opacity-50 p-3 rounded-3 mb-3 border border-secondary">
-                                        <p className="mb-2 text-light fw-bold">{mistake.question}</p>
-                                        <p className="mb-1 text-danger small fw-bold">
-                                            ❌ Te válaszod: <span className="fw-normal">{mistake.submittedAnswer ? mistake.submittedAnswer.replace(/[[\]]/g, '') : '(Üresen hagyva)'}</span>
-                                        </p>
-                                        <p className="mb-0 text-success small fw-bold">
-                                            ✅ Helyes válasz: <span className="fw-normal">{mistake.correctAnswer}</span>
-                                        </p>
-                                    </div>
-                                ))}
+                                <h2 className="h5 text-warning fw-bold mb-3 border-bottom border-secondary pb-2">Hibák áttekintése:</h2>
+                                {lessonResult.mistakes.map((mistake, idx) => {
+                                    const mistakeContent = exercises.find(exercise => exercise.exerciseId === mistake.exerciseId)?.content || {};
+                                    return (
+                                        <div key={idx} className="bg-black bg-opacity-50 p-3 rounded-3 mb-3 border border-secondary">
+                                            <p className="mb-2 text-light fw-bold"><LanguageText text={mistake.question}
+                                                lang={mistakeContent.questionLang} parts={mistakeContent.questionParts} /></p>
+                                            <p className="mb-1 text-danger small fw-bold">
+                                                <span aria-hidden="true">❌</span> Te válaszod: <span lang={mistake.submittedAnswer ? mistakeContent.answerLang : 'hu'} className="fw-normal">{mistake.submittedAnswer ? mistake.submittedAnswer.replace(/[[\]]/g, '') : '(Üresen hagyva)'}</span>
+                                            </p>
+                                            <p className="mb-0 text-success small fw-bold">
+                                                <span aria-hidden="true">✅</span> Helyes válasz: <span lang={mistakeContent.answerLang} className="fw-normal">{mistake.correctAnswer}</span>
+                                            </p>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
 
@@ -387,16 +401,24 @@ const LessonPlayer = () => {
         return (
             <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-light">
                 <Spinner animation="border" variant="info" className="mb-3" />
-                <h5>{isSubmitting ? 'Evaluating answers...' : 'Loading exercises...'}</h5>
+                <h1 ref={headingRef} tabIndex={-1} className="h5">{isSubmitting ? 'Válaszok értékelése...' : 'Feladatok betöltése...'}</h1>
             </div>
         );
     }
 
-    if (error) { 
+    if (submissionError) {
+        return <Container className="mt-5 text-center">
+            <h1 ref={headingRef} tabIndex={-1} className="h3">{submissionError}</h1>
+            <p>A válaszaid ezen az oldalon megmaradtak. Ellenőrizd a kapcsolatod, majd próbáld újra a mentést.</p>
+            <Button onClick={() => submitLesson(collectedAnswers)}>Mentés újrapróbálása</Button>
+        </Container>;
+    }
+
+    if (error) {
         return (
             <Container className="mt-5 text-center text-light">
-                <h3 className="text-danger">{error}</h3>
-                <Button variant="outline-light" className="mt-3" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+                <h1 ref={headingRef} tabIndex={-1} className="h3 text-danger">{error}</h1>
+                <Button variant="outline-secondary" className="mt-3" onClick={() => navigate('/dashboard')}>Vissza az áttekintéshez</Button>
             </Container>
         );
     }
@@ -418,19 +440,21 @@ const LessonPlayer = () => {
             switch (type) {
                 case 'MULTIPLE_CHOICE': return 'Válaszd ki a helyes opciót';
                 case 'WORD_BANK': return 'Rakd sorba a szavakat';
-                case 'IMAGE_CHOICE': return 'Válaszd ki a megfelelő képet';
+                case 'IMAGE_CHOICE': return 'Válaszd ki a képhez illő szót';
                 default: return 'Feladat';
             }
         };
         const allowDictionary = content?.questionLang !== 'hu';
+        const Instruction = 'h1';
 
         return (
             <div className="d-flex flex-column align-items-center w-100">
                 
                 {/* 1. Task Type */}
-                <span className="text-secondary fw-bold text-uppercase mb-3 d-block" style={{ letterSpacing: '2px', fontSize: '0.8rem' }}>
+                <Instruction id="lesson-task-instruction" lang="hu" ref={headingRef} tabIndex={0} className="text-body-secondary fw-bold text-uppercase mb-3 d-block" style={{ letterSpacing: '2px', fontSize: '0.9rem' }}>
                     {getTitle()}
-                </span>
+                    <span className="visually-hidden">. {currentIndex + 1}. feladat, összesen {exercises.length}.</span>
+                </Instruction>
                 
                 {/* Question 2 Text */}
                 {questionText && (
@@ -443,32 +467,29 @@ const LessonPlayer = () => {
                             boxShadow: '0 0 20px rgba(13, 202, 240, 0.15)'
                         }}
                     >
-                      <h2 className="fw-bold text-light mb-0" style={{ lineHeight: '1.4', fontSize: '1.8rem' }}>
-                            {allowDictionary ? (
+                      <h2 tabIndex={0} lang={content?.questionLang || 'hu'} className="fw-bold text-light mb-0" style={{ lineHeight: '1.4', fontSize: '1.8rem' }}>
+
                                 <ClickableText 
                                     text={questionText} 
-                                    disabled={!!challengeId} 
+                                    lang={content?.questionLang}
+                                    languageParts={content?.questionParts}
+                                    disabled={!!challengeId || !allowDictionary}
                                     hint={content?.hint} 
+                                    hintDirection={content?.hintDirection}
                                     source="LESSON" 
-                                    onWordsFound={(words) => setRenderedWords(words)} 
+                                    onWordsFound={setRenderedWords}
                                     onWordClick={(word) => setClickedWords(prev => new Set(prev).add(word))}
                                 />
-                            ) : (
-                                <span>{questionText}</span>
-                            )}
                         </h2>
+                        {allowDictionary && !challengeId && <p lang="hu" className="small text-body-secondary mt-3 mb-0">Az aláhúzott szavak fordítása Enterrel vagy Szóközzel megnyitható.</p>}
 
                        {!allowDictionary && content?.hint && (
-                            <div className="d-inline-block text-start mt-2 px-3 py-2 rounded" style={{ backgroundColor: 'rgba(13, 202, 240, 0.1)', borderLeft: '4px solid #0dcaf0' }}>
-                                <span className="small text-light fw-bold text-uppercase" style={{ letterSpacing: '1px' }}>
+                            <div tabIndex={0} role="note" aria-labelledby="lesson-hint-title" aria-describedby="lesson-hint-content" className="d-inline-block text-start mt-2 px-3 py-2 rounded" style={{ backgroundColor: 'rgba(13, 202, 240, 0.1)', borderLeft: '4px solid #0dcaf0' }}>
+                                <span id="lesson-hint-title" lang="hu" className="small text-light fw-bold text-uppercase" style={{ letterSpacing: '1px' }}>
                                     <i className="bi bi-lightbulb me-2 text-warning"></i>Tipp a fordításhoz
                                 </span>
-                                <div className="mt-1 small fw-medium" style={{ color: '#e0e0e0' }}>
-                                    {content.hint.split(',').map((pair, idx) => (
-                                        <span key={idx} className="me-3 d-inline-block">
-                                            {pair.trim()}
-                                        </span>
-                                    ))}
+                                <div id="lesson-hint-content" className="mt-1 small fw-medium text-body">
+                                    <TranslationHint content={content} />
                                 </div>
                             </div>
                         )}
@@ -490,11 +511,12 @@ const LessonPlayer = () => {
                     )}
 
                     {type === 'TRANSLATION' && (
-                        <Form.Group className="mb-4 text-start">
+                        <Form.Group className="mb-4 text-start" controlId="lesson-answer">
+                            <Form.Label id="lesson-answer-label" lang="hu">Válaszod</Form.Label>
                             <Form.Control 
                                 as="textarea" 
                                 rows={3} 
-                                placeholder="A fordítás helye..." 
+                                aria-labelledby="lesson-answer-label"
                                 value={currentAnswer} 
                                 onChange={(e) => setCurrentAnswer(e.target.value)} 
                                 className="fs-4 p-4 rounded-4 shadow-none text-info fw-bold" 
@@ -503,7 +525,7 @@ const LessonPlayer = () => {
                                     border: '2px solid rgba(13, 202, 240, 0.2)',
                                     resize: 'none'
                                 }}
-                                autoFocus 
+                                lang={content?.answerLang}
                                 disabled={isInputDisabled}
                             />
                         </Form.Group>
@@ -539,15 +561,17 @@ const LessonPlayer = () => {
                 {/* Progress Bar Header */}
                 <div className="mb-4">
                     <div className="d-flex justify-content-between align-items-center mb-2 fw-bold text-light opacity-75 small">
-                        <span style={{ width: '60px' }}>{currentIndex + 1} / {exercises.length}</span>
+                        <span style={{ width: '60px' }}><span aria-hidden="true">{currentIndex + 1} / {exercises.length}</span><span lang="hu" className="visually-hidden">{currentIndex + 1}. feladat, összesen {exercises.length}.</span></span>
                         
-                        <span className="text-info fs-6 px-3 py-1 bg-dark rounded-pill border border-secondary">
-                            ⏱️ {formatTime(elapsedTime)}
+                        <span role="timer" aria-live="off" aria-labelledby="lesson-elapsed-time" className="text-info fs-6 px-3 py-1 bg-dark rounded-pill border border-secondary">
+                            <span aria-hidden="true">⏱️ </span><DurationText id="lesson-elapsed-time" seconds={elapsedTime} label="Eltelt idő" />
                         </span>
                         
                         <span className="text-end" style={{ width: '60px' }}>{Math.round(progressPercentage)}%</span>
                     </div>
-                    <ProgressBar now={progressPercentage} variant="info" style={{ height: '10px', backgroundColor: '#333' }} className="rounded-pill border border-secondary" />
+                    <ProgressBar style={{ height: '10px', backgroundColor: '#333' }} className="rounded-pill border border-secondary">
+                        <ProgressBar aria-label="Lecke előrehaladása" now={progressPercentage} variant="info" />
+                    </ProgressBar>
                 </div>
 
                 {/* Quiz Card */}
@@ -557,11 +581,7 @@ const LessonPlayer = () => {
                         {renderExercise()}
 
                         {/* IMMEDIATE FEEDBACK BOX */}
-                        {feedback && (
-                            <Alert variant={feedback.type} className="mt-4 fw-bold text-start fs-5 border-0 shadow-sm transition-all w-100 rounded-4" style={{ maxWidth: '700px' }}>
-                                {feedback.msg}
-                            </Alert>
-                        )}
+                        <LearningFeedback feedback={feedback} error={checkError} />
                         
                         <div className="d-flex justify-content-between mt-5 w-100" style={{ maxWidth: '700px' }}>
                             <Button variant="outline-secondary" className="rounded-pill px-4" onClick={() => navigate('/dashboard')}>
@@ -571,11 +591,13 @@ const LessonPlayer = () => {
                             <Button 
                                 variant={buttonVariant} 
                                 size="lg"
-                                className="px-5 fw-bold text-dark rounded-pill shadow-sm" 
+                                className="px-5 fw-bold rounded-pill shadow-sm"
                                 onClick={handleCheckOrNext} 
-                                disabled={currentAnswer.trim().length === 0 || isChecking}
+                                disabled={currentAnswer.trim().length === 0}
+                                aria-disabled={isChecking || isSubmitting || !currentAnswer.trim()}
+                                aria-busy={isChecking || isSubmitting}
                             >
-                                {isChecking ? <Spinner size="sm" animation="border" /> : buttonText}
+                                {isChecking ? <><Spinner size="sm" animation="border" aria-hidden="true" /> Ellenőrzés folyamatban...</> : buttonText}
                             </Button>
                         </div>
                     </Card.Body>

@@ -4,11 +4,13 @@
  * Presents rules, time limits, and attempt constraints, and initializes the server-side session.
  */
 
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Container, Card, Button, Row, Col, Alert, Spinner } from 'react-bootstrap';
+import { Container, Card, Button, Row, Col, Alert } from 'react-bootstrap';
 import { assignmentApi } from '../services/assignmentApi';
-import { parseServerDate } from '../utils/dateUtils';
+import { parseServerDate, formatToLocalDisplay } from '../utils/dateUtils';
+import LearningFeedback from '../components/LearningFeedback';
+import { useCurrentTime } from '../hooks/useCurrentTime';
 
 /**
  * @component
@@ -19,10 +21,20 @@ const AssignmentStart = () => {
     const navigate = useNavigate();
     const location = useLocation();
     
-    const details = location.state?.assignmentDetails;
+    const [details, setDetails] = useState(location.state?.assignmentDetails);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
     const [isStarting, setIsStarting] = useState(false);
 
-    const [currentTime] = useState(() => Date.now());
+    const currentTime = useCurrentTime();
+
+    useEffect(() => {
+        let active = true;
+        assignmentApi.getAssignmentDetails(assignmentId).then(res => { if (active) setDetails(res.data); })
+            .catch(() => { if (active) setError('Nem sikerült frissíteni a feladat időbeállításait. Nyisd meg újra az oldalt.'); })
+            .finally(() => { if (active) setLoading(false); });
+        return () => { active = false; };
+    }, [assignmentId]);
 
     /**
      * Initiates the assignment session via the backend API.
@@ -32,6 +44,7 @@ const AssignmentStart = () => {
      * @function startTest
      */
     const startTest = async () => {
+        if (isStarting || loading || error) return;
         setIsStarting(true);
         try {
             const res = await assignmentApi.startAssignment(assignmentId);
@@ -40,15 +53,16 @@ const AssignmentStart = () => {
             });
         } catch (error) {
             console.error("Failed to start assignment", error);
-            alert("Hiba történt a teszt indításakor. Lehet, hogy már kitöltötted, vagy lejárt az idő.");
+            setError(error.response?.data?.message || 'Nem sikerült elindítani a feladatot. Frissítsd az oldalt és próbáld újra.');
             setIsStarting(false);
         }
     };
 
+    if (loading && !details) return <Container><h1 className="h4">Feladat betöltése...</h1></Container>;
     if (!details) {
         return (
             <Container className="py-5 text-center text-light">
-                <h4 className="text-danger mb-4">A feladat adatai nem találhatóak. Kérlek, indítsd el újra az osztályteremből!</h4>
+                <h1 className="h4 text-danger mb-4">A feladat adatai nem találhatóak. Kérlek, indítsd el újra az osztályteremből!</h1>
                 <Button variant="outline-secondary" onClick={() => navigate('/classrooms')}>Vissza az osztálytermekhez</Button>
             </Container>
         );
@@ -59,10 +73,11 @@ const AssignmentStart = () => {
             <Row className="justify-content-center">
                 <Col md={8} lg={6}>
                     <Card className="bg-dark text-light border-primary shadow-lg p-4 text-center">
-                        <h2 className="fw-bold mb-4 text-primary">Készen állsz?</h2>
+                        <h1 className="h2 fw-bold mb-4 app-accent-text">Készen állsz?</h1>
+                        <LearningFeedback error={error} />
                         
                         {details.test ? (
-                            <Alert variant="warning" className="bg-dark text-warning border-warning">
+                            <Alert variant="warning">
                                 <h5 className="fw-bold">Figyelem! Ez egy szigorú teszt.</h5>
                                 <p className="mb-0">
                                     Amint rányomsz az indításra, az időmérés megkezdődik. 
@@ -70,7 +85,7 @@ const AssignmentStart = () => {
                                 </p>
                             </Alert>
                         ) : (
-                            <Alert variant="info" className="bg-dark text-info border-info">
+                            <Alert variant="info">
                                 <h5 className="fw-bold">Gyakorló feladatsor</h5>
                                 <p className="mb-0">Minden feladatra azonnali visszajelzést fogsz kapni, és újra próbálkozhatsz a hibás válaszokkal.</p>
                             </Alert>
@@ -83,6 +98,7 @@ const AssignmentStart = () => {
                                 <strong>Időkeret:</strong> {details.timeLimitMinutes ? `${details.timeLimitMinutes} perc` : 'Nincs időkorlát'}
                             </p>
                             <p className="mb-0"><strong>Kérdések száma:</strong> {details.exerciseCount} db</p>
+                            <p><strong>Rád érvényes beadási határidő:</strong> {details.availableUntil ? formatToLocalDisplay(details.availableUntil) : 'Nincs'}</p>
                             <p className="mb-0 text-info mt-2 border-top border-secondary pt-2">
                                 <strong>Felhasznált próbálkozások:</strong> {details.attemptsUsed || 0} / {details.maxAttempts ? details.maxAttempts : 'Végtelen'}
                             </p>
@@ -95,9 +111,9 @@ const AssignmentStart = () => {
                                 return (
                                     <Button 
                                         variant="primary" size="lg" className="fw-bold" 
-                                        onClick={startTest} disabled={isStarting || isFuture}
+                                        onClick={startTest} disabled={loading || isFuture || !!error} aria-disabled={isStarting}
                                     >
-                                        {isStarting ? <Spinner size="sm" /> : (isFuture ? 'Még nem elérhető' : (details.test ? 'Teszt Megkezdése' : 'Gyakorlás Indítása'))}
+                                        {isStarting ? 'Indítás...' : (isFuture ? 'Még nem elérhető' : (details.test ? 'Teszt Megkezdése' : 'Gyakorlás Indítása'))}
                                     </Button>
                                 );
                             })()}

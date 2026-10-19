@@ -1,87 +1,77 @@
-import { Badge } from 'react-bootstrap';
+import { useId, useLayoutEffect, useRef } from 'react';
 
-/**
- * WordBankExercise Component
- * * Interactive sentence-building exercise.
- * ARCHITECTURE NOTE: Uses "Derived State" instead of local `useState`/`useEffect`.
- * The selected and available words are calculated directly from the `currentAnswer` string 
- * provided by the parent. This guarantees a Single Source of Truth, prevents cascading renders, 
- * and cleanly handles duplicate words in the word bank.
- */
-const WordBankExercise = ({ data, currentAnswer, onAnswer, disabled }) => {
-    
-    // 1. Derive selected words array from the parent's string state
-    const selectedWords = currentAnswer ? currentAnswer.trim().split(/\s+/) : [];
-
-    // 2. Derive available words by subtracting selected words from the initial options
-    const availableWords = [...(data?.options || [])];
-    selectedWords.forEach(word => {
-        const index = availableWords.indexOf(word);
-        if (index > -1) {
-            availableWords.splice(index, 1);
-        }
+/** Preserve duplicate words and restore focus when an activated token moves. */
+const WordBankExercise = ({ data, currentAnswer, onAnswer, disabled = false }) => {
+    const id = useId();
+    const buttons = useRef(new Map());
+    const pendingFocus = useRef(null);
+    const selectedWords = currentAnswer?.trim() ? currentAnswer.trim().split(/\s+/) : [];
+    const tokens = (data?.options || []).map((word, id) => ({ word, id }));
+    const used = new Set();
+    const selectedIds = selectedWords.map(word => {
+        const token = tokens.find(token => token.word === word && !used.has(token.id));
+        if (token) used.add(token.id);
+        return token?.id;
     });
+    const available = tokens.filter(token => !used.has(token.id));
 
-    /**
-     * Appends a word from the bank to the user's current sentence.
-     */
-    const handleSelect = (word) => {
-        if (disabled) return;
-        const newSelected = [...selectedWords, word];
-        onAnswer(newSelected.join(' ')); // Emit new state to parent
+    useLayoutEffect(() => {
+        if (pendingFocus.current !== null) {
+            buttons.current.get(pendingFocus.current)?.focus();
+            pendingFocus.current = null;
+        }
+    }, [currentAnswer]);
+
+    const registerButton = key => node => {
+        if (node) buttons.current.set(key, node);
+        else buttons.current.delete(key);
     };
 
-    /**
-     * Removes a specific word from the user's current sentence, returning it to the bank.
-     */
-    const handleDeselect = (index) => {
+    const select = token => {
         if (disabled) return;
-        const newSelected = [...selectedWords];
-        newSelected.splice(index, 1);
-        onAnswer(newSelected.join(' ')); // Emit new state to parent
+        const removed = available.find(item => item.word === token.word);
+        const remaining = available.filter(item => item.id !== removed.id);
+        const next = remaining.find(item => item.id > token.id) || remaining.at(-1);
+        pendingFocus.current = next ? `available-${next.id}` : `selected-${selectedWords.length}`;
+        onAnswer([...selectedWords, token.word].join(' '));
     };
 
-    return (
-        <div className="text-center">
-            {/* --- Answer Construction Area --- */}
-            <div 
-                className="mb-4 p-3 border-bottom border-info border-opacity-50 d-flex flex-wrap gap-2 justify-content-center align-items-center rounded-top" 
-                style={{ minHeight: '80px', backgroundColor: 'rgba(13, 202, 240, 0.05)' }}
-            >
-                {selectedWords.length === 0 && (
-                    <span className="text-secondary fst-italic">Kattints a lenti szavakra a mondatépítéshez...</span>
-                )}
-                {selectedWords.map((word, idx) => (
-                    <Badge 
-                        key={`sel-${idx}`} 
-                        bg="info" 
-                        text="dark" 
-                        className="fs-5 p-2 shadow-sm"
-                        onClick={() => handleDeselect(idx)} 
-                        style={{ cursor: disabled ? 'default' : 'pointer' }}
-                    >
-                        {word}
-                    </Badge>
-                ))}
-            </div>
+    const deselect = index => {
+        if (disabled) return;
+        const remaining = selectedWords.filter((_, position) => position !== index);
+        pendingFocus.current = remaining.length
+            ? `selected-${Math.min(index, remaining.length - 1)}`
+            : `available-${selectedIds[index]}`;
+        onAnswer(remaining.join(' '));
+    };
 
-            {/* --- Available Words Bank --- */}
-            <div className="d-flex flex-wrap gap-2 justify-content-center">
-                {availableWords.map((word, idx) => (
-                    <Badge 
-                        key={`avail-${idx}`} 
-                        bg="dark" 
-                        border="secondary"
-                        className="fs-5 p-3 border border-info border-opacity-25 text-light shadow-sm transition-all hover-border-info"
-                        onClick={() => handleSelect(word)}
-                        style={{ cursor: disabled ? 'default' : 'pointer' }}
-                    >
-                        {word}
-                    </Badge>
-                ))}
-            </div>
+    return <fieldset disabled={disabled} className="word-bank text-center">
+        <legend className="visually-hidden">Mondatépítés</legend>
+        <p lang="hu" className="small text-body-secondary">Válassz szavakat a mondathoz. Enter vagy Szóköz hozzáadja a kiválasztott szót. Az összeállított válasz szavait ugyanígy eltávolíthatod. A teljes mondat külön Tab-lépéssel is elérhető.</p>
+        <div role="group" aria-label="Összeállított válasz"
+            className="word-bank-answer mb-4 p-3 d-flex flex-wrap gap-2 justify-content-center align-items-center">
+            {selectedWords.length === 0 && <span className="text-body-secondary fst-italic">Még nem választottál szót.</span>}
+            {selectedWords.map((word, index) => <button key={`selected-${index}`} type="button"
+                lang={data?.answerLang}
+                aria-labelledby={`${id}-selected-word-${index}`}
+                className="word-token word-token-selected" disabled={disabled}
+                ref={registerButton(`selected-${index}`)} onClick={() => deselect(index)}>
+                <span id={`${id}-selected-word-${index}`} lang={data?.answerLang}>{word}</span>
+            </button>)}
         </div>
-    );
+        {currentAnswer && <p tabIndex={0} lang={data?.answerLang} className="word-bank-sentence text-body mb-4">{currentAnswer}</p>}
+        <div role="group" aria-label="Választható szavak" className="d-flex flex-wrap gap-2 justify-content-center">
+            {available.map(token => <button key={token.id} type="button" className="word-token"
+                lang={data?.answerLang}
+                aria-labelledby={`${id}-available-word-${token.id}`}
+                disabled={disabled} ref={registerButton(`available-${token.id}`)} onClick={() => select(token)}>
+                <span id={`${id}-available-word-${token.id}`} lang={data?.answerLang}>{token.word}</span>
+            </button>)}
+        </div>
+        <p role="status" aria-atomic="true" lang="hu" className="visually-hidden">
+            {selectedWords.length ? `${selectedWords.length} szó az összeállított válaszban.` : 'Az összeállított válasz üres.'}
+        </p>
+    </fieldset>;
 };
 
 export default WordBankExercise;

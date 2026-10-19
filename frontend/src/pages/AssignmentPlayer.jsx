@@ -4,9 +4,9 @@
  * Handles countdown timers, immediate feedback mapping, client-side progression, and final API submission.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Container, Card, Button, ProgressBar, Spinner, Form, Alert } from 'react-bootstrap';
+import { Container, Card, Button, ProgressBar, Spinner, Form } from 'react-bootstrap';
 import api from '../services/api';
 import { assignmentApi } from '../services/assignmentApi';
 import WordBankExercise from '../components/exercises/WordBankExercise.jsx';
@@ -14,6 +14,10 @@ import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExerci
 import ImageChoiceExercise from '../components/exercises/ImageChoiceExercise.jsx';
 import ClickableText from '../components/ClickableText.jsx';
 import { parseServerDate } from '../utils/dateUtils.js';
+import LearningFeedback from '../components/LearningFeedback.jsx';
+import TranslationHint from '../components/TranslationHint.jsx';
+import DurationText from '../components/DurationText.jsx';
+import useStageFocus from '../hooks/useStageFocus';
 
 /**
  * @component
@@ -30,7 +34,6 @@ const AssignmentPlayer = () => {
     // --- LOGIC FLAGS ---
     const hasFeedback = details?.hasFeedback === true || sessionData?.hasFeedback === true;
     const allowRetries = details?.allowRetries === true || sessionData?.allowRetries === true;
-    const isTest = details?.test === true || details?.isTest === true;
 
     // --- STATE MANAGEMENT ---
     const [exercises, setExercises] = useState(sessionData?.exercises || []);
@@ -44,8 +47,47 @@ const AssignmentPlayer = () => {
 
     const [feedback, setFeedback] = useState(null);
     const [isChecking, setIsChecking] = useState(false);
+    const [checkError, setCheckError] = useState(null);
+    const [submissionError, setSubmissionError] = useState(null);
+    const headingRef = useStageFocus(showSummary ? 'summary' : `question-${currentIndex}`);
 
     const isAutoSubmitting = useRef(false);
+    const latestAutoSubmit = useRef(null);
+    const expiryCheckPending = useRef(false);
+    const nextExpiryCheck = useRef(0);
+    const [timing, setTiming] = useState(sessionData?.timing || null);
+    const [serverOffset, setServerOffset] = useState(() => sessionData?.timing?.serverNow
+        ? parseServerDate(sessionData.timing.serverNow).getTime() - Date.now() : 0);
+    const [timingError, setTimingError] = useState('');
+    const [timingNotice, setTimingNotice] = useState('');
+    const previousDeadline = useRef(sessionData?.timing?.deadline);
+    const latestTimingValue = useRef(sessionData?.timing);
+    const latestServerTime = useRef(parseServerDate(sessionData?.timing?.serverNow)?.getTime() || 0);
+
+    const readTiming = useCallback(async () => {
+        const response = await assignmentApi.getSessionTiming(sessionId);
+        const value = response.data;
+        const serverTime = parseServerDate(value.serverNow)?.getTime() || 0;
+        if (serverTime < latestServerTime.current) return latestTimingValue.current;
+        latestServerTime.current = serverTime;
+        latestTimingValue.current = value;
+        setTiming(value);
+        if (value.serverNow) setServerOffset(parseServerDate(value.serverNow).getTime() - Date.now());
+        if (value.deadline !== previousDeadline.current) setTimingNotice('A tanár frissítette az időbeállításaidat.');
+        previousDeadline.current = value.deadline;
+        setTimingError('');
+        if (value.finished) setShowSummary(true);
+        return value;
+    }, [sessionId]);
+
+    useEffect(() => {
+        if (!sessionData?.timing || showSummary) return;
+        const refresh = () => readTiming().catch(() => setTimingError('Az időbeállítások frissítése nem sikerült. Újrapróbáljuk; a válaszaid megmaradnak.'));
+        const timer = setInterval(refresh, 5000);
+        const onVisibility = () => { if (document.visibilityState === 'visible') refresh(); };
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisibility); };
+    }, [sessionData?.timing, showSummary, readTiming]);
 
     useEffect(() => {
         if (!sessionData || !details) {
@@ -55,41 +97,37 @@ const AssignmentPlayer = () => {
     }, [sessionData, details, navigate]);
 
    // --- TIMER ---
-    const allowLate = details?.allowLateSubmission === true;
+    const allowLate = timing ? timing.allowLateSubmission : details?.allowLateSubmission === true;
+    const deadlineMs = timing ? parseServerDate(timing.deadline)?.getTime() ?? null
+        : details?.timeLimitMinutes && sessionData?.startedAt
+            ? parseServerDate(sessionData.startedAt).getTime() + details.timeLimitMinutes * 60000 : null;
 
     useEffect(() => {
-        if (!details?.timeLimitMinutes || !sessionData?.startedAt) return;
-        
-        const startTimeMs = parseServerDate(sessionData.startedAt).getTime();
-        const limitMs = details.timeLimitMinutes * 60 * 1000;
-        const exactDeadline = startTimeMs + limitMs;
-        
-        const timer = setInterval(() => {
-            const remaining = exactDeadline - Date.now();
+        if (deadlineMs === null || showSummary) return;
+        const tick = async () => {
+            const remaining = deadlineMs - (Date.now() + serverOffset);
             setTimeLeft(remaining);
-
-            if (remaining <= 0 && !isAutoSubmitting.current && !allowLate) {
-                clearInterval(timer);
-                isAutoSubmitting.current = true;
-                handleAutoSubmit();
+            if (remaining <= 0 && !isAutoSubmitting.current && !allowLate && !expiryCheckPending.current && Date.now() >= nextExpiryCheck.current) {
+                expiryCheckPending.current = true;
+                try {
+                    // Recheck with the server before submitting: a teacher may just have extended the attempt.
+                    if (sessionData?.timing) {
+                        const fresh = await readTiming();
+                        if (fresh.finished || fresh.allowLateSubmission || !fresh.deadline
+                            || parseServerDate(fresh.deadline).getTime() > parseServerDate(fresh.serverNow).getTime()) return;
+                    }
+                    isAutoSubmitting.current = true;
+                    latestAutoSubmit.current?.();
+                } catch {
+                    setTimingError('A lejárat szerveroldali ellenőrzése nem sikerült. A válaszaid megmaradnak, újrapróbáljuk.');
+                    nextExpiryCheck.current = Date.now() + 5000;
+                } finally { expiryCheckPending.current = false; }
             }
-        }, 1000);
-        
+        };
+        const timer = setInterval(tick, 1000);
         return () => clearInterval(timer);
-    }, [details, sessionData, allowLate]);
+    }, [deadlineMs, serverOffset, showSummary, allowLate, sessionData?.timing, readTiming]);
 
-    /**
-     * Formats the remaining time in milliseconds into a readable MM:SS format.
-     */
-    const formatTimeLeft = (ms) => {
-        const isNegative = ms < 0;
-        const absMs = Math.abs(ms);
-        const totalSeconds = Math.floor(absMs / 1000);
-        const m = Math.floor(totalSeconds / 60);
-        const s = totalSeconds % 60;
-        const formatted = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        return isNegative ? `+${formatted}` : formatted;
-    };
 
     /**
      * Evaluates the current answer or progresses to the next question based on the assignment's rules.
@@ -99,6 +137,8 @@ const AssignmentPlayer = () => {
      * @function handleCheckOrNext
      */
     const handleCheckOrNext = async () => {
+        if (isChecking || isSubmitting || !currentAnswer.trim()) return;
+        setCheckError(null);
         
         // 1. Strict test mode (no feedback, no retries) -> Immediate progression
         if (!hasFeedback && !allowRetries) {
@@ -151,7 +191,7 @@ const AssignmentPlayer = () => {
 
         } catch (err) {
             console.error("Hiba az ellenőrzés során:", err);
-            finalizeAnswerAndMove();
+            setCheckError('Nem sikerült ellenőrizni a választ. A válaszod megmaradt, próbáld újra.');
         } finally {
             setIsChecking(false);
         }
@@ -195,9 +235,20 @@ const AssignmentPlayer = () => {
      * Handles automatic submission when the countdown timer reaches zero.
      */
     const handleAutoSubmit = () => {
-        alert("Az időd lejárt! A rendszer automatikusan beküldi az eddigi válaszaidat.");
-        submitAssignment(collectedAnswers);
+        setTimingNotice('Az idő lejárt. A rendszer beküldi az eddigi válaszaidat.');
+        const answers = [...collectedAnswers];
+        const current = exercises[currentIndex];
+        if (current && currentAnswer.trim()) {
+            const index = answers.findIndex(a => a.exerciseId === current.exerciseId);
+            const answer = { exerciseId: current.exerciseId, answer: currentAnswer.trim(), retried: index >= 0 };
+            if (index >= 0) answers[index] = answer;
+            else answers.push(answer);
+        }
+        submitAssignment(answers);
     };
+
+    // The timer always uses the latest answers rather than the closure from its first tick.
+    useEffect(() => { latestAutoSubmit.current = handleAutoSubmit; });
 
     /**
      * Submits the compiled array of answers to the backend API.
@@ -221,7 +272,8 @@ const AssignmentPlayer = () => {
             setShowSummary(true);
             
            } catch (error) {
-            alert("Nem sikerült beküldeni a tesztet. Kérlek, ellenőrizd a kapcsolatod!", error);
+            console.error('Nem sikerült beküldeni a tesztet.', error);
+            setSubmissionError('Nem sikerült beküldeni a tesztet. Ellenőrizd a kapcsolatod, majd próbáld újra.');
         } finally {
             setIsSubmitting(false);
         }
@@ -233,7 +285,7 @@ const AssignmentPlayer = () => {
     const progressPercentage = (currentIndex / exercises.length) * 100;
     
     // Disable inputs while verifying or if a definitive feedback is shown
-    const isInputDisabled = isSubmitting || (hasFeedback && feedback && feedback.type !== 'warning');
+    const isInputDisabled = isChecking || isSubmitting || !!(hasFeedback && feedback && feedback.type !== 'warning');
 
     // --- DYNAMIC BUTTON TEXT ---
     let buttonText = 'Ellenőrzés';
@@ -267,8 +319,8 @@ const AssignmentPlayer = () => {
             <div className="min-vh-100 pb-5 text-light d-flex align-items-center bg-darker animate-fade-in">
                 <Container>
                     <Card className="text-center p-5 bg-dark text-light border-success shadow-lg" style={{ maxWidth: '600px', margin: '0 auto' }}>
-                        <div className="display-1 mb-4">🎉</div>
-                        <h2 className="fw-bold text-success mb-3">Sikeres Beküldés!</h2>
+                        <div aria-hidden="true" className="display-1 mb-4">🎉</div>
+                        <h1 ref={headingRef} tabIndex={-1} className="h2 fw-bold text-success mb-3">Sikeres Beküldés!</h1>
                         <p className="fs-5 text-secondary mb-4">
                             A válaszaidat rögzítettük. Az eredményedet a tanári értékelés után tekintheted meg az osztályteremben!
                         </p>
@@ -286,28 +338,33 @@ const AssignmentPlayer = () => {
         );
     }
 
+    const TaskHeading = 'h1';
     return (
         <div className="min-vh-100 pb-5 text-light d-flex align-items-center">
             <Container>
                 {/* Header Section */}
+                <div aria-live="polite" aria-atomic="true">{timingNotice}</div>
                 <div className="mb-4">
                     <div className="d-flex justify-content-between align-items-center mb-2 fw-bold text-light opacity-75 small">
-                        <span style={{ width: '60px' }}>{currentIndex + 1} / {exercises.length}</span>
-                        {timeLeft !== null && (
-                            <span className={`fs-6 px-3 py-1 bg-dark rounded-pill border ${timeLeft < 0 ? 'border-danger text-light bg-danger' : (timeLeft < 60000 ? 'border-danger text-danger' : 'border-secondary text-info')}`}>
-                                ⏱️ {timeLeft < 0 ? 'Túllépés: ' : ''}{formatTimeLeft(timeLeft)}
+                        <span style={{ width: '60px' }}><span aria-hidden="true">{currentIndex + 1} / {exercises.length}</span><span lang="hu" className="visually-hidden">{currentIndex + 1}. feladat, összesen {exercises.length}.</span></span>
+                        {deadlineMs !== null && timeLeft !== null && (
+                            <span role="timer" aria-live="off" aria-labelledby="assignment-time-left" className={`fs-6 px-3 py-1 bg-dark rounded-pill border ${timeLeft < 0 ? 'border-danger text-light bg-danger' : (timeLeft < 60000 ? 'border-danger text-danger' : 'border-secondary text-info')}`}>
+                                <span aria-hidden="true">⏱️ {timeLeft < 0 ? 'Túllépés: ' : ''}</span><DurationText id="assignment-time-left" seconds={timeLeft / 1000} overtime={timeLeft < 0} label={timeLeft < 0 ? 'Időtúllépés' : 'Hátralévő idő'} />
                             </span>
                         )}
                         <span className="text-end" style={{ width: '60px' }}>{Math.round(progressPercentage)}%</span>
                     </div>
-                    <ProgressBar now={progressPercentage} variant="info" style={{ height: '10px', backgroundColor: '#333' }} className="rounded-pill border border-secondary" />
+                    <ProgressBar style={{ height: '10px', backgroundColor: '#333' }} className="rounded-pill border border-secondary">
+                        <ProgressBar aria-label="Feladatsor előrehaladása" now={progressPercentage} variant="info" />
+                    </ProgressBar>
                 </div>
 
                 <Card className="shadow-lg border-0 bg-dark text-light">
                     <Card.Body className="p-4 p-md-5 text-center">
-                        <h4 className="mb-4 text-info fw-bold d-flex justify-content-center align-items-center gap-2">
-                            {isTest ? '📝 Tesztkérdés' : '🧠 Gyakorló feladat'}
-                        </h4>
+                        <TaskHeading id="assignment-task-instruction" lang="hu" ref={headingRef} tabIndex={0} className="h4 mb-4 text-body fw-bold d-flex justify-content-center align-items-center gap-2">
+                            {currentExercise.type === 'WORD_BANK' ? 'Rakd sorba a szavakat' : currentExercise.type === 'MULTIPLE_CHOICE' ? 'Válaszd ki a helyes opciót' : currentExercise.type === 'IMAGE_CHOICE' ? 'Válaszd ki a képhez illő szót' : 'Fordítás'}
+                            <span className="visually-hidden">. {currentIndex + 1}. feladat, összesen {exercises.length}.</span>
+                        </TaskHeading>
 
                         {currentExercise.content?.question && (
                             (() => {
@@ -320,29 +377,26 @@ const AssignmentPlayer = () => {
 
                                 return (
                                     <div className="mb-4 text-center">
-                                        <div className="fs-4 fw-bold p-3 border border-secondary rounded bg-black bg-opacity-25 mx-auto" style={{ color: '#0dcaf0', maxWidth: '800px' }}>
-                                            {showDictionary ? (
+                                        <h2 tabIndex={0} lang={currentExercise.content?.questionLang || 'hu'} className="fs-4 fw-bold p-3 border border-secondary rounded bg-black bg-opacity-25 mx-auto text-body" style={{ maxWidth: '800px' }}>
                                                 <ClickableText 
                                                     text={cleanQuestion} 
+                                                    lang={currentExercise.content?.questionLang}
+                                                    languageParts={currentExercise.content?.questionParts}
+                                                    disabled={!showDictionary}
                                                     source="LESSON" 
                                                     hint={currentExercise.content.hint} 
+                                                    hintDirection={currentExercise.content.hintDirection}
                                                 />
-                                            ) : (
-                                                <span>{cleanQuestion}</span>
-                                            )}
-                                        </div>
+                                        </h2>
+                                        {showDictionary && <p lang="hu" className="small text-body-secondary mt-3">Az aláhúzott szavak fordítása Enterrel vagy Szóközzel megnyitható.</p>}
 
                                         {showHint && (
-                                            <div className="d-inline-block text-start mt-2 px-3 py-2 rounded shadow-sm" style={{ backgroundColor: 'rgba(13, 202, 240, 0.1)', borderLeft: '4px solid #0dcaf0' }}>
-                                                <span className="small text-info fw-bold text-uppercase" style={{ letterSpacing: '1px' }}>
+                                            <div tabIndex={0} role="note" aria-labelledby="assignment-hint-title" aria-describedby="assignment-hint-content" className="d-inline-block text-start mt-2 px-3 py-2 rounded shadow-sm" style={{ backgroundColor: 'rgba(13, 202, 240, 0.1)', borderLeft: '4px solid #0dcaf0' }}>
+                                                <span id="assignment-hint-title" lang="hu" className="small text-info fw-bold text-uppercase" style={{ letterSpacing: '1px' }}>
                                                     <i className="bi bi-lightbulb me-2 text-warning"></i>Tipp a fordításhoz
                                                 </span>
-                                                <div className="mt-1 small fw-medium" style={{ color: '#e0e0e0' }}>
-                                                    {currentExercise.content.hint.split(',').map((pair, idx) => (
-                                                        <span key={idx} className="me-3 d-inline-block">
-                                                            {pair.trim()}
-                                                        </span>
-                                                    ))}
+                                                <div id="assignment-hint-content" className="mt-1 small fw-medium text-body">
+                                                    <TranslationHint content={currentExercise.content} />
                                                 </div>
                                             </div>
                                         )}
@@ -356,21 +410,23 @@ const AssignmentPlayer = () => {
                         {currentExercise.type === 'WORD_BANK' && <WordBankExercise data={currentExercise.content} currentAnswer={currentAnswer} onAnswer={setCurrentAnswer} disabled={isInputDisabled} />}
                         {currentExercise.type === 'MULTIPLE_CHOICE' && <MultipleChoiceExercise data={currentExercise.content} currentAnswer={currentAnswer} onAnswer={setCurrentAnswer} disabled={isInputDisabled} />}
                         {currentExercise.type === 'TRANSLATION' && (
-                            <Form.Group className="mb-5 text-start">
-                                <Form.Control as="textarea" rows={3} placeholder="Írd be a választ..." value={currentAnswer} onChange={(e) => setCurrentAnswer(e.target.value)} className="fs-5 bg-dark text-light border-secondary shadow-none" autoFocus disabled={isInputDisabled} />
+                            <Form.Group className="mb-5 text-start" controlId="assignment-answer">
+                                <Form.Label id="assignment-answer-label" lang="hu">Válaszod</Form.Label>
+                                <Form.Control as="textarea" rows={3} aria-labelledby="assignment-answer-label" lang={currentExercise.content?.answerLang} value={currentAnswer} onChange={(e) => setCurrentAnswer(e.target.value)} className="fs-5 bg-dark text-light border-secondary shadow-none" disabled={isInputDisabled} />
                             </Form.Group>
                         )}
 
                         {/* VISUAL FEEDBACK */}
-                        {feedback && hasFeedback && (
-                            <Alert variant={feedback.type} className="mt-4 fw-bold text-start fs-5 border-0 shadow-sm transition-all">
-                                {feedback.msg}
-                            </Alert>
-                        )}
+                        <LearningFeedback feedback={hasFeedback ? feedback : null} error={isSubmitting ? null : checkError || submissionError || timingError} />
+                        {submissionError && <Button autoFocus variant="outline-danger" aria-disabled={isSubmitting}
+                            aria-busy={isSubmitting} onClick={() => { if (!isSubmitting) submitAssignment(collectedAnswers); }}>
+                            {isSubmitting ? 'Beküldés folyamatban...' : 'Beadás újrapróbálása'}
+                        </Button>}
                         
                         <div className="d-flex justify-content-end mt-5">
-                            <Button variant={buttonVariant} className="px-5 fw-bold text-dark" onClick={handleCheckOrNext} disabled={currentAnswer.trim().length === 0 || isChecking || isSubmitting}>
-                                {(isChecking || isSubmitting) ? <Spinner size="sm" animation="border" /> : buttonText}
+                            <Button variant={buttonVariant} className="px-5 fw-bold" onClick={handleCheckOrNext} disabled={currentAnswer.trim().length === 0 && !isSubmitting}
+                                aria-disabled={isChecking || isSubmitting || !currentAnswer.trim()} aria-busy={isChecking || isSubmitting}>
+                                {(isChecking || isSubmitting) ? <><Spinner size="sm" animation="border" aria-hidden="true" /> {isSubmitting ? 'Beküldés folyamatban...' : 'Ellenőrzés folyamatban...'}</> : buttonText}
                             </Button>
                         </div>
                     </Card.Body>

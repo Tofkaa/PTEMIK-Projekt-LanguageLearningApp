@@ -57,8 +57,8 @@ const VocabularyHub = () => {
     if (isLoading) {
         return (
             <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-light">
-                <Spinner animation="border" variant="info" className="mb-3" />
-                <h5>Szószedet betöltése...</h5>
+                <Spinner animation="border" variant="info" className="mb-3" aria-hidden="true" />
+                <h1 className="h5">Szószedet betöltése...</h1>
             </div>
         );
     }
@@ -68,17 +68,17 @@ const VocabularyHub = () => {
             {/* Header & Practice Triggers */}
             <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
                 <div>
-                    <h2 className="fw-bold mb-1">📖 Szótár Hub & Tudástár</h2>
+                    <h1 className="h2 fw-bold mb-1"><span aria-hidden="true">📖</span> Szótár Hub & Tudástár</h1>
                     <p className="text-light opacity-75 mb-0">Tekintsd át az összes eddig elsajátított szavad és SRS fejlődésed.</p>
                 </div>
-                <div className="d-flex gap-3">
+                <div className="d-flex flex-wrap gap-3">
                     <Button 
                         variant="outline-info" 
                         size="lg" 
                         className="fw-bold rounded-pill px-4 shadow-sm"
                         onClick={() => navigate('/vocabulary/flashcards')}
                     >
-                        🃏 Szabad Gyakorlás
+                        <span aria-hidden="true">🃏</span> Szabad Gyakorlás
                     </Button>
                     <Button 
                         variant="info" 
@@ -86,7 +86,7 @@ const VocabularyHub = () => {
                         className="fw-bold text-dark rounded-pill px-4 shadow-sm"
                         onClick={() => navigate('/vocabulary/practice')}
                     >
-                        ⚡ Dinamikus Teszt
+                        <span aria-hidden="true">⚡</span> Dinamikus Teszt
                     </Button>
                 </div>
             </div>
@@ -95,7 +95,9 @@ const VocabularyHub = () => {
             <Card className="bg-dark border-secondary shadow-lg mb-4 rounded-4 p-3">
                 <Row className="g-3 align-items-center">
                     <Col md={8}>
+                        <Form.Label htmlFor="vocabulary-search">Keresés szó vagy jelentés alapján</Form.Label>
                         <Form.Control 
+                            id="vocabulary-search"
                             type="text"
                             placeholder="Keresés szó vagy jelentés alapján..."
                             value={searchTerm}
@@ -104,7 +106,9 @@ const VocabularyHub = () => {
                         />
                     </Col>
                     <Col md={4}>
+                        <Form.Label htmlFor="vocabulary-filter">Tanulási állapot</Form.Label>
                         <Form.Select 
+                            id="vocabulary-filter"
                             value={filterLevel}
                             onChange={(e) => setFilterLevel(e.target.value)}
                             className="bg-black text-light border-secondary shadow-none"
@@ -132,7 +136,7 @@ const VocabularyHub = () => {
                         {filteredVocabulary.length > 0 ? (
                             filteredVocabulary.map((item, idx) => (
                                 <tr key={idx} className="border-secondary">
-                                    <td className="text-start ps-4 fw-bold text-info">{item.word}</td>
+                                    <td className="text-start ps-4 fw-bold app-accent-text">{item.word}</td>
                                     <td className="text-start text-light opacity-90">{item.translation}</td>
                                     <td>
                                         <Badge bg={getSrsBadgeVariant(item.srsLevel)} className="px-3 py-2 rounded-pill">

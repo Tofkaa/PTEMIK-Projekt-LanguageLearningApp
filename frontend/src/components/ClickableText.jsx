@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
 import SmartWord from './SmartWord';
+import LanguageText from './LanguageText';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -26,24 +27,28 @@ const STOP_WORDS = new Set([
  * @param {string} text - The raw text (question) to be processed.
  * @param {boolean} disabled - If true, disables clickability (e.g., in test mode).
  * @param {string} source - Context for the backend (e.g., 'LESSON').
- * @param {string} hint - Optional, preloaded translation pairs (e.g., "apple=alma,pear=körte").
+ * @param {string} hint - Optional translation pairs; new content uses Hungarian → target language.
+ * @param {string} hintDirection - hu-to-target for new hints; absent for legacy target → Hungarian hints.
  * @param {function} onWordClick - Callback triggered when the student clicks a SmartWord.
  * @param {function} onWordsFound - Callback that passes all clickable English words to the parent.
  */
-const ClickableText = ({ text, disabled = false, source = 'LESSON', hint = '', onWordClick, onWordsFound }) => {
-    const { vocabularyMap } = useAuth(); 
+const ClickableText = ({ text, disabled = false, source = 'LESSON', hint = '', hintDirection, onWordClick, onWordsFound, lang, languageParts }) => {
+    const { vocabularyMap, user } = useAuth();
+    const wordLanguage = lang || user?.activeCourseCode;
 
     // Process string hints received from the backend into a fast-lookup object
     const hintMap = useMemo(() => {
         const map = {};
         if (hint) {
             hint.split(',').forEach(pair => {
-                const [en, hu] = pair.split('=').map(s => s.trim().toLowerCase());
-                if (en && hu) map[en] = hu;
+                const [left, right] = pair.split('=').map(s => s.trim().toLowerCase());
+                if (!left || !right) return;
+                const [target, native] = hintDirection === 'hu-to-target' ? [right, left] : [left, right];
+                map[target] = native;
             });
         }
         return map;
-    }, [hint]);
+    }, [hint, hintDirection]);
 
     // Tokenization (splitting and analysis) of the text
     const tokens = useMemo(() => {
@@ -94,8 +99,20 @@ const ClickableText = ({ text, disabled = false, source = 'LESSON', hint = '', o
             }
         });
 
+        // Explicit author-supplied spans must reproduce the question exactly; never guess a quoted word's language.
+        const declaredParts = Array.isArray(languageParts) && languageParts.every(p => typeof p?.text === 'string' && typeof p?.lang === 'string')
+            && languageParts.map(p => p.text).join('') === text ? languageParts : [];
+        let position = 0;
+        const ranges = declaredParts.map(p => { const start = position; position += p.text.length; return { ...p, start, end: position }; });
+        position = 0;
+        result = result.map(token => {
+            const start = position; position += token.text.length;
+            const tokenLang = ranges.find(p => p.start <= start && p.end >= position)?.lang || wordLanguage;
+            return { ...token, lang: tokenLang, isClickable: token.isClickable && tokenLang !== 'hu' };
+        });
+        validWords = result.filter(token => token.isClickable).map(token => token.cleanWord);
         return { result, validWords };
-    }, [text, hintMap, vocabularyMap]);
+    }, [text, hintMap, vocabularyMap, languageParts, wordLanguage]);
 
     // Notify the parent component (LessonPlayer) about the found valid English words.
     // This will be used to send the Auto-Add batch request to the backend.
@@ -105,13 +122,16 @@ const ClickableText = ({ text, disabled = false, source = 'LESSON', hint = '', o
         }
     }, [tokens.validWords, onWordsFound]);
 
+    if (disabled) return <LanguageText text={text} lang={wordLanguage} parts={languageParts} />;
+
     return (
-        <>
+        <span lang={wordLanguage}>
             {tokens.result.map(token => {
                 if (token.isClickable) {
                     return (
                         <SmartWord 
-                            key={token.id} 
+                            key={`${token.id}-${token.cleanWord}-${token.preloaded || ''}-${wordLanguage || ''}`}
+                            lang={token.lang}
                             word={token.text} 
                             queryWord={token.cleanWord} 
                             disabled={disabled} 
@@ -121,9 +141,9 @@ const ClickableText = ({ text, disabled = false, source = 'LESSON', hint = '', o
                         />
                     );
                 }
-                return <span key={token.id}>{token.text}</span>;
+                return <span key={token.id} lang={token.lang}>{token.text}</span>;
             })}
-        </>
+        </span>
     );
 };
 

@@ -1,8 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Container, Card, Button, ProgressBar, Spinner, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api.jsx';
 import { useNotifications } from '../context/NotificationContext.jsx';
+import MultipleChoiceExercise from '../components/exercises/MultipleChoiceExercise';
+import WordBankExercise from '../components/exercises/WordBankExercise';
+import LearningFeedback from '../components/LearningFeedback';
+import useStageFocus from '../hooks/useStageFocus';
+import LanguageText from '../components/LanguageText';
 
 const VocabularyPractice = () => {
     const navigate = useNavigate();
@@ -18,6 +23,10 @@ const VocabularyPractice = () => {
     const [startTime] = useState(Date.now());
     const [isCompleted, setIsCompleted] = useState(false);
     const [sessionSummary, setSessionSummary] = useState(null);
+    const [saveError, setSaveError] = useState(null);
+    const actionRef = useRef(null);
+    const headingRef = useStageFocus(isLoading ? 'loading' : error ? 'error'
+        : isCompleted ? 'result' : exercises.length ? `question-${currentIndex}` : 'empty');
 
     useEffect(() => {
         const fetchDynamicExercises = async () => {
@@ -39,7 +48,9 @@ const VocabularyPractice = () => {
         fetchDynamicExercises();
     }, []);
 
-    const handleCheckAnswer = async () => {
+    const handleCheckAnswer = () => {
+        if (feedback || isChecking || !currentAnswer.trim()) return;
+        actionRef.current?.focus();
         const currentEx = exercises[currentIndex];
         const userClean = currentAnswer.trim().toLowerCase();
         const correctClean = currentEx.correctAnswer.trim().toLowerCase();
@@ -47,48 +58,46 @@ const VocabularyPractice = () => {
         const isCorrect = userClean === correctClean;
 
         if (isCorrect) {
-            setFeedback({ type: 'success', msg: 'Tökéletes! ✅' });
+            setFeedback({ type: 'success', msg: <>Tökéletes! <span aria-hidden="true">✅</span></> });
         } else {
-            setFeedback({ type: 'danger', msg: `Helytelen! A helyes válasz: ${currentEx.correctAnswer} ❌` });
+            setFeedback({ type: 'danger', msg: <>Helytelen! A helyes válasz: <span lang={currentEx.answerLang || 'hu'}>{currentEx.correctAnswer}</span> <span aria-hidden="true">❌</span></> });
         }
 
-       const updatedResults = [...results, { targetWord: currentEx.targetWord, correct: isCorrect }];
-        setResults(updatedResults);
+        setResults(prev => [...prev, { targetWord: currentEx.targetWord, correct: isCorrect }]);
+    };
 
+    const handleNext = async () => {
+        if (!feedback || isChecking) return;
+        if (currentIndex < exercises.length - 1) {
+            setCurrentIndex(prev => prev + 1);
+            setCurrentAnswer('');
+            setFeedback(null);
+            return;
+        }
         setIsChecking(true);
-        
-        setTimeout(async () => {
-            if (currentIndex < exercises.length - 1) {
-                setCurrentIndex(prev => prev + 1);
-                setCurrentAnswer('');
-                setFeedback(null);
-                setIsChecking(false);
-            } else {
-                try {
-                    const timeTaken = Math.floor((Date.now() - startTime) / 1000);
-                    const response = await api.post('/vocabulary/practice/submit', {
-                        results: updatedResults,
-                        timeTakenSeconds: timeTaken
-                    });
-                    setSessionSummary(response.data); 
-                    if (refreshNotifications) {
-                        refreshNotifications();
-                    }
-                } catch (err) {
-                    console.error("Hiba az eredmények mentésekor:", err);
-                } finally {
-                    setIsChecking(false);
-                    setIsCompleted(true);
-                }
-            }
-        }, 1500);
+        setSaveError(null);
+        try {
+            const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+            const response = await api.post('/vocabulary/practice/submit', {
+                results,
+                timeTakenSeconds: timeTaken
+            });
+            setSessionSummary(response.data);
+            setIsCompleted(true);
+            refreshNotifications?.();
+        } catch (err) {
+            console.error('Hiba az eredmények mentésekor:', err);
+            setSaveError('Nem sikerült menteni az eredményeket. A válaszaid megmaradtak, próbáld újra a mentést.');
+        } finally {
+            setIsChecking(false);
+        }
     };
 
     if (isLoading) {
         return (
             <div className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-light">
                 <Spinner animation="border" variant="info" className="mb-3" />
-                <h5>Dinamikus gyakorlás generálása...</h5>
+                <h1 ref={headingRef} tabIndex={-1} className="h5">Dinamikus gyakorlás generálása...</h1>
             </div>
         );
     }
@@ -96,8 +105,8 @@ const VocabularyPractice = () => {
     if (error) {
         return (
             <Container className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-center text-light">
-                <h3 className="text-danger mb-4">{error}</h3>
-                <Button variant="outline-light" onClick={() => navigate('/dashboard')}>Vissza a Dashboardra</Button>
+                <h1 ref={headingRef} tabIndex={-1} className="h3 text-danger mb-4">{error}</h1>
+                <Button variant="outline-secondary" onClick={() => navigate('/dashboard')}>Vissza a Dashboardra</Button>
             </Container>
         );
     }
@@ -105,8 +114,8 @@ const VocabularyPractice = () => {
     if (exercises.length === 0) {
         return (
             <Container className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-center text-light">
-                <div className="mb-4" style={{ fontSize: '4rem' }}>🎉</div>
-                <h2 className="fw-bold mb-3">Nincs elég szó a gyakorláshoz!</h2>
+                <div aria-hidden="true" className="mb-4" style={{ fontSize: '4rem' }}>🎉</div>
+                <h1 ref={headingRef} tabIndex={-1} className="h2 fw-bold mb-3">Nincs elég szó a gyakorláshoz!</h1>
                 <p className="text-light opacity-75 mb-4">
                     Gyűjts még szavakat a leckékből vagy a szótárból, hogy indíthass egy dinamikus sessiont.
                 </p>
@@ -120,23 +129,26 @@ const VocabularyPractice = () => {
     if (isCompleted) {
         return (
             <Container className="min-vh-100 d-flex flex-column justify-content-center align-items-center text-center text-light">
-                <div className="mb-4" style={{ fontSize: '4rem' }}>🧠</div>
-                <h2 className="fw-bold mb-3 text-success">Dinamikus gyakorlás teljesítve!</h2>
+                <div aria-hidden="true" className="mb-4" style={{ fontSize: '4rem' }}>🧠</div>
+                <h1 ref={headingRef} tabIndex={-1} className="h2 fw-bold mb-3">Dinamikus gyakorlás teljesítve!</h1>
                 
                 {sessionSummary ? (
                     <div className="bg-dark p-4 rounded-4 border border-secondary mb-4 w-100 shadow-lg" style={{ maxWidth: '400px' }}>
-                        <h4 className="text-info fw-bold mb-4">Eredmények</h4>
+                        <h2 className="h4 text-info fw-bold mb-4">Eredmények</h2>
                         <p className="fs-5 mb-2 d-flex justify-content-between">
-                            <span>✅ Helyes:</span> 
-                            <span className="text-success fw-bold">{sessionSummary.correctCount} / {sessionSummary.totalQuestions}</span>
+                            <span><span aria-hidden="true">✅</span> Helyes:</span>
+                            <span className="text-success fw-bold">
+                                <span aria-hidden="true">{sessionSummary.correctCount} / {sessionSummary.totalQuestions}</span>
+                                <span lang="hu" className="visually-hidden">{sessionSummary.totalQuestions} feladatból {sessionSummary.correctCount} helyes válasz</span>
+                            </span>
                         </p>
                         <p className="fs-5 mb-2 d-flex justify-content-between">
-                            <span>⭐ Szerzett XP:</span> 
+                            <span><span aria-hidden="true">⭐</span> Szerzett XP:</span>
                             <span className="text-warning fw-bold">+{sessionSummary.earnedXp}</span>
                         </p>
                         <hr className="border-secondary" />
                         <p className="fs-5 mb-0 d-flex justify-content-between">
-                            <span>🔥 Napi Streak:</span> 
+                            <span><span aria-hidden="true">🔥</span> Napi Streak:</span>
                             <span className="text-danger fw-bold">{sessionSummary.newStreak} nap</span>
                         </p>
                     </div>
@@ -163,7 +175,10 @@ const VocabularyPractice = () => {
                 {/* Progress bar */}
                 <div className="w-100 mb-4" style={{ maxWidth: '600px' }}>
                     <div className="d-flex justify-content-between align-items-center mb-2 fw-bold text-light opacity-75 small">
-                        <span>Feladat: {currentIndex + 1} / {exercises.length}</span>
+                        <span>
+                            <span aria-hidden="true">Feladat: {currentIndex + 1} / {exercises.length}</span>
+                            <span lang="hu" className="visually-hidden">{currentIndex + 1}. feladat, összesen {exercises.length}.</span>
+                        </span>
                         <span className="text-uppercase text-info">{currentEx.type}</span>
                     </div>
                     <ProgressBar 
@@ -171,69 +186,43 @@ const VocabularyPractice = () => {
                         variant="info" 
                         style={{ height: '10px', backgroundColor: '#333' }} 
                         className="rounded-pill border border-secondary" 
-                    />
+                    >
+                        <ProgressBar aria-label="Szókincsgyakorlás előrehaladása" now={progressPercentage} variant="info" />
+                    </ProgressBar>
                 </div>
 
                 {/* Card container */}
                 <Card className="shadow-lg border-0 bg-dark text-light rounded-4 w-100 mb-4 p-4 text-center" style={{ maxWidth: '600px' }}>
                     <Card.Body>
-                        <h4 className="fw-bold text-light mb-4">{currentEx.question}</h4>
+                        <h1 ref={headingRef} tabIndex={-1} className="h4 fw-bold text-body mb-4">
+                            <span lang="hu" className="visually-hidden">{currentEx.type === 'MULTIPLE_CHOICE' ? 'Válaszd ki a helyes opciót' : currentEx.type === 'WORD_BANK' ? 'Rakd sorba a szavakat' : 'Fordítás'}. {currentIndex + 1}. feladat, összesen {exercises.length}. </span>
+                            <LanguageText text={currentEx.question} lang={currentEx.questionLang || 'hu'} parts={currentEx.questionParts} />
+                        </h1>
 
                         {/* RENDER BASED ON EXERCISE TYPE */}
                         {currentEx.type === 'MULTIPLE_CHOICE' && (
-                            <div className="d-grid gap-3 my-4">
-                                {currentEx.options.map((opt, idx) => (
-                                    <Button 
-                                        key={idx}
-                                        variant={currentAnswer === opt ? "info" : "outline-secondary"}
-                                        className="py-3 fw-bold rounded-pill text-light"
-                                        onClick={() => setCurrentAnswer(opt)}
-                                        disabled={isChecking || feedback}
-                                    >
-                                        {opt}
-                                    </Button>
-                                ))}
-                            </div>
+                            <MultipleChoiceExercise data={{ options: currentEx.options, answerLang: currentEx.answerLang || 'hu' }} currentAnswer={currentAnswer}
+                                onAnswer={setCurrentAnswer} disabled={isChecking || !!feedback} />
                         )}
 
                         {currentEx.type === 'WORD_BANK' && (
                             <div className="my-4">
-                                <div className="d-flex flex-wrap justify-content-center gap-2 mb-4">
-                                    {currentEx.options.map((word, idx) => (
-                                        <Button 
-                                            key={idx} 
-                                            variant="outline-info" 
-                                            className="fw-bold px-3 py-2 rounded-pill"
-                                            onClick={() => setCurrentAnswer(prev => prev ? `${prev} ${word}` : word)}
-                                            disabled={isChecking || feedback}
-                                        >
-                                            {word}
-                                        </Button>
-                                    ))}
-                                </div>
-                                <Form.Control 
-                                    type="text" 
-                                    readOnly 
-                                    value={currentAnswer} 
-                                    placeholder="Kattints a szavakra fent..." 
-                                    className="bg-black text-info text-center fw-bold fs-5 border-secondary"
-                                />
-                                <div className="mt-2">
-                                    <Button size="sm" variant="outline-danger" onClick={() => setCurrentAnswer('')}>Törlés</Button>
-                                </div>
+                                <WordBankExercise data={{ options: currentEx.options, answerLang: currentEx.answerLang }} currentAnswer={currentAnswer}
+                                    onAnswer={setCurrentAnswer} disabled={isChecking || !!feedback} />
                             </div>
                         )}
 
                         {currentEx.type === 'TRANSLATION' && (
-                            <Form.Group className="my-4">
+                            <Form.Group className="my-4" controlId="vocabulary-answer">
+                                <Form.Label id="vocabulary-answer-label" lang="hu">Válaszod</Form.Label>
                                 <Form.Control 
                                     type="text"
-                                    placeholder="Írd be a fordítást..."
+                                    aria-labelledby="vocabulary-answer-label"
                                     value={currentAnswer}
                                     onChange={(e) => setCurrentAnswer(e.target.value)}
                                     className="bg-black text-info text-center fs-4 py-3 rounded-pill border-secondary shadow-none fw-bold"
-                                    autoFocus
-                                    disabled={isChecking || feedback}
+                                    lang={currentEx.answerLang || 'hu'}
+                                    disabled={isChecking || !!feedback}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && currentAnswer.trim() && !isChecking) {
                                             handleCheckAnswer();
@@ -243,27 +232,25 @@ const VocabularyPractice = () => {
                             </Form.Group>
                         )}
 
-                        {feedback && (
-                            <div className={`mt-3 p-3 rounded-3 fw-bold fs-5 bg-${feedback.type} bg-opacity-25 border border-${feedback.type}`}>
-                                {feedback.msg}
-                            </div>
-                        )}
+                        <LearningFeedback feedback={feedback} error={saveError} />
                     </Card.Body>
                 </Card>
 
                 {/* Action button */}
                 <div className="w-100 d-flex flex-column gap-3" style={{ maxWidth: '600px' }}>
-                    {!feedback && (
                         <Button 
+                            ref={actionRef}
                             variant="info" 
                             size="lg" 
                             className="rounded-pill fw-bold py-3 text-dark shadow-sm"
-                            onClick={handleCheckAnswer}
-                            disabled={!currentAnswer.trim() || isChecking}
+                            onClick={feedback ? handleNext : handleCheckAnswer}
+                            disabled={!feedback && !currentAnswer.trim()}
+                            aria-disabled={isChecking || (!feedback && !currentAnswer.trim())} aria-busy={isChecking}
                         >
-                            {isChecking ? <Spinner size="sm" animation="border" /> : 'Ellenőrzés'}
+                            {isChecking ? <><Spinner size="sm" animation="border" aria-hidden="true" /> Mentés folyamatban...</>
+                                : !feedback ? 'Ellenőrzés' : saveError ? 'Mentés újrapróbálása'
+                                : currentIndex < exercises.length - 1 ? 'Következő feladat' : 'Befejezés és mentés'}
                         </Button>
-                    )}
                     <Button 
                         variant="link" 
                         className="text-secondary text-decoration-none" 
