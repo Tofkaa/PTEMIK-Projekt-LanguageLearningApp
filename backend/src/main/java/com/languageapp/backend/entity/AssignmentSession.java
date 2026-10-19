@@ -47,4 +47,9 @@ public class AssignmentSession {
     @Column(name = "raw_answers", columnDefinition = "TEXT")
     private String rawAnswers;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean timingInitialized;
+    private Integer effectiveTimeLimitMinutes;
+    private Instant effectiveAvailableUntil;
+
 }

@@ -30,6 +30,7 @@ class NotificationAssignmentTimeTest {
     @Mock private ChallengeRepository challengeRepository;
     @Mock private ClassroomAssignmentRepository assignmentRepository;
     @Mock private AssignmentSessionRepository sessionRepository;
+    @Mock private AssignmentAccommodationRepository accommodationRepository;
     @Mock private ClassroomMemberRepository classroomMemberRepository;
     @Mock private StudentVocabularyRepository studentVocabularyRepository;
     @Mock private SseService sseService;

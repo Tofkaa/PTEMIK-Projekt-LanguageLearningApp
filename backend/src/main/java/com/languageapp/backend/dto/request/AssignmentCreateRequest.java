@@ -2,6 +2,7 @@ package com.languageapp.backend.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
+import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -41,4 +42,6 @@ public class AssignmentCreateRequest {
     private String generationMode;
     private Integer questionCount;
     private List<UUID> exerciseIds;
+    @Valid
+    private List<AssignmentInitialAccommodationRequest> accommodations;
 }

@@ -37,6 +37,7 @@ public class AssignmentService {
     private final UserRepository userRepository;
     private final ClassroomMemberRepository classroomMemberRepository;
     private final AssignmentSessionRepository sessionRepository;
+    private final AssignmentAccommodationRepository accommodationRepository;
     private final EvaluationService evaluationService;
     private final StreakService streakService;
     private final Clock clock;
@@ -93,7 +94,27 @@ public class AssignmentService {
         }
         assignment.setExercises(exercises);
 
+        // Validate every student before publishing: no partially configured assignment on failure.
+        List<AssignmentAccommodation> initialAccommodations = new ArrayList<>();
+        var studentIds = new java.util.HashSet<UUID>();
+        if (request.getAccommodations() != null) {
+            for (var initial : request.getAccommodations()) {
+                if (initial == null || initial.getUserId() == null || !studentIds.add(initial.getUserId())) {
+                    throw new BadRequestException("Hiányzó vagy ismétlődő tanuló az egyéni időbeállításokban.");
+                }
+                var member = requireAcceptedMember(assignment, initial.getUserId());
+                validateAccommodation(assignment, initial);
+                var accommodation = new AssignmentAccommodation();
+                accommodation.setAssignment(assignment);
+                accommodation.setUser(member.getUser());
+                accommodation.setExtraMinutes(initial.getExtraMinutes());
+                accommodation.setUnlimited(initial.isUnlimited());
+                accommodation.setAvailableUntilOverride(initial.getAvailableUntilOverride());
+                initialAccommodations.add(accommodation);
+            }
+        }
         assignmentRepository.save(assignment);
+        if (!initialAccommodations.isEmpty()) accommodationRepository.saveAll(initialAccommodations);
 
         classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
                 .forEach(member -> sseService.sendPing(member.getUser().getEmail()));
@@ -143,11 +164,12 @@ public class AssignmentService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
-        ClassroomAssignment assignment = assignmentRepository.findById(assignmentId)
+        ClassroomAssignment assignment = assignmentRepository.findLockedById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
 
-        boolean isMember = classroomMemberRepository.existsByClassroom_ClassroomIdAndUser_UserId(
-                assignment.getClassroom().getClassroomId(), user.getUserId());
+        boolean isMember = classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(
+                assignment.getClassroom().getClassroomId(), user.getUserId())
+                .filter(m -> m.getStatus() == MembershipStatus.ACCEPTED).isPresent();
 
         if (!isMember) {
             throw new BadRequestException("Access denied: Not a member of this classroom.");
@@ -168,6 +190,10 @@ public class AssignmentService {
             session = ongoingSession.get();
             log.info("Student {} is resuming assignment {}", email, assignmentId);
         } else {
+            Instant availableUntil = configuredDeadline(assignment, user.getUserId());
+            if (availableUntil != null && !clock.instant().isBefore(availableUntil)) {
+                throw new BadRequestException("A feladat egyéni beadási határideje lejárt.");
+            }
             long completedCount = userSessions.stream().filter(s -> s.getFinishedAt() != null).count();
 
             if (assignment.getMaxAttempts() != null && completedCount >= assignment.getMaxAttempts()) {
@@ -178,9 +204,12 @@ public class AssignmentService {
             session.setAssignment(assignment);
             session.setUser(user);
             session.setStartedAt(clock.instant());
+            initializeTiming(session);
             session = sessionRepository.save(session);
             log.info("Student {} started attempt {} for assignment {}", email, completedCount + 1, assignmentId);
         }
+
+        initializeTiming(session);
 
         List<Exercise> exercises = new ArrayList<>(assignment.getExercises());
 
@@ -197,11 +226,12 @@ public class AssignmentService {
         return new AssignmentStartResponse(
                 session.getSessionId(),
                 session.getStartedAt(),
-                assignment.getTimeLimitMinutes(),
+                session.getEffectiveTimeLimitMinutes(),
                 assignment.isAllowRetries(),
                 assignment.isHasFeedback(),
                 exercises,
-                assignment.getClassroom().getClassroomId()
+                assignment.getClassroom().getClassroomId(),
+                timingResponse(session)
         );
     }
 
@@ -216,6 +246,10 @@ public class AssignmentService {
      */
     @Transactional
     public void submitAssignment(UUID sessionId, AssignmentSubmitRequest request, String email) {
+        UUID assignmentId = sessionRepository.findAssignmentId(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+        assignmentRepository.findLockedById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
         AssignmentSession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
 
@@ -230,10 +264,10 @@ public class AssignmentService {
         // JAVÍTÁS: Kivettük a szigorú 'throw new BadRequestException'-t!
         // Ha a diák késve küldi be (vagy beragadt egy lejárt tesztbe),
         // a rendszer csak logol, de feldolgozza és LEZÁRJA a tesztet, hogy ne ragadjon be örökre.
-        Integer limit = session.getAssignment().getTimeLimitMinutes();
-        if (limit != null && limit > 0) {
-            Instant deadline = session.getStartedAt().plus(limit + 2, ChronoUnit.MINUTES);
-            if (clock.instant().isAfter(deadline)) {
+        initializeTiming(session);
+        Instant deadline = timingResponse(session).deadline();
+        if (deadline != null) {
+            if (clock.instant().isAfter(deadline.plus(2, ChronoUnit.MINUTES))) {
                 log.warn("Late submission for user {}. Accepting to prevent session lock.", email);
             }
         }
@@ -423,7 +457,9 @@ public class AssignmentService {
                             s.getTeacherScore(),
                             s.getTeacherComment(),
                             s.isGraded(),
-                            answersList
+                            answersList,
+                            timingResponse(s).timeLimitMinutes(),
+                            timingResponse(s).deadline()
                     );
                 }).toList();
     }
@@ -463,7 +499,9 @@ public class AssignmentService {
                             s.getTeacherScore(),
                             s.getTeacherComment(),
                             s.isGraded(),
-                            answersList
+                            answersList,
+                            timingResponse(s).timeLimitMinutes(),
+                            timingResponse(s).deadline()
                     );
                 }).toList();
     }
@@ -501,6 +539,8 @@ public class AssignmentService {
         boolean isCompleted = false;
         int attemptsUsed = 0;
         boolean hasGradedSession = false;
+        Integer effectiveMinutes = positiveLimit(a.getTimeLimitMinutes());
+        Instant effectiveUntil = a.getAvailableUntil();
 
         if (email != null) {
             Optional<User> userOpt = userRepository.findByEmail(email);
@@ -509,6 +549,15 @@ public class AssignmentService {
                 attemptsUsed = (int) sessions.stream().filter(session -> session.getFinishedAt() != null).count();
                 isCompleted = attemptsUsed > 0;
                 hasGradedSession = sessions.stream().anyMatch(AssignmentSession::isGraded);
+                if (!a.getClassroom().getTeacher().getEmail().equals(email)) {
+                    effectiveMinutes = configuredMinutes(a, userOpt.get().getUserId());
+                    effectiveUntil = configuredDeadline(a, userOpt.get().getUserId());
+                    Optional<AssignmentSession> ongoing = sessions.stream().filter(s -> s.getFinishedAt() == null && s.isTimingInitialized()).findFirst();
+                    if (ongoing.isPresent()) {
+                        effectiveMinutes = ongoing.get().getEffectiveTimeLimitMinutes();
+                        effectiveUntil = ongoing.get().getEffectiveAvailableUntil();
+                    }
+                }
             }
         }
 
@@ -517,9 +566,9 @@ public class AssignmentService {
                 a.getTitle(),
                 a.getDescription(),
                 a.isTest(),
-                a.getTimeLimitMinutes(),
+                effectiveMinutes,
                 a.getAvailableFrom(),
-                a.getAvailableUntil(),
+                effectiveUntil,
                 a.getExercises().size(),
                 a.isRandomized(),
                 a.isAllowRetries(),
@@ -531,6 +580,133 @@ public class AssignmentService {
                 attemptsUsed,
                 hasGradedSession
         );
+    }
+
+    @Transactional(readOnly = true)
+    public AssignmentResponse getAssignmentDetails(UUID id, String email) {
+        ClassroomAssignment a = assignmentRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
+        if (!a.getClassroom().getTeacher().getEmail().equals(email)) {
+            User user = userRepository.findByEmail(email).orElseThrow(() -> new ResourceNotFoundException("User not found."));
+            requireAcceptedMember(a, user.getUserId());
+        }
+        return mapToResponse(a, email);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AssignmentAccommodationResponse> getAccommodations(UUID id, String email) {
+        ClassroomAssignment a = assignmentRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
+        requireOwner(a, email);
+        return classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(a.getClassroom().getClassroomId(), MembershipStatus.ACCEPTED)
+                .stream().map(m -> accommodationResponse(a, m.getUser())).toList();
+    }
+
+    /** Only extends active snapshots. Finished attempts are deliberately never rewritten. */
+    @Transactional
+    public void updateAccommodation(UUID id, UUID userId, AssignmentAccommodationRequest request, String email) {
+        ClassroomAssignment a = assignmentRepository.findLockedById(id).orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
+        requireOwner(a, email);
+        ClassroomMember member = requireAcceptedMember(a, userId);
+        validateAccommodation(a, request);
+        Integer minutes = effectiveMinutes(a, request.getExtraMinutes(), request.isUnlimited());
+        Instant until = request.getAvailableUntilOverride() != null ? request.getAvailableUntilOverride() : a.getAvailableUntil();
+        List<AssignmentSession> ongoing = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(id, userId)
+                .stream().filter(s -> s.getFinishedAt() == null).toList();
+        for (AssignmentSession s : ongoing) {
+            initializeTiming(s);
+            if (shorter(s.getEffectiveTimeLimitMinutes(), minutes) || earlier(s.getEffectiveAvailableUntil(), until)) {
+                throw new BadRequestException("Elkezdett próbálkozás időkerete és határideje csak hosszabbítható.");
+            }
+        }
+        AssignmentAccommodation ac = accommodationRepository.findByAssignment_AssignmentIdAndUser_UserId(id, userId)
+                .orElseGet(AssignmentAccommodation::new);
+        ac.setAssignment(a);
+        ac.setUser(member.getUser());
+        ac.setExtraMinutes(request.getExtraMinutes());
+        ac.setUnlimited(request.isUnlimited());
+        ac.setAvailableUntilOverride(request.getAvailableUntilOverride());
+        accommodationRepository.save(ac);
+        ongoing.forEach(s -> { s.setEffectiveTimeLimitMinutes(minutes); s.setEffectiveAvailableUntil(until); });
+        sseService.sendPing(member.getUser().getEmail());
+    }
+
+    @Transactional(readOnly = true)
+    public AssignmentTimingResponse getSessionTiming(UUID id, String email) {
+        AssignmentSession s = sessionRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+        if (!s.getUser().getEmail().equals(email) && !s.getAssignment().getClassroom().getTeacher().getEmail().equals(email)) {
+            throw new BadRequestException("Nincs jogosultságod ehhez a próbálkozáshoz.");
+        }
+        return timingResponse(s);
+    }
+
+    private AssignmentAccommodationResponse accommodationResponse(ClassroomAssignment a, User user) {
+        var ac = accommodationRepository.findByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), user.getUserId());
+        boolean ongoing = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), user.getUserId())
+                .stream().anyMatch(s -> s.getFinishedAt() == null);
+        return new AssignmentAccommodationResponse(user.getUserId(), user.getName(), user.getEmail(),
+                ac.map(AssignmentAccommodation::getExtraMinutes).orElse(0), ac.map(AssignmentAccommodation::isUnlimited).orElse(false),
+                ac.map(AssignmentAccommodation::getAvailableUntilOverride).orElse(null), configuredMinutes(a, user.getUserId()),
+                configuredDeadline(a, user.getUserId()), ongoing);
+    }
+
+    private void requireOwner(ClassroomAssignment a, String email) {
+        if (!a.getClassroom().getTeacher().getEmail().equals(email)) throw new BadRequestException("Csak az osztály tanára módosíthatja az időbeállításokat.");
+    }
+
+    private ClassroomMember requireAcceptedMember(ClassroomAssignment a, UUID id) {
+        return classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(a.getClassroom().getClassroomId(), id)
+                .filter(m -> m.getStatus() == MembershipStatus.ACCEPTED)
+                .orElseThrow(() -> new BadRequestException("Access denied: A tanuló nem elfogadott osztálytag."));
+    }
+
+    private Integer configuredMinutes(ClassroomAssignment a, UUID userId) {
+        var ac = accommodationRepository.findByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userId);
+        return effectiveMinutes(a, ac.map(AssignmentAccommodation::getExtraMinutes).orElse(0), ac.map(AssignmentAccommodation::isUnlimited).orElse(false));
+    }
+
+    private void validateAccommodation(ClassroomAssignment a, AssignmentAccommodationRequest request) {
+        if (request.getExtraMinutes() == null || request.getExtraMinutes() < 0 || (request.isUnlimited() && request.getExtraMinutes() != 0)) {
+            throw new BadRequestException("Érvénytelen többletidő.");
+        }
+        effectiveMinutes(a, request.getExtraMinutes(), request.isUnlimited());
+        Instant until = request.getAvailableUntilOverride() != null ? request.getAvailableUntilOverride() : a.getAvailableUntil();
+        if (until != null && a.getAvailableFrom() != null && !until.isAfter(a.getAvailableFrom())) {
+            throw new BadRequestException("Az egyéni határidőnek a kezdés után kell lennie.");
+        }
+    }
+
+    private Instant configuredDeadline(ClassroomAssignment a, UUID userId) {
+        return accommodationRepository.findByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userId)
+                .map(AssignmentAccommodation::getAvailableUntilOverride).orElse(a.getAvailableUntil());
+    }
+
+    private Integer positiveLimit(Integer minutes) { return minutes != null && minutes > 0 ? minutes : null; }
+
+    private Integer effectiveMinutes(ClassroomAssignment a, int extra, boolean unlimited) {
+        Integer base = positiveLimit(a.getTimeLimitMinutes());
+        if (unlimited || base == null) return null;
+        long total = (long) base + extra;
+        if (total > Integer.MAX_VALUE) throw new BadRequestException("Túl nagy időkeret.");
+        return (int) total;
+    }
+
+    private boolean shorter(Integer oldValue, Integer newValue) { return newValue != null && (oldValue == null || newValue < oldValue); }
+    private boolean earlier(Instant oldValue, Instant newValue) { return newValue != null && (oldValue == null || newValue.isBefore(oldValue)); }
+
+    private void initializeTiming(AssignmentSession s) {
+        if (s.isTimingInitialized()) return;
+        s.setEffectiveTimeLimitMinutes(configuredMinutes(s.getAssignment(), s.getUser().getUserId()));
+        s.setEffectiveAvailableUntil(configuredDeadline(s.getAssignment(), s.getUser().getUserId()));
+        s.setTimingInitialized(true);
+    }
+
+    private AssignmentTimingResponse timingResponse(AssignmentSession s) {
+        // Legacy attempts use the original common settings, never a subsequently granted accommodation.
+        Integer minutes = s.isTimingInitialized() ? s.getEffectiveTimeLimitMinutes() : positiveLimit(s.getAssignment().getTimeLimitMinutes());
+        Instant until = s.isTimingInitialized() ? s.getEffectiveAvailableUntil() : s.getAssignment().getAvailableUntil();
+        Instant deadline = minutes == null ? until : s.getStartedAt().plus(minutes, ChronoUnit.MINUTES);
+        if (until != null && (deadline == null || until.isBefore(deadline))) deadline = until;
+        return new AssignmentTimingResponse(s.getSessionId(), s.getStartedAt(), minutes, until, deadline,
+                s.getAssignment().isAllowLateSubmission(), s.getFinishedAt() != null, clock.instant());
     }
 
     /**

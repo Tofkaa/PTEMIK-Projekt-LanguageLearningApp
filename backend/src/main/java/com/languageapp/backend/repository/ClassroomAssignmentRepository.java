@@ -8,12 +8,20 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.UUID;
 import java.time.Instant;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+import java.util.Optional;
 
 /**
  * Repository for managing classroom assignments and their metadata.
  */
 @Repository
 public interface ClassroomAssignmentRepository extends JpaRepository<ClassroomAssignment, UUID> {
+
+    /** Serializes timing edits, start and submission for an assignment. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM ClassroomAssignment a WHERE a.assignmentId = :id")
+    Optional<ClassroomAssignment> findLockedById(@Param("id") UUID id);
 
     /**
      * Retrieves all assignments for a classroom, sorted by creation date.
@@ -30,10 +38,11 @@ public interface ClassroomAssignmentRepository extends JpaRepository<ClassroomAs
      */
     @Query("SELECT a FROM ClassroomAssignment a " +
             "JOIN ClassroomMember cm ON cm.classroom = a.classroom " +
+            "LEFT JOIN AssignmentAccommodation ac ON ac.assignment = a AND ac.user.userId = :userId " +
             "WHERE cm.user.userId = :userId " +
             "AND cm.status = 'ACCEPTED' " +
             "AND (a.availableFrom IS NULL OR a.availableFrom <= :now) " +
-            "AND (a.availableUntil IS NULL OR a.availableUntil > :now)")
+            "AND (COALESCE(ac.availableUntilOverride, a.availableUntil) IS NULL OR COALESCE(ac.availableUntilOverride, a.availableUntil) > :now)")
     List<ClassroomAssignment> findActiveAssignmentsForStudent(@Param("userId") UUID userId,
                                                            @Param("now") Instant now);
 }

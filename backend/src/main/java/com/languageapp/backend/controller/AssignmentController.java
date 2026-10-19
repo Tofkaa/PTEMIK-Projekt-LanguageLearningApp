@@ -22,6 +22,30 @@ public class AssignmentController {
 
     private final AssignmentService assignmentService;
 
+    @GetMapping("/{id}")
+    public ResponseEntity<AssignmentResponse> getDetails(@PathVariable UUID id, Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getAssignmentDetails(id, auth.getName()));
+    }
+
+    @GetMapping("/{id}/accommodations")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<List<AssignmentAccommodationResponse>> getAccommodations(@PathVariable UUID id, Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getAccommodations(id, auth.getName()));
+    }
+
+    @PutMapping("/{id}/accommodations/{userId}")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<Void> updateAccommodation(@PathVariable UUID id, @PathVariable UUID userId,
+            @Valid @RequestBody com.languageapp.backend.dto.request.AssignmentAccommodationRequest request, Authentication auth) {
+        assignmentService.updateAccommodation(id, userId, request, auth.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/sessions/{sessionId}/timing")
+    public ResponseEntity<AssignmentTimingResponse> getSessionTiming(@PathVariable UUID sessionId, Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getSessionTiming(sessionId, auth.getName()));
+    }
+
     /**
      * Teacher creates a new assignment for a specific classroom.
      */

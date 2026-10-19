@@ -21,4 +21,5 @@ public class AssignmentStartResponse {
     private boolean hasFeedback;
     private List<Exercise> exercises;
     private UUID classroomId;
+    private AssignmentTimingResponse timing;
 }

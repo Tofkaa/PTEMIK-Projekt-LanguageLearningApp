@@ -53,6 +53,14 @@ export const formatToLocalTimestamp = (dateData) => {
     return date ? date.toLocaleString('hu-HU') : 'N/A';
 };
 
+/** Value for a minute-precision datetime-local field, expressed in the browser's timezone. */
+export const formatToLocalInput = (dateData) => {
+    const date = parseServerDate(dateData);
+    if (!date) return '';
+    const pad = value => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 /**
  * Converts a local datetime-local input string to a standard UTC ISO string.
  * Used exclusively before API POST/PUT requests.

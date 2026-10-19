@@ -33,6 +33,7 @@ public class NotificationController {
 
     private final ClassroomAssignmentRepository assignmentRepository;
     private final AssignmentSessionRepository sessionRepository;
+    private final AssignmentAccommodationRepository accommodationRepository;
     private final ClassroomMemberRepository classroomMemberRepository;
     private final StudentVocabularyRepository studentVocabularyRepository;
 
@@ -96,7 +97,9 @@ public class NotificationController {
                                 boolean hasFinished = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userId)
                                         .stream().anyMatch(session -> session.getFinishedAt() != null);
 
-                                boolean isExpired = a.getAvailableUntil() != null && !now.isBefore(a.getAvailableUntil());
+                                var until = accommodationRepository.findByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userId)
+                                        .map(com.languageapp.backend.entity.AssignmentAccommodation::getAvailableUntilOverride).orElse(a.getAvailableUntil());
+                                boolean isExpired = until != null && !now.isBefore(until);
 
                                 if (!hasFinished && !isExpired) {
                                     sActiveIds.add(a.getClassroom().getClassroomId() + ":" + a.getAssignmentId());
