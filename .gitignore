@@ -7,3 +7,8 @@
 # Machine-local development certificate authorities
 rootCA.pem
 rootCA-key.pem
+
+# Local working documentation and manual migrations; retain the published HTTPS guide.
+/docs/*
+!/docs/local-https.md
+/backend/database/manual/
