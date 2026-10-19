@@ -32,6 +32,7 @@ import { ThemeProvider } from './context/ThemeContext.jsx';
 import OAuth2RedirectHandler from './components/OAuth2RedirectHandler.jsx';
 import Terms from './pages/Terms.jsx';
 import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
+import AppLayout from './components/AppLayout.jsx';
 
 /**
  * VerificationBanner Component
@@ -73,7 +74,7 @@ function App() {
         <AuthProvider>
             <NotificationProvider>
                 <Router>
-                    <NavigationBar />
+                    <AppLayout navigation={<NavigationBar />}>
                     <VerificationBanner />
                     <GlobalErrorToast />
                     <Routes>
@@ -124,6 +125,7 @@ function App() {
                         {/* 404 Route: Catch-all for undefined URLs */}
                         <Route path="*" element={<NotFound />} />
                     </Routes>
+                    </AppLayout>
                 </Router>
             </NotificationProvider>
         </AuthProvider>

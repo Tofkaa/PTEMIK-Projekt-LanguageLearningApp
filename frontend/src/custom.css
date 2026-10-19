@@ -7,29 +7,378 @@
 
 /* 1. Reset and base body styling */
 body {
-    background-color: #333333; 
-    color: #ffffff; /* White text for contrast */
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* A clean modern font (can be specialized later) */
 }
 
 /* 2. Primary Color Override */
 :root {
+    color-scheme: light;
     --primary-cyan: #3EC1D3; /* Defining the brand color as a CSS variable */
+    --app-accent-text: #087386;
+    --app-focus-color: #087386;
+    --app-control-border: #767676;
+}
+
+[data-bs-theme="dark"] {
+    color-scheme: dark;
+    --app-accent-text: #3ec1d3;
+    --app-focus-color: #3ec1d3;
+    --app-control-border: #adb5bd;
+}
+
+/* Text utilities and outlined controls need theme-specific contrast, independently of fill colours. */
+[data-bs-theme] .text-primary { color: var(--bs-primary-text-emphasis) !important; }
+[data-bs-theme] .text-info { color: var(--app-accent-text) !important; }
+[data-bs-theme] .text-warning { color: var(--bs-warning-text-emphasis) !important; }
+[data-bs-theme] .text-success { color: var(--bs-success-text-emphasis) !important; }
+[data-bs-theme] .text-danger { color: var(--bs-danger-text-emphasis) !important; }
+[data-bs-theme] .text-secondary,
+[data-bs-theme] .text-muted { color: var(--bs-secondary-color) !important; }
+
+.btn-outline-info,
+.btn-outline-primary,
+.btn-outline-success {
+    --bs-btn-color: var(--app-accent-text);
+    --bs-btn-border-color: var(--app-accent-text);
+    --bs-btn-hover-color: #212529;
+    --bs-btn-hover-bg: var(--primary-cyan);
+    --bs-btn-hover-border-color: var(--primary-cyan);
+    --bs-btn-active-color: #212529;
+    --bs-btn-active-bg: var(--primary-cyan);
+    --bs-btn-active-border-color: var(--primary-cyan);
+}
+.btn-outline-warning { --bs-btn-color: var(--bs-warning-text-emphasis); --bs-btn-border-color: var(--bs-warning-text-emphasis); }
+.btn-outline-danger { --bs-btn-color: var(--bs-danger-text-emphasis); --bs-btn-border-color: var(--bs-danger-text-emphasis); }
+.btn-outline-secondary { --bs-btn-color: var(--bs-secondary-color); --bs-btn-border-color: var(--bs-secondary-color); }
+
+.badge.bg-info,
+.badge.bg-warning { color: #212529 !important; }
+.badge.bg-primary,
+.badge.bg-secondary,
+.badge.bg-success,
+.badge.bg-danger { color: #fff !important; }
+
+[data-bs-theme] .bg-primary.text-white,
+[data-bs-theme] .bg-primary.text-light { color: #fff !important; }
+[data-bs-theme="light"] .dropdown-menu-dark .dropdown-item:is(.active, :active) {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+}
+
+/* Field boundaries must remain visible even when a legacy utility removes their border. */
+[data-bs-theme] .form-control,
+[data-bs-theme] .form-select {
+    color: var(--bs-body-color) !important;
+    background-color: var(--bs-body-bg) !important;
+    border-width: 2px !important;
+    border-style: solid !important;
+    border-color: var(--app-control-border) !important;
+    min-width: 0;
+    max-width: 100%;
+}
+[data-bs-theme] :is(.form-control, .form-select):focus {
+    border-color: var(--app-focus-color) !important;
+}
+[data-bs-theme] :is(.form-control, .form-select):is(.is-invalid, [aria-invalid="true"]),
+[data-bs-theme] .was-validated :is(.form-control, .form-select):invalid {
+    border-color: var(--bs-danger-text-emphasis) !important;
+}
+[data-bs-theme] :is(.form-control, .form-select).is-valid,
+[data-bs-theme] .was-validated :is(.form-control, .form-select):valid {
+    border-color: var(--bs-success-text-emphasis) !important;
+}
+
+.btn-info {
+    --bs-btn-border-color: var(--app-accent-text);
+    --bs-btn-hover-border-color: var(--app-accent-text);
+    --bs-btn-active-border-color: var(--app-accent-text);
+}
+
+/* Let user font/spacing overrides grow content rather than clip labels. */
+body { overflow-wrap: anywhere; }
+.row > *,
+:is(.card-body, .card-header, .modal-body, .modal-header, .list-group-item) > * { min-width: 0; }
+.btn,
+.badge,
+.nav-link,
+.dropdown-item,
+.accordion-button { white-space: normal; overflow-wrap: anywhere; }
+.badge { max-width: 100%; line-height: 1.35; }
+.navbar-expand-lg > .container { flex-wrap: wrap; }
+.navbar-expand-lg .navbar-collapse { min-width: 0; flex-wrap: wrap; gap: 0.75rem; }
+.navbar-expand-lg .navbar-nav { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.navbar-nav > * { min-width: 0; max-width: 100%; }
+.navbar-nav .nav-notification-badge {
+    flex: 0 0 auto;
+    width: max-content;
+    max-width: none;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+}
+.dashboard-hero-copy { min-width: 0; }
+.dashboard-hero-action { flex: 0 1 auto; max-width: 100%; }
+.dashboard-hero-action .btn { max-width: 100%; }
+.lesson-result-stats > * { flex: 1 1 8rem; max-width: 100%; }
+.modal-header .btn-close { flex-shrink: 0; }
+.grading-score-input { width: 8rem; flex: 0 1 8rem; }
+.invite-code-entry .form-control { flex: 1 1 14rem; }
+.heatmap-assignment-title { min-width: 8rem; max-width: 14rem; overflow-wrap: anywhere; }
+
+@media (min-width: 768px) {
+    .dashboard-hero-copy { flex: 1 1 18rem; }
+}
+
+@media (max-width: 575.98px) {
+    .auth-page .card-body { padding: 1rem !important; }
+    .modal-body { padding: 1rem !important; }
+    .modal-footer .btn { flex: 1 1 10rem; }
+}
+
+:focus-visible:not(#main-content) {
+    outline: 3px solid var(--app-focus-color) !important;
+    outline-offset: 3px;
+}
+
+/* The route/skip-link destination is a region, not an interactive control. */
+#main-content:focus {
+    outline: none;
+}
+
+.skip-link {
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 11000;
+    padding: 0.75rem 1rem;
+    color: var(--bs-body-color);
+    background: var(--bs-body-bg);
+    border: 2px solid var(--app-focus-color);
+    border-radius: 0.5rem;
+    transform: translateY(-200%);
+}
+
+.skip-link:focus {
+    transform: translateY(0);
+}
+
+.theme-picker {
+    width: fit-content;
+    max-width: 100%;
+}
+
+/* Native popups need an explicit foreground/background pair on Windows. */
+.form-select option,
+.form-select optgroup {
+    color: var(--bs-body-color);
+    background-color: var(--bs-body-bg);
+}
+
+.form-control,
+.form-select {
+    color-scheme: inherit;
+}
+
+.btn-close {
+    --bs-btn-close-opacity: 0.75;
+}
+
+.flashcard-surface.card {
+    position: relative;
+    max-width: 600px;
+    min-height: 300px;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border: 2px solid var(--bs-secondary-color);
+}
+
+.lesson-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.lesson-card:hover,
+.lesson-card:focus-within {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.flashcard-hitarea {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    cursor: pointer;
+}
+
+.flashcard-hitarea:disabled {
+    pointer-events: none;
+}
+
+.flashcard-word {
+    color: var(--app-accent-text);
+    overflow-wrap: anywhere;
+}
+
+.flashcard-translation {
+    background: var(--bs-success-bg-subtle);
+    color: var(--bs-success-text-emphasis);
+    border: 1px solid var(--bs-success-border-subtle);
+    overflow-wrap: anywhere;
+}
+
+.toast.global-error-toast {
+    --bs-toast-bg: var(--bs-danger-bg-subtle);
+    --bs-toast-color: var(--bs-danger-text-emphasis);
+    --bs-toast-border-color: var(--bs-danger-border-subtle);
+    --bs-toast-header-bg: var(--bs-danger-bg-subtle);
+    --bs-toast-header-color: var(--bs-danger-text-emphasis);
+    --bs-toast-header-border-color: var(--bs-danger-border-subtle);
+    overflow-wrap: anywhere;
+}
+
+.app-accent-text {
+    color: var(--app-accent-text) !important;
+}
+
+.tutorial-tooltip {
+    width: min(400px, calc(100vw - 2rem));
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border: 1px solid var(--bs-secondary-color);
+}
+
+.app-accent-link {
+    color: var(--app-accent-text) !important;
+    text-decoration: underline !important;
+    text-underline-offset: 0.2em;
+}
+
+.smart-word {
+    display: inline;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px dashed currentColor;
+    background: transparent;
+    color: var(--app-accent-text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.smart-word:hover {
+    border-bottom-style: solid;
+}
+
+.translation-close {
+    border: 1px solid currentColor;
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    font: inherit;
+}
+
+.exercise-choices,
+.word-bank {
+    min-width: 0;
+}
+
+.exercise-choice,
+.word-token {
+    border: 2px solid var(--bs-secondary-color);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+
+.exercise-choice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-height: 4rem;
+    height: 100%;
+}
+
+.exercise-choice input {
+    flex: 0 0 auto;
+    width: 1.2rem;
+    height: 1.2rem;
+    accent-color: var(--app-accent-text);
+}
+
+.exercise-choice:has(input:checked) {
+    border-color: var(--app-accent-text);
+    background: var(--bs-tertiary-bg);
+}
+
+.exercise-choice:focus-within {
+    outline: 3px solid var(--app-focus-color);
+    outline-offset: 3px;
+}
+
+.exercise-choice-mark {
+    color: var(--app-accent-text);
+    font-weight: bold;
+}
+
+.word-token {
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.word-token-selected {
+    border-color: var(--app-accent-text);
+    background: var(--bs-tertiary-bg);
+}
+
+.word-bank-answer {
+    min-height: 5rem;
+    border-bottom: 2px solid var(--app-accent-text);
+}
+
+.exercise-choice:has(input:disabled),
+.word-token:disabled {
+    cursor: default;
+    opacity: 0.75;
+}
+
+.form-check-input:not(:checked) {
+    border-color: var(--bs-secondary-color);
 }
 
 /* Overriding Bootstrap's primary button class */
 .btn-primary {
-    background-color: var(--primary-cyan);
-    border-color: var(--primary-cyan);
-    color: #333333; /* Dark text for better readability on cyan */
+    --bs-btn-color: #212529;
+    --bs-btn-bg: var(--primary-cyan);
+    --bs-btn-border-color: var(--app-accent-text);
+    --bs-btn-hover-color: #212529;
+    --bs-btn-hover-bg: #59cbd9;
+    --bs-btn-hover-border-color: var(--app-accent-text);
+    --bs-btn-active-color: #212529;
+    --bs-btn-active-bg: var(--primary-cyan);
+    --bs-btn-active-border-color: var(--app-accent-text);
+    --bs-btn-disabled-color: #212529;
+    --bs-btn-disabled-bg: var(--primary-cyan);
+    --bs-btn-disabled-border-color: var(--app-accent-text);
     font-weight: bold;
     border-radius: 20px; /* Highly rounded corners */
 }
 
 /* Overriding Bootstrap's success button class (used for Lesson Start buttons) */
 .btn-outline-success {
-    color: var(--primary-cyan);
-    border-color: var(--primary-cyan);
+    color: var(--app-accent-text);
+    border-color: var(--app-accent-text);
     border-radius: 20px;
 }
 
@@ -49,23 +398,20 @@ body {
 
 /* Specialized input styling from login wireframe */
 .form-control {
-    background-color: #ffffff !important;
-    border: 2px solid #ffffff;
-    color: var(--primary-cyan) !important;
     font-weight: 900;
     border-radius: 25px !important;
     padding: 0.8rem 1.5rem;
 }
 
 .form-control::placeholder {
-    color: var(--primary-cyan);
-    opacity: 0.8;
+    color: var(--bs-secondary-color);
+    opacity: 1;
 }
 
 .form-control:focus {
-    border-color: var(--primary-cyan);
-    box-shadow: 0 0 10px rgba(62, 193, 211, 0.5); 
-    outline: none;
+    border-color: var(--app-focus-color);
+    outline: 3px solid var(--app-focus-color);
+    outline-offset: 2px;
 }
 
 /* Special styling for dark-mode cards with light content (like quiz) */
@@ -76,14 +422,14 @@ body {
 
 /* Pulse warning animation for dynamic difficulty change at the end of lessons */
 .pulse-warning-banner {
-    animation: neon-rank-up 1.5s infinite alternate;
+    animation: neon-rank-up 1.5s 2 alternate;
     border: 2px solid #ffc107; 
     transition: all 0.3s ease-in-out;
 }
 
 /* Breathing animation for demotion (level down) banner */
 .breathing-demote-banner {
-    animation: tactical-reset 2.5s infinite alternate; 
+    animation: tactical-reset 2.5s 2 alternate;
     border: 2px solid #6c757d; 
     transition: all 0.3s ease-in-out;
 }
@@ -125,5 +471,17 @@ body {
         box-shadow: 0 0 30px 10px rgba(255, 193, 7, 0.9), inset 0 0 15px 5px rgba(255, 193, 7, 0.4);
         transform: scale(1.02); 
         border-color: #ffea99; 
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lesson-card {
+        transition: none;
+        transform: none;
+    }
+
+    .pulse-warning-banner,
+    .breathing-demote-banner {
+        animation: none;
     }
 }
