@@ -111,7 +111,7 @@ class ClassroomServiceTest {
                 classroomService.createClassroom(request, student.getEmail())
         );
 
-        assertTrue(exception.getMessage().contains("Only teachers can create classrooms"), "A rendszernek blokkolnia kell a diákokat!");
+        assertEquals("Csak tanár hozhat létre osztálytermet.", exception.getMessage());
         verify(classroomRepository, never()).save(any());
     }
 
@@ -135,6 +135,18 @@ class ClassroomServiceTest {
         assertEquals(student, savedMember.getUser());
         assertEquals(classroom, savedMember.getClassroom());
         assertEquals(MembershipStatus.PENDING, savedMember.getStatus(), "A csatlakozásnak PENDING státuszban kell várakoznia a tanárra!");
+    }
+
+    @Test
+    void joinClassroom_InvalidCode_ShouldExplainCorrectionInHungarianWithoutCreatingMembership() {
+        when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
+        when(classroomRepository.findByInviteCode("__A11Y__")).thenReturn(Optional.empty());
+
+        BadRequestException exception = assertThrows(BadRequestException.class,
+                () -> classroomService.joinClassroom("__A11Y__", student.getEmail()));
+
+        assertEquals("Érvénytelen meghívókód. Ellenőrizd a tanárodtól kapott kódot!", exception.getMessage());
+        verify(classroomMemberRepository, never()).save(any());
     }
 
     // --- 4. TESZT: Tanári moderáció (Jelentkezés elfogadása) ---

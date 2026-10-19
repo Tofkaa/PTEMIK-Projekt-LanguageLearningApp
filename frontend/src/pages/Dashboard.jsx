@@ -44,10 +44,12 @@ const Dashboard = () => {
             const randomLesson = lessons[Math.floor(Math.random() * totalLessonsCount)];
             heroState = {
                 type: 'ALL_DONE',
-                title: 'Minden elérhető leckét teljesítettél! 🎉',
+                title: 'Minden elérhető leckét teljesítettél!',
+                titleIcon: '🎉',
                 subtitle: 'Fantasztikus munka! Frissítsd fel a tudásod egy korábbi lecke ismétlésével.',
                 lesson: randomLesson,
-                buttonText: 'Tudás felfrissítése 🔄',
+                buttonText: 'Tudás felfrissítése',
+                buttonIcon: '🔄',
                 buttonVariant: 'warning',
                 borderColor: 'border-warning'
             };
@@ -55,7 +57,8 @@ const Dashboard = () => {
             // No completed lessons
             heroState = {
                 type: 'FIRST_STEPS',
-                title: 'Készen állsz az első kalandra? 🚀',
+                title: 'Készen állsz az első kalandra?',
+                titleIcon: '🚀',
                 subtitle: `Kezdd el a nyelvtanulást a(z) "${nextLesson.title}" leckével!`,
                 lesson: nextLesson,
                 buttonText: 'Első lecke indítása',
@@ -66,10 +69,12 @@ const Dashboard = () => {
             // Normal progress
             heroState = {
                 type: 'CONTINUE',
-                title: 'Folytasd a tanulást! 📚',
+                title: 'Folytasd a tanulást!',
+                titleIcon: '📚',
                 subtitle: `A következő logikus lépés: ${nextLesson.title} (${nextLesson.topicName || 'Egyéb'})`,
                 lesson: nextLesson,
-                buttonText: 'Folytatás ➡️',
+                buttonText: 'Folytatás',
+                buttonIcon: '➡️',
                 buttonVariant: 'info',
                 borderColor: 'border-info',
                 glow: '0 0 20px rgba(13, 202, 240, 0.2)' 
@@ -130,7 +135,7 @@ const Dashboard = () => {
                 {/* --- HEADER SECTION --- */}
                 <Row className="mb-4 pt-3">
                     <Col>
-                        <h2 className="fw-bold fs-1">Üdv újra, <span className="text-info">{user?.name}</span>! 👋</h2>
+                        <h1 className="fw-bold fs-1">Üdv újra, <span className="app-accent-text">{user?.name}</span>! <span aria-hidden="true">👋</span></h1>
                         <p className="text-light opacity-75 fs-5">
                             Készen állsz a mai tanulásra? Itt a te személyre szabott áttekintésed.
                         </p>
@@ -150,21 +155,22 @@ const Dashboard = () => {
                                     className={`tour-hero-widget border-2 ${heroState.borderColor} bg-dark rounded-4`}
                                     style={{ boxShadow: heroState.glow || 'none' }}
                                 >
-                                    <Card.Body className="d-flex flex-column flex-md-row align-items-md-center justify-content-between p-4 p-md-5">
-                                        <div className="mb-4 mb-md-0 pe-md-4">
-                                            <h3 className="fw-bold text-light mb-2">{heroState.title}</h3>
+                                    <Card.Body className="d-flex flex-column flex-md-row flex-wrap gap-3 align-items-md-center justify-content-between p-4 p-md-5">
+                                        <div className="dashboard-hero-copy pe-md-4">
+                                            <h2 className="h3 fw-bold text-light mb-2">{heroState.title} <span aria-hidden="true">{heroState.titleIcon}</span></h2>
                                             <p className="text-light opacity-75 fs-5 mb-0">
                                                 {heroState.subtitle}
                                             </p>
                                         </div>
-                                        <div className="text-md-end shrink-0">
+                                        <div className="dashboard-hero-action text-md-end">
                                             <Button 
                                                 variant={heroState.buttonVariant} 
                                                 size="lg" 
                                                 className="px-5 py-3 rounded-pill fw-bold shadow-sm"
+                                                aria-label={`${heroState.buttonText}: ${heroState.lesson.title}`}
                                                 onClick={() => navigate(`/lesson/${heroState.lesson.lessonId}`)}
                                             >
-                                                {heroState.buttonText}
+                                                {heroState.buttonText} <span aria-hidden="true">{heroState.buttonIcon}</span>
                                             </Button>
                                         </div>
                                     </Card.Body>
@@ -174,14 +180,14 @@ const Dashboard = () => {
                            {/* LEARNING PATH (LESSONS GRID) */}
                             <Card className="shadow-sm border-0 bg-transparent text-light">
                                 <Card.Body className="p-0">
-                                    <h4 className="tour-learning-path fw-bold border-bottom border-secondary pb-3 mb-4 d-flex align-items-center gap-2">
-                                        📚 Tanulási Útvonal
-                                    </h4>
+                                    <h2 className="h4 tour-learning-path fw-bold border-bottom border-secondary pb-3 mb-4 d-flex align-items-center gap-2">
+                                        <span aria-hidden="true">📚</span> Tanulási Útvonal
+                                    </h2>
 
                                     {/* UI State: Loading */}
                                     {isLoading && (
                                         <div className="text-center py-5">
-                                            <Spinner animation="border" variant="info" />
+                                            <Spinner animation="border" variant="info" role="status"><span className="visually-hidden">Leckék betöltése...</span></Spinner>
                                         </div>
                                     )}
                                     
@@ -193,25 +199,23 @@ const Dashboard = () => {
                                         <div className="d-flex flex-column gap-5">
                                             {Object.entries(groupedLessons).map(([topicName, topicLessons]) => (
                                                 <div key={topicName}>
-                                                    <h5 className="text-info fw-bold mb-3 px-1 text-uppercase tracking-wide small">
+                                                    <h3 className="app-accent-text fw-bold mb-3 px-1 text-uppercase tracking-wide small">
                                                         {topicName}
-                                                    </h5>
+                                                    </h3>
                                                     <Row className="g-3">
                                                         {topicLessons.map((lesson) => (
                                                             <Col md={6} key={lesson.lessonId}> 
                                                                 <Card 
-                                                                    className={`h-100 border shadow-sm bg-dark text-light rounded-4 ${lesson.completed ? 'border-success border-opacity-50' : 'border-secondary'}`} 
-                                                                    style={{ transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'pointer' }} 
-                                                                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 .5rem 1rem rgba(0,0,0,.15)' }} 
-                                                                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
+                                                                    as="article" aria-labelledby={`lesson-title-${lesson.lessonId}`}
+                                                                    className={`lesson-card h-100 border shadow-sm bg-dark text-light rounded-4 ${lesson.completed ? 'border-success border-opacity-50' : 'border-secondary'}`}
                                                                 >
                                                                     <Card.Body className="d-flex flex-column p-4">
-                                                                        <Card.Title className="fw-bold mb-2 d-flex justify-content-between align-items-start">
-                                                                            <span className="pe-2">{lesson.title}</span>
-                                                                            {lesson.completed && <span title="Már teljesítetted!" className="fs-5">✅</span>}
+                                                                        <Card.Title as="h4" id={`lesson-title-${lesson.lessonId}`} className="h5 fw-bold mb-2 d-flex justify-content-between align-items-start">
+                                                                            <span className="pe-2">{lesson.title}</span>{' '}
+                                                                            {lesson.completed && <span className="fs-5"><span aria-hidden="true">✅</span><span className="visually-hidden"> – Teljesítve</span></span>}
                                                                         </Card.Title>
                                                                         
-                                                                        <Card.Text className="text-light opacity-50 small mb-4 flex-grow-1">
+                                                                        <Card.Text id={`lesson-description-${lesson.lessonId}`} className="text-body-secondary small mb-4 flex-grow-1">
                                                                             {lesson.description}
                                                                         </Card.Text>
                                                                         
@@ -221,6 +225,8 @@ const Dashboard = () => {
                                                                                 variant={lesson.completed ? "outline-success" : "info"} 
                                                                                 size="sm" 
                                                                                 className="rounded-pill px-4 fw-bold"
+                                                                                aria-label={`${lesson.completed ? 'Ismétlés' : 'Indítás'}: ${lesson.title}`}
+                                                                                aria-describedby={`lesson-description-${lesson.lessonId}`}
                                                                                 onClick={() => navigate(`/lesson/${lesson.lessonId}`)}
                                                                             > 
                                                                                 {lesson.completed ? 'Ismétlés' : 'Indítás'}
@@ -247,16 +253,16 @@ const Dashboard = () => {
                           {/* STATISTICS */}
                             <Card className="tour-performance shadow-lg border-secondary rounded-4 bg-dark text-light">
                                 <Card.Body className="p-4">
-                                    <h5 className="fw-bold border-bottom border-secondary pb-3 mb-4">📊 Teljesítményed</h5>
+                                    <h2 className="h5 fw-bold border-bottom border-secondary pb-3 mb-4"><span aria-hidden="true">📊</span> Teljesítményed</h2>
                                     
                                     {/* 1. XP Progress */}
                                     <div className="mb-4">
                                         <div className="d-flex justify-content-between align-items-end mb-2">
-                                            <span className="fw-bold text-info fs-5">Szint {currentLevel}</span>
+                                            <span className="fw-bold app-accent-text fs-5">Szint {currentLevel}</span>
                                             <span className="text-muted small fw-bold">{currentXp} / {xpForNextLevel} XP</span>
                                         </div>
-                                        <ProgressBar now={progressPercentage} variant="info" className="rounded-pill" style={{ height: '10px' }} />
-                                        <div className="text-center mt-2 small text-light opacity-50">
+                                        <ProgressBar className="rounded-pill" style={{ height: '10px' }}><ProgressBar aria-label="Előrehaladás a következő szintig" now={progressPercentage} variant="info" /></ProgressBar>
+                                        <div className="text-center mt-2 small text-body-secondary">
                                             Még {xpForNextLevel - currentXp} XP a szintlépéshez!
                                         </div>
                                     </div>
@@ -265,7 +271,7 @@ const Dashboard = () => {
                                         {/* 2. Daily Streak */}
                                         <div className="d-flex justify-content-between align-items-center p-3 bg-black bg-opacity-25 rounded-3">
                                             <span className="fw-bold text-light d-flex align-items-center gap-2">
-                                                <span className="fs-4">🔥</span> Napi sorozat
+                                                <span aria-hidden="true" className="fs-4">🔥</span> Napi sorozat
                                             </span>
                                             <span className="text-warning fw-bold fs-5">{user?.streak || 0} nap</span>
                                         </div>
@@ -274,12 +280,12 @@ const Dashboard = () => {
                                         <div className="p-3 bg-black bg-opacity-25 rounded-3 d-flex flex-column gap-2">
                                             <div className="d-flex justify-content-between align-items-center">
                                                 <span className="fw-bold text-light d-flex align-items-center gap-2">
-                                                    <span className="fs-4">📖</span> Elvégzett leckék
+                                                    <span aria-hidden="true" className="fs-4">📖</span> Elvégzett leckék
                                                 </span>
                                                 <span className="text-success fw-bold fs-5">{completedLessonsCount} / {totalLessonsCount}</span>
                                             </div>
                                             {/* We use the variable here to show a subtle progress bar */}
-                                            <ProgressBar now={courseProgressPercentage} variant="success" className="rounded-pill" style={{ height: '4px' }} />
+                                            <ProgressBar className="rounded-pill" style={{ height: '4px' }}><ProgressBar aria-label="Elvégzett leckék aránya" now={courseProgressPercentage} variant="success" /></ProgressBar>
                                         </div>
                                     </div>
                                 </Card.Body>

@@ -1,15 +1,18 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Container, Card, Form, Button, Spinner, Alert, Tabs, Tab, Row, Col, Modal } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../services/api.jsx';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../utils/cropImage.js';
+import ImageCropControls from '../components/ImageCropControls';
+import LearningFeedback from '../components/LearningFeedback';
 
 const Settings = () => {
     const { user, setUser, logout } = useAuth();
     const isOAuthUser = user?.authProvider && user.authProvider !== 'LOCAL';
     const navigate = useNavigate();
+    const location = useLocation();
 
     // --- STATES ---
     const [difficulty, setDifficulty] = useState(user?.preferredDifficulty || 'MEDIUM');
@@ -25,6 +28,8 @@ const Settings = () => {
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    const [cropMediaSize, setCropMediaSize] = useState(null);
+    const [cropViewportSize, setCropViewportSize] = useState(null);
 
     const MAX_FILE_SIZE_MB = 5;
     const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -41,6 +46,14 @@ const Settings = () => {
     const [emailForm, setEmailForm] = useState({ newEmail: '', currentPassword: '', otpCode: '' });
     const [isProcessingEmail, setIsProcessingEmail] = useState(false);
     const [emailMessage, setEmailMessage] = useState({ type: '', text: '' });
+    const emailCodeRef = useRef(null);
+    const emailRequestRef = useRef(null);
+    const previousEmailStep = useRef(emailStep);
+    useEffect(() => {
+        if (emailStep === 'VERIFY') emailCodeRef.current?.focus();
+        else if (previousEmailStep.current === 'VERIFY') emailRequestRef.current?.focus();
+        previousEmailStep.current = emailStep;
+    }, [emailStep]);
 
     const [isExporting, setIsExporting] = useState(false);
     
@@ -52,7 +65,7 @@ const Settings = () => {
 
 
     // --- TABS LOGIC ---
-    const [activeTab, setActiveTab] = useState(sessionStorage.getItem('settingsActiveTab') || 'account');
+    const [activeTab, setActiveTab] = useState(location.state?.settingsTab === 'account' ? 'account' : sessionStorage.getItem('settingsActiveTab') || 'account');
 
     const handleTabChange = (tabKey) => {
         setActiveTab(tabKey);
@@ -94,6 +107,9 @@ const Settings = () => {
             setImageSrc(reader.result);
             setCrop({ x: 0, y: 0 });
             setZoom(1);
+            setCroppedAreaPixels(null);
+            setCropMediaSize(null);
+            setCropViewportSize(null);
             setShowCropModal(true);
         });
         reader.readAsDataURL(file);
@@ -105,13 +121,14 @@ const Settings = () => {
 
 
     const handleCropAndUpload = async () => {
-        if (!imageSrc || !croppedAreaPixels) return;
+        if (isUploadingImage || !imageSrc || !croppedAreaPixels) return;
 
         setIsUploadingImage(true);
         setImageMessage({ type: '', text: '' });
 
         try {
             const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
+            if (!croppedBlob) throw new Error('A kép kivágása nem sikerült.');
             const formData = new FormData();
             formData.append('file', croppedBlob, 'profile.jpg');
 
@@ -123,7 +140,6 @@ const Settings = () => {
             setShowCropModal(false);
             setImageSrc(null);
             setImageMessage({ type: 'success', text: 'Profilkép sikeresen frissítve! ✅' });
-            setTimeout(() => setImageMessage({ type: '', text: '' }), 4000);
         } catch (error) {
             console.error('Hiba a profilkép feltöltésekor:', error);
             const backendError = error.response?.data;
@@ -133,7 +149,6 @@ const Settings = () => {
                     ? backendError
                     : 'Nem sikerült feltölteni a képet a szerverre. Kérlek, próbáld újra!'
             });
-            setShowCropModal(false);
         } finally {
             setIsUploadingImage(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -150,6 +165,7 @@ const Settings = () => {
     // --- DIFFICULTY SAVE LOGIC ---
    const handleSavePreferences = async (e) => {
         e.preventDefault();
+        if (isUpdatingDiff || difficulty === user.preferredDifficulty) return;
         setIsUpdatingDiff(true);
         setDiffMessage({ type: '', text: '' });
 
@@ -161,8 +177,7 @@ const Settings = () => {
                 preferredDifficulty: difficulty 
             }));
             
-            setDiffMessage({ type: 'success', text: 'Tanulási beállítások elmentve! ✅' });
-            setTimeout(() => setDiffMessage({ type: '', text: '' }), 3000);
+            setDiffMessage({ type: 'success', text: 'Tanulási beállítások elmentve!' });
         } catch (err) {
             setDiffMessage({ type: 'danger', text: 'Hiba történt a beállítások mentésekor.' }, err);
         } finally {
@@ -173,7 +188,9 @@ const Settings = () => {
     // --- USERNAME SAVE LOGIC ---
     const handleSaveName = async (e) => {
         e.preventDefault();
+        if (isUpdatingName) return;
         const trimmed = name.trim();
+        if (trimmed === user.name) return;
         if (trimmed.length < 3) {
             setNameMessage({ type: 'danger', text: 'A névnek legalább 3 karakternek kell lennie!' });
             return;
@@ -194,9 +211,8 @@ const Settings = () => {
 
             setNameMessage({ 
                 type: 'success', 
-                text: `Név sikeresen frissítve! Az új azonosítód: ${response.data.name} #${response.data.userTag} ✅` 
+                text: `Név sikeresen frissítve! Az új azonosítód: ${response.data.name} #${response.data.userTag}`
             });
-            setTimeout(() => setNameMessage({ type: '', text: '' }), 4000);
         } catch (err) {
             const errorMsg = err.response?.data?.message || 'Hiba történt a név módosításakor.';
             setNameMessage({ type: 'danger', text: errorMsg });
@@ -208,6 +224,7 @@ const Settings = () => {
     // --- PASSWORD CHANGE LOGIC
     const handleSavePassword = async (e) => {
         e.preventDefault();
+        if (isUpdatingPassword) return;
         setPasswordMessage({ type: '', text: '' });
 
         if (passwords.newPassword !== passwords.confirmPassword) {
@@ -227,9 +244,8 @@ const Settings = () => {
                 newPassword: passwords.newPassword
             });
 
-            setPasswordMessage({ type: 'success', text: 'Jelszó sikeresen módosítva! ✅' });
+            setPasswordMessage({ type: 'success', text: 'Jelszó sikeresen módosítva!' });
             setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
-            setTimeout(() => setPasswordMessage({ type: '', text: '' }), 4000);
         } catch (err) {
             const errorMsg = err.response?.data?.message || err.response?.data || 'Hiba történt a jelszó módosításakor.';
             setPasswordMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hiba történt!' });
@@ -240,6 +256,7 @@ const Settings = () => {
 
     const handleRequestEmailChange = async (e) => {
         e.preventDefault();
+        if (isProcessingEmail) return;
         setEmailMessage({ type: '', text: '' });
         setIsProcessingEmail(true);
 
@@ -263,6 +280,7 @@ const Settings = () => {
 
     const handleVerifyEmailChange = async (e) => {
         e.preventDefault();
+        if (isProcessingEmail || emailForm.otpCode.length !== 6) return;
         setEmailMessage({ type: '', text: '' });
         setIsProcessingEmail(true);
 
@@ -270,14 +288,8 @@ const Settings = () => {
             await api.post('/users/me/email-change/verify', {
                 otpCode: emailForm.otpCode.trim()
             });
-            setEmailMessage({ 
-                type: 'success', 
-                text: 'E-mail cím sikeresen frissítve! ✅ Biztonsági okokból kérlek, jelentkezz be újra az új címeddel...' 
-            });
-            setTimeout(() => {
-                logout();
-                navigate('/login');
-            }, 3000);
+            await logout();
+            navigate('/login', { replace: true, state: { successMessage: 'E-mail cím sikeresen frissítve! Jelentkezz be az új e-mail címeddel.' } });
         } catch (err) {
             const errorMsg = err.response?.data?.message || err.response?.data || 'Hibás vagy lejárt ellenőrző kód.';
             setEmailMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hiba történt!' });
@@ -319,6 +331,7 @@ const Settings = () => {
 
     // --- GDPR: SOFT DELETE ---
    const handleDeleteAccount = async () => {
+        if (isDeleting) return;
         if (!isOAuthUser) {
             if (!deletePassword || deletePassword !== deleteConfirmPassword) {
                 setDeleteMessage({ type: 'danger', text: 'A megadott jelszavak nem egyeznek vagy üresek!' });
@@ -355,11 +368,13 @@ const Settings = () => {
                 ⬅️ Vissza a profilomra
             </Button>
             
-            <h2 className="fw-bold mb-4">Beállítások</h2>
+            <h1 className="h2 fw-bold mb-4">Beállítások</h1>
 
             <Card className="bg-dark border-0 shadow-lg rounded-4">
                 <Card.Body className="p-0">
                     <Tabs 
+                        id="settings-tabs"
+                        aria-label="Beállítások kategóriái"
                         activeKey={activeTab} 
                         onSelect={handleTabChange} 
                         className="custom-tabs border-secondary p-3 pb-0" 
@@ -368,48 +383,42 @@ const Settings = () => {
                         
                         {/* 1. TAB: Account information */}
                         <Tab eventKey="account" title="Fiókadatok" className="p-4">
-                            <h5 className="fw-bold text-info mb-4">Profilkép és Felhasználónév</h5>
-                            {imageMessage.text && (
-                                <Alert variant={imageMessage.type} className="py-2 border-0 fw-bold mb-3">
-                                    {imageMessage.text}
-                                </Alert>
-                            )}
+                            <h2 className="h5 fw-bold text-info mb-4">Profilkép és Felhasználónév</h2>
+                            <LearningFeedback label="Profilkép" error={!showCropModal && imageMessage.type === 'danger' ? imageMessage.text : null}
+                                feedback={imageMessage.type === 'success' ? { type: 'success', msg: imageMessage.text } : null} />
                             <Row className="align-items-center mb-5">
                                 <Col xs="auto">
-                                    <input type="file" accept="image/png, image/jpeg, image/webp" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
-                                    <div 
-                                        className="position-relative" 
+                                    <input type="file" aria-label="Új profilkép fájlja" accept="image/png, image/jpeg, image/webp" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} />
+                                    <button type="button" aria-label="Profilkép kiválasztása" disabled={isUploadingImage}
+                                        className="position-relative border-0 bg-transparent p-0"
                                         style={{ width: '100px', height: '100px', cursor: 'pointer' }}
                                         onClick={() => !isUploadingImage && fileInputRef.current.click()}
                                     >
                                         {isUploadingImage ? (
-                                            <div className="w-100 h-100 rounded-circle bg-secondary d-flex justify-content-center align-items-center">
-                                                <Spinner animation="border" variant="light" />
-                                            </div>
+                                            <span className="w-100 h-100 rounded-circle bg-secondary d-flex justify-content-center align-items-center">
+                                                <Spinner aria-hidden="true" animation="border" variant="light" />
+                                            </span>
                                         ) : user.profilePictureUrl ? (
-                                            <img src={user.profilePictureUrl} alt="Profil" className="w-100 h-100 rounded-circle object-fit-cover border border-2 border-info" />
+                                            <img src={user.profilePictureUrl} alt="" className="w-100 h-100 rounded-circle object-fit-cover border border-2 border-info" />
                                         ) : (
-                                            <div className="w-100 h-100 rounded-circle bg-secondary d-flex justify-content-center align-items-center border border-2 border-secondary">
-                                                <span style={{ fontSize: '3rem' }}>👤</span>
-                                            </div>
+                                            <span className="w-100 h-100 rounded-circle bg-secondary d-flex justify-content-center align-items-center border border-2 border-secondary">
+                                                <span aria-hidden="true" style={{ fontSize: '3rem' }}>👤</span>
+                                            </span>
                                         )}
-                                        {!isUploadingImage && <div className="position-absolute bottom-0 end-0 bg-info rounded-circle p-1" style={{ width: '28px', height: '28px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>✏️</div>}
-                                    </div>
+                                        {!isUploadingImage && <span aria-hidden="true" className="position-absolute bottom-0 end-0 bg-info rounded-circle p-1" style={{ width: '28px', height: '28px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>✏️</span>}
+                                    </button>
                                 </Col>
                                 <Col>
                                     <p className="text-secondary mb-0 small">Engedélyezett formátumok: JPG, PNG, WEBP. Maximum 5MB.</p>
-                                    <Button variant="outline-light" size="sm" className="mt-2" onClick={() => fileInputRef.current.click()}>Kép módosítása</Button>
+                                    <Button variant="outline-secondary" size="sm" disabled={isUploadingImage} className="mt-2" onClick={() => fileInputRef.current.click()}>Kép módosítása</Button>
                                 </Col>
                             </Row>
 
-                            {nameMessage.text && (
-                                <Alert variant={nameMessage.type} className="py-2 border-0 fw-bold mb-3">
-                                    {nameMessage.text}
-                                </Alert>
-                            )}
+                            <LearningFeedback label="Felhasználónév" error={nameMessage.type === 'danger' ? nameMessage.text : ''}
+                                feedback={nameMessage.type === 'success' ? { type: 'success', msg: nameMessage.text } : null} />
 
                             <Form onSubmit={handleSaveName}>
-                                <Form.Group className="mb-4">
+                                <Form.Group className="mb-4" controlId="settings-name">
                                     <Form.Label className="text-light opacity-75">
                                         Felhasználónév <span className="text-info ms-1">#{user.userTag}</span>
                                     </Form.Label>
@@ -418,22 +427,25 @@ const Settings = () => {
                                             type="text" 
                                             className="bg-secondary bg-opacity-25 text-light border-secondary" 
                                             value={name}
+                                            autoComplete="nickname"
+                                            aria-describedby="settings-name-help"
                                             onChange={(e) => setName(e.target.value)}
                                             minLength={3}
                                             maxLength={30}
                                             required
-                                            disabled={isUpdatingName}
+                                            readOnly={isUpdatingName}
                                         />
                                         <Button 
                                             variant="info" 
                                             type="submit" 
                                             className="fw-bold text-dark px-4"
-                                            disabled={isUpdatingName || name.trim() === user.name || name.trim().length < 3}
+                                            aria-disabled={isUpdatingName || name.trim() === user.name || name.trim().length < 3}
+                                            aria-busy={isUpdatingName}
                                         >
-                                            {isUpdatingName ? <Spinner size="sm" /> : 'Mentés'}
+                                            {isUpdatingName && <Spinner size="sm" aria-hidden="true" className="me-2" />}Mentés
                                         </Button>
                                     </div>
-                                    <Form.Text className="text-secondary">
+                                    <Form.Text id="settings-name-help" className="text-secondary">
                                         A felhasználónév módosítása új, négyjegyű azonosítót (#tag) generál a neved mellé, a barátkódod ({user.friendCode}) viszont változatlan marad.
                                     </Form.Text>
                                 </Form.Group>
@@ -442,25 +454,26 @@ const Settings = () => {
 
                         {/* 2. TAB: Learning Preferences */}
                         <Tab eventKey="learning" title="Tanulás" className="p-4">
-                            <h5 className="fw-bold text-info mb-3">Adaptív Algoritmus</h5>
+                            <h2 className="h5 fw-bold text-info mb-3">Adaptív Algoritmus</h2>
                             <p className="text-light opacity-75 mb-4">Itt felülírhatod az adaptív algoritmust, és beállíthatod, hogy milyen nehézségű leckéket szeretnél kapni.</p>
                             
                             <div style={{ minHeight: '50px' }}>
-                                {diffMessage.text && <Alert variant={diffMessage.type} className="py-2 border-0 fw-bold">{diffMessage.text}</Alert>}
+                                <LearningFeedback label="Tanulási beállítások" error={diffMessage.type === 'danger' ? diffMessage.text : ''}
+                                    feedback={diffMessage.type === 'success' ? { type: 'success', msg: diffMessage.text } : null} />
                             </div>
 
                             <Form onSubmit={handleSavePreferences}>
-                                <Form.Group className="mb-4">
+                                <Form.Group className="mb-4" controlId="preferred-difficulty">
                                     <Form.Label className="fw-bold text-light opacity-75">Célzott Nehézség</Form.Label>
-                                    <Form.Select className="bg-secondary bg-opacity-25 text-light border-secondary p-2" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
-                                        <option value="DYNAMIC" className="text-dark">🔵 Dinamikus (DYNAMIC) - Nehézség a teljesítményed alapján</option>
-                                        <option value="EASY" className="text-dark">🟢 Kezdő (EASY) - Több kártyás feladat</option>
-                                        <option value="MEDIUM" className="text-dark">🟡 Haladó (MEDIUM) - Vegyes feladatok</option>
-                                        <option value="HARD" className="text-dark">🔴 Profi (HARD) - Csak gépelés</option>
+                                    <Form.Select className="border-secondary p-2" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+                                        <option value="DYNAMIC">🔵 Dinamikus (DYNAMIC) - Nehézség a teljesítményed alapján</option>
+                                        <option value="EASY">🟢 Kezdő (EASY) - Több kártyás feladat</option>
+                                        <option value="MEDIUM">🟡 Haladó (MEDIUM) - Vegyes feladatok</option>
+                                        <option value="HARD">🔴 Profi (HARD) - Csak gépelés</option>
                                     </Form.Select>
                                 </Form.Group>
-                                <Button variant="info" type="submit" className="fw-bold text-dark" disabled={isUpdatingDiff || difficulty === user.preferredDifficulty}>
-                                    {isUpdatingDiff ? <Spinner size="sm" /> : 'Beállítások Mentése'}
+                                <Button variant="info" type="submit" className="fw-bold text-dark" aria-disabled={isUpdatingDiff || difficulty === user.preferredDifficulty} aria-busy={isUpdatingDiff}>
+                                    {isUpdatingDiff && <Spinner size="sm" aria-hidden="true" className="me-2" />}Beállítások Mentése
                                 </Button>
                             </Form>
                         </Tab>
@@ -469,68 +482,73 @@ const Settings = () => {
                         <Tab eventKey="security" title="Biztonság" className="p-4">
                             
                             {/* --- E-MAIL ADDRESS CHANGE (OTP FLOW) --- */}
-                            <h5 className="fw-bold text-info mb-3">📧 E-mail cím módosítása</h5>
+                            <h2 className="h5 fw-bold text-info mb-3"><span aria-hidden="true">📧 </span>E-mail cím módosítása</h2>
                             <p className="text-secondary small mb-3">
                                 Jelenlegi e-mail címed: <strong className="text-light">{user.email}</strong>
                             </p>
 
-                            {emailMessage.text && (
-                                <Alert variant={emailMessage.type} className="py-2 border-0 fw-bold mb-3" style={{ maxWidth: '500px' }}>
-                                    {emailMessage.text}
-                                </Alert>
-                            )}
+                            <LearningFeedback label="E-mail cím" error={emailMessage.type === 'danger' ? emailMessage.text : ''}
+                                feedback={emailMessage.type !== 'danger' && emailMessage.text ? { type: emailMessage.type, msg: emailMessage.text } : null} />
 
                             {emailStep === 'REQUEST' ? (
                                 <Form onSubmit={handleRequestEmailChange} className="mb-5 pb-4 border-bottom border-secondary" style={{ maxWidth: '500px' }}>
-                                    <Form.Group className="mb-3">
+                                    <Form.Group className="mb-3" controlId="settings-new-email">
                                         <Form.Label className="text-light opacity-75">Új e-mail cím</Form.Label>
                                         <Form.Control 
                                             type="email" 
+                                            autoComplete="email"
                                             className="bg-secondary bg-opacity-25 text-light border-secondary"
                                             placeholder="uj.cim@pelda.hu"
                                             value={emailForm.newEmail}
                                             onChange={(e) => setEmailForm({ ...emailForm, newEmail: e.target.value })}
                                             required
-                                            disabled={isProcessingEmail}
+                                            readOnly={isProcessingEmail}
                                         />
                                     </Form.Group>
 
-                                    <Form.Group className="mb-4">
+                                    <Form.Group className="mb-4" controlId="settings-email-password">
                                         <Form.Label className="text-light opacity-75">Jelenlegi jelszó (megerősítéshez)</Form.Label>
                                         <Form.Control 
                                             type="password" 
+                                            autoComplete="current-password"
                                             className="bg-secondary bg-opacity-25 text-light border-secondary"
                                             value={emailForm.currentPassword}
                                             onChange={(e) => setEmailForm({ ...emailForm, currentPassword: e.target.value })}
                                             required
-                                            disabled={isProcessingEmail}
+                                            readOnly={isProcessingEmail}
                                         />
                                     </Form.Group>
 
                                     <Button 
+                                        ref={emailRequestRef}
                                         variant="info" 
                                         type="submit" 
                                         className="fw-bold text-dark px-4"
-                                        disabled={isProcessingEmail || !emailForm.newEmail || !emailForm.currentPassword}
+                                        aria-disabled={isProcessingEmail || !emailForm.newEmail || !emailForm.currentPassword}
+                                        aria-busy={isProcessingEmail}
                                     >
-                                        {isProcessingEmail ? <Spinner size="sm" /> : 'Ellenőrző kód küldése'}
+                                        {isProcessingEmail && <Spinner size="sm" aria-hidden="true" className="me-2" />}Ellenőrző kód küldése
                                     </Button>
                                 </Form>
                             ) : (
                                 <Form onSubmit={handleVerifyEmailChange} className="mb-5 pb-4 border-bottom border-secondary" style={{ maxWidth: '500px' }}>
-                                    <Form.Group className="mb-4">
+                                    <Form.Group className="mb-4" controlId="settings-email-code">
                                         <Form.Label className="text-light opacity-75">6-jegyű ellenőrző kód (OTP)</Form.Label>
                                         <Form.Control 
+                                            ref={emailCodeRef}
                                             type="text" 
+                                            inputMode="numeric"
+                                            autoComplete="one-time-code"
+                                            aria-describedby="settings-code-help"
                                             className="bg-secondary bg-opacity-25 text-light border-info fs-4 text-center font-monospace tracking-wide"
                                             placeholder="123456"
                                             maxLength={6}
                                             value={emailForm.otpCode}
                                             onChange={(e) => setEmailForm({ ...emailForm, otpCode: e.target.value.replace(/\D/g, '') })}
                                             required
-                                            disabled={isProcessingEmail}
+                                            readOnly={isProcessingEmail}
                                         />
-                                        <Form.Text className="text-secondary">
+                                        <Form.Text id="settings-code-help" className="text-secondary">
                                             Add meg az új e-mail címre küldött 6 számjegyű kódot.
                                         </Form.Text>
                                     </Form.Group>
@@ -540,9 +558,10 @@ const Settings = () => {
                                             variant="success" 
                                             type="submit" 
                                             className="fw-bold px-4"
-                                            disabled={isProcessingEmail || emailForm.otpCode.length !== 6}
+                                            aria-disabled={isProcessingEmail || emailForm.otpCode.length !== 6}
+                                            aria-busy={isProcessingEmail}
                                         >
-                                            {isProcessingEmail ? <Spinner size="sm" /> : 'Kód megerősítése'}
+                                            {isProcessingEmail && <Spinner size="sm" aria-hidden="true" className="me-2" />}Kód megerősítése
                                         </Button>
                                         <Button 
                                             variant="outline-secondary" 
@@ -561,51 +580,51 @@ const Settings = () => {
                             )}
 
                             {/* --- PASSWORD CHANGE --- */}
-                            <h5 className="fw-bold text-info mb-3">🔒 Jelszó módosítása</h5>
+                            <h2 className="h5 fw-bold text-info mb-3"><span aria-hidden="true">🔒 </span>Jelszó módosítása</h2>
                             
-                            {passwordMessage.text && (
-                                <Alert variant={passwordMessage.type} className="py-2 border-0 fw-bold mb-3" style={{ maxWidth: '500px' }}>
-                                    {passwordMessage.text}
-                                </Alert>
-                            )}
+                            <LearningFeedback label="Jelszó" error={passwordMessage.type === 'danger' ? passwordMessage.text : ''}
+                                feedback={passwordMessage.type === 'success' ? { type: 'success', msg: passwordMessage.text } : null} />
 
                             <Form onSubmit={handleSavePassword} style={{ maxWidth: '500px' }}>
-                                <Form.Group className="mb-3">
+                                <Form.Group className="mb-3" controlId="settings-current-password">
                                     <Form.Label className="text-light opacity-75">Jelenlegi jelszó</Form.Label>
                                     <Form.Control 
                                         type="password" 
+                                        autoComplete="current-password"
                                         className="bg-secondary bg-opacity-25 text-light border-secondary"
                                         value={passwords.currentPassword}
                                         onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
                                         required
-                                        disabled={isUpdatingPassword}
+                                        readOnly={isUpdatingPassword}
                                     />
                                 </Form.Group>
 
-                                <Form.Group className="mb-3">
+                                <Form.Group className="mb-3" controlId="settings-new-password">
                                     <Form.Label className="text-light opacity-75">Új jelszó</Form.Label>
                                     <Form.Control 
                                         type="password" 
+                                        autoComplete="new-password"
                                         className="bg-secondary bg-opacity-25 text-light border-secondary"
                                         placeholder="Legalább 6 karakter"
                                         value={passwords.newPassword}
                                         onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
                                         minLength={6}
                                         required
-                                        disabled={isUpdatingPassword}
+                                        readOnly={isUpdatingPassword}
                                     />
                                 </Form.Group>
 
-                                <Form.Group className="mb-4">
+                                <Form.Group className="mb-4" controlId="settings-confirm-password">
                                     <Form.Label className="text-light opacity-75">Új jelszó megerősítése</Form.Label>
                                     <Form.Control 
                                         type="password" 
+                                        autoComplete="new-password"
                                         className="bg-secondary bg-opacity-25 text-light border-secondary"
                                         value={passwords.confirmPassword}
                                         onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
                                         minLength={6}
                                         required
-                                        disabled={isUpdatingPassword}
+                                        readOnly={isUpdatingPassword}
                                     />
                                 </Form.Group>
 
@@ -613,16 +632,17 @@ const Settings = () => {
                                     variant="info" 
                                     type="submit" 
                                     className="fw-bold text-dark px-4"
-                                    disabled={isUpdatingPassword || !passwords.currentPassword || !passwords.newPassword || !passwords.confirmPassword}
+                                    aria-disabled={isUpdatingPassword || !passwords.currentPassword || !passwords.newPassword || !passwords.confirmPassword}
+                                    aria-busy={isUpdatingPassword}
                                 >
-                                    {isUpdatingPassword ? <Spinner size="sm" /> : 'Jelszó frissítése'}
+                                    {isUpdatingPassword && <Spinner size="sm" aria-hidden="true" className="me-2" />}Jelszó frissítése
                                 </Button>
                             </Form>
                         </Tab>
 
                         {/* 4. TAB: GDPR */}
                         <Tab eventKey="privacy" title="Adatvédelem" className="p-4">
-                            <h5 className="fw-bold text-info mb-3">🛡️ Adatvédelmi Beállítások</h5>
+                            <h2 className="h5 fw-bold text-info mb-3"><span aria-hidden="true">🛡️ </span>Adatvédelmi Beállítások</h2>
                             <p className="text-secondary small mb-4">
                                 Itt kezelheted a GDPR-hoz kapcsolódó jogaidat: letöltheted a rendszerben tárolt adataidat, vagy véglegesen törölheted a fiókodat.
                             </p>
@@ -691,9 +711,9 @@ const Settings = () => {
                 </Card.Body>
             </Card>
             {/* --- PROFILE PICTURE CROPPING AND ZOOMING MODAL --- */}
-            <Modal show={showCropModal} onHide={handleCloseCropModal} centered backdrop="static" contentClassName="bg-dark text-light border-secondary">
-                <Modal.Header closeButton closeVariant="white" className="border-secondary">
-                    <Modal.Title className="fw-bold text-info">Profilkép beállítása</Modal.Title>
+            <Modal show={showCropModal} onHide={handleCloseCropModal} aria-labelledby="avatar-crop-title" centered backdrop="static" contentClassName="bg-dark text-light border-secondary">
+                <Modal.Header closeButton closeLabel="Ablak bezárása" className="border-secondary">
+                    <Modal.Title id="avatar-crop-title" className="fw-bold app-accent-text">Profilkép beállítása</Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="p-4">
                     <div className="position-relative w-100 rounded-3 overflow-hidden mb-4" style={{ height: '320px', backgroundColor: '#111' }}>
@@ -705,44 +725,41 @@ const Settings = () => {
                                 aspect={1}
                                 cropShape="round"
                                 showGrid={false}
-                                onCropChange={setCrop}
+                                onCropChange={next => { if (!isUploadingImage) setCrop(next); }}
                                 onCropComplete={onCropComplete}
-                                onZoomChange={setZoom}
+                                onZoomChange={next => { if (!isUploadingImage) setZoom(next); }}
+                                onMediaLoaded={setCropMediaSize}
+                                onCropSizeChange={setCropViewportSize}
+                                cropperProps={{ role: 'group', 'aria-label': 'Profilkép kivágási területe', tabIndex: isUploadingImage ? -1 : 0 }}
+                                mediaProps={{ alt: 'Profilkép kivágási előnézete' }}
                             />
                         )}
                     </div>
 
-                    <Form.Group className="px-2">
-                        <div className="d-flex justify-content-between mb-1">
-                            <Form.Label className="small text-secondary mb-0">Nagyítás (Zoom)</Form.Label>
-                            <span className="small text-info fw-bold">{Math.round(zoom * 100)}%</span>
-                        </div>
-                        <Form.Range
-                            min={1}
-                            max={3}
-                            step={0.05}
-                            value={zoom}
-                            onChange={(e) => setZoom(Number(e.target.value))}
-                            disabled={isUploadingImage}
-                        />
-                    </Form.Group>
+                    <ImageCropControls crop={crop} onCropChange={setCrop} zoom={zoom} onZoomChange={setZoom}
+                        bounds={{ x: cropMediaSize && cropViewportSize ? Math.abs((cropMediaSize.width * zoom - cropViewportSize.width) / 2) : 0,
+                            y: cropMediaSize && cropViewportSize ? Math.abs((cropMediaSize.height * zoom - cropViewportSize.height) / 2) : 0 }}
+                        disabled={isUploadingImage || !cropMediaSize || !cropViewportSize} />
+                    <LearningFeedback error={imageMessage.type === 'danger' ? imageMessage.text : null} />
+                    <div role="status" aria-atomic="true">{isUploadingImage ? 'Profilkép feltöltése folyamatban.' : ''}</div>
                 </Modal.Body>
                 <Modal.Footer className="border-secondary">
                     <Button variant="outline-secondary" onClick={handleCloseCropModal} disabled={isUploadingImage}>
                         Mégse
                     </Button>
-                    <Button variant="info" className="fw-bold text-dark px-4" onClick={handleCropAndUpload} disabled={isUploadingImage}>
+                    <Button variant="info" className="fw-bold text-dark px-4" onClick={handleCropAndUpload}
+                        disabled={!croppedAreaPixels} aria-disabled={isUploadingImage} aria-busy={isUploadingImage}>
                         {isUploadingImage ? <><Spinner size="sm" className="me-2" />Feltöltés...</> : 'Kivágás és Mentés'}
                     </Button>
                 </Modal.Footer>
             </Modal>
             {/* --- GDPR: ACCOUNT DELETION CONFIRMATION  MODAL --- */}
-           <Modal show={showDeleteModal} onHide={() => !isDeleting && setShowDeleteModal(false)} centered backdrop="static" contentClassName="bg-dark text-light border-danger">
-                <Modal.Header closeButton closeVariant="white" className="border-secondary bg-danger bg-opacity-25">
-                    <Modal.Title className="fw-bold text-danger">⚠️ Fiók Törlése</Modal.Title>
+           <Modal show={showDeleteModal} onHide={() => !isDeleting && setShowDeleteModal(false)} aria-labelledby="account-delete-title" centered backdrop="static" contentClassName="bg-dark text-light border-danger">
+                <Modal.Header closeButton closeLabel="Ablak bezárása" className="border-secondary bg-danger bg-opacity-25">
+                    <Modal.Title id="account-delete-title" className="fw-bold text-danger">⚠️ Fiók Törlése</Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="p-4">
-                    {deleteMessage.text && <Alert variant={deleteMessage.type} className="fw-bold mb-3">{deleteMessage.text}</Alert>}
+                    <LearningFeedback error={deleteMessage.type === 'danger' ? deleteMessage.text : ''} />
                     
                     <p className="fs-5">Biztosan törölni szeretnéd a fiókodat?</p>
                     <p className="text-secondary small">
@@ -753,31 +770,34 @@ const Settings = () => {
                     <Form.Group className="mt-4">
                         {!isOAuthUser ? (
                             <>
-                                <Form.Label className="text-light opacity-75 small">Jelszó</Form.Label>
+                                <Form.Label htmlFor="delete-password" className="text-light opacity-75 small">Jelszó</Form.Label>
                                 <Form.Control 
+                                    id="delete-password"
                                     type="password" 
                                     className="bg-secondary bg-opacity-25 text-light border-danger mb-3"
                                     value={deletePassword}
                                     onChange={(e) => setDeletePassword(e.target.value)}
                                     disabled={isDeleting}
-                                    autoComplete="off"
+                                    autoComplete="current-password"
                                 />
-                                <Form.Label className="text-light opacity-75 small">Jelszó megerősítése</Form.Label>
+                                <Form.Label htmlFor="delete-confirm-password" className="text-light opacity-75 small">Jelszó megerősítése</Form.Label>
                                 <Form.Control 
+                                    id="delete-confirm-password"
                                     type="password" 
                                     className="bg-secondary bg-opacity-25 text-light border-danger"
                                     value={deleteConfirmPassword}
                                     onChange={(e) => setDeleteConfirmPassword(e.target.value)}
                                     disabled={isDeleting}
-                                    autoComplete="off"
+                                    autoComplete="current-password"
                                 />
                             </>
                         ) : (
                             <>
-                                <Form.Label className="text-light opacity-75 small">
+                                <Form.Label htmlFor="delete-oauth-confirmation" className="text-light opacity-75 small">
                                     Mivel {user.authProvider} fiókkal léptél be, a megerősítéshez gépeld be: <strong className="text-light">TÖRLÉS</strong>
                                 </Form.Label>
                                 <Form.Control 
+                                    id="delete-oauth-confirmation"
                                     type="text" 
                                     placeholder="TÖRLÉS"
                                     className="bg-secondary bg-opacity-25 text-light border-danger text-center fw-bold fs-5"

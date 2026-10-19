@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Button, Alert, Spinner, Accordion, Badge, ListGroup, Modal, Row, Col } from 'react-bootstrap';
+import { Card, Form, Button, Spinner, Accordion, Badge, ListGroup, Modal, Row, Col } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi';
+import LanguageText from '../LanguageText';
+import ExerciseImage from '../ExerciseImage';
+import LearningFeedback from '../LearningFeedback';
 
 const AVAILABLE_COURSES = {
     'en': { name: 'Angol', flag: '🇬🇧' },
@@ -11,6 +14,7 @@ const AVAILABLE_COURSES = {
 const CurriculumManager = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [statusBusy, setStatusBusy] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
     
     const [topics, setTopics] = useState([]);
@@ -44,6 +48,7 @@ const CurriculumManager = () => {
         } catch (error) {
             console.error("Hiba a tananyagok betöltésekor:", error);
             setTopics([]);
+            setMessage({ text: 'Nem sikerült betölteni a tananyagokat. Próbáld újra az oldal frissítésével.', type: 'danger' });
         } finally {
             setIsLoadingTopics(false);
         }
@@ -59,7 +64,7 @@ const CurriculumManager = () => {
     };
 
     const handleUpload = async () => {
-        if (!selectedFile) return;
+        if (!selectedFile || isLoading) return;
 
         if (importLevel === 'LESSON' && !targetTopicId) {
             setMessage({ text: 'Kérlek válaszd ki a cél Témakört!', type: 'warning' });
@@ -89,7 +94,7 @@ const CurriculumManager = () => {
                     await adminApi.importExercises(targetLessonId, jsonData);
                 }
 
-                setMessage({ text: 'Tananyag sikeresen importálva! 🎉', type: 'success' });
+                setMessage({ text: 'Tananyag sikeresen importálva!', type: 'success' });
                 window.dispatchEvent(new Event('adminActionOccurred'));
                 setSelectedFile(null);
                 document.getElementById('json-upload-input').value = '';
@@ -100,15 +105,21 @@ const CurriculumManager = () => {
                 
                 fetchTopics();
             } catch (error) {
-                setMessage({ text: 'Hiba az importálás során. Ellenőrizd a JSON formátumát!', type: 'danger', error });
+                setMessage({ text: error.response?.data?.message || 'Hiba az importálás során. Ellenőrizd a JSON formátumát!', type: 'danger' });
             } finally { setIsLoading(false); }
+        };
+        reader.onerror = () => {
+            setMessage({ text: 'Nem sikerült elolvasni a fájlt. Válaszd ki újra, és próbáld meg ismét!', type: 'danger' });
+            setIsLoading(false);
         };
         reader.readAsText(selectedFile);
     };
 
     const handleStatusToggle = async (id, type, name, currentStatus) => {
+        if (statusBusy) return;
         const nextStatus = !currentStatus;
         if (window.confirm(`Biztosan ${nextStatus ? 'visszaállítod' : 'felfüggeszted'} ezt a(z) ${type} elemet? (${name})`)) {
+            setStatusBusy(true);
             try {
                 if (type === 'Témakör') {
                     await adminApi.toggleTopicStatus(id, nextStatus);
@@ -136,6 +147,8 @@ const CurriculumManager = () => {
                 window.dispatchEvent(new Event('adminActionOccurred'));
             } catch (error) {
                 setMessage({ text: `Hiba a(z) ${type} módosításakor.`, type: 'danger', error});
+            } finally {
+                setStatusBusy(false);
             }
         }
     };
@@ -173,19 +186,21 @@ const CurriculumManager = () => {
 
     return (
         <div>
-            {message.text && <Alert variant={message.type} className="shadow-sm rounded-4">{message.text}</Alert>}
+            <LearningFeedback error={message.type === 'danger' ? message.text : ''}
+                feedback={message.type !== 'danger' && message.text ? { type: message.type, msg: message.text } : null} />
 
             <Card className="bg-dark border-secondary shadow-lg mb-4 rounded-4">
                 <Card.Body className="p-4">
-                    <h5 className="text-info fw-bold mb-4">Tananyag JSON Importálása</h5>
+                    <h3 className="h5 text-info fw-bold mb-4">Tananyag JSON Importálása</h3>
                     
                     <Row className="mb-4">
                         <Col md={3}>
-                            <Form.Group>
+                            <Form.Group controlId="curriculum-import-level">
                                 <Form.Label className="text-secondary small fw-bold">Mit szeretnél importálni?</Form.Label>
                                 <Form.Select 
                                     className="bg-dark text-light border-secondary shadow-sm"
                                     value={importLevel}
+                                    disabled={isLoading}
                                     onChange={(e) => {
                                         setImportLevel(e.target.value);
                                         setTargetTopicId('');
@@ -202,11 +217,12 @@ const CurriculumManager = () => {
                         {/* Csak Témakör esetén bekérjük a Nyelvet */}
                         {importLevel === 'FULL_TOPIC' && (
                             <Col md={3}>
-                                <Form.Group>
+                                <Form.Group controlId="curriculum-import-course">
                                     <Form.Label className="text-secondary small fw-bold">Nyelv (Kurzus)</Form.Label>
                                     <Form.Select 
                                         className="bg-dark text-light border-secondary shadow-sm"
                                         value={importCourseCode}
+                                        disabled={isLoading}
                                         onChange={(e) => setImportCourseCode(e.target.value)}
                                     >
                                         {Object.entries(AVAILABLE_COURSES).map(([code, data]) => (
@@ -222,11 +238,12 @@ const CurriculumManager = () => {
                         {/* Csak akkor mutatjuk, ha Leckét VAGY Feladatot importál */}
                         {(importLevel === 'LESSON' || importLevel === 'EXERCISE') && (
                             <Col md={4}>
-                                <Form.Group>
+                                <Form.Group controlId="curriculum-import-topic">
                                     <Form.Label className="text-secondary small fw-bold">Cél Témakör</Form.Label>
                                     <Form.Select 
                                         className="bg-dark text-light border-secondary shadow-sm"
                                         value={targetTopicId}
+                                        disabled={isLoading}
                                         onChange={(e) => {
                                             setTargetTopicId(e.target.value);
                                             setTargetLessonId(''); // Reset lecke ha témakört vált
@@ -246,13 +263,13 @@ const CurriculumManager = () => {
                         {/* Csak akkor mutatjuk, ha Feladatot importál */}
                         {importLevel === 'EXERCISE' && (
                             <Col md={4}>
-                                <Form.Group>
+                                <Form.Group controlId="curriculum-import-lesson">
                                     <Form.Label className="text-secondary small fw-bold">Cél Lecke</Form.Label>
                                     <Form.Select 
                                         className="bg-dark text-light border-secondary shadow-sm"
                                         value={targetLessonId}
                                         onChange={(e) => setTargetLessonId(e.target.value)}
-                                        disabled={!targetTopicId}
+                                        disabled={!targetTopicId || isLoading}
                                     >
                                         <option value="">-- Válassz Leckét --</option>
                                         {availableLessonsForTarget.map(l => (
@@ -266,25 +283,26 @@ const CurriculumManager = () => {
                         )}
                     </Row>
 
-                    <Form.Group className="mb-4">
-                        <Form.Control id="json-upload-input" type="file" accept=".json" onChange={handleFileChange} className="bg-dark text-light border-secondary rounded-3" />
-                        <Form.Text className="text-secondary">
+                    <Form.Group className="mb-4" controlId="json-upload-input">
+                        <Form.Label>Tananyag JSON-fájlja</Form.Label>
+                        <Form.Control type="file" accept=".json" disabled={isLoading} aria-describedby="curriculum-import-help" onChange={handleFileChange} className="bg-dark text-light border-secondary rounded-3" />
+                        <Form.Text id="curriculum-import-help" className="text-secondary">
                             {importLevel === 'FULL_TOPIC' && "Tölts fel egy JSON array-t, ami TopicImportRequest objektumokat tartalmaz."}
                             {importLevel === 'LESSON' && "Tölts fel egy JSON array-t, ami LessonImportRequest objektumokat tartalmaz."}
                             {importLevel === 'EXERCISE' && "Tölts fel egy JSON array-t, ami ExerciseImportRequest objektumokat tartalmaz."}
                         </Form.Text>
                     </Form.Group>
 
-                    <Button variant="info" className="fw-bold px-4 text-dark rounded-pill" onClick={handleUpload} disabled={!selectedFile || isLoading}>
-                        {isLoading ? <Spinner as="span" animation="border" size="sm" className="me-2"/> : 'Kiválasztott JSON Importálása 🚀'}
+                    <Button variant="info" className="fw-bold px-4 text-dark rounded-pill" onClick={handleUpload} aria-disabled={!selectedFile || isLoading} aria-busy={isLoading}>
+                        {isLoading && <Spinner as="span" animation="border" size="sm" aria-hidden="true" className="me-2"/>}Kiválasztott JSON Importálása
                     </Button>
                 </Card.Body>
             </Card>
 
-            <h4 className="text-light fw-bold mb-4">Meglévő Tananyagok (Kezelés)</h4>
+            <h3 className="h4 text-light fw-bold mb-4">Meglévő Tananyagok (Kezelés)</h3>
             
             {isLoadingTopics ? (
-                <div className="text-center py-4"><Spinner animation="border" variant="info" /></div>
+                <div role="status" className="text-center py-4"><Spinner animation="border" variant="info" aria-hidden="true" /> Tananyagok betöltése…</div>
             ) : topics.length === 0 ? (
                 <p className="text-secondary">Nincs még elérhető tananyag az adatbázisban.</p>
             ) : (
@@ -294,75 +312,81 @@ const CurriculumManager = () => {
                     return (
                         <div key={courseCode} className="mb-5">
                             {/* Csoport Fejléc */}
-                            <h5 className="text-info fw-bold mb-3 border-bottom border-secondary pb-2 d-flex align-items-center">
-                                <span className="fs-3 me-2">{courseData.flag}</span> 
+                            <h4 className="h5 text-info fw-bold mb-3 border-bottom border-secondary pb-2 d-flex align-items-center">
+                                <span aria-hidden="true" className="fs-3 me-2">{courseData.flag}</span>
                                 {courseData.name} Kurzus ({courseTopics.length} témakör)
-                            </h5>
+                            </h4>
                             
                             <Accordion className="border-secondary custom-dark-accordion">
                                 {courseTopics.map((topic) => (
-                                    <Accordion.Item eventKey={topic.topicId} key={topic.topicId} className={`bg-dark border-secondary mb-3 rounded-4 overflow-hidden shadow-sm`}>
-                                        <Accordion.Header className={!topic.active ? 'opacity-75 bg-danger bg-opacity-10' : ''}>
-                                            <div className="d-flex w-100 justify-content-between align-items-center pe-3">
+                                    <Accordion.Item eventKey={topic.topicId} key={topic.topicId} className={`bg-dark border-secondary mb-3 rounded-4 shadow-sm`}>
+                                        <div className="d-flex flex-wrap align-items-center gap-2 pe-3">
+                                        <Accordion.Header as="h5" className={`flex-grow-1 ${!topic.active ? 'bg-danger bg-opacity-10' : ''}`}>
                                                 <span className="text-light fw-bold fs-5">
-                                                    📘 {topic.topicName} {!topic.active && <Badge bg="danger" className="ms-3 fs-6">Felfüggesztve</Badge>}
+                                                    <span aria-hidden="true">📘 </span>{topic.topicName} {!topic.active && <Badge bg="danger" className="ms-3 fs-6">Felfüggesztve</Badge>}
                                                 </span>
-                                                <Button 
+                                        </Accordion.Header>
+                                                <Button
+                                                    aria-label={`${topic.active ? 'Témakör Felfüggesztése' : 'Témakör Visszaállítása'}: ${topic.topicName}`}
+                                                    aria-disabled={statusBusy}
                                                     variant={topic.active ? "outline-danger" : "outline-success"} 
                                                     size="sm" 
                                                     className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" 
-                                                    onClick={(e) => { e.stopPropagation(); handleStatusToggle(topic.topicId, 'Témakör', topic.topicName, topic.active); }}
+                                                    onClick={() => handleStatusToggle(topic.topicId, 'Témakör', topic.topicName, topic.active)}
                                                 >
-                                                    <span>{topic.active ? '🛑' : '♻️'}</span> {topic.active ? 'Témakör Felfüggesztése' : 'Témakör Visszaállítása'}
+                                                    <span aria-hidden="true">{topic.active ? '🛑' : '♻️'}</span> {topic.active ? 'Témakör Felfüggesztése' : 'Témakör Visszaállítása'}
                                                 </Button>
                                             </div>
-                                        </Accordion.Header>
                                         <Accordion.Body className={`bg-dark text-light border-top border-secondary p-4 ${!topic.active ? 'bg-danger bg-opacity-10' : ''}`}>
 
                                             {topic.lessons && topic.lessons.length > 0 ? (
                                                 <div className="d-flex flex-column gap-4">
                                                     {topic.lessons.map(lesson => (
                                                         <Card key={lesson.lessonId} className={`bg-transparent border border-secondary shadow-sm rounded-4 ${!lesson.active ? 'bg-danger bg-opacity-10' : ''}`}>
-                                                            <Card.Header className="d-flex justify-content-between align-items-center bg-black bg-opacity-25 border-bottom border-secondary py-3 px-4">
+                                                            <Card.Header className="d-flex flex-wrap gap-2 justify-content-between align-items-center bg-black bg-opacity-25 border-bottom border-secondary py-3 px-4">
                                                                 <div>
-                                                                    <span className="fw-bold text-info fs-5 me-3">📄 {lesson.title} (Sorszám: {lesson.orderIndex})</span>
+                                                                    <h6 className="fw-bold text-info fs-5 me-3 mb-0"><span aria-hidden="true">📄 </span>{lesson.title} (Sorszám: {lesson.orderIndex})</h6>
                                                                     {!lesson.active && <Badge bg="danger" className="ms-3 fs-6">Felfüggesztve</Badge>}
                                                                 </div>
-                                                                <Button 
+                                                                <Button
+                                                                    aria-label={`${lesson.active ? 'Felfüggesztés' : 'Visszaállítás'}: ${lesson.title}`}
+                                                                    aria-disabled={statusBusy}
                                                                     variant={lesson.active ? "outline-danger" : "outline-success"} 
                                                                     size="sm" 
                                                                     className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" 
                                                                     onClick={() => handleStatusToggle(lesson.lessonId, 'Lecke', lesson.title, lesson.active)}
                                                                 >
-                                                                    <span>{lesson.active ? '🛑' : '♻️'}</span> {lesson.active ? 'Felfüggesztés' : 'Visszaállítás'}
+                                                                    <span aria-hidden="true">{lesson.active ? '🛑' : '♻️'}</span> {lesson.active ? 'Felfüggesztés' : 'Visszaállítás'}
                                                                 </Button>
                                                             </Card.Header>
                                                             <Card.Body className="p-0">
                                                                 <ListGroup variant="flush">
                                                                     {lesson.exercises?.map(exercise => (
                                                                         <ListGroup.Item key={exercise.exerciseId} className={`bg-transparent border-bottom border-secondary border-opacity-50 text-light d-flex flex-wrap justify-content-between align-items-center py-3 px-4 ${!exercise.active ? 'bg-danger bg-opacity-10' : ''}`}>
-                                                                            <div className="d-flex align-items-center text-truncate pe-3 mb-2 mb-md-0">
+                                                                            <div className="d-flex flex-wrap align-items-center gap-2 pe-3 mb-2 mb-md-0">
                                                                                <Badge bg="info" text="dark" pill className="me-3 px-3 py-2 fw-bold" style={{ minWidth: '130px' }}>
                                                                                     🧩 {exercise.type}
                                                                                 </Badge>
                                                                                 <Badge bg={getDifficultyBadge(exercise.difficulty)} pill className="me-3">{exercise.difficulty}</Badge>
-                                                                                <span className="text-secondary text-truncate" title={getPreview(exercise.content)}>
+                                                                                <span className="text-secondary">
                                                                                     {getPreview(exercise.content)}
                                                                                 </span>
                                                                                 {!exercise.active && <Badge bg="danger" className="ms-3">Felfüggesztve</Badge>}
                                                                             </div>
                                                                             
-                                                                            <div className="d-flex align-items-center gap-3 flex-shrink-0">
-                                                                                <Button variant="outline-info" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" onClick={() => handleShowPreview(exercise)}>
-                                                                                    <span>👁️</span> Megtekintés
+                                                                            <div className="d-flex flex-wrap align-items-center gap-2">
+                                                                                <Button aria-label={`Megtekintés: ${lesson.title}, ${getPreview(exercise.content)}`} variant="outline-info" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" onClick={() => handleShowPreview(exercise)}>
+                                                                                    <span aria-hidden="true">👁️</span> Megtekintés
                                                                                 </Button>
-                                                                                <Button 
+                                                                                <Button
+                                                                                    aria-label={`${exercise.active ? 'Felfüggesztés' : 'Visszaállítás'}: ${lesson.title}, ${getPreview(exercise.content)}`}
+                                                                                    aria-disabled={statusBusy}
                                                                                     variant={exercise.active ? "outline-danger" : "outline-success"} 
                                                                                     size="sm" 
                                                                                     className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" 
                                                                                     onClick={() => handleStatusToggle(exercise.exerciseId, 'Feladat', exercise.type, exercise.active)}
                                                                                 >
-                                                                                    <span>{exercise.active ? '🛑' : '♻️'}</span> {exercise.active ? 'Felfüggesztés' : 'Visszaállítás'}
+                                                                                    <span aria-hidden="true">{exercise.active ? '🛑' : '♻️'}</span> {exercise.active ? 'Felfüggesztés' : 'Visszaállítás'}
                                                                                 </Button>
                                                                             </div>
                                                                         </ListGroup.Item>
@@ -390,25 +414,27 @@ const CurriculumManager = () => {
             )}
 
             {/* FELADAT ELŐNÉZET MODAL */}
-            <Modal show={previewModal.show} onHide={() => setPreviewModal({ show: false, exercise: null })} centered size="lg">
-                <Modal.Header closeButton className="bg-dark border-secondary" variant="dark">
-                    <Modal.Title className="text-info fw-bold">
-                        🧩 {previewModal.exercise?.type} - Előnézet
+            <Modal show={previewModal.show} onHide={() => setPreviewModal({ show: false, exercise: null })} aria-labelledby="curriculum-preview-title" centered size="lg">
+                <Modal.Header closeButton closeLabel="Előnézet bezárása" className="bg-dark border-secondary">
+                    <Modal.Title as="h2" id="curriculum-preview-title" className="h4 app-accent-text fw-bold">
+                        <span aria-hidden="true">🧩 </span>{previewModal.exercise?.type} - Előnézet
                     </Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="bg-dark text-light p-4">
                     {previewModal.exercise && (
                         <div>
-                            <h4 className="text-info mb-4">
-                                {previewModal.exercise.content?.question || 'Nincs megadva szöveges kérdés'}
-                            </h4>
+                            <h3 className="h4 text-info mb-4">
+                                <LanguageText text={previewModal.exercise.content?.question || 'Nincs megadva szöveges kérdés'}
+                                    lang={previewModal.exercise.content?.questionLang || 'hu'} parts={previewModal.exercise.content?.questionParts} />
+                            </h3>
                             
+                            <ExerciseImage exercise={previewModal.exercise} maxHeight={180} />
                             {previewModal.exercise.content?.options && (
                                 <div className="mb-4">
                                     <strong className="text-secondary text-uppercase small tracking-wide">Válaszlehetőségek:</strong>
                                     <div className="d-flex flex-wrap gap-2 mt-2">
                                         {previewModal.exercise.content.options.map((opt, i) => (
-                                            <Badge key={i} bg="secondary" className="fs-6 py-2 px-3 fw-normal rounded-pill">
+                                            <Badge key={i} lang={previewModal.exercise.content?.answerLang} bg="secondary" className="fs-6 py-2 px-3 fw-normal rounded-pill">
                                                 {opt}
                                             </Badge>
                                         ))}
@@ -419,7 +445,7 @@ const CurriculumManager = () => {
                             {previewModal.exercise.correctAnswer && (
                                 <div className="mt-4 p-3 border border-success rounded-4 bg-success bg-opacity-10 shadow-sm">
                                     <strong className="text-success text-uppercase small d-block mb-1">Helyes válasz:</strong>
-                                    <span className="fs-5 fw-bold text-light">
+                                    <span lang={previewModal.exercise.content?.answerLang} className="fs-5 fw-bold text-light">
                                         {previewModal.exercise.correctAnswer?.answer || JSON.stringify(previewModal.exercise.correctAnswer)}
                                     </span>
                                 </div>

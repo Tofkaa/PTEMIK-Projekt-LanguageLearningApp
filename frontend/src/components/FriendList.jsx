@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
+import LearningFeedback from './LearningFeedback';
 
 const AVAILABLE_COURSES = {
     'en': { name: 'Angol', flag: '🇬🇧' },
@@ -41,6 +42,18 @@ const FriendList = () => {
     const [expiresIn, setExpiresIn] = useState(3);
     const [challengeLoading, setChallengeLoading] = useState(false);
     const [challengeError, setChallengeError] = useState('');
+    const [removeError, setRemoveError] = useState('');
+    const [removingId, setRemovingId] = useState(null);
+    const listHeadingRef = useRef(null);
+    const restoreListFocus = useRef(false);
+    const lessonRequestId = useRef(0);
+
+    useEffect(() => {
+        if (restoreListFocus.current) {
+            listHeadingRef.current?.focus();
+            restoreListFocus.current = false;
+        }
+    }, [friends]);
 
    const isFirstLoad = useRef(true);
 
@@ -72,12 +85,14 @@ const FriendList = () => {
     };
 
     const fetchLessonsForChallenge = async (courseCode) => {
+        const requestId = ++lessonRequestId.current;
         setFetchingLessons(true);
         try {
 
             const response = await api.get('/lessons/all-for-challenge', {
                 params: { courseCode: courseCode }
             });
+            if (requestId !== lessonRequestId.current) return;
             
             const fetchedLessons = response.data || [];
             
@@ -95,21 +110,30 @@ const FriendList = () => {
                 setSelectedLesson('');
             }
         } catch (err) {
+            if (requestId !== lessonRequestId.current) return;
             console.error("Nem sikerült lekérni a leckéket a kihíváshoz", err);
+            setLessons([]);
+            setSelectedLesson('');
+            setChallengeError('Nem sikerült betölteni a leckéket. Zárd be az ablakot, és próbáld újra!');
         } finally {
-            setFetchingLessons(false);
+            if (requestId === lessonRequestId.current) setFetchingLessons(false);
         }
     };
 
     const handleOpenChallenge = (friend) => {
         setSelectedFriend(friend);
         setChallengeError('');
+        setLessons([]);
+        setSelectedLesson('');
+        setFetchingLessons(true);
         // Alapértelmezetten a felhasználó aktív nyelvével indítjuk a modalt
         setChallengeCourse(user?.activeCourseCode || 'en');
         setShowModal(true);
     };
 
     const handleCloseModal = () => {
+        if (challengeLoading) return;
+        lessonRequestId.current += 1;
         setShowModal(false);
         setSelectedFriend(null);
     };
@@ -119,6 +143,7 @@ const FriendList = () => {
      * Automatically redirects the user to the LessonPlayer upon success, attaching the bypass ID.
      */
     const handleStartChallenge = async () => {
+        if (challengeLoading || fetchingLessons) return;
         if (!selectedLesson) {
             setChallengeError("Kérlek, válassz egy leckét!");
             return;
@@ -152,25 +177,32 @@ const FriendList = () => {
         }
     };
 
-    const handleRemoveFriend = async (friendshipId, friendName) => {
+    const handleRemoveFriend = async (friendshipId, friendName, button) => {
+        if (removingId) return;
         if (window.confirm(`Biztosan törlöd ${friendName} felhasználót a barátaid közül?`)) {
+            setRemovingId(friendshipId);
+            setRemoveError('');
             try {
                 await api.delete(`/friendships/${friendshipId}`);
-                fetchFriends();
+                restoreListFocus.current = !!button.closest('.card')?.contains(document.activeElement);
+                setFriends(previous => previous.filter(friend => friend.friendshipId !== friendshipId));
+                refreshNotifications?.();
             } catch (err) {
                 console.error("Hiba a barát törlésekor:", err);
-                setChallengeError('Nem sikerült törölni a barátot.');
+                setRemoveError('Nem sikerült törölni a barátot. Próbáld újra!');
+            } finally {
+                setRemovingId(null);
             }
         }
     };
     
-    if (loading) return <div className="text-center p-4"><Spinner animation="border" variant="info" /></div>;
+    if (loading) return <div role="status" className="text-center p-4"><Spinner animation="border" variant="info" aria-hidden="true" /> Barátlista betöltése…</div>;
     if (error) return <Alert variant="danger">{error}</Alert>;
 
     if (friends.length === 0) {
         return (
             <div className="p-5 text-center text-light">
-                <h5 className="mb-3">Még nincsenek barátaid a listán.</h5>
+                <h2 ref={listHeadingRef} tabIndex={-1} className="h5 mb-3">Még nincsenek barátaid a listán.</h2>
                 <p>Lépj át a Keresés fülre, és jelölj be valakit a kódja alapján!</p>
             </div>
         );
@@ -178,7 +210,8 @@ const FriendList = () => {
 
     return (
         <div className="p-3">
-            <h5 className="text-light mb-4">Barátaim ({friends.length})</h5>
+            <LearningFeedback error={removeError} />
+            <h2 ref={listHeadingRef} tabIndex={-1} className="h5 text-light mb-4">Barátaim ({friends.length})</h2>
             <Row>
                 {friends.map((friend) => (
                     <Col md={6} key={friend.friendshipId} className="mb-3">
@@ -203,17 +236,21 @@ const FriendList = () => {
                                         variant="outline-info" 
                                         size="sm" 
                                         className="w-100 fw-bold"
+                                        aria-label={`Kihívás: ${friend.name}#${friend.userTag}`}
                                         onClick={() => handleOpenChallenge(friend)}
                                     >
-                                        ⚔️ Kihívás
+                                        <span aria-hidden="true">⚔️ </span>Kihívás
                                     </Button>
                                     <Button 
                                         variant="outline-danger" 
                                         size="sm"
                                         title="Barát törlése"
-                                        onClick={() => handleRemoveFriend(friend.friendshipId, friend.name)}
+                                        aria-label={`Barát törlése: ${friend.name}#${friend.userTag}`}
+                                        aria-disabled={!!removingId}
+                                        aria-busy={removingId === friend.friendshipId}
+                                        onClick={(event) => handleRemoveFriend(friend.friendshipId, friend.name, event.currentTarget)}
                                     >
-                                        ✖
+                                        <span aria-hidden="true">✖</span>
                                     </Button>
                                 </div>
                             </Card.Body>
@@ -223,18 +260,18 @@ const FriendList = () => {
             </Row>
 
             {/* --- A FELUGRÓ ABLAK (MODAL) --- */}
-            <Modal show={showModal} onHide={handleCloseModal} centered data-bs-theme="dark" className="text-light">
-                <Modal.Header closeButton className="border-secondary bg-dark">
-                    <Modal.Title className="fw-bold">
-                        ⚔️ Kihívod: <span className="text-info">{selectedFriend?.name}</span>
+            <Modal show={showModal} onHide={handleCloseModal} aria-labelledby="challenge-modal-title" centered className="text-light">
+                <Modal.Header closeButton closeLabel="Kihívás bezárása" className="border-secondary bg-dark">
+                    <Modal.Title id="challenge-modal-title" className="fw-bold">
+                        <span aria-hidden="true">⚔️ </span>Kihívod: <span className="text-info">{selectedFriend?.name}</span>
                     </Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="bg-dark">
-                    {challengeError && <Alert variant="danger">{challengeError}</Alert>}
+                    <LearningFeedback error={challengeError} />
                     
                     <Form>
                         {/* 1. LÉPÉS: NYELV KIVÁLASZTÁSA */}
-                        <Form.Group className="mb-3">
+                        <Form.Group controlId="challenge-course" className="mb-3">
                             <Form.Label className="text-muted fw-bold">1. Milyen nyelven szeretnél párbajozni?</Form.Label>
                             <Form.Select 
                                 className="bg-secondary text-light border-secondary shadow-none"
@@ -251,7 +288,7 @@ const FriendList = () => {
                         </Form.Group>
 
                         {/* 2. LÉPÉS: NEHÉZSÉG KIVÁLASZTÁSA */}
-                        <Form.Group className="mb-3">
+                        <Form.Group controlId="challenge-difficulty" className="mb-3">
                             <Form.Label className="text-muted fw-bold">2. Milyen nehézségi szinten párbajozzatok?</Form.Label>
                             <Form.Select 
                                 className="bg-secondary text-light border-secondary shadow-none"
@@ -266,7 +303,7 @@ const FriendList = () => {
                         </Form.Group>
 
                         {/* 3. LÉPÉS: LECKE KIVÁLASZTÁSA */}
-                        <Form.Group className="mb-3">
+                        <Form.Group controlId="challenge-lesson" className="mb-3">
                             <Form.Label className="text-muted fw-bold">3. Melyik leckéből hívod ki?</Form.Label>
                             <Form.Select 
                                 className="bg-secondary text-light border-secondary shadow-none"
@@ -289,7 +326,7 @@ const FriendList = () => {
                         </Form.Group>
 
                         {/* 4. LÉPÉS: LEJÁRATI IDŐ */}
-                        <Form.Group className="mb-4">
+                        <Form.Group controlId="challenge-expiry" className="mb-4">
                             <Form.Label className="text-muted fw-bold">4. Meddig érvényes a kihívás?</Form.Label>
                             <Form.Select 
                                 className="bg-secondary text-light border-secondary shadow-none"
@@ -308,8 +345,8 @@ const FriendList = () => {
                         </Form.Group>
                     </Form>
 
-                    <Alert variant="warning" className="mb-0 text-light fw-bold border-0 shadow-sm">
-                        ⚠️ A kihívás elküldéséhez neked is azonnal le kell játszanod ezt a leckét! Ne indítsd el, ha most nem érsz rá!
+                    <Alert role="note" variant="warning" className="mb-0 fw-bold border-0 shadow-sm">
+                        <span aria-hidden="true">⚠️ </span>A kihívás elküldéséhez neked is azonnal le kell játszanod ezt a leckét! Ne indítsd el, ha most nem érsz rá!
                     </Alert>
 
                 </Modal.Body>
@@ -317,8 +354,8 @@ const FriendList = () => {
                     <Button variant="secondary" onClick={handleCloseModal} disabled={challengeLoading}>
                         Mégse
                     </Button>
-                    <Button variant="info" className="fw-bold" onClick={handleStartChallenge} disabled={challengeLoading || fetchingLessons || lessons.length === 0}>
-                        {challengeLoading ? 'Készülés...' : 'Játék Indítása! 🚀'}
+                    <Button variant="info" className="fw-bold" onClick={handleStartChallenge} disabled={fetchingLessons || lessons.length === 0} aria-disabled={challengeLoading} aria-busy={challengeLoading}>
+                        Játék Indítása! <span aria-hidden="true">🚀</span>
                     </Button>
                 </Modal.Footer>
             </Modal>

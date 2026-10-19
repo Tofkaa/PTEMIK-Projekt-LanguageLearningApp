@@ -49,28 +49,28 @@ describe('scheduled classroom assignment', () => {
 
     it('enables starting at the scheduled instant without reloading or refetching', async () => {
         await openClassroom();
-        expect(screen.getByRole('button', { name: 'Még nem elérhető' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Még nem elérhető: TimeZoneTest' })).toBeDisabled();
         const requests = assignmentApi.getClassroomAssignments.mock.calls.length;
 
         act(() => vi.advanceTimersByTime(1000));
 
-        expect(screen.getByRole('button', { name: 'Indítás' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Indítás: TimeZoneTest' })).toBeEnabled();
         expect(assignmentApi.getClassroomAssignments).toHaveBeenCalledTimes(requests);
 
         act(() => vi.advanceTimersByTime(60_000));
-        expect(screen.queryByRole('button', { name: 'Indítás' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Indítás: TimeZoneTest' })).not.toBeInTheDocument();
         expect(screen.getByText('Nincs aktív feladatod. 🎉')).toBeInTheDocument();
     });
 
     it.each(['focus', 'visibilitychange'])('updates immediately on %s after the tab was inactive', async (eventName) => {
         await openClassroom();
-        expect(screen.getByRole('button', { name: 'Még nem elérhető' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Még nem elérhető: TimeZoneTest' })).toBeDisabled();
 
         act(() => {
             vi.setSystemTime(start);
             (eventName === 'focus' ? window : document).dispatchEvent(new Event(eventName));
         });
 
-        expect(screen.getByRole('button', { name: 'Indítás' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Indítás: TimeZoneTest' })).toBeEnabled();
     });
 });

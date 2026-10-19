@@ -55,18 +55,18 @@ const ChallengeHistory = () => {
      * Generates the appropriate UI badge based on the challenge status and the winner.
      */
     const getResultBadge = (challenge) => {
-        if (challenge.status === 'DECLINED') return <Badge bg="danger">Elutasítva ❌</Badge>;
-        if (challenge.status === 'EXPIRED') return <Badge bg="secondary">Lejárt ⏳</Badge>;
+        if (challenge.status === 'DECLINED') return <Badge bg="danger">Elutasítva <span aria-hidden="true">❌</span></Badge>;
+        if (challenge.status === 'EXPIRED') return <Badge bg="secondary">Lejárt <span aria-hidden="true">⏳</span></Badge>;
         
         if (challenge.status === 'COMPLETED') {
-            if (challenge.winnerName === "Döntetlen") return <Badge bg="warning" text="dark">Döntetlen 🤝</Badge>;
-            if (challenge.winnerName === user?.name) return <Badge bg="success">Győzelem! 🏆</Badge>;
-            return <Badge bg="danger">Vereség 😢</Badge>;
+            if (challenge.winnerName === "Döntetlen") return <Badge bg="warning" text="dark">Döntetlen <span aria-hidden="true">🤝</span></Badge>;
+            if (challenge.winnerName === user?.name) return <Badge bg="success">Győzelem! <span aria-hidden="true">🏆</span></Badge>;
+            return <Badge bg="danger">Vereség <span aria-hidden="true">😢</span></Badge>;
         }
         return null;
     };
 
-    if (loading) return <div className="text-center p-4"><Spinner animation="border" variant="info" /></div>;
+    if (loading) return <div role="status" className="text-center p-4"><Spinner animation="border" variant="info" aria-hidden="true" /> Előzmények betöltése…</div>;
     if (error) return <Alert variant="danger">{error}</Alert>;
 
     if (history.length === 0) {
@@ -80,7 +80,7 @@ const ChallengeHistory = () => {
 
     return (
         <div className="p-3">
-            <h5 className="text-light mb-4">Előzmények ({history.length})</h5>
+            <h2 className="h5 text-light mb-4">Előzmények ({history.length})</h2>
             <Row>
                 {history.map((challenge) => {
                     const iAmChallenger = challenge.challengerName === user?.name;
@@ -91,15 +91,15 @@ const ChallengeHistory = () => {
 
                     return (
                         <Col md={12} key={challenge.challengeId} className="mb-3">
-                            <Card className="bg-dark border-secondary shadow-sm opacity-75">
+                            <Card className="bg-dark border-secondary shadow-sm">
                                 <Card.Body className="d-flex justify-content-between align-items-center">
                                     <div>
-                                        <h6 className="text-light mb-1">
-                                            ⚔️ Ellenfél: <strong className="text-info">{opponentName}</strong>
-                                        </h6>
+                                        <h3 className="h6 text-light mb-1">
+                                            <span aria-hidden="true">⚔️ </span>Ellenfél: <strong className="text-info">{opponentName}</strong>
+                                        </h3>
                                         <div className="text-light small">
                                            
-                                            <span title={courseData.name} className="me-2">{courseData.flag}</span>
+                                            <span className="me-2"><span aria-hidden="true">{courseData.flag} </span>{courseData.name}.</span>
                                             Lecke: {challenge.lessonTitle} ({challenge.difficulty})
                                         </div>
                                         <div className="text-secondary small mt-1">

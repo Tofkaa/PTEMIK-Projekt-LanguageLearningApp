@@ -40,7 +40,7 @@ const RecentResultsSection = () => {
     if (results.length === 0) {
         return (
             <div className="p-3 border border-secondary rounded-3 bg-black bg-opacity-25 text-center">
-                <p className="text-light opacity-50 fst-italic mb-0">
+                <p className="text-body-secondary fst-italic mb-0">
                     Még nincsenek megjeleníthető eredményeid. Teljesíts egy leckét a Dashboardon!
                 </p>
             </div>
@@ -50,22 +50,22 @@ const RecentResultsSection = () => {
   return (
         <div className="d-flex flex-column gap-3 mt-2">
             {results.map((result, idx) => (
-                <div key={idx} className="d-flex justify-content-between align-items-center p-3 rounded-3 border border-secondary bg-black bg-opacity-25">
+                <div key={idx} className="d-flex flex-wrap gap-2 justify-content-between align-items-center p-3 rounded-3 border border-secondary bg-black bg-opacity-25">
                     <div>
-                        <h6 className="fw-bold text-light mb-1">
+                        <h3 className="h6 fw-bold text-light mb-1">
                             {result.lessonTitle} 
                             {getDifficultyBadge(result.difficulty)}
-                        </h6>
-                        <small className="text-light opacity-50">
+                        </h3>
+                        <small className="text-body-secondary">
                             {formatToLocalDisplay(result.submittedAt)}
                         </small>
                     </div>
 
                     {/* Right side: points */}
                     <div className="text-end">
-                        <h5 className={`fw-bold mb-0 ${result.score >= 60 ? 'text-success' : 'text-danger'}`}>
+                        <p className={`h5 fw-bold mb-0 ${result.score >= 60 ? 'text-success' : 'text-danger'}`}>
                             {result.score}%
-                        </h5>
+                        </p>
                         <small className="text-light opacity-75" style={{ fontSize: '0.75rem' }}>
                             {result.correctAnswers} / {result.totalQuestions} helyes
                         </small>

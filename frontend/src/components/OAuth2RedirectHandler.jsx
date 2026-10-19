@@ -38,8 +38,8 @@ const OAuth2RedirectHandler = () => {
     return (
         <div className="d-flex justify-content-center align-items-center vh-100 bg-dark text-light">
             <div className="text-center">
-                <Spinner animation="border" variant="info" className="mb-3" />
-                <h4 className="fw-bold">Bejelentkezés folyamatban...</h4>
+                <Spinner aria-hidden="true" animation="border" variant="info" className="mb-3" />
+                <h1 className="h4 fw-bold">Bejelentkezés folyamatban...</h1>
                 <p className="text-secondary">Hitelesítés ellenőrzése a szerverrel</p>
             </div>
         </div>

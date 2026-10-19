@@ -1,7 +1,7 @@
 import  { useState, useEffect, useCallback } from 'react';
 import { classroomApi } from '../services/classroomApi';
 import { Card, Button, Modal, Form, Row, Col, Badge } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import { getUnseenIds } from '../utils/viewedStore';
@@ -22,7 +22,6 @@ const TeacherClassrooms = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({ name: '', description: '', courseCode: 'en' });
     const [isLoading, setIsLoading] = useState(true);
-    const navigate = useNavigate();
     const { notifications } = useNotifications();
 
     const fetchClassrooms = useCallback(async (silent = false) => {
@@ -104,13 +103,13 @@ const TeacherClassrooms = () => {
 
                         return (
                             <Col md={6} lg={4} key={room.classroomId}>
-                                <Card className="h-100 bg-dark text-light border-secondary shadow-sm" style={{ cursor: 'pointer' }}
-                                   onClick={() => navigate(`/classrooms/${room.classroomId}`, { state: { className: room.name, isOwner: true, courseCode: room.courseCode } })}>
+                                <Card className="h-100 bg-dark text-light border-secondary shadow-sm">
                                     <Card.Body className="d-flex flex-column">
                                         <Card.Title className="fw-bold d-flex justify-content-between align-items-start">
                                             <span>
                                                 <span className="me-2" title={`Kurzus: ${courseData.name}`}>{courseData.flag}</span>
-                                                {room.name}
+                                                <Link className="stretched-link app-accent-link" to={`/classrooms/${room.classroomId}`}
+                                                    state={{ className: room.name, isOwner: true, courseCode: room.courseCode }}>{room.name}</Link>
                                             </span>
                                          
                                             {totalClassroomPings > 0 && (
@@ -142,13 +141,13 @@ const TeacherClassrooms = () => {
             </Row>
 
             {/* Dark Mode Modal for Creation */}
-            <Modal show={isModalOpen} onHide={() => setIsModalOpen(false)} centered contentClassName="bg-dark text-light border-secondary">
-                <Modal.Header closeButton className="border-secondary" closeVariant="white">
-                    <Modal.Title className="fw-bold">Új osztály létrehozása</Modal.Title>
+            <Modal show={isModalOpen} onHide={() => setIsModalOpen(false)} aria-labelledby="classroom-create-title" centered contentClassName="bg-dark text-light border-secondary">
+                <Modal.Header closeButton closeLabel="Ablak bezárása" className="border-secondary">
+                    <Modal.Title id="classroom-create-title" className="fw-bold">Új osztály létrehozása</Modal.Title>
                 </Modal.Header>
                 <Form onSubmit={handleCreate}>
                     <Modal.Body>
-                        <Form.Group className="mb-3">
+                        <Form.Group className="mb-3" controlId="new-classroom-name">
                             <Form.Label className="text-secondary fw-bold">Osztály neve</Form.Label>
                             <Form.Control 
                                 type="text" 
@@ -158,7 +157,7 @@ const TeacherClassrooms = () => {
                                 onChange={(e) => setFormData({...formData, name: e.target.value})}
                             />
                         </Form.Group>
-                        <Form.Group className="mb-3">
+                        <Form.Group className="mb-3" controlId="new-classroom-description">
                             <Form.Label className="text-secondary fw-bold">Leírás</Form.Label>
                             <Form.Control 
                                 as="textarea" 
@@ -170,8 +169,8 @@ const TeacherClassrooms = () => {
                         </Form.Group>
                         
                         {/* --- Choose Course --- */}
-                        <Form.Group className="mb-3">
-                            <Form.Label className="text-info fw-bold">Tanított Nyelv (Kurzus)</Form.Label>
+                        <Form.Group className="mb-3" controlId="new-classroom-course">
+                            <Form.Label className="app-accent-text fw-bold">Tanított Nyelv (Kurzus)</Form.Label>
                             <Form.Select 
                                 required
                                 className="bg-dark text-light border-info"
@@ -191,7 +190,7 @@ const TeacherClassrooms = () => {
 
                     </Modal.Body>
                     <Modal.Footer className="border-secondary">
-                        <Button variant="outline-light" onClick={() => setIsModalOpen(false)}>
+                        <Button variant="outline-secondary" onClick={() => setIsModalOpen(false)}>
                             Mégse
                         </Button>
                         <Button variant="primary" type="submit" className="fw-bold">

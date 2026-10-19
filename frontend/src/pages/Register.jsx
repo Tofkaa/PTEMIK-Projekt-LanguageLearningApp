@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Form, Button, Card, Container, Row, Col, Alert, ButtonGroup, ToggleButton } from 'react-bootstrap';
+import { Form, Button, Card, Container, Row, Col, ButtonGroup, ToggleButton } from 'react-bootstrap';
 import api from '../services/api.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
+import LearningFeedback from '../components/LearningFeedback';
+import useStageFocus from '../hooks/useStageFocus';
 
 const AVAILABLE_COURSES = {
     'en': { name: 'Angol', flag: '🇬🇧' },
@@ -11,6 +14,7 @@ const AVAILABLE_COURSES = {
 };
 
 const Register = () => {
+    const { theme } = useTheme();
     const [name, setName] = useState(sessionStorage.getItem('reg_name') || '');
     const [email, setEmail] = useState(sessionStorage.getItem('reg_email') || '');
     const [password, setPassword] = useState('');
@@ -24,6 +28,7 @@ const Register = () => {
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRegistered, setIsRegistered] = useState(false);
+    const headingRef = useStageFocus(isRegistered);
 
     const navigate = useNavigate();
 
@@ -94,8 +99,8 @@ const Register = () => {
                     <Col md={8} lg={5}>
                         <Card className="bg-dark text-light border-info shadow-lg mt-5 text-center p-4">
                             <Card.Body>
-                                <div className="text-info mb-3" style={{ fontSize: '3rem' }}>✉️</div>
-                                <h3 className="fw-bold text-info mb-3">Ellenőrizd a postafiókodat!</h3>
+                                <div aria-hidden="true" className="text-info mb-3" style={{ fontSize: '3rem' }}>✉️</div>
+                                <h1 ref={headingRef} tabIndex={-1} className="h3 fw-bold app-accent-text mb-3">Ellenőrizd a postafiókodat!</h1>
                                 <p className="mb-3">
                                     Sikeresen regisztráltál! Küldtünk egy megerősítő linket a(z) <strong className="text-light">{email}</strong> címre.
                                 </p>
@@ -115,8 +120,8 @@ const Register = () => {
     }
 
    return (
-        <Container className="mt-5 position-relative">
-            <div className="position-absolute top-0 end-0 p-3" style={{ zIndex: 1000 }}>
+        <Container className="auth-page mt-5">
+            <div className="d-flex justify-content-end px-3">
                 <ThemeToggle />
             </div>
 
@@ -124,19 +129,19 @@ const Register = () => {
                 <Col md={8} lg={5}>
                     <Card className="bg-transparent border-0 mt-5 text-light">
                         <Card.Body className="p-5">
-                            <h2 className="text-center mb-4 fw-bold">Új fiók létrehozása</h2>
+                            <h1 ref={headingRef} tabIndex={-1} className="h2 text-center mb-4 fw-bold">Új fiók létrehozása</h1>
                             
-                            {error && <Alert variant="danger" className="text-center rounded-4 border-0 shadow-sm fw-bold">⚠️ {error}</Alert>}
+                            <LearningFeedback error={error} />
 
                             <Form onSubmit={handleSubmit}>
                                 <Form.Group className="mb-3" controlId="formName">
                                     <Form.Label>Teljes név</Form.Label>
-                                    <Form.Control type="text" placeholder="Pl. Teszt Elek" value={name} onChange={(e) => setName(e.target.value)} required disabled={isSubmitting} />
+                                    <Form.Control type="text" autoComplete="name" placeholder="Pl. Teszt Elek" value={name} onChange={(e) => setName(e.target.value)} required disabled={isSubmitting} />
                                 </Form.Group>
 
                                 <Form.Group className="mb-3" controlId="formEmail">
                                     <Form.Label>Email cím</Form.Label>
-                                    <Form.Control type="email" placeholder="pelda@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={isSubmitting} />
+                                    <Form.Control type="email" autoComplete="email" placeholder="pelda@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={isSubmitting} />
                                 </Form.Group>
 
                                 <Form.Group className="mb-3" controlId="formPassword">
@@ -149,8 +154,8 @@ const Register = () => {
                                     <Form.Control type="password" placeholder="Jelszó megerősítése" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={6} autoComplete='new-password' disabled={isSubmitting} />
                                 </Form.Group>
                                 
-                                <Form.Group className="mb-4 text-center">
-                                    <Form.Label className="d-block mb-2 text-light fw-bold">Fiók típusa</Form.Label>
+                                <Form.Group as="fieldset" className="mb-4 text-center">
+                                    <Form.Label as="legend" className="d-block mb-2 text-light fw-bold">Fiók típusa</Form.Label>
                                     <ButtonGroup className="w-100 shadow-sm">
                                         <ToggleButton
                                             id="role-student"
@@ -163,7 +168,7 @@ const Register = () => {
                                             className="fw-bold"
                                             disabled={isSubmitting}
                                         >
-                                            👨‍🎓 Tanuló
+                                            <span aria-hidden="true">👨‍🎓 </span>Tanuló
                                         </ToggleButton>
                                         <ToggleButton
                                             id="role-teacher"
@@ -176,13 +181,13 @@ const Register = () => {
                                             className="fw-bold"
                                             disabled={isSubmitting}
                                         >
-                                            👩‍🏫 Tanár
+                                            <span aria-hidden="true">👩‍🏫 </span>Tanár
                                         </ToggleButton>
                                     </ButtonGroup>
                                 </Form.Group>
 
-                                <Form.Group className="mb-4 p-3 border border-secondary rounded bg-dark bg-opacity-50 shadow-sm">
-                                    <Form.Label className="text-light fw-bold">🌍 Melyik nyelvet szeretnéd tanulni?</Form.Label>
+                                <Form.Group controlId="registration-course" className="mb-4 p-3 border border-secondary rounded bg-dark bg-opacity-50 shadow-sm">
+                                    <Form.Label className="text-light fw-bold"><span aria-hidden="true">🌍 </span>Melyik nyelvet szeretnéd tanulni?</Form.Label>
                                     <Form.Select 
                                         value={courseCode}
                                         onChange={(e) => setCourseCode(e.target.value)}
@@ -198,8 +203,8 @@ const Register = () => {
                                     </Form.Select>
                                 </Form.Group>
 
-                                <Form.Group className="mb-4 p-3 border border-secondary rounded bg-dark bg-opacity-50 shadow-sm">
-                                    <Form.Label className="text-light fw-bold">🧠 Tanulási Mód</Form.Label>
+                                <Form.Group controlId="registration-difficulty" className="mb-4 p-3 border border-secondary rounded bg-dark bg-opacity-50 shadow-sm">
+                                    <Form.Label className="text-light fw-bold"><span aria-hidden="true">🧠 </span>Tanulási Mód</Form.Label>
                                     <Form.Select 
                                         value={preferredDifficulty}
                                         onChange={(e) => setPreferredDifficulty(e.target.value)}
@@ -212,7 +217,7 @@ const Register = () => {
                                         <option value="MEDIUM">🟡 Fix: Haladó (Csak MEDIUM feladatok)</option>
                                         <option value="HARD">🔴 Fix: Profi (Csak HARD feladatok)</option>
                                     </Form.Select>
-                                    <Form.Text className="text-light opacity-50 small mt-2 d-block">
+                                    <Form.Text className="text-body-secondary small mt-2 d-block">
                                         Ezeket a beállításokat később a profilodban bármikor módosíthatod.
                                     </Form.Text>
                                 </Form.Group>
@@ -247,30 +252,29 @@ const Register = () => {
 
                             <div className="d-flex flex-column gap-3 mb-4">
                                 <Button 
-                                    variant="outline-light" 
+                                    variant={theme === 'dark' ? 'outline-light' : 'outline-dark'}
                                     className="fw-bold py-2 d-flex align-items-center justify-content-center gap-2"
                                     onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/google'}
                                     disabled={isSubmitting}
                                 >
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" width="20" />
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="" width="20" />
                                     Belépés Google fiókkal
                                 </Button>
                                 
                                 <Button 
-                                    variant="outline-light" 
+                                    variant={theme === 'dark' ? 'outline-light' : 'outline-dark'}
                                     className="fw-bold py-2 d-flex align-items-center justify-content-center gap-2"
-                                    style={{ borderColor: '#5865F2', color: '#5865F2' }}
                                     onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/discord'}
                                     disabled={isSubmitting}
                                 >
-                                    <img src="https://assets-global.website-files.com/6257adef93867e50d84d30e2/636e0a69f118df70ad7828d4_icon_clyde_blurple_RGB.svg" alt="Discord" width="24" />
+                                    <img src="https://assets-global.website-files.com/6257adef93867e50d84d30e2/636e0a69f118df70ad7828d4_icon_clyde_blurple_RGB.svg" alt="" width="24" />
                                     Belépés Discord fiókkal
                                 </Button>
                             </div>
                             
                             <div className="text-center mt-3">
                                 <span className="text-light">Már van fiókod? </span>
-                                <Link to="/login" className="text-decoration-none fw-bold text-info">Lépj be itt!</Link>
+                                <Link to="/login" className="app-accent-link fw-bold">Lépj be itt!</Link>
                             </div>
                         </Card.Body>
                     </Card>

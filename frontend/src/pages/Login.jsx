@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Form, Button, Card, Container, Row, Col, Alert } from 'react-bootstrap';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Form, Button, Card, Container, Row, Col } from 'react-bootstrap';
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
+import LearningFeedback from '../components/LearningFeedback';
 
 /**
  * Login Component
@@ -11,11 +13,13 @@ import ThemeToggle from '../components/ThemeToggle.jsx';
  * and initializing the global state (AuthContext) upon successful login.
  */
 const Login = () => {
+    const { theme } = useTheme();
+    const location = useLocation();
     // Component-level state for input fields and error handling
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
-    const [error, setError] = useState('');
+    const [error, setError] = useState(() => typeof location.state?.error === 'string' ? location.state.error : '');
     const [isLoading, setIsLoading] = useState(false);
 
     const navigate = useNavigate();
@@ -27,6 +31,7 @@ const Login = () => {
      */
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isLoading) return;
         setError(''); 
         setIsLoading(true);
         
@@ -75,8 +80,8 @@ const Login = () => {
     };
 
    return (
-       <Container className="mt-5 position-relative">
-           <div className="position-absolute top-0 end-0 p-3" style={{ zIndex: 1000 }}>
+       <Container className="auth-page mt-5">
+           <div className="d-flex justify-content-end px-3">
                <ThemeToggle />
            </div>
 
@@ -84,16 +89,18 @@ const Login = () => {
                <Col md={8} lg={5}>
                    <Card className="bg-transparent border-0 mt-5 text-light">
                        <Card.Body className="p-5">
-                           <h2 className="text-center mb-4 fw-bold text-white">Bejelentkezés</h2>
+                           <h1 className="h2 text-center mb-4 fw-bold text-white">Bejelentkezés</h1>
                            
                            {/* Render error alert upon failed authentication */}
-                           {error && <Alert variant="danger" className="text-center rounded-4 border-0 shadow-sm fw-bold">⚠️ {error}</Alert>}
+                           <LearningFeedback error={error} feedback={typeof location.state?.successMessage === 'string'
+                               ? { type: 'success', msg: location.state.successMessage } : null} />
 
                            <Form onSubmit={handleSubmit}>
                                <Form.Group className="mb-3" controlId="formBasicEmail">
                                    <Form.Label>Email cím</Form.Label>
                                    <Form.Control 
                                         type="email" 
+                                        autoComplete="username"
                                         placeholder="pelda@email.com" 
                                         value={email} 
                                         onChange={(e) => setEmail(e.target.value)} 
@@ -125,7 +132,7 @@ const Login = () => {
                                        onChange={(e) => setRememberMe(e.target.checked)}
                                        disabled={isLoading}
                                    />
-                                   <Link to="/forgot-password" className="small text-info text-decoration-none fw-bold">
+                                   <Link to="/forgot-password" className="small app-accent-link fw-bold">
                                        Elfelejtetted a jelszavad?
                                    </Link>
                                </Form.Group>
@@ -144,30 +151,29 @@ const Login = () => {
 
                             <div className="d-flex flex-column gap-3 mb-4">
                                 <Button 
-                                    variant="outline-light" 
+                                    variant={theme === 'dark' ? 'outline-light' : 'outline-dark'}
                                     className="fw-bold py-2 d-flex align-items-center justify-content-center gap-2"
                                     onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/google'}
                                     disabled={isLoading}
                                 >
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" width="20" />
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="" width="20" />
                                     Belépés Google fiókkal
                                 </Button>
                                 
                                 <Button 
-                                    variant="outline-light" 
+                                    variant={theme === 'dark' ? 'outline-light' : 'outline-dark'}
                                     className="fw-bold py-2 d-flex align-items-center justify-content-center gap-2"
-                                    style={{ borderColor: '#5865F2', color: '#5865F2' }}
                                     onClick={() => window.location.href = 'http://localhost:8080/oauth2/authorization/discord'}
                                     disabled={isLoading}
                                 >
-                                    <img src="https://assets-global.website-files.com/6257adef93867e50d84d30e2/636e0a69f118df70ad7828d4_icon_clyde_blurple_RGB.svg" alt="Discord" width="24" />
+                                    <img src="https://assets-global.website-files.com/6257adef93867e50d84d30e2/636e0a69f118df70ad7828d4_icon_clyde_blurple_RGB.svg" alt="" width="24" />
                                     Belépés Discord fiókkal
                                 </Button>
                             </div>
                            
                            <div className="text-center mt-3">
                                <span className="text-light">Nincs még fiókod? </span>
-                               <Link to="/register" className="text-decoration-none fw-bold text-info">Regisztrálj itt!</Link>
+                                   <Link to="/register" className="app-accent-link fw-bold">Regisztrálj itt!</Link>
                            </div>
                        </Card.Body>
                    </Card>

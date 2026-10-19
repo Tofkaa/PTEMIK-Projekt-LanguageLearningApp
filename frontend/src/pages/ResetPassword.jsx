@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Form, Button, Card, Container, Row, Col, Alert } from 'react-bootstrap';
 import { authApi } from '../services/authApi';
+import LearningFeedback from '../components/LearningFeedback';
+import useStageFocus from '../hooks/useStageFocus';
 
 const ResetPassword = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
-    const navigate = useNavigate();
 
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [status, setStatus] = useState('idle'); // 'idle', 'loading', 'success', 'error'
     const [message, setMessage] = useState('');
+    const headingRef = useStageFocus(!token ? 'missing-token' : status === 'success' ? 'success' : 'form');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (status === 'loading') return;
         
         if (password !== confirmPassword) {
             setStatus('error');
@@ -29,7 +32,6 @@ const ResetPassword = () => {
             const response = await authApi.resetPassword({ token, newPassword: password });
             setStatus('success');
             setMessage(response.data || 'Jelszó sikeresen frissítve!');
-            setTimeout(() => navigate('/login'), 3000);
         } catch (error) {
             setStatus('error');
             
@@ -48,7 +50,7 @@ const ResetPassword = () => {
         return (
             <Container className="d-flex justify-content-center align-items-center mt-5" style={{ minHeight: '60vh' }}>
                 <Alert variant="danger" className="text-center p-4 rounded-4 shadow-lg">
-                    <h4>⚠️ Hiányzó azonosító</h4>
+                    <h1 ref={headingRef} tabIndex={-1} className="h4"><span aria-hidden="true">⚠️</span> Hiányzó azonosító</h1>
                     <p>Érvénytelen vagy hiányzó visszaállító link.</p>
                     <Link to="/login" className="btn btn-outline-danger mt-2">Vissza a belépéshez</Link>
                 </Alert>
@@ -57,15 +59,15 @@ const ResetPassword = () => {
     }
 
     return (
-        <Container className="mt-5">
+        <Container className="auth-page mt-5">
             <Row className="justify-content-center">
                 <Col md={8} lg={5}>
                     <Card className="bg-transparent border-0 mt-5 text-light">
                         <Card.Body className="p-5">
-                            <h2 className="text-center mb-4 fw-bold">Új jelszó beállítása</h2>
+                            <h1 ref={headingRef} tabIndex={-1} className="h2 text-center mb-4 fw-bold">Új jelszó beállítása</h1>
                             
-                            {status === 'error' && <Alert variant="danger" className="text-center rounded-4 border-0 shadow-sm fw-bold">⚠️ {message}</Alert>}
-                            {status === 'success' && <Alert variant="success" className="text-center rounded-4 border-0 shadow-sm fw-bold">✅ {message} <br/><small>Átirányítás...</small></Alert>}
+                            <LearningFeedback error={status === 'error' ? message : ''} feedback={status === 'success' ? { type: 'success', msg: message } : null} />
+                            {status === 'success' && <Link to="/login" className="app-accent-link d-block mt-3">Vissza a belépéshez</Link>}
 
                             {status !== 'success' && (
                                 <Form onSubmit={handleSubmit}>
@@ -73,11 +75,12 @@ const ResetPassword = () => {
                                         <Form.Label>Új jelszó</Form.Label>
                                         <Form.Control 
                                             type="password" 
+                                            autoComplete="new-password"
                                             placeholder="Legalább 6 karakter" 
                                             value={password} 
                                             onChange={(e) => setPassword(e.target.value)} 
                                             required minLength={6} 
-                                            disabled={status === 'loading'}
+                                            readOnly={status === 'loading'}
                                         />
                                     </Form.Group>
 
@@ -85,15 +88,16 @@ const ResetPassword = () => {
                                         <Form.Label>Új jelszó megerősítése</Form.Label>
                                         <Form.Control 
                                             type="password" 
+                                            autoComplete="new-password"
                                             placeholder="Jelszó újra" 
                                             value={confirmPassword} 
                                             onChange={(e) => setConfirmPassword(e.target.value)} 
                                             required minLength={6} 
-                                            disabled={status === 'loading'}
+                                            readOnly={status === 'loading'}
                                         />
                                     </Form.Group>
 
-                                    <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold" disabled={status === 'loading'}>
+                                    <Button variant="primary" type="submit" className="w-100 mb-3 py-2 fw-bold" aria-disabled={status === 'loading'}>
                                         {status === 'loading' ? 'Feldolgozás...' : 'Jelszó mentése'}
                                     </Button>
                                 </Form>

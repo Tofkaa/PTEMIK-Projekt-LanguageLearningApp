@@ -24,7 +24,7 @@ const VerifiedRoute = ({ children }) => {
                         <p className="small text-secondary mb-4">
                             Kérjük, keresd meg a postafiókodban a regisztrációkor küldött aktiváló linket.
                         </p>
-                        <Button variant="outline-light" onClick={() => navigate('/dashboard')} className="w-100 fw-bold">
+                        <Button variant="outline-secondary" onClick={() => navigate('/dashboard')} className="w-100 fw-bold">
                             Vissza a Dashboardra
                         </Button>
                     </Card.Body>

@@ -4,7 +4,7 @@
  * Calculates user levels dynamically based on the global XP formula (XP / 100).
  */
 
-import { useState, useEffect } from 'react';
+import { useId, useState, useEffect } from 'react';
 import { Card, Table, Spinner, Alert, ButtonGroup, ToggleButton, Badge } from 'react-bootstrap';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
  */
 const Leaderboard = ({defaultScope = 'global'}) => {
     const { user } = useAuth();
+    const controlId = useId();
     
     const [scope, setScope] = useState(defaultScope);
     const [sortBy, setSortBy] = useState('xp');
@@ -26,28 +27,25 @@ const Leaderboard = ({defaultScope = 'global'}) => {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        fetchLeaderboard();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [scope, sortBy]);
-
-    /**
-     * Fetches the leaderboard data from the API based on the selected scope and sorting criteria.
-     */
-    const fetchLeaderboard = async () => {
+        let active = true;
+        const fetchLeaderboard = async () => {
         setLoading(true);
         setError('');
         try {
             const response = await api.get(`/leaderboard/${scope}`, {
                 params: { sortBy: sortBy, _t: Date.now() }
             });
-            setPlayers(response.data || []);
+            if (active) setPlayers(response.data || []);
         } catch (err) {
             console.error(err);
-            setError('Nem sikerült betölteni a ranglistát.');
+            if (active) setError('Nem sikerült betölteni a ranglistát.');
         } finally {
-            setLoading(false);
+            if (active) setLoading(false);
         }
-    };
+        };
+        fetchLeaderboard();
+        return () => { active = false; };
+    }, [scope, sortBy]);
 
     /**
      * Calculates the user's level based on their total XP.
@@ -66,54 +64,52 @@ const Leaderboard = ({defaultScope = 'global'}) => {
      * @returns {JSX.Element} The rendered rank indicator.
      */
     const getRankIcon = (rank) => {
-        if (rank === 1) return <span className="fs-4">🥇</span>;
-        if (rank === 2) return <span className="fs-4">🥈</span>;
-        if (rank === 3) return <span className="fs-4">🥉</span>;
+        if (rank >= 1 && rank <= 3) return <><span className="visually-hidden">{rank}. hely</span><span aria-hidden="true" className="fs-4">{['🥇', '🥈', '🥉'][rank - 1]}</span></>;
         return <span className="text-secondary fw-bold px-2">{rank}.</span>;
     };
 
     return (
         <Card className="bg-dark border-secondary shadow-lg mt-4 mb-5">
             <Card.Header className="border-bottom border-secondary d-flex flex-column flex-md-row justify-content-between align-items-center p-3 gap-3">
-                <h4 className="text-light mb-0 fw-bold">🏆 Ranglista</h4>
+                <h2 className="h4 text-light mb-0 fw-bold"><span aria-hidden="true">🏆 </span>Ranglista</h2>
                 
                 <div className="d-flex gap-2 flex-wrap justify-content-center">
-                    <ButtonGroup size="sm">
+                    <fieldset className="border-0 p-0 m-0"><legend className="visually-hidden">Ranglista köre</legend><ButtonGroup size="sm">
                         <ToggleButton
-                            id="toggle-global" type="radio" variant="outline-info" name="scope"
+                            id={`${controlId}-global`} type="radio" variant="outline-info" name={`${controlId}-scope`}
                             value="global" checked={scope === 'global'} onChange={(e) => setScope(e.currentTarget.value)}
                         >
-                            🌍 Globális
+                            <span aria-hidden="true">🌍 </span>Globális
                         </ToggleButton>
                         <ToggleButton
-                            id="toggle-friends" type="radio" variant="outline-info" name="scope"
+                            id={`${controlId}-friends`} type="radio" variant="outline-info" name={`${controlId}-scope`}
                             value="friends" checked={scope === 'friends'} onChange={(e) => setScope(e.currentTarget.value)}
                         >
-                            🤝 Barátok
+                            <span aria-hidden="true">🤝 </span>Barátok
                         </ToggleButton>
-                    </ButtonGroup>
+                    </ButtonGroup></fieldset>
 
-                    <ButtonGroup size="sm">
+                    <fieldset className="border-0 p-0 m-0"><legend className="visually-hidden">Ranglista rendezése</legend><ButtonGroup size="sm">
                         <ToggleButton
-                            id="toggle-xp" type="radio" variant="outline-warning" name="sortBy"
+                            id={`${controlId}-xp`} type="radio" variant="outline-warning" name={`${controlId}-sort`}
                             value="xp" checked={sortBy === 'xp'} onChange={(e) => setSortBy(e.currentTarget.value)}
                         >
-                            ⭐ XP
+                            <span aria-hidden="true">⭐ </span>XP
                         </ToggleButton>
                         <ToggleButton
-                            id="toggle-streak" type="radio" variant="outline-warning" name="sortBy"
+                            id={`${controlId}-streak`} type="radio" variant="outline-warning" name={`${controlId}-sort`}
                             value="streak" checked={sortBy === 'streak'} onChange={(e) => setSortBy(e.currentTarget.value)}
                         >
-                            🔥 Streak
+                            <span aria-hidden="true">🔥 </span>Streak
                         </ToggleButton>
-                    </ButtonGroup>
+                    </ButtonGroup></fieldset>
                 </div>
             </Card.Header>
 
             <Card.Body className="p-0 position-relative" style={{ minHeight: '300px' }}>
                 {loading && (
-                    <div className="position-absolute top-50 start-50 translate-middle">
-                        <Spinner animation="border" variant="info" />
+                    <div role="status" className="position-absolute top-50 start-50 translate-middle text-center">
+                        <Spinner animation="border" variant="info" aria-hidden="true" /> Ranglista betöltése…
                     </div>
                 )}
                 
@@ -128,6 +124,7 @@ const Leaderboard = ({defaultScope = 'global'}) => {
                 {!loading && !error && players.length > 0 && (
                     <div className="table-responsive">
                         <Table size="sm" hover variant="dark" className="mb-0 text-center align-middle">
+                            <caption className="visually-hidden">{scope === 'global' ? 'Globális' : 'Barátok'} ranglista, {sortBy === 'xp' ? 'XP' : 'napi sorozat'} szerint</caption>
                             <thead className="text-uppercase text-secondary" style={{ fontSize: '0.85rem' }}>
                                 <tr>
                                     <th className="py-3 border-secondary">Hely.</th>
@@ -154,11 +151,11 @@ const Leaderboard = ({defaultScope = 'global'}) => {
                                             </td>
                                             <td>
                                                 <Badge bg="secondary" pill className="px-3 py-2 border border-secondary">
-                                                    Lvl {calculateLevel(player.xp)}
+                                                    {calculateLevel(player.xp)}. szint
                                                 </Badge>
                                             </td>
                                             <td className="fw-bold text-warning fs-5">
-                                                {sortBy === 'xp' ? `${player.xp} ⭐` : `${player.streak} 🔥`}
+                                                {sortBy === 'xp' ? `${player.xp} XP` : `${player.streak} nap`}
                                             </td>
                                         </tr>
                                     );

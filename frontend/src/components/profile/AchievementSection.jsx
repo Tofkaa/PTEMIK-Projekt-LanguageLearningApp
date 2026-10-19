@@ -43,7 +43,7 @@ const AchievementsSection = () => {
     }
 
     if (achievements.length === 0) {
-        return <div className="text-light opacity-50 fst-italic">Még nincsenek elérhető kitüntetések a rendszerben.</div>;
+        return <div className="text-body-secondary fst-italic">Még nincsenek elérhető kitüntetések a rendszerben.</div>;
     }
 
     // Sort achievements: Unlocked trophies appear first in the grid
@@ -62,18 +62,17 @@ const AchievementsSection = () => {
                             ? 'border-info bg-dark shadow-sm' 
                             : 'border-secondary bg-black bg-opacity-25' 
                         }`}
-                        style={{ 
-                            opacity: ach.isUnlocked ? 1 : 0.5,
-                            transform: ach.isUnlocked ? 'scale(1)' : 'scale(0.98)'
-                        }}
                     >
                         {/* Trophy Icon (Emoji or Image) */}
                         <div 
+                            aria-hidden="true"
                             className="d-flex justify-content-center align-items-center bg-secondary bg-opacity-25 rounded-circle me-3" 
                             style={{ 
                                 width: '50px', 
                                 height: '50px', 
                                 fontSize: '1.8rem',
+                                flexShrink: 0,
+                                opacity: ach.isUnlocked ? 1 : 0.55,
                                 filter: ach.isUnlocked ? 'none' : 'grayscale(100%)' 
                             }}
                         >
@@ -82,10 +81,10 @@ const AchievementsSection = () => {
 
                         {/* Trophy Details */}
                         <div>
-                            <h6 className={`fw-bold mb-1 ${ach.isUnlocked ? 'text-info' : 'text-light'}`}>
-                                {ach.name} {!ach.isUnlocked && <span className="ms-1 fs-6">🔒</span>}
-                            </h6>
-                            <p className="text-light opacity-75 mb-0" style={{ fontSize: '0.8rem', lineHeight: '1.2' }}>
+                            <h3 className={`h6 fw-bold mb-1 ${ach.isUnlocked ? 'text-info' : 'text-light'}`}>
+                                {ach.name} {!ach.isUnlocked && <><span aria-hidden="true" className="ms-1 fs-6">🔒</span><span className="visually-hidden"> – még nem szerezted meg</span></>}
+                            </h3>
+                            <p className="text-body-secondary mb-0" style={{ fontSize: '0.8rem' }}>
                                 {ach.description}
                             </p>
                             

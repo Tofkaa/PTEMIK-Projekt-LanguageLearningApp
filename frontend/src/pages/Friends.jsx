@@ -5,7 +5,7 @@
  * Handles client-side "read receipt" logic via LocalStorage.
  */
 
-import { Container, Row, Col, Tabs, Tab, Card, Badge, Button } from 'react-bootstrap';
+import { Container, Row, Col, Tabs, Tab, Card, Badge } from 'react-bootstrap';
 import FriendSearch from '../components/FriendSearch';
 import PendingRequests from '../components/PendingRequests';
 import FriendList from '../components/FriendList';
@@ -55,13 +55,14 @@ const Friends = () => {
             <Row className="justify-content-center">
                 <Col md={10} lg={8}>
                     <div className="d-flex justify-content-between align-items-center mb-4">
-                        <h2 className="text-light fw-bold m-0">🌐 Közösség</h2>
+                        <h1 className="h2 text-light fw-bold m-0"><span aria-hidden="true">🌐 </span>Közösség</h1>
                     </div>
                     
                     <Card className="bg-dark border-secondary shadow-lg">
                         <Card.Body className="p-0">
                             <Tabs
                                 id="friends-tabs"
+                                aria-label="Közösségi funkciók"
                                 className="border-bottom border-secondary p-3 pb-0 custom-dark-tabs"
                                 activeKey={activeTab}
                                 onSelect={handleTabSelect}
@@ -69,7 +70,7 @@ const Friends = () => {
                                 {/* FRIENDS TAB */}
                                 <Tab eventKey="list" title={
                                     <span>
-                                        👥 Barátaim
+                                        <span aria-hidden="true">👥 </span>Barátaim
                                         {hasNewFriend && activeTab !== 'list' && (
                                             <Badge bg="info" className="ms-2">Új!</Badge> // Info színű, mert ez nem egy elvégzendő feladat
                                         )}
@@ -79,7 +80,7 @@ const Friends = () => {
                                 </Tab>
                                 
                                 {/* FRIENDS SEARCH TAB */}
-                                <Tab eventKey="search" title="🔍 Keresés">
+                                <Tab eventKey="search" title={<><span aria-hidden="true">🔍 </span>Keresés</>}>
                                     <div className="p-4">
                                         <FriendSearch /> 
                                     </div>
@@ -88,7 +89,7 @@ const Friends = () => {
                                 {/* REQUESTS TAB */}
                                 <Tab eventKey="requests" title={
                                         <span>
-                                            🔔 Kérelmek
+                                            <span aria-hidden="true">🔔 </span>Kérelmek
                                             {notifications.pendingFriends > 0 && (
                                                 <Badge bg="danger" pill className="ms-2">{notifications.pendingFriends}</Badge>
                                             )}
@@ -103,7 +104,7 @@ const Friends = () => {
                                 {/* CHALLENGES TAB */}
                                 <Tab eventKey="active" title={
                                         <span>
-                                            ⚔️ Aktív Kihívások
+                                            <span aria-hidden="true">⚔️ </span>Aktív Kihívások
                                             {notifications.pendingChallenges > 0 && (
                                                 <Badge bg="danger" pill className="ms-2">{notifications.pendingChallenges}</Badge>
                                             )}
@@ -118,7 +119,7 @@ const Friends = () => {
                                 {/* HISTORY TAB */}
                                 <Tab eventKey="history" title={
                                     <span>
-                                        📜 Előzmények
+                                        <span aria-hidden="true">📜 </span>Előzmények
                                         {hasNewHistory && activeTab !== 'history' && (
                                             <Badge bg="info" className="ms-2">Új!</Badge>
                                         )}
@@ -128,7 +129,7 @@ const Friends = () => {
                                 </Tab>
                                 
                                 {/* LEADERBOARD TAB */}
-                                <Tab eventKey="leaderboard" title={<span>🏆 Ranglista</span>}>
+                                <Tab eventKey="leaderboard" title={<span><span aria-hidden="true">🏆 </span>Ranglista</span>}>
                                     <div className="p-4">
                                         <Leaderboard defaultScope="friends" />
                                     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, Form, Spinner, Table, ProgressBar } from 'react-bootstrap';
 import { classroomApi } from '../services/classroomApi';
@@ -10,6 +10,9 @@ import { useCurrentTime } from '../hooks/useCurrentTime';
 import ExercisePreviewCard from '../components/ExercisePreviewCard';
 import { useAuth } from '../context/AuthContext';
 import { getUnseenIds, markAsViewed } from '../utils/viewedStore';
+import AssignmentTimingModal from './AssignmentTimingModal';
+import AssignmentInitialTiming from './AssignmentInitialTiming';
+import LearningFeedback from './LearningFeedback';
 
 /**
  * Dashboard component for teachers to manage a specific classroom.
@@ -30,8 +33,22 @@ const TeacherClassroomDetail = () => {
     // State definitions
     const [pendingMembers, setPendingMembers] = useState([]);
     const [acceptedMembers, setAcceptedMembers] = useState([]);
+    const [memberBusy, setMemberBusy] = useState(false);
+    const [memberError, setMemberError] = useState('');
+    const [memberFeedback, setMemberFeedback] = useState(null);
+    const memberHeadingRef = useRef(null);
+    const restoreMemberFocus = useRef(false);
+    useEffect(() => {
+        if (restoreMemberFocus.current) {
+            if (document.activeElement === document.body) memberHeadingRef.current?.focus();
+            restoreMemberFocus.current = false;
+        }
+    }, [pendingMembers, acceptedMembers]);
     const [assignments, setAssignments] = useState([]);
     const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+    const [timingAssignment, setTimingAssignment] = useState(null);
+    const [initialTiming, setInitialTiming] = useState({});
+    const [assignmentError, setAssignmentError] = useState('');
     
     const [lessons, setLessons] = useState([]);
     const [selectedLessonId, setSelectedLessonId] = useState('');
@@ -150,18 +167,30 @@ const TeacherClassroomDetail = () => {
     /**
      * Accepts or rejects a pending join request.
      */
-    const handleModerate = async (studentId, approve) => {
-        try { await classroomApi.moderateMember(classroomId, studentId, approve); fetchDashboardData(true); }
-        catch (error) { console.error("Hiba a moderálás során:", error); }
+    const handleMemberAction = async (studentId, action, origin) => {
+        if (memberBusy) return;
+        setMemberBusy(true);
+        setMemberError('');
+        setMemberFeedback(null);
+        try {
+            if (action === 'remove') await classroomApi.kickMember(classroomId, studentId);
+            else await classroomApi.moderateMember(classroomId, studentId, action === 'approve');
+            restoreMemberFocus.current = document.activeElement === origin;
+            await fetchDashboardData(true);
+            setMemberFeedback({ type: 'success', msg: 'Az osztálytagság módosítása sikerült.' });
+        } catch (error) {
+            setMemberError(error.response?.data?.message || 'Nem sikerült módosítani az osztálytagságot. Próbáld újra!');
+        } finally {
+            setMemberBusy(false);
+        }
     };
 
     /**
      * Removes an accepted student from the classroom.
      */
-    const handleKick = async (studentId) => {
+    const handleKick = async (studentId, origin) => {
         if (window.confirm("Biztosan el akarod távolítani ezt a diákot az osztályból?")) {
-            try { await classroomApi.kickMember(classroomId, studentId); fetchDashboardData(true); }
-            catch (error) { console.error("Hiba a diák eltávolításakor:", error); }
+            await handleMemberAction(studentId, 'remove', origin);
         }
     };
 
@@ -257,6 +286,7 @@ const TeacherClassroomDetail = () => {
         e.preventDefault();
         if (isSubmitting) return; 
         setIsSubmitting(true);
+        setAssignmentError('');
 
         try {
             const payload = {
@@ -273,6 +303,10 @@ const TeacherClassroomDetail = () => {
 
                 availableFrom: formatToUtcForServer(assignmentForm.availableFrom),
                 availableUntil: formatToUtcForServer(assignmentForm.availableUntil),
+                accommodations: Object.entries(initialTiming).map(([userId, timing]) => ({
+                    userId, extraMinutes: timing.unlimited ? 0 : Number(timing.extraMinutes), unlimited: timing.unlimited,
+                    availableUntilOverride: formatToUtcForServer(timing.availableUntilOverride),
+                })),
 
                 exerciseIds: assignmentForm.exerciseIds,
 
@@ -284,8 +318,9 @@ const TeacherClassroomDetail = () => {
 
             await assignmentApi.createAssignment(classroomId, payload);
             setIsAssignmentModalOpen(false);
+            setInitialTiming({});
             setAssignmentForm({
-                title: '', description: '', hasFeedback: false, isTest: false, isRandomized: true,
+                title: '', description: '', hasFeedback: false, isTest: false, isRandomized: true, allowDictionary: true, allowLateSubmission: false,
                 allowRetries: false, maxAttempts: '', timeLimitMinutes: '', availableFrom: '', availableUntil: '', exerciseIds: [],
                 generationMode: 'FIXED', questionCount: ''
             });
@@ -296,7 +331,7 @@ const TeacherClassroomDetail = () => {
             fetchDashboardData(); 
         } catch (error) {
             console.error("Hiba a feladat kiosztásakor:", error);
-            alert(error.response?.data?.message || (error instanceof RangeError ? error.message : "Hiba történt a mentés során."));
+            setAssignmentError(error.response?.data?.message || (error instanceof RangeError ? error.message : "Hiba történt a mentés során. A beállításaid megmaradtak; próbáld újra."));
         } finally {
             setIsSubmitting(false); 
         }
@@ -387,10 +422,10 @@ const TeacherClassroomDetail = () => {
      */
     const renderAssignmentCard = (a, status) => (
         <Col md={6} lg={4} key={a.assignmentId}>
-            <Card className={`h-100 bg-dark text-light border-secondary shadow-sm ${status === 'expired' ? 'opacity-75' : ''}`}>
+            <Card className="h-100 bg-dark text-light border-secondary shadow-sm">
                 <Card.Body className="d-flex flex-column">
-                    <div className="d-flex justify-content-between align-items-start mb-2">
-                        <Card.Title className="fw-bold text-primary m-0">{a.title}</Card.Title>
+                    <div className="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-2">
+                        <Card.Title as="h2" className="h5 fw-bold text-primary m-0">{a.title}</Card.Title>
                         <div>
                             {hasUngradedSubmission(a.assignmentId) && (
                                 <Badge bg="danger" className="animate-pulse shadow-sm me-2 border border-light">🔴 ÚJ BEKÜLDÉS</Badge>
@@ -415,16 +450,18 @@ const TeacherClassroomDetail = () => {
                         </div>
                     </div>
 
-                    <div className="mt-auto pt-2 border-top border-secondary d-flex gap-2">
+                    <div className="mt-auto pt-2 border-top border-secondary d-flex flex-wrap gap-2">
+                        <Button variant="outline-secondary" size="sm" aria-label={`Egyéni időbeállítások: ${a.title}`} onClick={() => setTimingAssignment(a)}>Egyéni időbeállítások</Button>
                         <Button 
+                            aria-label={`Eredmények: ${a.title}`}
                             variant="outline-info" 
                             size="sm" 
                             className="flex-grow-1 fw-bold"
                            onClick={() => handleViewSubmissions(a)}
                         >
-                            📊 Eredmények
+                            <span aria-hidden="true">📊 </span>Eredmények
                         </Button>
-                        <Button variant="outline-danger" size="sm" onClick={() => handleDeleteAssignment(a.assignmentId)}>törlés🗑️</Button>
+                        <Button aria-label={`törlés: ${a.title}`} variant="outline-danger" size="sm" onClick={() => handleDeleteAssignment(a.assignmentId)}>törlés<span aria-hidden="true">🗑️</span></Button>
                     </div>
                 </Card.Body>
             </Card>
@@ -433,14 +470,15 @@ const TeacherClassroomDetail = () => {
 
     return (
         <Container className="py-4 text-light">
+            {timingAssignment && <AssignmentTimingModal assignment={timingAssignment} onHide={() => setTimingAssignment(null)} />}
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <Button variant="outline-secondary" size="sm" onClick={() => navigate('/classrooms')} className="mb-2">← Vissza</Button>
-                    <h2 className="fw-bold m-0">{classroomName}</h2>
+                    <h1 className="h2 fw-bold m-0">{classroomName}</h1>
                 </div>
             </div>
 
-          <Tabs activeKey={activeMainTab} onSelect={(key) => setActiveMainTab(key)} className="mb-4 custom-dark-tabs">
+          <Tabs id="teacher-classroom-tabs" aria-label="Osztályterem kezelése" activeKey={activeMainTab} onSelect={(key) => setActiveMainTab(key)} className="mb-4 custom-dark-tabs">
 
                 <Tab eventKey="assignments" title={
                     <span className="fw-bold">
@@ -452,7 +490,7 @@ const TeacherClassroomDetail = () => {
                         <Button variant="primary" className="fw-bold px-4 shadow-sm" onClick={openAssignmentModal}>+ Új Feladat / Teszt Kiírása</Button>
                     </div>
 
-            <Tabs defaultActiveKey="active" className="mb-3 border-secondary custom-dark-tabs">
+            <Tabs id="teacher-assignment-tabs" aria-label="Kiosztott feladatok állapota" defaultActiveKey="active" className="mb-3 border-secondary custom-dark-tabs">
                 <Tab eventKey="active" title={
                     <span className="fw-bold text-info">
                         🔥 Aktív ({activeAssignments.length})
@@ -490,10 +528,12 @@ const TeacherClassroomDetail = () => {
 
                 <Tab eventKey="members" title={
                     <span className="fw-bold">
-                        👥 Tagság kezelése
+                        <span aria-hidden="true">👥 </span>Tagság kezelése
                         {unseenPendingList.length > 0 && <Badge bg="danger" pill className="ms-2 animate-pulse">{unseenPendingList.length}</Badge>}
                     </span>}>
 
+                    <h2 ref={memberHeadingRef} tabIndex={-1} className="h4 mt-3">Tagság kezelése</h2>
+                    <LearningFeedback error={memberError} feedback={memberFeedback} />
                     <Row className="g-4 mt-1">
                         <Col md={6}>
                             <Card className="bg-dark border-secondary h-100">
@@ -514,7 +554,10 @@ const TeacherClassroomDetail = () => {
                                                 </div>
                                                 <div className="text-secondary small">{member.email}</div>
                                             </div>
-                                            <div className="d-flex gap-2"><Button variant="success" size="sm" onClick={() => handleModerate(member.userId, true)}>✓</Button><Button variant="outline-danger" size="sm" onClick={() => handleModerate(member.userId, false)}>✕</Button></div>
+                                            <div className="d-flex gap-2">
+                                                <Button aria-label={`Csatlakozás elfogadása: ${member.studentName || member.name}#${member.userTag}`} aria-disabled={memberBusy} variant="success" size="sm" onClick={event => handleMemberAction(member.userId, 'approve', event.currentTarget)}><span aria-hidden="true">✓</span></Button>
+                                                <Button aria-label={`Csatlakozás elutasítása: ${member.studentName || member.name}#${member.userTag}`} aria-disabled={memberBusy} variant="outline-danger" size="sm" onClick={event => handleMemberAction(member.userId, 'reject', event.currentTarget)}><span aria-hidden="true">✕</span></Button>
+                                            </div>
                                         </ListGroup.Item>
                                     ))}
                                 </ListGroup>
@@ -529,7 +572,7 @@ const TeacherClassroomDetail = () => {
                                     {acceptedMembers.map(member => (
                                         <ListGroup.Item key={member.memberId} className="bg-dark text-light border-secondary d-flex justify-content-between">
                                             <div><div className="fw-bold">{member.studentName || member.name} <span className="text-light small">#{member.userTag}</span></div><div className="text-secondary small">Belépett: {formatToLocalDisplay(member.joinedAt, false)}</div></div>
-                                            <Button variant="outline-danger" size="sm" onClick={() => handleKick(member.userId)}>Kirúgás</Button>
+                                            <Button aria-label={`Kirúgás: ${member.studentName || member.name}#${member.userTag}`} aria-disabled={memberBusy} variant="outline-danger" size="sm" onClick={event => handleKick(member.userId, event.currentTarget)}>Kirúgás</Button>
                                         </ListGroup.Item>
                                     ))}
                                 </ListGroup>
@@ -541,7 +584,7 @@ const TeacherClassroomDetail = () => {
                 <Tab eventKey="statistics" title={<span className="fw-bold">📊 Statisztika & Haladás</span>}>
                     {stats && advancedStats && (
                         <div className="mt-4">
-                            <Tabs defaultActiveKey="overview" className="mb-3 border-secondary custom-dark-tabs small">
+                            <Tabs id="teacher-statistics-tabs" aria-label="Osztálystatisztikák nézetei" defaultActiveKey="overview" className="mb-3 border-secondary custom-dark-tabs small">
                                 
                                 {/* DEFAULT OVERVIEW */}
                                 <Tab eventKey="overview" title="Áttekintés">
@@ -619,7 +662,7 @@ const TeacherClassroomDetail = () => {
                                                         </th>
                                                         {advancedStats.assignmentHeaders.map(header => (
                                                             <th key={header.assignmentId} title={header.title} className="text-light p-3">
-                                                                <div className="text-truncate" style={{ maxWidth: '120px', display: 'inline-block' }}>
+                                                                <div className="heatmap-assignment-title">
                                                                     {header.title}
                                                                 </div>
                                                             </th>
@@ -688,8 +731,8 @@ const TeacherClassroomDetail = () => {
                                                                     {mistake.mistakeCount} rontott válasz
                                                                 </Badge>
                                                                 {mistake.exercise && (
-                                                                    <Button variant="link" size="sm" className="text-info p-0 text-decoration-none" onClick={() => toggleMistakePreview(idx)}>
-                                                                        {expandedMistakeIndex === idx ? 'elrejtés' : 'előnézet👁️'}
+                                                                    <Button aria-label={`${expandedMistakeIndex === idx ? 'elrejtés' : 'előnézet'}: ${mistake.assignmentTitle}, ${mistake.question}`} aria-expanded={expandedMistakeIndex === idx} variant="link" size="sm" className="text-info p-0 text-decoration-none" onClick={() => toggleMistakePreview(idx)}>
+                                                                        {expandedMistakeIndex === idx ? 'elrejtés' : <>előnézet<span aria-hidden="true">👁️</span></>}
                                                                     </Button>
                                                                 )}
                                                             </div>
@@ -718,13 +761,14 @@ const TeacherClassroomDetail = () => {
             </Tabs>
 
            <Modal 
-                show={isAssignmentModalOpen} 
-                onHide={() => setIsAssignmentModalOpen(false)} 
+                show={isAssignmentModalOpen}
+                aria-labelledby="assignment-builder-title"
+                onHide={() => { if (!isSubmitting) setIsAssignmentModalOpen(false); }}
                 size="xl" 
                 centered 
             >
-                <Modal.Header closeButton>
-                    <Modal.Title className="fw-bold text-primary">Feladat / Tananyag Összeállítása</Modal.Title>
+                <Modal.Header closeButton closeLabel="Ablak bezárása">
+                    <Modal.Title id="assignment-builder-title" className="fw-bold app-accent-text">Feladat / Tananyag Összeállítása</Modal.Title>
                 </Modal.Header>
                 <Form onSubmit={handleAssignmentSubmit}>
                     <Modal.Body>
@@ -733,21 +777,27 @@ const TeacherClassroomDetail = () => {
                             <Col lg={4}>
                                 <div className="p-3 border rounded mb-3">
                                     <Form.Label className="text-info fw-bold mb-2">Cél:</Form.Label>
-                                    <Form.Check type="radio" label="Szigorú Teszt" name="amode" checked={assignmentMode === 'TEST'} onChange={() => setAssignmentMode('TEST')} className="text-danger fw-bold mb-1" />
-                                    <Form.Check type="radio" label="Tananyag / Gyakorló" name="amode" checked={assignmentMode === 'PRACTICE'} onChange={() => setAssignmentMode('PRACTICE')} className="text-success fw-bold mb-3" />
+                                    <Form.Check id="assignment-mode-test" type="radio" label="Szigorú Teszt" name="amode" checked={assignmentMode === 'TEST'} onChange={() => setAssignmentMode('TEST')} className="text-danger fw-bold mb-1" />
+                                    <Form.Check id="assignment-mode-practice" type="radio" label="Tananyag / Gyakorló" name="amode" checked={assignmentMode === 'PRACTICE'} onChange={() => setAssignmentMode('PRACTICE')} className="text-success fw-bold mb-3" />
                                     
-                                    <Form.Group className="mb-3"><Form.Label className="small fw-bold">Cím</Form.Label><Form.Control type="text" required value={assignmentForm.title} onChange={e => setAssignmentForm({...assignmentForm, title: e.target.value})} /></Form.Group>
-                                    <Form.Group className="mb-3"><Form.Label className="small fw-bold">Leírás</Form.Label><Form.Control as="textarea" rows={2} value={assignmentForm.description} onChange={e => setAssignmentForm({...assignmentForm, description: e.target.value})} /></Form.Group>
-                                    <Form.Group className="mb-3"><Form.Label className="small fw-bold">Idő (perc)</Form.Label><Form.Control type="number" 
+                                    <Form.Group controlId="assignment-title" className="mb-3"><Form.Label className="small fw-bold">Cím</Form.Label><Form.Control type="text" required value={assignmentForm.title} onChange={e => setAssignmentForm({...assignmentForm, title: e.target.value})} /></Form.Group>
+                                    <Form.Group controlId="assignment-description" className="mb-3"><Form.Label className="small fw-bold">Leírás</Form.Label><Form.Control as="textarea" rows={2} value={assignmentForm.description} onChange={e => setAssignmentForm({...assignmentForm, description: e.target.value})} /></Form.Group>
+                                    <Form.Group controlId="assignment-duration" className="mb-3"><Form.Label className="small fw-bold">Idő (perc)</Form.Label><div className="d-flex gap-2"><Form.Control type="number"
                                             min="1" 
                                             value={assignmentForm.timeLimitMinutes} 
                                             onChange={e => {
                                                 const val = e.target.value.replace(/\D/g, '');
                                                 setAssignmentForm({...assignmentForm, timeLimitMinutes: val});
-                                            }} /></Form.Group>
+                                            }} />
+                                        <Button type="button" variant="outline-secondary" aria-label="Idő csökkentése 1 perccel"
+                                            disabled={isSubmitting || !assignmentForm.timeLimitMinutes || Number(assignmentForm.timeLimitMinutes) <= 1}
+                                            onClick={() => setAssignmentForm(previous => ({ ...previous, timeLimitMinutes: String(Math.max(1, Number(previous.timeLimitMinutes) - 1)) }))}>−</Button>
+                                        <Button type="button" variant="outline-secondary" aria-label="Idő növelése 1 perccel" disabled={isSubmitting}
+                                            onClick={() => setAssignmentForm(previous => ({ ...previous, timeLimitMinutes: String(Number(previous.timeLimitMinutes || 0) + 1) }))}>+</Button>
+                                    </div></Form.Group>
                                     
                                     {assignmentMode === 'TEST' && (
-                                        <Form.Group className="mb-3">
+                                        <Form.Group controlId="assignment-attempts" className="mb-3">
                                             <Form.Label className="small text-warning fw-bold">Maximum próbálkozás (Újraírás)</Form.Label>
                                             <Form.Control 
                                               type="number" 
@@ -767,7 +817,7 @@ const TeacherClassroomDetail = () => {
                                         
                                         <Form.Check 
                                             type="radio" 
-                                            label="Minden kijelölt feladatot megkapnak" 
+                                            id="assignment-generation-fixed" label="Minden kijelölt feladatot megkapnak"
                                             name="genMode" 
                                             checked={assignmentForm.generationMode === 'FIXED'} 
                                             onChange={() => setAssignmentForm({...assignmentForm, generationMode: 'FIXED'})} 
@@ -776,7 +826,7 @@ const TeacherClassroomDetail = () => {
                                         
                                         <Form.Check 
                                             type="radio" 
-                                            label="Véletlenszerű sorsolás a kijelöltekből (Anti-Cheat)" 
+                                            id="assignment-generation-random" label="Véletlenszerű sorsolás a kijelöltekből (Anti-Cheat)"
                                             name="genMode" 
                                             checked={assignmentForm.generationMode === 'RANDOM_SUBSET'} 
                                             onChange={() => setAssignmentForm({...assignmentForm, generationMode: 'RANDOM_SUBSET'})} 
@@ -784,7 +834,7 @@ const TeacherClassroomDetail = () => {
                                         />
 
                                         {assignmentForm.generationMode === 'RANDOM_SUBSET' && (
-                                            <Form.Group className="mt-2 ms-3 p-2 bg-secondary bg-opacity-10 rounded border border-info">
+                                            <Form.Group controlId="assignment-question-count" className="mt-2 ms-3 p-2 bg-secondary bg-opacity-10 rounded border border-info">
                                                 <Form.Label className="small text-info fw-bold">Hány kérdést kapjon 1 diák?</Form.Label>
                                                 <Form.Control 
                                                     type="number" 
@@ -806,24 +856,24 @@ const TeacherClassroomDetail = () => {
                                    
                                     {assignmentMode === 'TEST' && (
                                         <div className="small border-top pt-2">
-                                            <Form.Check type="switch" label="Azonnali visszajelzés" className="mb-1" 
+                                            <Form.Check id="assignment-feedback" type="switch" label="Azonnali visszajelzés" className="mb-1"
                                                 checked={assignmentForm.hasFeedback} 
                                                 onChange={e => setAssignmentForm({...assignmentForm, hasFeedback: e.target.checked})} />
 
-                                             <Form.Check type="switch" label="Szótár és Tippek engedélyezése" className="mb-1" 
+                                             <Form.Check id="assignment-dictionary" type="switch" label="Szótár és Tippek engedélyezése" className="mb-1"
                                                 checked={assignmentForm.allowDictionary} 
                                                 onChange={e => setAssignmentForm({...assignmentForm, allowDictionary: e.target.checked})} />   
                                            
-                                            <Form.Check type="switch" label="Kevert sorrend" className="mb-1" 
+                                            <Form.Check id="assignment-randomized" type="switch" label="Kevert sorrend" className="mb-1"
                                                 checked={assignmentForm.isRandomized} 
                                                 onChange={e => setAssignmentForm({...assignmentForm, isRandomized: e.target.checked})} />
                                                 
-                                            <Form.Check type="switch" label="Második esély a hibás válaszoknál" 
+                                            <Form.Check id="assignment-retries" type="switch" label="Második esély a hibás válaszoknál"
                                                 checked={assignmentForm.allowRetries} 
                                                 onChange={e => setAssignmentForm({...assignmentForm, allowRetries: e.target.checked})} />
                                             
                                             {assignmentForm.timeLimitMinutes > 0 && (
-                                                <Form.Check type="switch" label="Késedelmes beadás engedélyezése" 
+                                                <Form.Check id="assignment-late" type="switch" label="Késedelmes beadás engedélyezése"
                                                     className="mt-2"
                                                     checked={assignmentForm.allowLateSubmission} 
                                                     onChange={e => setAssignmentForm({...assignmentForm, allowLateSubmission: e.target.checked})} />
@@ -835,8 +885,8 @@ const TeacherClassroomDetail = () => {
 
                             {/* MIDDLE: SELECTION */}
                             <Col lg={4} className="border-start">
-                                <h6 className="fw-bold text-info">Válogatás Forrásból</h6>
-                                <Form.Select className="mb-3" value={selectedLessonId} onChange={handleLessonChange}>
+                                <Form.Label htmlFor="assignment-source-lesson" className="fw-bold text-info">Válogatás Forrásból</Form.Label>
+                                <Form.Select id="assignment-source-lesson" className="mb-3" value={selectedLessonId} onChange={handleLessonChange}>
                                     <option value="">-- Válassz leckét --</option>
                                     {lessons.map(l => <option key={l.lessonId} value={l.lessonId}>[{l.orderIndex ? `${l.orderIndex}. lecke` : ''}] {l.title}</option>)}
                                 </Form.Select>
@@ -860,7 +910,7 @@ const TeacherClassroomDetail = () => {
                                                         checked={assignmentForm.exerciseIds.includes(ex.exerciseId)} 
                                                         onChange={() => toggleExerciseSelection(ex)} 
                                                     />
-                                                        <Button variant="link" size="sm" className="text-info p-0" onClick={() => togglePreview(ex.exerciseId)}>👁️</Button>
+                                                        <Button variant="link" size="sm" className="text-info p-0" aria-label={`Feladat előnézete: ${ex.content?.question || ex.type}`} aria-expanded={previewExerciseId === ex.exerciseId} onClick={() => togglePreview(ex.exerciseId)}><span aria-hidden="true">👁️</span></Button>
                                                     </div>
                                                     {previewExerciseId === ex.exerciseId && (
                                                         <div className="mt-1 p-2 bg-secondary bg-opacity-10 rounded border border-info small">
@@ -883,8 +933,8 @@ const TeacherClassroomDetail = () => {
                                         <ListGroup variant="flush">
                                             {selectedExercisesData.map((ex, index) => (
                                                 <ListGroup.Item key={ex.id} className="d-flex justify-content-between align-items-center p-2 bg-transparent">
-                                                    <div className="small overflow-hidden text-truncate" style={{ maxWidth: '80%' }}>{index + 1}. {ex.title}</div>
-                                                    <Button variant="outline-danger" size="sm" className="border-0" onClick={() => removeFromSummary(ex.id)}>✕</Button>
+                                                    <div className="small flex-grow-1 pe-2">{index + 1}. {ex.title}</div>
+                                                    <Button variant="outline-danger" size="sm" className="border-0" aria-label={`Feladat eltávolítása: ${ex.title}`} onClick={() => removeFromSummary(ex.id)}><span aria-hidden="true">✕</span></Button>
                                                 </ListGroup.Item>
                                             ))}
                                         </ListGroup>
@@ -895,31 +945,32 @@ const TeacherClassroomDetail = () => {
                         
                         <Row className="mt-4 border-top pt-3 small">
                             <Col md={6}>
-                                <Form.Group>
+                                <Form.Group controlId="assignment-available-from">
                                     <Form.Label className="fw-bold opacity-75">Elérhető:</Form.Label>
                                     <Form.Control 
                                         type="datetime-local" 
-                                        style={{ colorScheme: 'auto' }} 
                                         value={assignmentForm.availableFrom} 
                                         onChange={e => setAssignmentForm({...assignmentForm, availableFrom: e.target.value})} 
                                     />
                                 </Form.Group>
                             </Col>
                             <Col md={6}>
-                                <Form.Group>
+                                <Form.Group controlId="assignment-available-until">
                                     <Form.Label className="fw-bold opacity-75">Határidő:</Form.Label>
                                     <Form.Control 
                                         type="datetime-local" 
-                                        style={{ colorScheme: 'auto' }} 
                                         value={assignmentForm.availableUntil} 
                                         onChange={e => setAssignmentForm({...assignmentForm, availableUntil: e.target.value})} 
                                     />
                                 </Form.Group>
                             </Col>
                         </Row>
+                        <AssignmentInitialTiming students={acceptedMembers} value={initialTiming} onChange={setInitialTiming}
+                            timeLimitMinutes={assignmentForm.timeLimitMinutes} saving={isSubmitting} />
+                        <LearningFeedback error={assignmentError} />
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button variant="outline-secondary" onClick={() => setIsAssignmentModalOpen(false)}>Mégse</Button>
+                        <Button variant="outline-secondary" disabled={isSubmitting} onClick={() => setIsAssignmentModalOpen(false)}>Mégse</Button>
                         <Button variant="primary" 
                             type="submit" 
                             className="fw-bold px-4" 

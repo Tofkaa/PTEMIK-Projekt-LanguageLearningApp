@@ -10,29 +10,29 @@ const AdminDashboard = () => {
     return (
         <Container fluid className="py-4 text-light" style={{ minHeight: '80vh', maxWidth: '1400px' }}>
             <div className="mb-4 border-bottom border-secondary pb-3">
-                <h2 className="fw-bold m-0 text-danger">🛡️ Adminisztrációs Központ</h2>
+                <h1 className="h2 fw-bold m-0 text-danger"><span aria-hidden="true">🛡️ </span>Adminisztrációs Központ</h1>
                 <p className="text-secondary m-0">Rendszerfelügyelet, tartalomkezelés és moderáció</p>
             </div>
             
-            <Tab.Container defaultActiveKey="users">
+            <Tab.Container id="admin-sections" defaultActiveKey="users" mountOnEnter>
                 <Row>
                     {/* OLDALSÁV (Sidebar) */}
                     <Col md={3} lg={2} className="mb-4 mb-md-0">
-                        <Nav variant="pills" className="flex-column gap-2 custom-admin-nav">
+                        <Nav variant="pills" aria-label="Adminisztrációs funkciók" className="flex-column gap-2 custom-admin-nav">
                             <Nav.Item>
-                                <Nav.Link eventKey="users" className="fw-bold text-light">👥 Felhasználók</Nav.Link>
+                                <Nav.Link eventKey="users" className="fw-bold text-light"><span aria-hidden="true">👥 </span>Felhasználók</Nav.Link>
                             </Nav.Item>
                             <Nav.Item>
-                                <Nav.Link eventKey="content" className="fw-bold text-light">📚 Tananyag CMS</Nav.Link>
+                                <Nav.Link eventKey="content" className="fw-bold text-light"><span aria-hidden="true">📚 </span>Tananyag CMS</Nav.Link>
                             </Nav.Item>
                             <Nav.Item>
-                                <Nav.Link eventKey="achievements" className="fw-bold text-light">🏆 Kitüntetések</Nav.Link>
+                                <Nav.Link eventKey="achievements" className="fw-bold text-light"><span aria-hidden="true">🏆 </span>Kitüntetések</Nav.Link>
                             </Nav.Item>
                             <Nav.Item>
-                                <Nav.Link eventKey="classrooms" className="fw-bold text-light">🏫 Osztálytermek</Nav.Link>
+                                <Nav.Link eventKey="classrooms" className="fw-bold text-light"><span aria-hidden="true">🏫 </span>Osztálytermek</Nav.Link>
                             </Nav.Item>
                             <Nav.Item>
-                                <Nav.Link eventKey="logs" className="fw-bold text-light">📝 Rendszernapló</Nav.Link>
+                                <Nav.Link eventKey="logs" className="fw-bold text-light"><span aria-hidden="true">📝 </span>Rendszernapló</Nav.Link>
                             </Nav.Item>
                         </Nav>
                     </Col>
@@ -43,35 +43,35 @@ const AdminDashboard = () => {
                             
                             <Tab.Pane eventKey="users">
                                 <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
-                                    <h4 className="text-info fw-bold mb-4">Felhasználók Moderációja</h4>
+                                    <h2 className="h4 text-info fw-bold mb-4">Felhasználók Moderációja</h2>
                                     <UserManagement /> 
                                 </div>
                             </Tab.Pane>
                             
                             <Tab.Pane eventKey="content">
                                  <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
-                                    <h4 className="text-info fw-bold mb-4">Tananyag Kezelő (CMS)</h4>
+                                    <h2 className="h4 text-info fw-bold mb-4">Tananyag Kezelő (CMS)</h2>
                                    <CurriculumManager />
                                 </div>
                             </Tab.Pane>
 
                             <Tab.Pane eventKey="achievements">
                                  <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
-                                    <h4 className="text-info fw-bold mb-4">Kitüntetés Kezelő</h4>
+                                    <h2 className="h4 text-info fw-bold mb-4">Kitüntetés Kezelő</h2>
                                    <AchievementManager />
                                 </div>
                             </Tab.Pane>
 
                             <Tab.Pane eventKey="classrooms">
                                  <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
-                                    <h4 className="text-info fw-bold mb-4">Osztálytermek Moderációja</h4>
+                                    <h2 className="h4 text-info fw-bold mb-4">Osztálytermek Moderációja</h2>
                                     <ClassroomManager />
                                 </div>
                             </Tab.Pane>
 
                             <Tab.Pane eventKey="logs">
                                 <div className="p-4 border border-secondary rounded bg-dark shadow-sm">
-                                    <h4 className="text-danger fw-bold mb-4">Rendszernaplók (Audit Trail)</h4>
+                                    <h2 className="h4 text-danger fw-bold mb-4">Rendszernaplók (Audit Trail)</h2>
                                     <SystemLogs /> 
                                 </div>
                             </Tab.Pane>

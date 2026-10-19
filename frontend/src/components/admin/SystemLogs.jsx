@@ -13,7 +13,7 @@ const SystemLogs = () => {
 
         // 1. Feliratkozás az egyedi eseményre (Event Listener)
         const handleAdminAction = () => {
-            fetchLogs(false); // Csendes frissítés spinner nélkül
+            fetchLogs(true); // Keep the table mounted while refreshing after an admin action.
         };
 
         window.addEventListener('adminActionOccurred', handleAdminAction);
@@ -86,7 +86,7 @@ const SystemLogs = () => {
     };
 
     if (isLoading) {
-        return <div className="text-center py-5"><Spinner animation="border" variant="light" /></div>;
+        return <div role="status" className="text-center py-5"><Spinner animation="border" variant="light" aria-hidden="true" /> Rendszernapló betöltése…</div>;
     }
 
     return (
@@ -98,8 +98,9 @@ const SystemLogs = () => {
                     </div>
                 )}
                 
-                <div className="table-responsive custom-scrollbar" style={{ maxHeight: '600px' }}>
+                <div role="region" aria-label="Rendszernapló, görgethető táblázat" tabIndex={0} className="table-responsive custom-scrollbar" style={{ maxHeight: '600px' }}>
                     <Table hover variant="dark" className="m-0 align-middle border-secondary" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+                        <caption className="visually-hidden">Adminisztrációs események időpontja, végrehajtója és részletei</caption>
                         <thead className="position-sticky top-0 bg-dark" style={{ zIndex: 1 }}>
                             <tr>
                                 <th className="text-secondary border-secondary py-3 px-4">Időpont</th>

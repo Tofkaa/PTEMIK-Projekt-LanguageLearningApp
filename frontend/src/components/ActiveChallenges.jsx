@@ -63,7 +63,7 @@ const ActiveChallenges = () => {
         navigate(`/lesson/${challenge.lessonId}?challengeId=${challenge.challengeId}`);
     };
 
-    if (loading) return <div className="text-center p-4"><Spinner animation="border" variant="warning" /></div>;
+    if (loading) return <div role="status" className="text-center p-4"><Spinner animation="border" variant="warning" aria-hidden="true" /> Aktív kihívások betöltése…</div>;
     if (error) return <Alert variant="danger">{error}</Alert>;
 
     if (challenges.length === 0) {
@@ -77,7 +77,7 @@ const ActiveChallenges = () => {
 
     return (
         <div className="p-3">
-            <h5 className="text-light mb-4">Aktív Kihívások ({challenges.length})</h5>
+            <h2 className="h5 text-light mb-4">Aktív Kihívások ({challenges.length})</h2>
             <Row>
                 {challenges.map((challenge) => {
                     const iAmChallenger = challenge.challengerName === user?.name;
@@ -86,11 +86,13 @@ const ActiveChallenges = () => {
                             <Card className={`bg-dark border-${challenge.isMyTurn ? 'warning' : 'secondary'} shadow-sm`}>
                                 <Card.Body className="d-flex justify-content-between align-items-center">
                                     <div>
-                                        <h5 className="text-light mb-1 fw-bold">
+                                        <h3 className="h5 text-light mb-1 fw-bold">
+                                            <span aria-hidden="true">{iAmChallenger ? '⚔️ ' : '🔥 '}</span>
                                             {iAmChallenger 
-                                                ? `⚔️ Kihívtad: ${challenge.opponentName}` 
-                                                : `🔥 ${challenge.challengerName} kihívott téged!`}
-                                        </h5>
+                                                ? `Kihívtad: ${challenge.opponentName}`
+                                                : `${challenge.challengerName} kihívott téged!`}
+                                        </h3>
+                                        <p className="mb-1">Lecke: {challenge.lessonTitle || 'Kihívásfeladat'}</p>
                                         <div className="text-secondary small mt-1">
                                             Küldve: {formatToLocalDisplay(challenge.startTime)}
                                         </div>
@@ -100,8 +102,8 @@ const ActiveChallenges = () => {
                                             Lejár: {formatToLocalDisplay(challenge.expiresAt, false)} 
                                         </small>
                                         {challenge.isMyTurn && (
-                                            <Button variant="warning" className="fw-bold px-4" onClick={() => handlePlayChallenge(challenge)} >
-                                                Játék! 🚀
+                                            <Button aria-label={`Játék! ${iAmChallenger ? challenge.opponentName : challenge.challengerName} ellen, ${challenge.lessonTitle || 'Kihívásfeladat'}`} variant="warning" className="fw-bold px-4" onClick={() => handlePlayChallenge(challenge)} >
+                                                Játék! <span aria-hidden="true">🚀</span>
                                             </Button>
                                         )}
                                     </div>

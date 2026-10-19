@@ -64,12 +64,6 @@ const UserManagement = () => {
         u.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const getRoleBadgeColor = (role) => {
-        if (role === 'ADMIN' || role === 'ROLE_ADMIN') return 'danger';
-        if (role === 'TEACHER' || role === 'ROLE_TEACHER') return 'warning';
-        return 'info';
-    };
-
     if (isLoading) {
         return <div className="text-center py-5"><Spinner animation="border" variant="light" /></div>;
     }
@@ -84,8 +78,9 @@ const UserManagement = () => {
 
             <div className="d-flex justify-content-between align-items-center mb-3">
                 <InputGroup style={{ maxWidth: '400px' }}>
-                    <InputGroup.Text className="bg-dark text-secondary border-secondary">🔍</InputGroup.Text>
+                    <InputGroup.Text aria-hidden="true" className="bg-dark text-secondary border-secondary">🔍</InputGroup.Text>
                     <Form.Control
+                        aria-label="Felhasználók keresése név vagy e-mail alapján"
                         type="text"
                         placeholder="Keresés név vagy email alapján..."
                         className="bg-dark text-light border-secondary"
@@ -115,7 +110,7 @@ const UserManagement = () => {
                                 const isSelf = u.userId === currentUser?.userId;
 
                                 return (
-                                <tr key={u.userId} className={!u.active ? 'opacity-75 bg-danger bg-opacity-10' : ''}>
+                                <tr key={u.userId} className={!u.active ? 'bg-danger bg-opacity-10' : ''}>
                                     <td>
                                         <div className="fw-bold text-light">
                                             {u.name} <span className="text-secondary small">#{u.userTag}</span>
@@ -135,17 +130,18 @@ const UserManagement = () => {
                                     </td>
                                     <td className="text-center">
                                         <Form.Select 
+                                            aria-label={`Jogosultság: ${u.name} (${u.email})`}
                                             size="sm" 
-                                            className={`bg-dark text-${getRoleBadgeColor(u.role)} border-${getRoleBadgeColor(u.role)} fw-bold shadow-sm`}
+                                            className="fw-bold shadow-sm"
                                             value={u.role.replace('ROLE_', '')}
                                             onChange={(e) => handleRoleChange(u.userId, e.target.value)}
                                             style={{ width: '110px', cursor: isSelf ? 'not-allowed' : 'pointer', margin: '0 auto' }}
                                             disabled={isSelf}
                                             title={isSelf ? "Saját magad jogosultságát nem módosíthatod!" : ""}
                                         >
-                                            <option value="STUDENT" className="text-info bg-dark fw-bold">Diák</option>
-                                            <option value="TEACHER" className="text-warning bg-dark fw-bold">Tanár</option>
-                                            <option value="ADMIN" className="text-danger bg-dark fw-bold">Admin</option>
+                                            <option value="STUDENT">Diák</option>
+                                            <option value="TEACHER">Tanár</option>
+                                            <option value="ADMIN">Admin</option>
                                         </Form.Select>
                                     </td>
                                     <td className="text-end">
@@ -155,10 +151,11 @@ const UserManagement = () => {
                                                 size="sm" 
                                                 className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" 
                                                 onClick={() => handleStatusToggle(u.userId, u.active)}
+                                                aria-label={`Felfüggesztés: ${u.name} (${u.email})`}
                                                 disabled={isSelf}
                                                 title={isSelf ? "Saját magadat nem függesztheted fel!" : ""}
                                             >
-                                                <span>🛑</span> Felfüggesztés
+                                                <span aria-hidden="true">🛑</span> Felfüggesztés
                                             </Button>
                                         ) : (
                                             <Button 
@@ -166,9 +163,10 @@ const UserManagement = () => {
                                                 size="sm" 
                                                 className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" 
                                                 onClick={() => handleStatusToggle(u.userId, u.active)}
+                                                aria-label={`Visszaállítás: ${u.name} (${u.email})`}
                                                 disabled={isSelf}
                                             >
-                                                <span>♻️</span> Visszaállítás
+                                                <span aria-hidden="true">♻️</span> Visszaállítás
                                             </Button>
                                         )}
                                     </td>

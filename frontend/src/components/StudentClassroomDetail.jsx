@@ -141,15 +141,15 @@ const StudentClassroomDetail = () => {
                 <Button variant="outline-secondary" size="sm" onClick={() => navigate('/classrooms')} className="mb-2">
                     ← Vissza az osztályokhoz
                 </Button>
-                <h2 className="fw-bold m-0 text-primary">{classroomName}</h2>
+                <h1 className="h2 fw-bold m-0 app-accent-text">{classroomName}</h1>
             </div>
 
-           <Tabs activeKey={activeMainTab} onSelect={(k) => setActiveMainTab(k)} className="mb-4 custom-dark-tabs">
+           <Tabs id="student-classroom-tabs" aria-label="Osztálytermi funkciók" activeKey={activeMainTab} onSelect={(k) => setActiveMainTab(k)} className="mb-4 custom-dark-tabs">
                 {/* STUDENT ASSIGNMENTS TAB */}
                 <Tab eventKey="assignments" title={<span className="fw-bold">📝 Feladatok</span>}>
                     
                     {/* ACTIVE AND COMPLETED ASSIGNMENTS */}
-                 <Tabs activeKey={activeSubTab} onSelect={(k) => setActiveSubTab(k)} className="mt-3 mb-3 border-secondary">
+                 <Tabs id="student-assignment-tabs" aria-label="Feladatok állapota" activeKey={activeSubTab} onSelect={(k) => setActiveSubTab(k)} className="mt-3 mb-3 border-secondary">
                         
                         {/* 1. ACTIVE TODOS */}
                         <Tab eventKey="active" title={
@@ -170,8 +170,8 @@ const StudentClassroomDetail = () => {
                                         <Col md={6} lg={4} key={a.assignmentId}>
                                             <Card className="h-100 bg-dark text-light border-info shadow-lg hover-border-primary transition-all">
                                                 <Card.Body className="d-flex flex-column">
-                                                    <div className="d-flex justify-content-between align-items-start mb-2">
-                                                        <Card.Title className="fw-bold m-0">{a.title}</Card.Title>
+                                                    <div className="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-2">
+                                                        <Card.Title as="h2" className="h5 fw-bold m-0">{a.title}</Card.Title>
                                                         <div>
                                                             {a.attemptsUsed === 0 ? (
                                                                 a.test ? (
@@ -199,6 +199,7 @@ const StudentClassroomDetail = () => {
                                                         const isFuture = availableFrom && availableFrom.getTime() > currentTime;
                                                         return (
                                                             <Button 
+                                                                aria-label={`${isFuture ? 'Még nem elérhető' : 'Indítás'}: ${a.title}`}
                                                                 variant={isFuture ? "secondary" : "primary"} 
                                                                 className="w-100 fw-bold shadow-sm" 
                                                                 disabled={isFuture}
@@ -230,10 +231,10 @@ const StudentClassroomDetail = () => {
                            <Row className="g-4 mt-1">
                                 {completedAssignments.map(a => (
                                     <Col md={6} lg={4} key={a.assignmentId}>
-                                        <Card className="h-100 bg-dark text-secondary border-secondary shadow-sm" style={{ opacity: 0.85 }}>
+                                        <Card className="h-100 bg-dark text-secondary border-secondary shadow-sm">
                                             <Card.Body className="d-flex flex-column">
-                                                <div className="d-flex justify-content-between align-items-start mb-2">
-                                                    <Card.Title className="fw-bold m-0 text-light">{a.title}</Card.Title>
+                                                <div className="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-2">
+                                                    <Card.Title as="h2" className="h5 fw-bold m-0 text-light">{a.title}</Card.Title>
                                                     
                                                    {hasUnseenResultForAssignment(a.assignmentId) ? (
                                                         <Badge bg="success" className="animate-pulse shadow-sm border border-light">✉️ Új Értékelés!</Badge>
@@ -252,6 +253,7 @@ const StudentClassroomDetail = () => {
                                                <div className="mt-auto d-grid gap-2">
                                                     {a.hasGradedSession ? (
                                                         <Button 
+                                                            aria-label={`Eredmény megtekintése: ${a.title}`}
                                                             variant="success" 
                                                             className="fw-bold"
                                                             onClick={() => handleViewResult(a)}
@@ -273,6 +275,7 @@ const StudentClassroomDetail = () => {
                                                         if (canStillWrite && hasAttemptsLeft) {
                                                             return (
                                                                 <Button 
+                                                                    aria-label={`Újraírás: ${a.title}`}
                                                                     variant="primary" 
                                                                     className="fw-bold"
                                                                     onClick={() => navigate(`/assignment/${a.assignmentId}/start`, { state: { assignmentDetails: a } })}
@@ -357,9 +360,9 @@ const StudentClassroomDetail = () => {
             </Tabs>
 
             {/* RESULTS PREVIEW MODAL */}
-            <Modal show={isResultModalOpen} onHide={() => setIsResultModalOpen(false)} size="lg" centered contentClassName="bg-dark text-light border-secondary">
-                <Modal.Header closeButton closeVariant="white" className="border-secondary">
-                    <Modal.Title className="text-info fw-bold">Eredmények: {selectedAssignmentTitle}</Modal.Title>
+            <Modal show={isResultModalOpen} onHide={() => setIsResultModalOpen(false)} aria-labelledby="assignment-results-title" size="lg" centered contentClassName="bg-dark text-light border-secondary">
+                <Modal.Header closeButton closeLabel="Ablak bezárása" className="border-secondary">
+                    <Modal.Title id="assignment-results-title" className="app-accent-text fw-bold">Eredmények: {selectedAssignmentTitle}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="p-4 custom-scrollbar" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                     {studentSessions.length === 0 ? (
@@ -394,8 +397,8 @@ const StudentClassroomDetail = () => {
                                                     <div>{i + 1}. Kérdés: <span className="text-light fw-normal">{ans.question}</span></div>
                                                     
                                                     {ans.exercise && (
-                                                        <Button variant="link" size="sm" className="text-info p-0 text-decoration-none" title="Feladat előnézete" onClick={() => togglePreview(previewId)}>
-                                                            részletek👁️
+                                                        <Button aria-label={`részletek: ${idx + 1}. próbálkozás, ${i + 1}. kérdés`} aria-expanded={expandedPreviewId === previewId} variant="link" size="sm" className="text-info p-0 text-decoration-none" onClick={() => togglePreview(previewId)}>
+                                                            részletek<span aria-hidden="true">👁️</span>
                                                         </Button>
                                                     )}
                                                 </div>
@@ -430,7 +433,7 @@ const StudentClassroomDetail = () => {
                     )}
                 </Modal.Body>
                 <Modal.Footer className="border-secondary">
-                    <Button variant="outline-light" onClick={() => setIsResultModalOpen(false)}>Bezárás</Button>
+                    <Button variant="outline-secondary" onClick={() => setIsResultModalOpen(false)}>Bezárás</Button>
                 </Modal.Footer>
             </Modal>
 

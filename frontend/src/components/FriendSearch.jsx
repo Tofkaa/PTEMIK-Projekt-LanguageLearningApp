@@ -1,23 +1,25 @@
-import { useState } from 'react';
-import { Form, Button, Alert, InputGroup, Badge } from 'react-bootstrap';
+import { useId, useState } from 'react';
+import { Form, Button, InputGroup, Badge } from 'react-bootstrap';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import LearningFeedback from './LearningFeedback';
 
 const FriendSearch = () => {
     const { user } = useAuth();
+    const identifierId = useId();
     const [identifier, setIdentifier] = useState('');
     const [status, setStatus] = useState({ type: '', message: '' }); // type: 'success' vagy 'danger'
     const [loading, setLoading] = useState(false);
 
     const handleSearch = async (e) => {
         e.preventDefault();
-        if (!identifier.trim()) return;
+        if (!identifier.trim() || loading) return;
 
         setLoading(true);
         setStatus({ type: '', message: '' }); // Korábbi üzenetek törlése
 
         try {
-            const response = await api.post('/friendships/request', { targetIdentifier: identifier });
+            const response = await api.post('/friendships/request', { targetIdentifier: identifier.trim() });
             // Ha sikeres, zöld üzenetet mutatunk és kiürítjük a mezőt
             setStatus({ type: 'success', message: response.data.message || 'Kérelem elküldve!' });
             setIdentifier(''); 
@@ -50,29 +52,29 @@ const FriendSearch = () => {
                     </div>
                 </div>
             )}
-            <h5 className="text-light mb-2">Hozzáadás azonosító alapján</h5>
-            <p className="text-light small mb-4">
+            <h2 className="h5 text-light mb-2">Hozzáadás azonosító alapján</h2>
+            <p id={`${identifierId}-help`} className="text-light small mb-4">
                 Keress név alapján (pl. <strong className="text-info">Username#1234</strong>) vagy barátkóddal (pl. <strong className="text-info">A7B-9X2</strong>).
             </p>
             
             {/* Visszajelző üzenet (Sikeres küldés vagy Hiba) */}
-            {status.message && (
-                <Alert variant={status.type} onClose={() => setStatus({ type: '', message: '' })} dismissible>
-                    {status.message}
-                </Alert>
-            )}
+            <LearningFeedback error={status.type === 'danger' ? status.message : ''}
+                feedback={status.type === 'success' ? { type: 'success', msg: status.message } : null} />
 
             <Form onSubmit={handleSearch}>
+                <Form.Label htmlFor={identifierId}>Név és azonosító vagy barátkód</Form.Label>
                 <InputGroup className="mb-3 shadow-sm">
                     <Form.Control
+                        id={identifierId}
+                        aria-describedby={`${identifierId}-help`}
                         placeholder="Név#Tag vagy Barátkód..."
                         value={identifier}
                         onChange={(e) => setIdentifier(e.target.value)}
                         className="bg-secondary text-light border-secondary"
-                        disabled={loading}
+                        readOnly={loading}
                     />
-                    <Button variant="primary" type="submit" disabled={loading || !identifier.trim()} className="px-4 fw-bold">
-                        {loading ? 'Küldés...' : 'Kérelem Küldése'}
+                    <Button variant="primary" type="submit" aria-disabled={loading || !identifier.trim()} aria-busy={loading} className="px-4 fw-bold">
+                        Kérelem Küldése
                     </Button>
                 </InputGroup>
             </Form>

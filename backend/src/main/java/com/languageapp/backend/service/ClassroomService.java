@@ -51,7 +51,7 @@ public class ClassroomService {
                 .orElseThrow(() -> new ResourceNotFoundException("Teacher not found."));
 
         if (!Role.TEACHER.equals(teacher.getRole())) {
-            throw new BadRequestException("Only teachers can create classrooms.");
+            throw new BadRequestException("Csak tanár hozhat létre osztálytermet.");
         }
 
         Course targetCourse = courseRepository.findByLanguageCode(request.getCourseCode().toLowerCase())
@@ -85,14 +85,14 @@ public class ClassroomService {
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found."));
 
         Classroom classroom = classroomRepository.findByInviteCode(inviteCode.toUpperCase())
-                .orElseThrow(() -> new BadRequestException("Invalid invite code."));
+                .orElseThrow(() -> new BadRequestException("Érvénytelen meghívókód. Ellenőrizd a tanárodtól kapott kódot!"));
 
         if (classroom.getTeacher().getUserId().equals(student.getUserId())) {
-            throw new BadRequestException("You cannot join your own classroom.");
+            throw new BadRequestException("Saját osztálytermedhez nem küldhetsz csatlakozási kérelmet.");
         }
 
         if (classroomMemberRepository.existsByClassroom_ClassroomIdAndUser_UserId(classroom.getClassroomId(), student.getUserId())) {
-            throw new BadRequestException("You are already a member or have a pending request for this classroom.");
+            throw new BadRequestException("Már tagja vagy ennek az osztályteremnek, vagy a kérelmed jóváhagyásra vár.");
         }
 
         ClassroomMember member = new ClassroomMember();
@@ -113,7 +113,7 @@ public class ClassroomService {
                 .orElseThrow(() -> new ResourceNotFoundException("Classroom not found."));
 
         if (!classroom.getTeacher().getEmail().equals(teacherEmail)) {
-            throw new BadRequestException("You do not have permission to moderate this classroom.");
+            throw new BadRequestException("Nincs jogosultságod ennek az osztályteremnek a kezeléséhez.");
         }
 
         ClassroomMember member = classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(classroomId, studentId)
@@ -216,7 +216,7 @@ public class ClassroomService {
                 .orElseThrow(() -> new ResourceNotFoundException("Classroom not found."));
 
         if (!classroom.getTeacher().getEmail().equals(teacherEmail)) {
-            throw new BadRequestException("You do not have permission to view stats for this classroom.");
+            throw new BadRequestException("Nincs jogosultságod az osztályterem statisztikáinak megtekintéséhez.");
         }
 
         return classroomMemberRepository.getClassroomStats(classroomId);
@@ -232,7 +232,7 @@ public class ClassroomService {
 
 
         if (!classroom.getTeacher().getEmail().equals(teacherEmail)) {
-            throw new BadRequestException("You do not have permission to perform this action.");
+            throw new BadRequestException("Nincs jogosultságod a művelet végrehajtásához.");
         }
 
         ClassroomMember member = classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(classroomId, studentId)

@@ -10,6 +10,8 @@ import { Container, Card, Button, Badge, Table, Modal, Form, Spinner, Row, Col, 
 import { assignmentApi } from '../services/assignmentApi';
 import { formatToLocalDisplay, parseServerDate } from '../utils/dateUtils';
 import ExercisePreviewCard from '../components/ExercisePreviewCard';
+import LanguageText from '../components/LanguageText';
+import LearningFeedback from '../components/LearningFeedback';
 
 /**
  * @component
@@ -33,12 +35,15 @@ const AssignmentSubmissions = () => {
     const [gradeForm, setGradeForm] = useState({ teacherScore: '', teacherComment: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [expandedPreviewIndex, setExpandedPreviewIndex] = useState(null);
+    const [loadError, setLoadError] = useState('');
+    const [gradeError, setGradeError] = useState('');
+    const [feedback, setFeedback] = useState(null);
 
     /**
      * Calculates if the student's submission is late, and if it is, by how much
      */
     const getLateInfo = (session) => {
-        if (!timeLimitMinutes || !session?.startedAt || !session?.finishedAt) return null;
+        if (!session?.startedAt || !session?.finishedAt) return null;
         
         const startDate = parseServerDate(session.startedAt);
         const endDate = parseServerDate(session.finishedAt);
@@ -46,12 +51,15 @@ const AssignmentSubmissions = () => {
         const start = startDate.getTime();
         const end = endDate.getTime();
         
-        const takenMs = end - start;
-        const limitMs = timeLimitMinutes * 60 * 1000;
+        const deadline = Object.hasOwn(session, 'submissionDeadline')
+            ? parseServerDate(session.submissionDeadline)?.getTime()
+            : timeLimitMinutes ? start + timeLimitMinutes * 60000 : null;
+        if (deadline == null) return null;
+        const overMs = end - deadline;
         
         // 5 másodperc kegyelmi idő hálózati késés miatt
-        if (takenMs > limitMs + 5000) { 
-            const overS = Math.floor((takenMs - limitMs) / 1000);
+        if (overMs > 5000) {
+            const overS = Math.floor(overMs / 1000);
             const overM = Math.floor(overS / 60);
             const remS = overS % 60;
             return `${overM}p ${remS}mp`;
@@ -71,12 +79,13 @@ const AssignmentSubmissions = () => {
      */
     const fetchSessions = useCallback(async () => {
         setIsLoading(true);
+        setLoadError('');
         try {
             const res = await assignmentApi.getAssignmentSessions(assignmentId);
             setSessions(res.data);
         } catch (error) {
             console.error("Hiba a beadott munkák lekérésekor:", error);
-            alert("Nem sikerült lekérni a listát. Lehet, hogy nincs jogosultságod.");
+            setLoadError('Nem sikerült lekérni a listát. Ellenőrizd a kapcsolatot és a jogosultságodat, majd próbáld újra!');
         } finally {
             setIsLoading(false);
         }
@@ -97,9 +106,11 @@ const AssignmentSubmissions = () => {
     const openGradingModal = (session) => {
         setSelectedSession(session);
         setGradeForm({
-            teacherScore: session.teacherScore !== null ? session.teacherScore : session.finalScore,
+            teacherScore: session.teacherScore ?? session.finalScore,
             teacherComment: session.teacherComment || ''
         });
+        setGradeError('');
+        setExpandedPreviewIndex(null);
         setIsGradingModalOpen(true);
     };
 
@@ -109,18 +120,26 @@ const AssignmentSubmissions = () => {
     const handleGradeSubmit = async (e) => {
         e.preventDefault();
         if (isSubmitting) return;
+        const score = Number(gradeForm.teacherScore);
+        if (gradeForm.teacherScore === '' || !Number.isInteger(score) || score < 0 || score > 100) {
+            setGradeError('A végső pontszám 0 és 100 közötti egész szám legyen!');
+            return;
+        }
         setIsSubmitting(true);
+        setGradeError('');
 
         try {
             await assignmentApi.gradeSession(selectedSession.sessionId, {
-                teacherScore: parseInt(gradeForm.teacherScore),
+                teacherScore: score,
                 teacherComment: gradeForm.teacherComment
             });
+            setSessions(previous => previous.map(session => session.sessionId === selectedSession.sessionId
+                ? { ...session, teacherScore: score, teacherComment: gradeForm.teacherComment, graded: true } : session));
+            setFeedback({ type: 'success', msg: `Az értékelés publikálva: ${selectedSession.studentName}.` });
             setIsGradingModalOpen(false);
-            fetchSessions(); 
         } catch (error) {
             console.error("Hiba az értékelés mentésekor:", error);
-            alert("Nem sikerült elmenteni az értékelést.");
+            setGradeError(error.response?.data?.message || 'Nem sikerült elmenteni az értékelést. A pontszám és a megjegyzés megmaradt; próbáld újra!');
         } finally {
             setIsSubmitting(false);
         }
@@ -150,7 +169,7 @@ const AssignmentSubmissions = () => {
     const hardest = getHardestQuestion();
 
     if (isLoading) {
-        return <Container className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}><Spinner animation="border" variant="info" /></Container>;
+        return <Container role="status" className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}><Spinner animation="border" variant="info" aria-hidden="true" /> Beadott munkák betöltése…</Container>;
     }
 
     return (
@@ -159,9 +178,11 @@ const AssignmentSubmissions = () => {
                 <Button variant="outline-secondary" size="sm" onClick={() => navigate(-1)} className="mb-2">
                     ← Vissza az osztályterembe
                 </Button>
-                <h4 className="text-secondary">{classroomName}</h4>
-                <h2 className="fw-bold m-0 text-info">Beadott munkák: {assignmentTitle}</h2>
+                <p className="h4 text-secondary">{classroomName}</p>
+                <h1 className="h2 fw-bold m-0 app-accent-text">Beadott munkák: {assignmentTitle}</h1>
             </div>
+            <LearningFeedback error={loadError} feedback={feedback} />
+            {loadError && <Button variant="outline-info" onClick={fetchSessions}>Lista újratöltése</Button>}
 
             <Row className="mb-4 g-3">
                 <Col md={4}>
@@ -173,7 +194,7 @@ const AssignmentSubmissions = () => {
                 <Col md={4}>
                     <div className="p-3 bg-dark border border-info rounded text-center shadow-sm h-100 d-flex flex-column justify-content-center">
                         <div className="small text-secondary mb-1">Teszt Átlagpontszám</div>
-                        <div className="fs-4 fw-bold text-info">
+                        <div className="fs-4 fw-bold app-accent-text">
                             {sessions.length > 0 ? Math.round(sessions.reduce((acc, s) => acc + (s.teacherScore !== null ? s.teacherScore : s.finalScore), 0) / sessions.length) : 0}%
                         </div>
                     </div>
@@ -185,7 +206,7 @@ const AssignmentSubmissions = () => {
                             <div className="fw-bold text-success">{hardest}</div>
                         ) : (
                             <>
-                                <div className="small fw-bold text-warning text-truncate px-2" title={hardest.question}>
+                                <div className="small fw-bold text-warning px-2">
                                     {hardest.question}
                                 </div>
                                 <div className="text-muted small mt-1">({hardest.count} rontott válasz)</div>
@@ -198,6 +219,7 @@ const AssignmentSubmissions = () => {
             <Card className="bg-dark text-light border-secondary shadow-lg">
                 <Card.Body className="p-0">
                     <Table hover variant="dark" className="m-0" responsive>
+                        <caption className="visually-hidden">Beadások, pontszámok és értékelési műveletek</caption>
                         <thead className="border-secondary">
                             <tr>
                                 <th>Diák Neve</th>
@@ -241,7 +263,7 @@ const AssignmentSubmissions = () => {
                                                 {session.graded ? <Badge bg="info">Publikálva</Badge> : <Badge bg="warning" text="dark">Várakozik</Badge>}
                                             </td>
                                             <td className="text-end">
-                                                <Button variant={session.graded ? "outline-info" : "primary"} size="sm" onClick={() => openGradingModal(session)}>
+                                                <Button aria-label={`${session.graded ? 'Módosítás' : 'Értékelés'}: ${session.studentName}, ${formatToLocalDisplay(session.finishedAt)}`} variant={session.graded ? "outline-info" : "primary"} size="sm" onClick={() => openGradingModal(session)}>
                                                     {session.graded ? 'Módosítás' : 'Értékelés'}
                                                 </Button>
                                             </td>
@@ -255,31 +277,32 @@ const AssignmentSubmissions = () => {
             </Card>
 
             {/* GRADING MODAL */}
-            <Modal show={isGradingModalOpen} onHide={() => setIsGradingModalOpen(false)} size="lg" centered contentClassName="bg-dark text-light border-secondary">
-                <Modal.Header closeButton className="border-secondary" closeVariant="white">
-                    <Modal.Title className="fw-bold text-info">
+            <Modal show={isGradingModalOpen} onHide={() => { if (!isSubmitting) setIsGradingModalOpen(false); }} aria-labelledby="grading-modal-title" size="lg" centered contentClassName="bg-dark text-light border-secondary">
+                <Modal.Header closeButton closeLabel="Értékelés bezárása" className="border-secondary">
+                    <Modal.Title as="h2" id="grading-modal-title" className="fw-bold app-accent-text">
                         Dolgozat Értékelése: {selectedSession?.studentName}
                     </Modal.Title>
                 </Modal.Header>
                 <Form onSubmit={handleGradeSubmit}>
                     <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }} className="custom-scrollbar">
+                        <LearningFeedback error={gradeError} />
                         
                         {/* HATALMAS PIROS FIGYELMEZTETÉS A KÉSÉSRŐL A MODALBAN */}
                         {selectedSession && getLateInfo(selectedSession) && (
-                            <Alert variant="danger" className="d-flex align-items-center mb-4 shadow-sm border-danger">
-                                <span className="fs-2 me-3">⚠️</span>
+                            <Alert role="note" variant="danger" className="d-flex align-items-center mb-4 shadow-sm border-danger">
+                                <span aria-hidden="true" className="fs-2 me-3">⚠️</span>
                                 <div>
-                                    <h5 className="fw-bold text-danger mb-1">Időtúllépés történt!</h5>
-                                    <div className="text-dark">
+                                    <h5 className="fw-bold alert-heading mb-1">Időtúllépés történt!</h5>
+                                    <div>
                                         A diák <strong>+{getLateInfo(selectedSession)}</strong> késéssel adta be a munkát 
-                                        az eredeti {timeLimitMinutes} perces korláthoz képest. Ezt vedd figyelembe a pontozásnál!
+                                        a rá érvényes beadási időponthoz képest. Ezt vedd figyelembe a pontozásnál!
                                     </div>
                                 </div>
                             </Alert>
                         )}
 
                         <div className="mb-4">
-                            <h6 className="fw-bold text-secondary mb-3 border-bottom border-secondary pb-2">A diák válaszai:</h6>
+                            <h3 className="h6 fw-bold text-secondary mb-3 border-bottom border-secondary pb-2">A diák válaszai:</h3>
                             {(!selectedSession?.answers || selectedSession.answers.length === 0) ? (
                                 <div className="text-light small">Nincsenek elérhető válaszadatok.</div>
                             ) : (
@@ -287,33 +310,33 @@ const AssignmentSubmissions = () => {
                                     {selectedSession.answers.map((ans, index) => (
                                         <li key={index} className="mb-3 p-3 bg-black bg-opacity-25 rounded border border-secondary shadow-sm">
                                             
-                                            <div className="text-info fw-bold mb-2 pb-2 border-bottom border-secondary d-flex justify-content-between align-items-center">
-                                                <div>{index + 1}. Kérdés: <span className="text-light fw-normal">{ans.question}</span></div>
+                                            <div className="app-accent-text fw-bold mb-2 pb-2 border-bottom border-secondary d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                                                <div>{index + 1}. Kérdés: <span className="text-light fw-normal"><LanguageText text={ans.question} lang={ans.exercise?.content?.questionLang || 'hu'} parts={ans.exercise?.content?.questionParts} /></span></div>
                                                 
                                                 {ans.exercise && (
-                                                    <Button variant="link" size="sm" className="text-info p-0 text-decoration-none" title="Feladat előnézete" onClick={() => togglePreview(index)}>
-                                                        előnézet👁️
+                                                    <Button aria-label={`előnézet: ${index + 1}. kérdés`} aria-expanded={expandedPreviewIndex === index} aria-controls={`grading-preview-${index}`} variant="link" size="sm" className="app-accent-text p-0 text-decoration-none" onClick={() => togglePreview(index)}>
+                                                        előnézet<span aria-hidden="true">👁️</span>
                                                     </Button>
                                                 )}
                                             </div>
 
-                                          {expandedPreviewIndex === index && ans.exercise && (
-                                                <div className="mt-2 mb-3">
-                                                    <ExercisePreviewCard 
+                                          {ans.exercise && (
+                                                <div id={`grading-preview-${index}`} hidden={expandedPreviewIndex !== index} className="mt-2 mb-3">
+                                                    {expandedPreviewIndex === index && <ExercisePreviewCard
                                                         exercise={ans.exercise} 
                                                         serverCorrectAnswer={ans.serverCorrectAnswer} 
-                                                    />
+                                                    />}
                                                 </div>
                                             )}
 
                                             <div className="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
                                                 <div>
                                                     <span className="text-secondary fw-bold">Diák válasza: </span> 
-                                                    <span className="ms-1 text-light">
+                                                    <span lang={ans.exercise?.content?.answerLang} className="ms-1 text-light">
                                                         {typeof ans.studentAnswer === 'object' ? JSON.stringify(ans.studentAnswer) : ans.studentAnswer}
                                                     </span>
                                                 </div>
-                                                <div className="d-flex gap-2">
+                                                <div className="d-flex flex-wrap gap-2">
                                                     {ans.correct ? (
                                                         <Badge bg="success" className="px-2 py-1">Helyes</Badge>
                                                     ) : (
@@ -334,28 +357,30 @@ const AssignmentSubmissions = () => {
 
                         {/* GRADING FORM */}
                         <div className="bg-darker p-3 rounded border border-secondary">
-                            <Form.Group className="mb-3">
-                                <Form.Label className="text-info fw-bold">Végső Pontszám (%)</Form.Label>
-                                <div className="d-flex align-items-center gap-3">
+                            <Form.Group className="mb-3" controlId="teacher-final-score">
+                                <Form.Label className="app-accent-text fw-bold">Végső Pontszám (%)</Form.Label>
+                                <div className="d-flex flex-wrap align-items-center gap-3">
                                     <Form.Control 
                                         type="number" 
                                         min="0" max="100" 
-                                        className="bg-dark text-light border-info w-25" 
+                                        className="bg-dark text-light border-info grading-score-input"
                                         value={gradeForm.teacherScore} 
+                                        readOnly={isSubmitting}
                                         onChange={e => setGradeForm({...gradeForm, teacherScore: e.target.value})} 
                                         required 
                                     />
                                     <span className="text-secondary small">(Eredeti automata pont: {selectedSession?.finalScore}%)</span>
                                 </div>
                             </Form.Group>
-                            <Form.Group>
-                                <Form.Label className="text-info fw-bold">Tanári Megjegyzés (Opcionális)</Form.Label>
+                            <Form.Group controlId="teacher-comment">
+                                <Form.Label className="app-accent-text fw-bold">Tanári Megjegyzés (Opcionális)</Form.Label>
                                 <Form.Control 
                                     as="textarea" 
                                     rows={3} 
                                     className="bg-dark text-light border-secondary" 
                                     placeholder="Ide írhatsz szöveges visszajelzést a diáknak..."
                                     value={gradeForm.teacherComment} 
+                                    readOnly={isSubmitting}
                                     onChange={e => setGradeForm({...gradeForm, teacherComment: e.target.value})} 
                                 />
                             </Form.Group>
@@ -363,9 +388,9 @@ const AssignmentSubmissions = () => {
 
                     </Modal.Body>
                     <Modal.Footer className="border-secondary">
-                        <Button variant="outline-light" onClick={() => setIsGradingModalOpen(false)}>Mégse</Button>
-                        <Button variant="success" type="submit" className="fw-bold px-4" disabled={isSubmitting}>
-                            {isSubmitting ? <Spinner size="sm" /> : 'Eredmény Publikálása'}
+                        <Button variant="outline-secondary" onClick={() => setIsGradingModalOpen(false)} disabled={isSubmitting}>Mégse</Button>
+                        <Button variant="success" type="submit" className="fw-bold px-4" aria-disabled={isSubmitting} aria-busy={isSubmitting}>
+                            {isSubmitting && <Spinner size="sm" aria-hidden="true" className="me-2" />}Eredmény Publikálása
                         </Button>
                     </Modal.Footer>
                 </Form>
