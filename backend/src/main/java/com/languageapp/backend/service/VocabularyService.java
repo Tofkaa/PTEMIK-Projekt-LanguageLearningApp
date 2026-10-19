@@ -292,6 +292,10 @@ public class VocabularyService {
                         .exerciseId(UUID.randomUUID())
                         .type("MULTIPLE_CHOICE")
                         .question("Mi a jelentése ennek a szónak: " + item.getWord() + "?")
+                        .questionLang("hu").answerLang("hu")
+                        .questionParts(List.of(new DynamicExerciseDTO.LanguagePart("Mi a jelentése ennek a szónak: ", "hu"),
+                                new DynamicExerciseDTO.LanguagePart(item.getWord(), user.getActiveCourse().getLanguageCode()),
+                                new DynamicExerciseDTO.LanguagePart("?", "hu")))
                         .targetWord(item.getWord())
                         .correctAnswer(item.getTranslation())
                         .options(options)
@@ -306,6 +310,7 @@ public class VocabularyService {
                         .exerciseId(UUID.randomUUID())
                         .type("WORD_BANK")
                         .question("Rakd sorba a kifejezés szavait: " + item.getTranslation())
+                        .questionLang("hu").answerLang(user.getActiveCourse().getLanguageCode())
                         .targetWord(item.getWord())
                         .correctAnswer(item.getWord())
                         .options(shuffledWords)
@@ -316,6 +321,9 @@ public class VocabularyService {
                         .exerciseId(UUID.randomUUID())
                         .type("TRANSLATION")
                         .question("Fordítsd le magyarra: " + item.getWord())
+                        .questionLang("hu").answerLang("hu")
+                        .questionParts(List.of(new DynamicExerciseDTO.LanguagePart("Fordítsd le magyarra: ", "hu"),
+                                new DynamicExerciseDTO.LanguagePart(item.getWord(), user.getActiveCourse().getLanguageCode())))
                         .targetWord(item.getWord())
                         .correctAnswer(item.getTranslation())
                         .hint(item.getWord() + " = " + item.getTranslation())

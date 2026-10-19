@@ -17,4 +17,9 @@ public class DynamicExerciseDTO {
     private String correctAnswer;
     private List<String> options;
     private String hint;
+    private String questionLang;
+    private String answerLang;
+    private List<LanguagePart> questionParts;
+
+    public record LanguagePart(String text, String lang) {}
 }

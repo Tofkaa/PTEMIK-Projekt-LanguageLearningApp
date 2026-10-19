@@ -8,6 +8,7 @@ import com.languageapp.backend.entity.Exercise;
 import com.languageapp.backend.entity.Lesson;
 import com.languageapp.backend.entity.LessonTopic;
 import com.languageapp.backend.exception.ResourceNotFoundException;
+import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.repository.CourseRepository;
 import com.languageapp.backend.repository.ExerciseRepository;
 import com.languageapp.backend.repository.LessonRepository;
@@ -93,6 +94,7 @@ public class CurriculumService {
     }
 
     private void importExercisesInternal(Lesson parentLesson, List<ExerciseImportRequest> exerciseRequests) {
+        exerciseRequests.forEach(this::validateAccessibilityMetadata);
         for (ExerciseImportRequest exerciseReq : exerciseRequests) {
             Exercise exercise = new Exercise();
             exercise.setLesson(parentLesson);
@@ -107,5 +109,52 @@ public class CurriculumService {
 
             exerciseRepository.save(exercise);
         }
+    }
+
+    private void validateAccessibilityMetadata(ExerciseImportRequest request) {
+        var content = request.getContent();
+        if (content == null) throw new BadRequestException("A feladat content mezője kötelező.");
+        requireLanguage(content.get("questionLang"));
+        requireLanguage(content.get("answerLang"));
+        if (content.get("hint") instanceof String hint && !hint.isBlank()) {
+            if (!"hu-to-target".equals(content.get("hintDirection")) || !content.containsKey("hintParts")) {
+                throw new BadRequestException("Tipphez hintDirection: hu-to-target és nyelvjelölt hintParts szükséges.");
+            }
+        }
+        for (String field : List.of("question", "hint")) {
+            String partsField = field + "Parts";
+            if (!content.containsKey(partsField)) continue;
+            if (!(content.get(partsField) instanceof List<?> parts) || parts.isEmpty()) {
+                throw new BadRequestException("A " + partsField + " nem üres szövegrészlista kell legyen.");
+            }
+            StringBuilder textValue = new StringBuilder();
+            for (var part : parts) {
+                if (!(part instanceof java.util.Map<?, ?> segment) || !(segment.get("text") instanceof String text)) {
+                    throw new BadRequestException("Minden " + partsField + " elemhez text és lang szükséges.");
+                }
+                requireLanguage(segment.get("lang"));
+                textValue.append(text);
+            }
+            if (!textValue.toString().equals(content.get(field))) {
+                throw new BadRequestException("A " + partsField + " szövege pontosan egyezzen a " + field + " értékével.");
+            }
+        }
+        boolean hasImage = request.getImageUrl() != null && !request.getImageUrl().isBlank()
+                || content.get("imageUrl") instanceof String image && !image.isBlank();
+        if ("IMAGE_CHOICE".equals(request.getType()) && !hasImage) throw new BadRequestException("A képes feladathoz kép szükséges.");
+        if (hasImage) {
+            if (!(content.get("imageAlt") instanceof String alt) || alt.isBlank()
+                    || !(content.get("imagePurpose") instanceof String purpose)
+                    || !List.of("informative", "visual-assessment").contains(purpose)) {
+                throw new BadRequestException("Képhez imageAlt és imagePurpose (informative vagy visual-assessment) szükséges.");
+            }
+            requireLanguage(content.get("imageAltLang"));
+        }
+    }
+
+    private void requireLanguage(Object value) {
+        if (!(value instanceof String tag) || tag.isBlank()) throw new BadRequestException("Hiányzó nyelvjelölés (BCP 47 lang).");
+        try { new java.util.Locale.Builder().setLanguageTag(tag).build(); }
+        catch (java.util.IllformedLocaleException e) { throw new BadRequestException("Érvénytelen nyelvjelölés: " + tag); }
     }
 }

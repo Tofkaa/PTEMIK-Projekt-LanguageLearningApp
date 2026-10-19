@@ -13,14 +13,14 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Válaszd ki a képhez illő angol szót!", "options": ["Apple", "Banana", "Grape"], "questionLang": "hu", "answerLang": "en" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Válaszd ki a képhez illő angol szót!", "options": ["Apple", "Banana", "Grape"], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Apple" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Apple+%F0%9F%8D%8E"
           },
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Válaszd ki a képhez illő angol szót!", "options": ["Apple", "Banana", "Grape"], "questionLang": "hu", "answerLang": "en" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Válaszd ki a képhez illő angol szót!", "options": ["Apple", "Banana", "Grape"], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Banana" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Banana+%F0%9F%8D%8C"
           },
@@ -33,7 +33,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Az alma piros.", "hint": "apple = alma, red = piros", "questionLang": "hu", "answerLang": "en" },
+            "content": { "question": "Az alma piros.", "hint": "alma = apple, piros = red", "hintDirection": "hu-to-target", "hintParts": [{"text":"alma","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"apple","lang":"en"},{"text":", ","lang":"hu"},{"text":"piros","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"red","lang":"en"}], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "The apple is red." }
           },
           {
@@ -65,13 +65,13 @@
           {
             "type": "MULTIPLE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "How do you say 'Anya'?", "options": ["Father", "Mother", "Brother"], "questionLang": "en", "answerLang": "en" },
+            "content": { "question": "How do you say 'Anya'?", "questionParts": [{"text":"How do you say ","lang":"en"},{"text":"'Anya'","lang":"hu"},{"text":"?","lang":"en"}], "options": ["Father", "Mother", "Brother"], "questionLang": "en", "answerLang": "en" },
             "correctAnswer": { "answer": "Mother" }
           },
           {
             "type": "MULTIPLE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "How do you say 'Testvér (fiú)'?", "options": ["Sister", "Brother", "Uncle"], "questionLang": "en", "answerLang": "en" },
+            "content": { "question": "How do you say 'Testvér (fiú)'?", "questionParts": [{"text":"How do you say ","lang":"en"},{"text":"'Testvér (fiú)'","lang":"hu"},{"text":"?","lang":"en"}], "options": ["Sister", "Brother", "Uncle"], "questionLang": "en", "answerLang": "en" },
             "correctAnswer": { "answer": "Brother" }
           },
           {
@@ -83,7 +83,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Ő az én nővérem.", "hint": "nővér/húg = sister", "questionLang": "hu", "answerLang": "en" },
+            "content": { "question": "Ő az én nővérem.", "hint": "nővér/húg = sister", "hintDirection": "hu-to-target", "hintParts": [{"text":"nővér/húg","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"sister","lang":"en"}], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "She is my sister." }
           },
           {
@@ -115,14 +115,14 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Melyik állat van a képen?", "options": ["Cat", "Dog", "Bird"], "questionLang": "hu", "answerLang": "en" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Melyik állat van a képen?", "options": ["Cat", "Dog", "Bird"], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Dog" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Dog+%F0%9F%90%B6"
           },
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Melyik állat van a képen?", "options": ["Cat", "Dog", "Fish"], "questionLang": "hu", "answerLang": "en" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Melyik állat van a képen?", "options": ["Cat", "Dog", "Fish"], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Cat" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Cat+%F0%9F%90%B1"
           },
@@ -135,7 +135,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "A kutya nagy.", "hint": "nagy = big", "questionLang": "hu", "answerLang": "en" },
+            "content": { "question": "A kutya nagy.", "hint": "nagy = big", "hintDirection": "hu-to-target", "hintParts": [{"text":"nagy","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"big","lang":"en"}], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "The dog is big." }
           },
           {
@@ -174,7 +174,7 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Mit látsz a képen?", "options": ["Train", "Airplane", "Bus"], "questionLang": "hu", "answerLang": "en" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Mit látsz a képen?", "options": ["Train", "Airplane", "Bus"], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Airplane" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Airplane+%E2%9C%88%EF%B8%8F"
           },
@@ -193,7 +193,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Hol van a csomagom?", "hint": "csomag = luggage / bag", "questionLang": "hu", "answerLang": "en" },
+            "content": { "question": "Hol van a csomagom?", "hint": "csomag = luggage / bag", "hintDirection": "hu-to-target", "hintParts": [{"text":"csomag","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"luggage / bag","lang":"en"}], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Where is my luggage?" }
           },
           {
@@ -219,7 +219,7 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Mi van a képen?", "options": ["Key", "Map", "Ticket"], "questionLang": "hu", "answerLang": "en" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Mi van a képen?", "options": ["Key", "Map", "Ticket"], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Key" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Hotel+Key+%F0%9F%97%9D%EF%B8%8F"
           },
@@ -238,7 +238,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Van szabad szobájuk?", "hint": "szabad szoba = available room", "questionLang": "hu", "answerLang": "en" },
+            "content": { "question": "Van szabad szobájuk?", "hint": "szabad szoba = available room", "hintDirection": "hu-to-target", "hintParts": [{"text":"szabad szoba","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"available room","lang":"en"}], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Do you have an available room?" }
           },
           {
@@ -264,14 +264,14 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Melyik ez az irány?", "options": ["Right", "Left", "Straight"], "questionLang": "hu", "answerLang": "en" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Melyik ez az irány?", "options": ["Right", "Left", "Straight"], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Left" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Left+%E2%AC%85%EF%B8%8F"
           },
           {
             "type": "MULTIPLE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "How do you say 'Jobbra'?", "options": ["Left", "Right", "Back"], "questionLang": "en", "answerLang": "en" },
+            "content": { "question": "How do you say 'Jobbra'?", "questionParts": [{"text":"How do you say ","lang":"en"},{"text":"'Jobbra'","lang":"hu"},{"text":"?","lang":"en"}], "options": ["Left", "Right", "Back"], "questionLang": "en", "answerLang": "en" },
             "correctAnswer": { "answer": "Right" }
           },
           {
@@ -283,7 +283,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Menjen egyenesen.", "hint": "egyenesen = straight", "questionLang": "hu", "answerLang": "en" },
+            "content": { "question": "Menjen egyenesen.", "hint": "egyenesen = straight", "hintDirection": "hu-to-target", "hintParts": [{"text":"egyenesen","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"straight","lang":"en"}], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Go straight." }
           },
           {
@@ -316,14 +316,14 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Mit látsz a képen?", "options": ["Water", "Bread", "Meat"], "questionLang": "hu", "answerLang": "en" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Mit látsz a képen?", "options": ["Water", "Bread", "Meat"], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Bread" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Bread+%F0%9F%8D%9E"
           },
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Mit látsz a képen?", "options": ["Coffee", "Water", "Tea"], "questionLang": "hu", "answerLang": "en" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Mit látsz a képen?", "options": ["Coffee", "Water", "Tea"], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "Water" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Water+%F0%9F%A5%A4"
           },
@@ -336,7 +336,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Kérek egy kávét.", "hint": "kérek = I would like", "questionLang": "hu", "answerLang": "en" },
+            "content": { "question": "Kérek egy kávét.", "hint": "kérek = I would like", "hintDirection": "hu-to-target", "hintParts": [{"text":"kérek","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"I would like","lang":"en"}], "questionLang": "hu", "answerLang": "en" },
             "correctAnswer": { "answer": "I would like a coffee." }
           },
           {

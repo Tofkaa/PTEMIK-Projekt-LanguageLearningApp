@@ -63,6 +63,7 @@ class EvaluationServiceTest {
         // Assert
         assertTrue(response.isCorrect(), "A tökéletes válasznak helyesnek kell lennie.");
         assertFalse(response.isAlmostCorrect(), "Nem lehet 'majdnem jó', ha tökéletes.");
+        assertEquals("Helyes válasz!", response.getFeedbackMessage());
     }
 
     // --- 2. TESZT: Elgépelés (Levenshtein algoritmus) detektálása ---
@@ -77,6 +78,7 @@ class EvaluationServiceTest {
         // Assert
         assertFalse(response.isCorrect(), "Az elgépelt válasz nem lehet 100%-ig helyes.");
         assertTrue(response.isAlmostCorrect(), "A Levenshtein algoritmusnak fel kell ismernie az apró elgépelést.");
+        assertEquals("Majdnem jó! Ellenőrizd az elgépelést!", response.getFeedbackMessage());
     }
 
     // --- 3. TESZT: Teljesen rossz válasz ---
@@ -91,6 +93,7 @@ class EvaluationServiceTest {
         // Assert
         assertFalse(response.isCorrect());
         assertFalse(response.isAlmostCorrect());
+        assertEquals("Helytelen válasz. Folytasd a gyakorlást!", response.getFeedbackMessage());
     }
 
     // --- 4. TESZT: XP Kalkuláció - Elsőre hibátlan (10 XP) ---

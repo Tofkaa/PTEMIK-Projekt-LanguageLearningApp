@@ -167,7 +167,7 @@ public class EvaluationService {
             challengeService.processChallengeResult(challengeId, userId, score, request.getTimeTakenSeconds());
         }
 
-        String feedback = passed ? "Congratulations! You passed the lesson." : "Keep practicing! You can do better.";
+        String feedback = passed ? "Gratulálunk, sikeresen teljesítetted a leckét!" : "Gyakorolj tovább, menni fog!";
         achievementService.checkAndAwardAchievements(user, score);
 
         return LessonSubmitResponse.builder()
@@ -337,11 +337,11 @@ public class EvaluationService {
         if (normExpected.equals(normUser)) {
             return ExerciseCheckResponse.builder()
                     .isCorrect(true).isAlmostCorrect(false)
-                    .feedbackMessage("Perfect! ✅").build();
+                    .feedbackMessage("Helyes válasz!").build();
         }
 
         boolean isAlmostCorrect = false;
-        String feedbackMsg = "Incorrect! No worries, let's keep going. ❌";
+        String feedbackMsg = "Helytelen válasz. Folytasd a gyakorlást!";
 
         if ("WORD_BANK".equals(exercise.getType())) {
             List<String> expectedWords = List.of(normExpected.split(" "));
@@ -354,14 +354,14 @@ public class EvaluationService {
                 }
                 if (misplaced > 0 && misplaced <= 2) {
                     isAlmostCorrect = true;
-                    feedbackMsg = "Almost right! You just mixed up the word order a bit. 🔄";
+                    feedbackMsg = "Majdnem jó! Ellenőrizd a szavak sorrendjét!";
                 }
             }
         } else {
             int distance = calculateLevenshteinDistance(normExpected, normUser);
             if (distance <= 2 && normExpected.length() > 4) {
                 isAlmostCorrect = true;
-                feedbackMsg = "Almost right! Looks like a small typo. ✍️";
+                feedbackMsg = "Majdnem jó! Ellenőrizd az elgépelést!";
             }
         }
 

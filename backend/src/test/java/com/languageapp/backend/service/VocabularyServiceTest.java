@@ -107,6 +107,19 @@ class VocabularyServiceTest {
         assertFalse(result.get(0).isNewAddition(), "A lekérdezett szavaknál ez a flag false kell legyen");
     }
 
+    @Test void generatedExercisesDeclareQuestionAndAnswerLanguages() {
+        when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.of(testUser));
+        when(vocabularyRepository.findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(
+                eq(testUser.getUserId()), eq(COURSE_ID), any(Instant.class))).thenReturn(List.of(testVocabulary));
+        when(vocabularyRepository.findAllByUserAndCourse(testUser, testCourse)).thenReturn(List.of(testVocabulary));
+        var exercises = vocabularyService.generateDynamicPracticeSession(USER_EMAIL, 10);
+        assertEquals(1, exercises.size());
+        var exercise = exercises.getFirst();
+        assertEquals("hu", exercise.getQuestionLang()); assertEquals("hu", exercise.getAnswerLang());
+        assertEquals(exercise.getQuestion(), exercise.getQuestionParts().stream().map(p -> p.text()).collect(java.util.stream.Collectors.joining()));
+        assertTrue(exercise.getQuestionParts().stream().anyMatch(p -> p.text().equals("apple") && p.lang().equals("en")));
+    }
+
     @Test
     void getDueVocabularyForToday_UserNotFound_ShouldThrowException() {
         // Arrange

@@ -7,6 +7,7 @@ import com.languageapp.backend.entity.Exercise;
 import com.languageapp.backend.entity.Lesson;
 import com.languageapp.backend.entity.LessonTopic;
 import com.languageapp.backend.exception.ResourceNotFoundException;
+import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.repository.ExerciseRepository;
 import com.languageapp.backend.repository.LessonRepository;
 import com.languageapp.backend.repository.LessonTopicRepository;
@@ -101,6 +102,7 @@ class CurriculumServiceTest {
 
         ExerciseImportRequest exerciseReq = new ExerciseImportRequest();
         exerciseReq.setType("MULTIPLE_CHOICE");
+        exerciseReq.setContent(java.util.Map.of("questionLang", "hu", "answerLang", "en"));
 
         when(exerciseRepository.save(any(Exercise.class))).thenAnswer(i -> i.getArguments()[0]);
 
@@ -114,5 +116,84 @@ class CurriculumServiceTest {
         Exercise savedExercise = exerciseCaptor.getValue();
         assertEquals("MULTIPLE_CHOICE", savedExercise.getType());
         assertEquals(mockLesson, savedExercise.getLesson(), "A feladatnak hozzá kell kapcsolódnia a leckéhez");
+    }
+
+    private ExerciseImportRequest imageRequest() {
+        var request = new ExerciseImportRequest(); request.setType("IMAGE_CHOICE"); request.setImageUrl("/images/test.png");
+        request.setContent(new java.util.HashMap<>(java.util.Map.of("questionLang", "hu", "answerLang", "de",
+                "imagePurpose", "visual-assessment", "imageAlt", "Képfelismerési szókincsfeladat", "imageAltLang", "hu")));
+        return request;
+    }
+
+    @Test void importsVisualAssessmentWithoutDerivingAltFromAnswer() {
+        when(lessonRepository.findById(mockLesson.getLessonId())).thenReturn(Optional.of(mockLesson));
+        var request = imageRequest();
+        request.setCorrectAnswer(java.util.Map.of("answer", "Apfel"));
+        curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(), List.of(request));
+        verify(exerciseRepository).save(argThat(e -> e.getContent().get("imageAlt").equals("Képfelismerési szókincsfeladat")));
+    }
+
+    @Test void rejectsMissingImageAlternativeBeforeSavingAnyExercise() {
+        when(lessonRepository.findById(mockLesson.getLessonId())).thenReturn(Optional.of(mockLesson));
+        var invalid = imageRequest(); invalid.getContent().remove("imageAlt");
+        assertThrows(BadRequestException.class, () -> curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(), List.of(imageRequest(), invalid)));
+        verifyNoInteractions(exerciseRepository);
+    }
+
+    @Test void rejectsInconsistentMixedLanguageParts() {
+        when(lessonRepository.findById(mockLesson.getLessonId())).thenReturn(Optional.of(mockLesson));
+        var invalid = imageRequest(); invalid.getContent().put("question", "Question");
+        invalid.getContent().put("questionParts", List.of(java.util.Map.of("text", "Different", "lang", "en")));
+        assertThrows(BadRequestException.class, () -> curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(), List.of(invalid)));
+        verifyNoInteractions(exerciseRepository);
+    }
+
+    @Test void rejectsMissingImagePurposeWithReadableValidationError() {
+        when(lessonRepository.findById(mockLesson.getLessonId())).thenReturn(Optional.of(mockLesson));
+        var invalid = imageRequest(); invalid.getContent().remove("imagePurpose");
+        assertThrows(BadRequestException.class, () -> curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(), List.of(invalid)));
+        verifyNoInteractions(exerciseRepository);
+    }
+
+    @Test void rejectsInvalidLanguageTag() {
+        when(lessonRepository.findById(mockLesson.getLessonId())).thenReturn(Optional.of(mockLesson));
+        var invalid = imageRequest(); invalid.getContent().put("answerLang", "en_US");
+        assertThrows(BadRequestException.class, () -> curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(), List.of(invalid)));
+        verifyNoInteractions(exerciseRepository);
+    }
+
+    private ExerciseImportRequest hintRequest() {
+        var request = imageRequest();
+        request.getContent().put("hint", "alma = Apfel");
+        request.getContent().put("hintDirection", "hu-to-target");
+        request.getContent().put("hintParts", List.of(java.util.Map.of("text", "alma = ", "lang", "hu"),
+                java.util.Map.of("text", "Apfel", "lang", "de")));
+        return request;
+    }
+
+    @Test void importsExplicitHintLanguagesWithoutReversingOrChangingTheText() {
+        when(lessonRepository.findById(mockLesson.getLessonId())).thenReturn(Optional.of(mockLesson));
+        var request = hintRequest();
+        curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(), List.of(request));
+        verify(exerciseRepository).save(argThat(e -> e.getContent().equals(request.getContent())));
+    }
+
+    @Test void rejectsHintWithoutDirectionOrLanguagePartsBeforeSaving() {
+        when(lessonRepository.findById(mockLesson.getLessonId())).thenReturn(Optional.of(mockLesson));
+        var request = hintRequest(); request.getContent().remove("hintDirection");
+        assertThrows(BadRequestException.class, () -> curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(), List.of(request)));
+        request.getContent().put("hintDirection", "hu-to-target"); request.getContent().remove("hintParts");
+        assertThrows(BadRequestException.class, () -> curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(), List.of(request)));
+        verifyNoInteractions(exerciseRepository);
+    }
+
+    @Test void rejectsHintPartsThatChangeTheDisplayedTextOrUseInvalidLanguage() {
+        when(lessonRepository.findById(mockLesson.getLessonId())).thenReturn(Optional.of(mockLesson));
+        var request = hintRequest();
+        request.getContent().put("hintParts", List.of(java.util.Map.of("text", "Other", "lang", "de")));
+        assertThrows(BadRequestException.class, () -> curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(), List.of(request)));
+        request.getContent().put("hintParts", List.of(java.util.Map.of("text", "alma = Apfel", "lang", "de_DE")));
+        assertThrows(BadRequestException.class, () -> curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(), List.of(request)));
+        verifyNoInteractions(exerciseRepository);
     }
 }

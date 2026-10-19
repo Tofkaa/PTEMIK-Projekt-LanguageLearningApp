@@ -13,14 +13,14 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Válaszd ki a képhez illő német szót!", "options": ["Apfel", "Banane", "Traube"], "questionLang": "hu", "answerLang": "de" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Válaszd ki a képhez illő német szót!", "options": ["Apfel", "Banane", "Traube"], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Apfel" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Apfel+%F0%9F%8D%8E"
           },
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Válaszd ki a képhez illő német szót!", "options": ["Apfel", "Banane", "Traube"], "questionLang": "hu", "answerLang": "de" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Válaszd ki a képhez illő német szót!", "options": ["Apfel", "Banane", "Traube"], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Banane" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Banane+%F0%9F%8D%8C"
           },
@@ -33,7 +33,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Az alma piros.", "hint": "alma = Apfel, piros = rot", "questionLang": "hu", "answerLang": "de" },
+            "content": { "question": "Az alma piros.", "hint": "alma = Apfel, piros = rot", "hintDirection": "hu-to-target", "hintParts": [{"text":"alma","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"Apfel","lang":"de"},{"text":", ","lang":"hu"},{"text":"piros","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"rot","lang":"de"}], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Der Apfel ist rot." }
           },
           {
@@ -83,7 +83,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Ő az én nővérem.", "hint": "nővér/húg = Schwester", "questionLang": "hu", "answerLang": "de" },
+            "content": { "question": "Ő az én nővérem.", "hint": "nővér/húg = Schwester", "hintDirection": "hu-to-target", "hintParts": [{"text":"nővér/húg","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"Schwester","lang":"de"}], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Sie ist meine Schwester." }
           },
           {
@@ -115,14 +115,14 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Melyik állat van a képen?", "options": ["Katze", "Hund", "Vogel"], "questionLang": "hu", "answerLang": "de" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Melyik állat van a képen?", "options": ["Katze", "Hund", "Vogel"], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Hund" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Hund+%F0%9F%90%B6"
           },
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Melyik állat van a képen?", "options": ["Katze", "Hund", "Fisch"], "questionLang": "hu", "answerLang": "de" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Melyik állat van a képen?", "options": ["Katze", "Hund", "Fisch"], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Katze" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Katze+%F0%9F%90%B1"
           },
@@ -135,7 +135,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "A kutya nagy.", "hint": "nagy = groß", "questionLang": "hu", "answerLang": "de" },
+            "content": { "question": "A kutya nagy.", "hint": "nagy = groß", "hintDirection": "hu-to-target", "hintParts": [{"text":"nagy","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"groß","lang":"de"}], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Der Hund ist groß." }
           },
           {
@@ -174,7 +174,7 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Mit látsz a képen?", "options": ["Zug", "Flugzeug", "Bus"], "questionLang": "hu", "answerLang": "de" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Mit látsz a képen?", "options": ["Zug", "Flugzeug", "Bus"], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Flugzeug" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Flugzeug+%E2%9C%88%EF%B8%8F"
           },
@@ -193,7 +193,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Hol van a csomagom?", "hint": "csomag = Gepäck", "questionLang": "hu", "answerLang": "de" },
+            "content": { "question": "Hol van a csomagom?", "hint": "csomag = Gepäck", "hintDirection": "hu-to-target", "hintParts": [{"text":"csomag","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"Gepäck","lang":"de"}], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Wo ist mein Gepäck?" }
           },
           {
@@ -219,7 +219,7 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Mi van a képen?", "options": ["Schlüssel", "Karte", "Ticket"], "questionLang": "hu", "answerLang": "de" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Mi van a képen?", "options": ["Schlüssel", "Karte", "Ticket"], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Schlüssel" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Hotel+Schl%C3%BCssel+%F0%9F%97%9D%EF%B8%8F"
           },
@@ -238,7 +238,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Van szabad szobájuk?", "hint": "szabad szoba = freies Zimmer", "questionLang": "hu", "answerLang": "de" },
+            "content": { "question": "Van szabad szobájuk?", "hint": "szabad szoba = freies Zimmer", "hintDirection": "hu-to-target", "hintParts": [{"text":"szabad szoba","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"freies Zimmer","lang":"de"}], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Haben Sie ein freies Zimmer?" }
           },
           {
@@ -264,7 +264,7 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Melyik ez az irány?", "options": ["Rechts", "Links", "Geradeaus"], "questionLang": "hu", "answerLang": "de" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Melyik ez az irány?", "options": ["Rechts", "Links", "Geradeaus"], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Links" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Links+%E2%AC%85%EF%B8%8F"
           },
@@ -283,7 +283,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Menjen egyenesen.", "hint": "egyenesen = geradeaus", "questionLang": "hu", "answerLang": "de" },
+            "content": { "question": "Menjen egyenesen.", "hint": "egyenesen = geradeaus", "hintDirection": "hu-to-target", "hintParts": [{"text":"egyenesen","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"geradeaus","lang":"de"}], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Gehen Sie geradeaus." }
           },
           {
@@ -316,14 +316,14 @@
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Mit látsz a képen?", "options": ["Wasser", "Brot", "Fleisch"], "questionLang": "hu", "answerLang": "de" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Mit látsz a képen?", "options": ["Wasser", "Brot", "Fleisch"], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Brot" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Brot+%F0%9F%8D%9E"
           },
           {
             "type": "IMAGE_CHOICE",
             "difficulty": "EASY",
-            "content": { "question": "Mit látsz a képen?", "options": ["Kaffee", "Wasser", "Tee"], "questionLang": "hu", "answerLang": "de" },
+            "content": { "imagePurpose": "visual-assessment", "imageAlt": "Képfelismerési szókincsfeladat: válaszd ki a képen látható dolog idegen nyelvű nevét.", "imageAltLang": "hu", "question": "Mit látsz a képen?", "options": ["Kaffee", "Wasser", "Tee"], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Wasser" },
             "imageUrl": "https://placehold.co/600x400/1e1e1e/0dcaf0?text=Wasser+%F0%9F%A5%A4"
           },
@@ -336,7 +336,7 @@
           {
             "type": "TRANSLATION",
             "difficulty": "MEDIUM",
-            "content": { "question": "Kérek egy kávét.", "hint": "kérek = ich hätte gerne", "questionLang": "hu", "answerLang": "de" },
+            "content": { "question": "Kérek egy kávét.", "hint": "kérek = ich hätte gerne", "hintDirection": "hu-to-target", "hintParts": [{"text":"kérek","lang":"hu"},{"text":" = ","lang":"hu"},{"text":"ich hätte gerne","lang":"de"}], "questionLang": "hu", "answerLang": "de" },
             "correctAnswer": { "answer": "Ich hätte gerne einen Kaffee." }
           },
           {
