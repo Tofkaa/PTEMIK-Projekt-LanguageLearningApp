@@ -62,20 +62,20 @@ export const AuthProvider = ({ children }) => {
         checkLoggedInUser();
     }, []);
 
-    /**
-     * Logs the user in by storing the token and updating the user state.
-     * Called after a successful login API request.
-     * * @param {string} token - The JWT access token
-     * @param {Object} userData - The authenticated user's profile data
-     */
+    /** Update progress/profile and vocabulary without changing authentication storage. */
+    const updateProfile = async (userData) => {
+        setUser(userData);
+        await fetchVocabularyMap();
+    };
+
+    /** Store a newly authenticated session, then synchronize its profile. */
     const login = async (token, userData, rememberMe = false) => {
         if (rememberMe) {
             localStorage.setItem('token', token);
         } else {
             sessionStorage.setItem('token', token);
         }
-        setUser(userData);
-        await fetchVocabularyMap();
+        await updateProfile(userData);
     };
 
     /**
@@ -128,7 +128,7 @@ export const AuthProvider = ({ children }) => {
 
     // Provide the authentication state and methods to the rest of the application
     return (
-        <AuthContext.Provider value={{ user,setUser, login, logout, vocabularyMap, changeLanguage }}>
+        <AuthContext.Provider value={{ user,setUser, login, logout, vocabularyMap, changeLanguage, updateProfile }}>
             {children}
         </AuthContext.Provider>
     );

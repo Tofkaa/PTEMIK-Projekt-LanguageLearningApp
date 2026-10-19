@@ -34,7 +34,7 @@ const generateHash = (input) => {
 const LessonPlayer = () => {
     const { id: lessonId } = useParams();
     const navigate = useNavigate();
-    const { user, login } = useAuth(); 
+    const { user, updateProfile } = useAuth();
 
     const [searchParams] = useSearchParams();
     const challengeId = searchParams.get('challengeId');
@@ -222,7 +222,7 @@ const LessonPlayer = () => {
             
             try {
                 const userResponse = await api.get('/users/me'); 
-                login(localStorage.getItem('token'), userResponse.data); 
+                await updateProfile(userResponse.data);
             } catch (fetchErr) {
                 console.warn("Failed to fetch fresh profile, initiating fallback update:", fetchErr);
                 const updatedUser = { 
@@ -230,7 +230,7 @@ const LessonPlayer = () => {
                     xp: user.xp + (response.data.xpEarned || 0),
                     streak: response.data.newStreak !== undefined ? response.data.newStreak : user.streak
                 };
-                login(localStorage.getItem('token'), updatedUser); 
+                await updateProfile(updatedUser);
             }
         } catch (err) {
             console.error("Submission error:", err);
