@@ -85,7 +85,8 @@ function App() {
                         <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
                         <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
                         <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
-                        <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
+                        {/* Recovery is authorized by its token, including when a session already exists. */}
+                        <Route path="/reset-password" element={<ResetPassword />} />
                         <Route path="/terms" element={<Terms />} />
                         <Route path="/privacy" element={<PrivacyPolicy />} />
                         
