@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { useState } from 'react';
 import { Modal } from 'react-bootstrap';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import AppLayout from '../AppLayout';
 
 function ExamplePage() {
@@ -15,9 +15,48 @@ function ExamplePage() {
     </AppLayout>;
 }
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('accessible application layout', () => {
+    it('wraps Tab and Shift+Tab inside a real Bootstrap modal and preserves Escape focus restoration', async () => {
+        // jsdom has no layout. Browser verification separately checks real visible rectangles.
+        vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}]);
+        function ModalPage() {
+            const [open, setOpen] = useState(false);
+            return <AppLayout><button onClick={() => setOpen(true)}>Megnyitás</button>
+                <Modal show={open} onHide={() => setOpen(false)} aria-label="Fókuszpróba">
+                    <Modal.Body>
+                        <button>Első</button><input aria-label="Köztes mező" />
+                        <button onClick={() => setOpen(false)}>Utolsó</button>
+                        <button disabled>Inaktív</button>
+                        <fieldset disabled><button>Tiltott mezőcsoport</button></fieldset>
+                        <div hidden><button>Rejtett</button></div>
+                        <button tabIndex={-1}>Programozott fókusz</button>
+                    </Modal.Body>
+                </Modal>
+            </AppLayout>;
+        }
+        render(<MemoryRouter><ModalPage /></MemoryRouter>);
+        const origin = screen.getByRole('button', { name: 'Megnyitás' });
+        origin.focus(); fireEvent.click(origin);
+        const dialog = await screen.findByRole('dialog', { name: 'Fókuszpróba' });
+        const first = screen.getByRole('button', { name: 'Első' });
+        const last = screen.getByRole('button', { name: 'Utolsó' });
+        last.focus();
+        expect(fireEvent.keyDown(last, { key: 'Tab' })).toBe(false);
+        expect(first).toHaveFocus();
+        expect(fireEvent.keyDown(first, { key: 'Tab', shiftKey: true })).toBe(false);
+        expect(last).toHaveFocus();
+        const middle = screen.getByRole('textbox', { name: 'Köztes mező' });
+        middle.focus();
+        expect(fireEvent.keyDown(middle, { key: 'Tab' })).toBe(true);
+        dialog.focus();
+        fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+        expect(last).toHaveFocus();
+        fireEvent.keyDown(last, { key: 'Escape', keyCode: 27 });
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        expect(origin).toHaveFocus();
+    });
     it('excludes the background from screen-reader browsing during a real modal and restores it after closing', async () => {
         function ModalPage() {
             const [open, setOpen] = useState(false);

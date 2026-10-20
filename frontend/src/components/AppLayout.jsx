@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import { matchPath, useLocation } from 'react-router-dom';
+import { wrapModalFocus } from '../utils/modalFocus';
 
 const pageTitles = [
     ['/login', 'Bejelentkezés'],
@@ -43,9 +44,19 @@ export default function AppLayout({ navigation, children }) {
             else shell.removeAttribute('aria-hidden');
         };
         const observer = new MutationObserver(synchronizeModalBackground);
+        const handleModalTab = event => {
+            const dialog = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')]
+                .filter(element => !element.closest('[aria-hidden="true"]') && element.getClientRects().length > 0).at(-1);
+            if (dialog) wrapModalFocus(event, dialog);
+        };
+        document.addEventListener('keydown', handleModalTab);
         observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['role', 'aria-modal'] });
         synchronizeModalBackground();
-        return () => { observer.disconnect(); shell.removeAttribute('aria-hidden'); };
+        return () => {
+            observer.disconnect();
+            document.removeEventListener('keydown', handleModalTab);
+            shell.removeAttribute('aria-hidden');
+        };
     }, []);
 
     useLayoutEffect(() => {
