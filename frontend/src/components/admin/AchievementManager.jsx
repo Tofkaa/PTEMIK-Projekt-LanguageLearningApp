@@ -110,15 +110,15 @@ const AchievementManager = () => {
             ) : achievements.length === 0 ? (
                 <p className="text-secondary fst-italic">Még nincsenek kitüntetések a rendszerben.</p>
             ) : (
-                <div className="table-responsive rounded-4 border border-secondary">
-                    <Table hover variant="dark" className="m-0 align-middle">
+                <div role="region" tabIndex={0} aria-label="Kitüntetések, görgethető táblázat" className="table-responsive rounded-4 border border-secondary">
+                    <Table hover variant="dark" className="admin-data-table m-0 align-middle">
                         <caption className="visually-hidden">Menedzselt kitüntetések és státuszműveleteik</caption>
                         <thead className="bg-black bg-opacity-25">
                             <tr className="text-secondary">
-                                <th className="py-3 px-4">Ikon & Név</th>
-                                <th className="py-3">Leírás</th>
-                                <th className="py-3">Szabály (Criteria)</th>
-                                <th className="text-end py-3 px-4">Művelet</th>
+                                <th scope="col" className="py-3 px-4">Ikon & Név</th>
+                                <th scope="col" className="py-3">Leírás</th>
+                                <th scope="col" className="py-3">Szabály (Criteria)</th>
+                                <th scope="col" className="text-end py-3 px-4">Művelet</th>
                             </tr>
                         </thead>
                         <tbody>

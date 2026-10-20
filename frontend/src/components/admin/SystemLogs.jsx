@@ -44,41 +44,41 @@ const SystemLogs = () => {
         switch (actionType) {
             // Felhasználók
             case 'USER_BANNED':
-                return <Badge bg="danger" className="shadow-sm">FELFÜGGESZTÉS 🛑</Badge>;
+                return <Badge bg="danger" className="shadow-sm">FELFÜGGESZTÉS <span aria-hidden="true">🛑</span></Badge>;
             case 'USER_UNBANNED':
-                return <Badge bg="success" className="shadow-sm">VISSZAÁLLÍTÁS ♻️</Badge>;
+                return <Badge bg="success" className="shadow-sm">VISSZAÁLLÍTÁS <span aria-hidden="true">♻️</span></Badge>;
             case 'ROLE_CHANGED':
-                return <Badge bg="warning" text="dark" className="shadow-sm">JOGOSULTSÁG 👑</Badge>;
+                return <Badge bg="warning" text="dark" className="shadow-sm">JOGOSULTSÁG <span aria-hidden="true">👑</span></Badge>;
             
             // Tananyag CMS - Új elemek (Import)
             case 'CURRICULUM_IMPORTED':
             case 'LESSON_IMPORTED':
             case 'EXERCISE_IMPORTED':
-                return <Badge bg="info" text="dark" className="shadow-sm">TARTALOM IMPORT 📥</Badge>;
+                return <Badge bg="info" text="dark" className="shadow-sm">TARTALOM IMPORT <span aria-hidden="true">📥</span></Badge>;
             
             // Tananyag CMS - Soft Delete
             case 'TOPIC_SUSPENDED':
             case 'LESSON_SUSPENDED':
             case 'EXERCISE_SUSPENDED':
-                return <Badge bg="danger" className="shadow-sm">TARTALOM LETILTVA 🚫</Badge>;
+                return <Badge bg="danger" className="shadow-sm">TARTALOM LETILTVA <span aria-hidden="true">🚫</span></Badge>;
             case 'TOPIC_RESTORED':
             case 'LESSON_RESTORED':
             case 'EXERCISE_RESTORED':
-                return <Badge bg="success" className="shadow-sm">TARTALOM VISSZAÁLLÍTVA ♻️</Badge>;
+                return <Badge bg="success" className="shadow-sm">TARTALOM VISSZAÁLLÍTVA <span aria-hidden="true">♻️</span></Badge>;
 
             // Kitüntetések
             case 'ACHIEVEMENT_IMPORTED':
-                return <Badge bg="info" text="dark" className="shadow-sm">KITÜNTETÉS IMPORT 📥</Badge>;
+                return <Badge bg="info" text="dark" className="shadow-sm">KITÜNTETÉS IMPORT <span aria-hidden="true">📥</span></Badge>;
             case 'ACHIEVEMENT_SUSPENDED':
-                return <Badge bg="danger" className="shadow-sm">KITÜNTETÉS LETILTVA 🚫</Badge>;
+                return <Badge bg="danger" className="shadow-sm">KITÜNTETÉS LETILTVA <span aria-hidden="true">🚫</span></Badge>;
             case 'ACHIEVEMENT_RESTORED':
-                return <Badge bg="success" className="shadow-sm">KITÜNTETÉS VISSZAÁLLÍTVA ♻️</Badge>;
+                return <Badge bg="success" className="shadow-sm">KITÜNTETÉS VISSZAÁLLÍTVA <span aria-hidden="true">♻️</span></Badge>;
 
             // Osztálytermek
             case 'CLASSROOM_BANNED':
-                return <Badge bg="danger" className="shadow-sm">OSZTÁLY FELFÜGGESZTVE 🛑</Badge>;
+                return <Badge bg="danger" className="shadow-sm">OSZTÁLY FELFÜGGESZTVE <span aria-hidden="true">🛑</span></Badge>;
             case 'CLASSROOM_RESTORED':
-                return <Badge bg="success" className="shadow-sm">OSZTÁLY VISSZAÁLLÍTVA ♻️</Badge>;
+                return <Badge bg="success" className="shadow-sm">OSZTÁLY VISSZAÁLLÍTVA <span aria-hidden="true">♻️</span></Badge>;
 
             default:
                 return <Badge bg="secondary" className="shadow-sm">{actionType}</Badge>;
@@ -99,14 +99,14 @@ const SystemLogs = () => {
                 )}
                 
                 <div role="region" aria-label="Rendszernapló, görgethető táblázat" tabIndex={0} className="table-responsive custom-scrollbar" style={{ maxHeight: '600px' }}>
-                    <Table hover variant="dark" className="m-0 align-middle border-secondary" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+                    <Table hover variant="dark" className="admin-data-table m-0 align-middle border-secondary" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
                         <caption className="visually-hidden">Adminisztrációs események időpontja, végrehajtója és részletei</caption>
                         <thead className="position-sticky top-0 bg-dark" style={{ zIndex: 1 }}>
                             <tr>
-                                <th className="text-secondary border-secondary py-3 px-4">Időpont</th>
-                                <th className="text-secondary border-secondary py-3">Adminisztrátor</th>
-                                <th className="text-secondary border-secondary py-3">Művelet</th>
-                                <th className="text-secondary border-secondary py-3 px-4">Részletek</th>
+                                <th scope="col" className="text-secondary border-secondary py-3 px-4">Időpont</th>
+                                <th scope="col" className="text-secondary border-secondary py-3">Adminisztrátor</th>
+                                <th scope="col" className="text-secondary border-secondary py-3">Művelet</th>
+                                <th scope="col" className="text-secondary border-secondary py-3 px-4">Részletek</th>
                             </tr>
                         </thead>
                         <tbody>

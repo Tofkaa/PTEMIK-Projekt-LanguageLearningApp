@@ -45,14 +45,15 @@ const ClassroomManager = () => {
         <div>
             <LearningFeedback error={message.type === 'danger' ? message.text : ''}
                 feedback={message.type === 'success' ? { type: 'success', msg: message.text } : null} />
-            <Table responsive hover variant="dark" className="border-secondary align-middle">
+            <div role="region" tabIndex={0} aria-label="Osztálytermek, görgethető táblázat" className="table-responsive">
+            <Table hover variant="dark" className="admin-data-table border-secondary align-middle">
                 <caption className="visually-hidden">Osztálytermek moderációja</caption>
                 <thead className="bg-black bg-opacity-25">
                     <tr className="text-secondary">
-                        <th>Név & Tanár</th>
-                        <th>Kód</th>
-                        <th className="text-center">Státusz</th>
-                        <th className="text-end">Műveletek</th>
+                        <th scope="col">Név & Tanár</th>
+                        <th scope="col">Kód</th>
+                        <th scope="col" className="text-center">Státusz</th>
+                        <th scope="col" className="text-end">Műveletek</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -78,6 +79,7 @@ const ClassroomManager = () => {
                     ))}
                 </tbody>
             </Table>
+            </div>
         </div>
     );
 };

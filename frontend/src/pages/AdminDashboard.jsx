@@ -18,7 +18,7 @@ const AdminDashboard = () => {
                 <Row>
                     {/* OLDALSÁV (Sidebar) */}
                     <Col md={3} lg={2} className="mb-4 mb-md-0">
-                        <Nav variant="pills" aria-label="Adminisztrációs funkciók" className="flex-column gap-2 custom-admin-nav">
+                        <Nav variant="pills" aria-label="Adminisztrációs funkciók" aria-orientation="vertical" className="flex-column gap-2 custom-admin-nav">
                             <Nav.Item>
                                 <Nav.Link eventKey="users" className="fw-bold text-light"><span aria-hidden="true">👥 </span>Felhasználók</Nav.Link>
                             </Nav.Item>

@@ -69,7 +69,7 @@ const ActiveChallenges = () => {
     if (challenges.length === 0) {
         return (
             <div className="p-5 text-center text-light">
-                <h5 className="mb-3">Minden csendes...</h5>
+                <h2 className="h5 mb-3">Minden csendes...</h2>
                 <p className="text-light">Jelenleg nincs egyetlen aktív kihívásod sem. Lépj a Barátaim fülre, és indíts egyet!</p>
             </div>
         );
@@ -84,7 +84,7 @@ const ActiveChallenges = () => {
                     return (
                         <Col md={12} key={challenge.challengeId} className="mb-3">
                             <Card className={`bg-dark border-${challenge.isMyTurn ? 'warning' : 'secondary'} shadow-sm`}>
-                                <Card.Body className="d-flex justify-content-between align-items-center">
+                                <Card.Body className="d-flex flex-wrap gap-3 justify-content-between align-items-center">
                                     <div>
                                         <h3 className="h5 text-light mb-1 fw-bold">
                                             <span aria-hidden="true">{iAmChallenger ? '⚔️ ' : '🔥 '}</span>

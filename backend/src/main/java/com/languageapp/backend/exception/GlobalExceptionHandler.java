@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.util.HtmlUtils;
@@ -27,6 +29,21 @@ import java.time.Clock;
 @RequiredArgsConstructor
 public class GlobalExceptionHandler {
     private final Clock clock;
+
+    /** Missing, empty or invalid query parameters are client errors. */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(
+            MissingServletRequestParameterException ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(buildErrorResponse(HttpStatus.BAD_REQUEST,
+                "Missing or empty request parameter: " + ex.getParameterName(), request.getRequestURI()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidParameter(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(buildErrorResponse(HttpStatus.BAD_REQUEST,
+                "Invalid request parameter: " + ex.getName(), request.getRequestURI()));
+    }
 
     /** Invalid timestamp formats are client errors, including missing UTC offsets. */
     @ExceptionHandler(HttpMessageNotReadableException.class)

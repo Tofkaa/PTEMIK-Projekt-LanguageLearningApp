@@ -4,7 +4,7 @@
  * Visually distinguishes wins, losses, and ties, and maps backend timestamps securely.
  */
 
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Card, Spinner, Alert, Badge, Row, Col } from 'react-bootstrap';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -27,27 +27,33 @@ const ChallengeHistory = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const { notifications } = useNotifications();
+    const isFirstLoad = useRef(true);
+    const requestId = useRef(0);
 
     useEffect(() => {
-        fetchHistory(true);
+        fetchHistory(isFirstLoad.current);
+        isFirstLoad.current = false;
     }, [notifications.totalHistory]); 
 
     /**
      * Fetches the user's closed challenges from the API.
      */
     const fetchHistory = async (isInitialLoad = false) => {
+        const currentRequest = ++requestId.current;
         if (isInitialLoad) setLoading(true);       
         
         try {
             const response = await api.get('/challenges/history', {
                 params: { _t: Date.now() }
             });
+            if (currentRequest !== requestId.current) return;
             setHistory(response.data || []);
+            setError('');
        } catch (err) {
             console.error("Előzmények betöltési hiba:", err);
-            if (isInitialLoad) setError('Nem sikerült betölteni az előzményeket.');
+            if (currentRequest === requestId.current && isInitialLoad) setError('Nem sikerült betölteni az előzményeket.');
         } finally {
-           if (isInitialLoad) setLoading(false);
+           if (currentRequest === requestId.current) setLoading(false);
         }
     };
 
@@ -72,7 +78,7 @@ const ChallengeHistory = () => {
     if (history.length === 0) {
         return (
             <div className="p-5 text-center text-light">
-                <h5 className="mb-3">Még nem vívtál meg egyetlen csatát sem.</h5>
+                <h2 className="h5 mb-3">Még nem vívtál meg egyetlen csatát sem.</h2>
                 <p className="text-light">A befejezett, lejárt vagy elutasított kihívások itt fognak megjelenni.</p>
             </div>
         );
@@ -92,7 +98,7 @@ const ChallengeHistory = () => {
                     return (
                         <Col md={12} key={challenge.challengeId} className="mb-3">
                             <Card className="bg-dark border-secondary shadow-sm">
-                                <Card.Body className="d-flex justify-content-between align-items-center">
+                                <Card.Body className="d-flex flex-wrap gap-3 justify-content-between align-items-center">
                                     <div>
                                         <h3 className="h6 text-light mb-1">
                                             <span aria-hidden="true">⚔️ </span>Ellenfél: <strong className="text-info">{opponentName}</strong>

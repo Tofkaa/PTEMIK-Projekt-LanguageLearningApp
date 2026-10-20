@@ -176,7 +176,7 @@ describe('lesson focus and feedback', () => {
         await screen.findByRole('button', { name: 'Befejezés és Értékelés' });
         activate('Befejezés és Értékelés');
         const result = await screen.findByRole('heading', { name: 'Sikeres Lecke!' });
-        expect(result).toHaveFocus();
+        await waitFor(() => expect(result).toHaveFocus());
         await waitFor(() => expect(auth.updateProfile).toHaveBeenCalledWith({ xp: 20, streak: 1 }));
         expect(screen.getByText('2 próbálkozásból 2 helyes válasz')).toBeInTheDocument();
     });

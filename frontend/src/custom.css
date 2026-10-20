@@ -106,6 +106,8 @@ body { overflow-wrap: anywhere; }
 .dropdown-item,
 .accordion-button { white-space: normal; overflow-wrap: anywhere; }
 .badge { max-width: 100%; line-height: 1.35; }
+/* Preserve readable columns; the named, keyboard-focusable wrapper scrolls on narrow screens. */
+.admin-data-table { min-width: 42rem; }
 .navbar-expand-lg > .container { flex-wrap: wrap; }
 .navbar-expand-lg .navbar-collapse { min-width: 0; flex-wrap: wrap; gap: 0.75rem; }
 .navbar-expand-lg .navbar-nav { min-width: 0; max-width: 100%; flex-wrap: wrap; }
