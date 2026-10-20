@@ -2,13 +2,43 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import GlobalErrorToast from '../GlobalErrorToast';
 
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+const auth = vi.hoisted(() => ({ user: { userId: 'teacher' } }));
+vi.mock('../../context/AuthContext', () => ({ useAuth: () => auth }));
+
+afterEach(() => { cleanup(); vi.useRealTimers(); auth.user = { userId: 'teacher' }; });
 
 function emitError(message) {
     act(() => window.dispatchEvent(new CustomEvent('api-error', { detail: message })));
 }
 
 describe('persistent accessible error toast', () => {
+    it('discards errors on logout and account switches, but keeps same-account errors on profile updates', async () => {
+        const view = render(<><button>Belépés</button><GlobalErrorToast /></>);
+        emitError('Tanári művelet hibája');
+        await screen.findByRole('alert');
+        auth.user = { userId: 'teacher', name: 'Frissített név' };
+        view.rerender(<><button>Belépés</button><GlobalErrorToast /></>);
+        expect(screen.getByRole('alert')).toHaveTextContent('Tanári művelet hibája');
+        const login = screen.getByRole('button', { name: 'Belépés' });
+        login.focus();
+        auth.user = null;
+        view.rerender(<><button>Belépés</button><GlobalErrorToast /></>);
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(login).toHaveFocus();
+        emitError('Vendég hiba');
+        await screen.findByRole('alert');
+        auth.user = { userId: 'student' };
+        view.rerender(<><button>Belépés</button><GlobalErrorToast /></>);
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        emitError('Diák hiba');
+        await screen.findByRole('alert');
+        auth.user = { userId: 'teacher' };
+        view.rerender(<><button>Belépés</button><GlobalErrorToast /></>);
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        emitError('Új tanári hiba');
+        expect(await screen.findByRole('alert')).toHaveTextContent('Új tanári hiba');
+    });
+
     it('keeps an error visible until explicitly dismissed without stealing focus', async () => {
         render(<><button>Újrapróbálás</button><GlobalErrorToast /></>);
         const origin = screen.getByRole('button', { name: 'Újrapróbálás' });

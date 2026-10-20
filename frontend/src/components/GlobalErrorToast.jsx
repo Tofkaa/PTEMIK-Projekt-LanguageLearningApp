@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { Toast, ToastContainer } from 'react-bootstrap';
+import { useAuth } from '../context/AuthContext';
 
+// Remount on logout/account change; errors and return-focus targets belong to one session.
 const GlobalErrorToast = () => {
+    const { user } = useAuth();
+    return <SessionErrorToast key={user?.userId ?? 'guest'} />;
+};
+
+const SessionErrorToast = () => {
     const [show, setShow] = useState(false);
     const [message, setMessage] = useState('');
     const toastRef = useRef(null);

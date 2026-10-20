@@ -21,14 +21,13 @@ import LearningFeedback from './LearningFeedback';
  * 
  * @component
  */
-const TeacherClassroomDetail = () => {
+const TeacherClassroomDetail = ({ classroom }) => {
     const { id: classroomId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
     
-    const classroomName = location.state?.className || 'Osztályterem Kezelése';
-    // ÚJ: Kinyerjük az osztályterem nyelvét a state-ből (fallback: en)
-    const classroomCourseCode = location.state?.courseCode || 'en';
+    const classroomName = classroom?.name || location.state?.className || 'Osztályterem Kezelése';
+    const classroomCourseCode = classroom?.courseCode || location.state?.courseCode || 'en';
 
     // State definitions
     const [pendingMembers, setPendingMembers] = useState([]);

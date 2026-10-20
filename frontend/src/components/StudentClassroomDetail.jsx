@@ -10,14 +10,14 @@ import { parseServerDate, formatToLocalDisplay } from '../utils/dateUtils';
 import { useCurrentTime } from '../hooks/useCurrentTime';
 import ExercisePreviewCard from '../components/ExercisePreviewCard';
 
-const StudentClassroomDetail = () => {
+const StudentClassroomDetail = ({ classroom }) => {
     const { id: classroomId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
     const { notifications } = useNotifications();
     
-    const classroomName = location.state?.className || 'Osztályterem';
+    const classroomName = classroom?.name || location.state?.className || 'Osztályterem';
 
     const [assignments, setAssignments] = useState([]);
     const [classmates, setClassmates] = useState([]);
