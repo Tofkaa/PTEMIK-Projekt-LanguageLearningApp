@@ -13,6 +13,7 @@ import { getUnseenIds, markAsViewed } from '../utils/viewedStore';
 import AssignmentTimingModal from './AssignmentTimingModal';
 import AssignmentInitialTiming from './AssignmentInitialTiming';
 import LearningFeedback from './LearningFeedback';
+import LanguageText from './LanguageText';
 
 /**
  * Dashboard component for teachers to manage a specific classroom.
@@ -537,14 +538,14 @@ const TeacherClassroomDetail = ({ classroom }) => {
                         <Col md={6}>
                             <Card className="bg-dark border-secondary h-100">
                                 <Card.Header className="bg-dark border-secondary d-flex justify-content-between">
-                                    <h5 className="m-0 text-warning">Várakozó</h5>
+                                    <h3 className="h5 m-0 text-warning">Várakozó</h3>
                                         <Badge bg={pendingMembers.length > 0 ? "danger" : "warning"} text={pendingMembers.length > 0 ? "light" : "dark"} className={pendingMembers.length > 0 ? "shadow animate-pulse" : ""}>
                                             {pendingMembers.length}
                                         </Badge>
                                 </Card.Header>
                                 <ListGroup variant="flush">
                                     {pendingMembers.map(member => (
-                                        <ListGroup.Item key={member.memberId} className="bg-dark text-light border-secondary d-flex justify-content-between">
+                                        <ListGroup.Item key={member.memberId} className="bg-dark text-light border-secondary d-flex flex-wrap gap-3 justify-content-between">
                                             {/* JAVÍTÁS: userTag hozzáadása a várakozókhoz is */}
                                             <div>
                                                 <div className="fw-bold">
@@ -565,11 +566,11 @@ const TeacherClassroomDetail = ({ classroom }) => {
                         <Col md={6}>
                             <Card className="bg-dark border-secondary h-100">
                                 <Card.Header className="bg-dark border-secondary d-flex justify-content-between">
-                                    <h5 className="m-0 text-info">Aktív</h5><Badge bg="info" text="dark">{acceptedMembers.length}</Badge>
+                                    <h3 className="h5 m-0 text-info">Aktív</h3><Badge bg="info" text="dark">{acceptedMembers.length}</Badge>
                                 </Card.Header>
                                 <ListGroup variant="flush">
                                     {acceptedMembers.map(member => (
-                                        <ListGroup.Item key={member.memberId} className="bg-dark text-light border-secondary d-flex justify-content-between">
+                                        <ListGroup.Item key={member.memberId} className="bg-dark text-light border-secondary d-flex flex-wrap gap-3 justify-content-between">
                                             <div><div className="fw-bold">{member.studentName || member.name} <span className="text-light small">#{member.userTag}</span></div><div className="text-secondary small">Belépett: {formatToLocalDisplay(member.joinedAt, false)}</div></div>
                                             <Button aria-label={`Kirúgás: ${member.studentName || member.name}#${member.userTag}`} aria-disabled={memberBusy} variant="outline-danger" size="sm" onClick={event => handleKick(member.userId, event.currentTarget)}>Kirúgás</Button>
                                         </ListGroup.Item>
@@ -580,9 +581,10 @@ const TeacherClassroomDetail = ({ classroom }) => {
                     </Row>
                 </Tab>
 
-                <Tab eventKey="statistics" title={<span className="fw-bold">📊 Statisztika & Haladás</span>}>
+                <Tab eventKey="statistics" title={<span className="fw-bold"><span aria-hidden="true">📊 </span>Statisztika & Haladás</span>}>
                     {stats && advancedStats && (
                         <div className="mt-4">
+                            <h2 className="h4">Osztálystatisztikák</h2>
                             <Tabs id="teacher-statistics-tabs" aria-label="Osztálystatisztikák nézetei" defaultActiveKey="overview" className="mb-3 border-secondary custom-dark-tabs small">
                                 
                                 {/* DEFAULT OVERVIEW */}
@@ -590,42 +592,47 @@ const TeacherClassroomDetail = ({ classroom }) => {
                                     <Row className="mb-4 text-center mt-3">
                                         <Col md={6}>
                                             <Card className="bg-dark border-info p-3">
-                                                <h6 className="text-secondary">Osztályterem Átlag</h6>
-                                                <h2 className="text-info fw-bold">{stats.classAverage}%</h2>
+                                                <h3 className="h6 text-secondary">Osztályterem Átlag</h3>
+                                                <p className="h2 text-info fw-bold">{stats.classAverage}%</p>
                                             </Card>
                                         </Col>
                                         <Col md={6}>
                                             <Card className="bg-dark border-success p-3">
-                                                <h6 className="text-secondary">Kiadott feladatok</h6>
-                                                <h2 className="text-success fw-bold">{stats.totalAssignments} db</h2>
+                                                <h3 className="h6 text-secondary">Kiadott feladatok</h3>
+                                                <p className="h2 text-success fw-bold">{stats.totalAssignments} db</p>
                                             </Card>
                                         </Col>
                                     </Row>
 
                                     <Card className="bg-dark text-light border-secondary shadow-lg">
                                         <Card.Header className="bg-dark border-secondary fw-bold text-primary">
-                                            Diákok Aggregált Teljesítménye
+                                            <h3 className="h6 m-0">Diákok Aggregált Teljesítménye</h3>
                                         </Card.Header>
-                                        <Table hover variant="dark" responsive className="m-0">
+                                        <div className="table-responsive" role="region" tabIndex={0} aria-label="Diákok aggregált teljesítménye, görgethető táblázat">
+                                        <Table hover variant="dark" className="classroom-statistics-table m-0">
+                                            <caption className="visually-hidden">Diákok aggregált teljesítménye</caption>
                                             <thead>
                                                 <tr className="text-secondary">
-                                                    <th>Diák Neve</th>
-                                                    <th className="text-center">Befejezett</th>
-                                                    <th className="text-center">Haladás</th>
-                                                    <th className="text-center">Átlagpont</th>
-                                                    <th>Utolsó Aktivitás</th>
+                                                    <th scope="col">Diák Neve</th>
+                                                    <th scope="col" className="text-center">Befejezett</th>
+                                                    <th scope="col" className="text-center">Haladás</th>
+                                                    <th scope="col" className="text-center">Átlagpont</th>
+                                                    <th scope="col">Utolsó Aktivitás</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {stats.studentProgress.map((s, idx) => (
                                                     <tr key={idx} className="align-middle">
-                                                        <td>
+                                                        <th scope="row" className="fw-normal">
                                                             <div className="fw-bold">{s.studentName}</div>
                                                             <div className="small text-secondary">{s.studentEmail}</div>
-                                                        </td>
-                                                        <td className="text-center">{s.completedCount} / {stats.totalAssignments}</td>
+                                                        </th>
+                                                        <td className="text-center"><span aria-hidden="true">{s.completedCount} / {stats.totalAssignments}</span><span className="visually-hidden">Összesen {stats.totalAssignments} feladatból {s.completedCount} befejezett</span></td>
                                                         <td className="text-center" style={{ width: '150px' }}>
-                                                            <ProgressBar now={(s.completedCount / stats.totalAssignments) * 100} variant="info" style={{ height: '8px' }} />
+                                                            <ProgressBar style={{ height: '8px' }}><ProgressBar now={stats.totalAssignments > 0 ? (s.completedCount / stats.totalAssignments) * 100 : 0}
+                                                                aria-label={`${s.studentName} haladása`}
+                                                                aria-valuetext={`Összesen ${stats.totalAssignments} feladatból ${s.completedCount} befejezett`}
+                                                                variant="info" /></ProgressBar>
                                                         </td>
                                                         <td className="text-center">
                                                             <Badge bg={s.averageScore >= 80 ? "success" : s.averageScore >= 50 ? "warning" : "danger"} className="fs-6">
@@ -639,6 +646,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
                                                 ))}
                                             </tbody>
                                         </Table>
+                                        </div>
                                     </Card>
                                 </Tab>
 
@@ -646,21 +654,22 @@ const TeacherClassroomDetail = ({ classroom }) => {
                                 <Tab eventKey="heatmap" title="Nehézségi Hőtérkép">
                                     <Card className="bg-dark text-light border-secondary shadow-lg mt-3">
                                         <Card.Header className="bg-dark border-secondary d-flex justify-content-between align-items-center">
-                                            <span className="fw-bold text-warning">Teljesítmény Mátrix</span>
+                                            <h3 className="h6 m-0 fw-bold text-warning">Teljesítmény Mátrix</h3>
                                             <Button variant="outline-success" size="sm" onClick={exportToCSV} className="fw-bold d-flex align-items-center gap-2">
                                                 <span>⬇️</span> CSV Export
                                             </Button>
                                         </Card.Header>
-                                        <div className="table-responsive">
-                                            <Table bordered variant="dark" className="m-0 text-center align-middle" style={{ minWidth: '800px' }}>
+                                        <div className="table-responsive" role="region" tabIndex={0} aria-label="Teljesítménymátrix, görgethető táblázat">
+                                            <Table bordered variant="dark" className="classroom-heatmap m-0 text-center align-middle" style={{ minWidth: '800px' }}>
+                                                <caption className="visually-hidden">Tanulók feladatonkénti eredményei</caption>
                                                 {/* X-plane: Assignment names */}
                                                 <thead className="border-bottom border-2 border-info bg-black bg-opacity-50">
                                                     <tr>
-                                                        <th className="text-start text-info text-uppercase p-3 border-end border-2 border-info" style={{ minWidth: '220px' }}>
+                                                        <th scope="col" className="text-start text-info text-uppercase p-3 border-end border-2 border-info" style={{ minWidth: '220px' }}>
                                                             Diák \ Feladat
                                                         </th>
                                                         {advancedStats.assignmentHeaders.map(header => (
-                                                            <th key={header.assignmentId} title={header.title} className="text-light p-3">
+                                                            <th scope="col" key={header.assignmentId} title={header.title} className="text-light p-3">
                                                                 <div className="heatmap-assignment-title">
                                                                     {header.title}
                                                                 </div>
@@ -673,16 +682,17 @@ const TeacherClassroomDetail = ({ classroom }) => {
                                                 <tbody>
                                                     {advancedStats.heatmapData.map((row, idx) => (
                                                         <tr key={idx}>
-                                                            <th className="text-start fw-bold text-light bg-black bg-opacity-25 p-3 border-end border-2 border-info">
+                                                            <th scope="row" className="text-start fw-bold text-light bg-black bg-opacity-25 p-3 border-end border-2 border-info">
                                                                 {row.studentName}
                                                             </th>
                                                             
                                                             {advancedStats.assignmentHeaders.map(header => {
                                                                 const score = row.scores[header.assignmentId];
+                                                                const hasScore = typeof score === 'number' && Number.isFinite(score);
                                                                 return (
                                                                     <td key={header.assignmentId} className={`p-0 ${getHeatmapColor(score)}`}>
-                                                                        <div className="p-3 w-100 h-100 d-flex align-items-center justify-content-center" title={score !== null ? `${score}%` : 'Nincs beadva'}>
-                                                                            {score !== null ? `${score}%` : '-'}
+                                                                        <div className="p-3 w-100 h-100 d-flex align-items-center justify-content-center">
+                                                                            {hasScore ? `${score}%` : 'Nincs beadva'}
                                                                         </div>
                                                                     </td>
                                                                 );
@@ -703,7 +713,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
                              <Tab eventKey="mistakes" title="Gyakori Hibák">
                                     <Card className="bg-dark text-light border-secondary shadow-lg mt-3">
                                         <Card.Header className="bg-dark border-secondary fw-bold text-danger">
-                                            Top 5 Leggyakrabban Elrontott Kérdés
+                                            <h3 className="h6 m-0">Top 5 Leggyakrabban Elrontott Kérdés</h3>
                                         </Card.Header>
                                         <ListGroup variant="flush">
                                             {advancedStats.topMistakes.length === 0 ? (
@@ -715,22 +725,24 @@ const TeacherClassroomDetail = ({ classroom }) => {
                                                     <ListGroup.Item key={idx} className="bg-dark text-light border-secondary p-3">
                                                         
                                                         {/* TITLES AND BUTTONS */}
-                                                        <div className="d-flex justify-content-between align-items-center">
-                                                            <div className="d-flex align-items-center gap-3">
+                                                        <div className="d-flex flex-wrap gap-3 justify-content-between align-items-center">
+                                                            <div className="d-flex flex-wrap align-items-center gap-3">
                                                                 <div className="fs-4 fw-bold text-secondary">#{idx + 1}</div>
                                                                 <div>
-                                                                    <div className="fw-bold">{mistake.question}</div>
+                                                                    <div className="fw-bold"><LanguageText text={mistake.question}
+                                                                        lang={mistake.exercise?.content?.questionLang || 'hu'} parts={mistake.exercise?.content?.questionParts} /></div>
                                                                     <div className="small text-info mt-1">
                                                                         <span className="text-secondary">Forrás:</span> {mistake.assignmentTitle}
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div className="d-flex align-items-center gap-3">
+                                                            <div className="d-flex flex-wrap align-items-center gap-3">
                                                                 <Badge bg="danger" pill className="fs-6 px-3 py-2">
                                                                     {mistake.mistakeCount} rontott válasz
                                                                 </Badge>
                                                                 {mistake.exercise && (
-                                                                    <Button aria-label={`${expandedMistakeIndex === idx ? 'elrejtés' : 'előnézet'}: ${mistake.assignmentTitle}, ${mistake.question}`} aria-expanded={expandedMistakeIndex === idx} variant="link" size="sm" className="text-info p-0 text-decoration-none" onClick={() => toggleMistakePreview(idx)}>
+                                                                    <Button aria-label={`${expandedMistakeIndex === idx ? 'elrejtés' : 'előnézet'}: ${mistake.assignmentTitle}, ${idx + 1}. hibacsoport`} aria-expanded={expandedMistakeIndex === idx}
+                                                                        aria-controls={expandedMistakeIndex === idx ? `teacher-mistake-preview-${idx}` : undefined} variant="link" size="sm" className="text-info p-0 text-decoration-none" onClick={() => toggleMistakePreview(idx)}>
                                                                         {expandedMistakeIndex === idx ? 'elrejtés' : <>előnézet<span aria-hidden="true">👁️</span></>}
                                                                     </Button>
                                                                 )}
@@ -739,7 +751,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
 
                                                         {/* EXPANDABLE PREVIEW */}
                                                       {expandedMistakeIndex === idx && mistake.exercise && (
-                                                            <div className="mt-3">
+                                                            <div id={`teacher-mistake-preview-${idx}`} className="mt-3">
                                                                 <ExercisePreviewCard 
                                                                     exercise={mistake.exercise} 
                                                                     serverCorrectAnswer={mistake.serverCorrectAnswer}

@@ -19,7 +19,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     classroomApi.moderateMember.mockReset();
     classroomApi.getMembers.mockImplementation((id, status) => Promise.resolve({ data: status === 'ACCEPTED'
-        ? [{ userId: 'student', studentName: 'Anna', email: 'anna@example.test' }] : [] }));
+        ? [{ memberId: 'member', userId: 'student', studentName: 'Anna', email: 'anna@example.test' }] : [] }));
     assignmentApi.getClassroomAssignments.mockResolvedValue({ data: [] });
     assignmentApi.getClassroomStatistics.mockResolvedValue({ data: null });
     assignmentApi.getAdvancedClassroomStatistics.mockResolvedValue({ data: null });
@@ -53,6 +53,53 @@ async function openPendingMember(isProcessed = () => false) {
     fireEvent.click(screen.getByRole('tab', { name: 'Tagság kezelése' }));
     return screen.findByRole('button', { name: 'Csatlakozás elfogadása: Anna#42' });
 }
+
+it.each([0, 4])('names statistics and handles progress when the assignment count is %s', async totalAssignments => {
+    assignmentApi.getClassroomStatistics.mockResolvedValue({ data: {
+        classAverage: 75, totalAssignments, studentProgress: [{ studentName: 'Anna', studentEmail: 'anna@example.test',
+            completedCount: 0, averageScore: 75, lastActivity: 'Nincs adat' }],
+    } });
+    assignmentApi.getAdvancedClassroomStatistics.mockResolvedValue({ data: {
+        assignmentHeaders: [{ assignmentId: 'missing', title: 'Első vizsga' }, { assignmentId: 'zero', title: 'Második vizsga' }],
+        heatmapData: [{ studentName: 'Anna', scores: { zero: 0 } }], topMistakes: [],
+    } });
+    render(<MemoryRouter initialEntries={['/classrooms/room']}><Routes><Route path="/classrooms/:id" element={<TeacherClassroomDetail />} /></Routes></MemoryRouter>);
+    await screen.findByRole('button', { name: '+ Új Feladat / Teszt Kiírása' });
+    fireEvent.click(screen.getByRole('tab', { name: 'Statisztika & Haladás' }));
+    expect(await screen.findByRole('heading', { name: 'Osztálystatisztikák', level: 2 })).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Diákok aggregált teljesítménye, görgethető táblázat' });
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(within(region).getByRole('table', { name: 'Diákok aggregált teljesítménye' })).toBeInTheDocument();
+    expect(within(region).getByRole('rowheader', { name: /Anna/ })).toHaveAttribute('scope', 'row');
+    const progress = within(region).getByRole('progressbar', { name: 'Anna haladása' });
+    expect(progress).toHaveAttribute('aria-valuenow', '0');
+    expect(progress).toHaveAttribute('aria-valuetext', `Összesen ${totalAssignments} feladatból 0 befejezett`);
+    fireEvent.click(screen.getByRole('tab', { name: 'Nehézségi Hőtérkép' }));
+    const matrix = screen.getByRole('region', { name: 'Teljesítménymátrix, görgethető táblázat' });
+    expect(matrix).toHaveAttribute('tabindex', '0');
+    expect(within(matrix).getByRole('rowheader', { name: 'Anna' })).toHaveAttribute('scope', 'row');
+    expect(within(matrix).getByRole('cell', { name: 'Nincs beadva' })).toBeInTheDocument();
+    expect(within(matrix).getByRole('cell', { name: '0%' })).toBeInTheDocument();
+});
+
+it('marks mistake question languages separately and distinguishes repeated questions', async () => {
+    const exercise = { exerciseId: 'ex', type: 'MULTIPLE_CHOICE', content: {
+        question: 'Which animal can fly?', questionLang: 'en', answerLang: 'en', options: ['Bird'] } };
+    assignmentApi.getClassroomStatistics.mockResolvedValue({ data: { classAverage: 0, totalAssignments: 1, studentProgress: [] } });
+    assignmentApi.getAdvancedClassroomStatistics.mockResolvedValue({ data: { assignmentHeaders: [], heatmapData: [],
+        topMistakes: [1, 2].map(() => ({ question: 'Which animal can fly?', assignmentTitle: 'Vizsga', mistakeCount: 1, exercise })),
+    } });
+    render(<MemoryRouter initialEntries={['/classrooms/room']}><Routes><Route path="/classrooms/:id" element={<TeacherClassroomDetail />} /></Routes></MemoryRouter>);
+    await screen.findByRole('button', { name: '+ Új Feladat / Teszt Kiírása' });
+    fireEvent.click(screen.getByRole('tab', { name: 'Statisztika & Haladás' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Gyakori Hibák' }));
+    for (const question of screen.getAllByText('Which animal can fly?')) expect(question).toHaveAttribute('lang', 'en');
+    const preview = screen.getByRole('button', { name: 'előnézet: Vizsga, 1. hibacsoport' });
+    expect(screen.getByRole('button', { name: 'előnézet: Vizsga, 2. hibacsoport' })).toBeInTheDocument();
+    fireEvent.click(preview);
+    expect(preview).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById(preview.getAttribute('aria-controls'))).toBeInTheDocument();
+});
 
 it('names membership actions and moves focus to the member list after approval', async () => {
     let processed = false;
