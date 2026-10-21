@@ -96,23 +96,23 @@ const PendingRequests = () => {
 
             {(!requests || requests.length === 0) ? (
                 <div className="p-5 text-center text-light">
-                    <h5 className="mb-3">Minden csendes...</h5>
+                    <h3 className="h5 mb-3">Minden csendes...</h3>
                     <p>Jelenleg nincsenek függőben lévő barátkérelmeid.</p>
                 </div>
             ) : (
                 <>
                     {requests.map((request) => (
                         <Card key={request.friendshipId} className="bg-dark border-secondary mb-3 shadow-sm">
-                            <Card.Body className="d-flex justify-content-between align-items-center">
+                            <Card.Body className="d-flex flex-wrap gap-3 justify-content-between align-items-center">
                                 <div>
-                                    <h6 className="text-light mb-1 fw-bold">
+                                    <h3 className="h6 text-light mb-1 fw-bold">
                                         {request.senderName} <span className="text-info">#{request.senderTag}</span>
-                                    </h6>
+                                    </h3>
                                     <small className="text-light">
                                         {formatToLocalDisplay(request.sentAt, false)}
                                     </small>
                                 </div>
-                                <div className="d-flex gap-2">
+                                <div className="d-flex flex-wrap gap-2">
                                     <Button aria-label={`Elfogad: ${request.senderName}#${request.senderTag}`} aria-disabled={!!busyId} aria-busy={busyId === request.friendshipId} variant="success" size="sm" className="fw-bold" onClick={(event) => handleAction(request.friendshipId, 'accept', event.currentTarget)}>
                                         Elfogad
                                     </Button>

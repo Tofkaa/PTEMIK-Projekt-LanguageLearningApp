@@ -3,6 +3,7 @@ import { Form, Button, InputGroup, Badge } from 'react-bootstrap';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import LearningFeedback from './LearningFeedback';
+import AccessibleCode from './AccessibleCode';
 
 const FriendSearch = () => {
     const { user } = useAuth();
@@ -36,7 +37,7 @@ const FriendSearch = () => {
         <div className="p-4 bg-dark bg-opacity-50 rounded border border-secondary shadow-sm">
             {/* ÚJ RÉSZ: Saját azonosítók kijelzése */}
             {user && (
-                <div className="mb-4 p-3 bg-secondary bg-opacity-25 rounded border border-secondary d-flex justify-content-between align-items-center">
+                <div className="mb-4 p-3 bg-secondary bg-opacity-25 rounded border border-secondary d-flex flex-wrap gap-3 justify-content-between align-items-center">
                     <div>
                         <small className="text-light d-block fw-bold mb-1">A te azonosítóid (ezt oszd meg másokkal):</small>
                         <div className="fs-5">
@@ -46,15 +47,15 @@ const FriendSearch = () => {
                     </div>
                     <div className="text-end">
                         <small className="text-light d-block fw-bold mb-1">Barátkód:</small>
-                        <Badge bg="warning" text="dark" className="fs-6 font-monospace px-3 py-2 shadow-sm">
-                            {user.friendCode}
+                        <Badge bg="warning" text="dark" className="community-code fs-6 font-monospace px-3 py-2 shadow-sm">
+                            <AccessibleCode code={user.friendCode} />
                         </Badge>
                     </div>
                 </div>
             )}
             <h2 className="h5 text-light mb-2">Hozzáadás azonosító alapján</h2>
             <p id={`${identifierId}-help`} className="text-light small mb-4">
-                Keress név alapján (pl. <strong className="text-info">Username#1234</strong>) vagy barátkóddal (pl. <strong className="text-info">A7B-9X2</strong>).
+                Keress név alapján (pl. <strong className="text-info">Username#1234</strong>) vagy barátkóddal (pl. <strong className="text-info"><AccessibleCode code="A7B-9X2" /></strong>).
             </p>
             
             {/* Visszajelző üzenet (Sikeres küldés vagy Hiba) */}

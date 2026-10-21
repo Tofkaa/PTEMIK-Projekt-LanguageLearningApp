@@ -5,6 +5,7 @@ import CurriculumManager from '../admin/CurriculumManager';
 import FriendSearch from '../FriendSearch';
 import FriendList from '../FriendList';
 import PendingRequests from '../PendingRequests';
+import AccessibleCode from '../AccessibleCode';
 import { adminApi } from '../../services/adminApi';
 import api from '../../services/api';
 
@@ -34,6 +35,39 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('CMS controls', () => {
+    it('preserves the current import mode and course when the select reports no valid option', async () => {
+        render(<CurriculumManager />);
+        const course = await screen.findByRole('combobox', { name: 'Nyelv (Kurzus)' });
+        const level = screen.getByRole('combobox', { name: 'Mit szeretnél importálni?' });
+        fireEvent.change(course, { target: { value: 'es' } });
+        level.focus();
+        fireEvent.change(level, { target: { value: '' } });
+        expect(level).toHaveValue('FULL_TOPIC');
+        expect(screen.getByRole('combobox', { name: 'Nyelv (Kurzus)' })).toHaveValue('es');
+        expect(level).toHaveFocus();
+        fireEvent.change(level, { target: { value: 'FULL_TOPIC' } });
+        expect(screen.getByRole('combobox', { name: 'Nyelv (Kurzus)' })).toHaveValue('es');
+        fireEvent.change(level, { target: { value: 'LESSON' } });
+        fireEvent.change(screen.getByRole('combobox', { name: 'Cél Témakör' }), { target: { value: 'topic' } });
+        fireEvent.change(level, { target: { value: 'LESSON' } });
+        expect(screen.getByRole('combobox', { name: 'Cél Témakör' })).toHaveValue('topic');
+    });
+
+    it('separates question language from action names and distinguishes identical questions by position', async () => {
+        const data = structuredClone(topic);
+        const exercise = data.lessons[0].exercises[0];
+        exercise.content = { question: 'Which animal can fly?', questionLang: 'en', answerLang: 'en' };
+        data.lessons[0].exercises.push({ ...exercise, exerciseId: 'another-exercise' });
+        adminApi.getAllTopics.mockResolvedValue({ data: [data] });
+        render(<CurriculumManager />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Alapszavak', exact: true }));
+        for (const text of screen.getAllByText('Which animal can fly?')) expect(text).toHaveAttribute('lang', 'en');
+        for (const index of [1, 2]) {
+            expect(screen.getByRole('button', { name: `Megtekintés: Gyümölcsök, ${index}. feladat` })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: `Felfüggesztés: Gyümölcsök, ${index}. feladat` })).toBeInTheDocument();
+        }
+    });
+
     it('separates the accordion toggle from its status action and labels every import field', async () => {
         const { container } = render(<CurriculumManager />);
         const toggle = await screen.findByRole('button', { name: 'Alapszavak', exact: true });
@@ -43,7 +77,7 @@ describe('CMS controls', () => {
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
         expect(adminApi.toggleTopicStatus).not.toHaveBeenCalled();
         expect(screen.getByRole('button', { name: 'Felfüggesztés: Gyümölcsök' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Megtekintés: Gyümölcsök, Melyik az alma?' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Megtekintés: Gyümölcsök, 1. feladat' })).toBeInTheDocument();
         expect(screen.getByLabelText('Tananyag JSON-fájlja')).toHaveAccessibleDescription(/TopicImportRequest/);
         expect(screen.getByRole('combobox', { name: 'Nyelv (Kurzus)' })).toHaveValue('en');
         expect(screen.getByRole('heading', { name: 'Tananyag JSON Importálása', level: 3 })).toBeInTheDocument();
@@ -79,10 +113,32 @@ describe('CMS controls', () => {
         const preview = screen.getByRole('button', { name: /Megtekintés: Gyümölcsök/ });
         preview.focus();
         fireEvent.click(preview);
-        const dialog = await screen.findByRole('dialog', { name: /MULTIPLE_CHOICE - Előnézet/ });
+        const dialog = await screen.findByRole('dialog', { name: 'Feleletválasztás – Előnézet' });
+        expect(within(dialog).getByRole('heading', { name: 'Feleletválasztás – Előnézet' })).toBeInTheDocument();
         fireEvent.click(within(dialog).getByRole('button', { name: 'Előnézet bezárása' }));
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
         expect(preview).toHaveFocus();
+    });
+
+    it.each(['en', 'de'])('provides a separate %s focus point for the answer row under a Hungarian preview title', async answerLang => {
+        const data = structuredClone(topic);
+        data.lessons[0].exercises[0].content = {
+            question: 'Melyik állat repül?', questionLang: 'hu', answerLang,
+            options: answerLang === 'en' ? ['Dog', 'Bird', 'Fish'] : ['Hund', 'Vogel', 'Fisch'],
+        };
+        adminApi.getAllTopics.mockResolvedValue({ data: [data] });
+        render(<CurriculumManager />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Alapszavak', exact: true }));
+        fireEvent.click(screen.getByRole('button', { name: 'Megtekintés: Gyümölcsök, 1. feladat' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Feleletválasztás – Előnézet' });
+        const options = data.lessons[0].exercises[0].content.options;
+        const row = within(dialog).getByRole('group', { name: options.join(', ') });
+        expect(row).toHaveAttribute('lang', answerLang);
+        expect(row).toHaveAttribute('tabindex', '0');
+        row.focus();
+        expect(row).toHaveFocus();
+        for (const option of options) expect(within(row).getByText(option)).toHaveAttribute('lang', answerLang);
+        expect(within(dialog).getByRole('heading', { name: 'Feleletválasztás – Előnézet' }).closest('[lang]')).not.toHaveAttribute('lang', answerLang);
     });
 
     it('announces an import validation error and retains the file for retry', async () => {
@@ -120,6 +176,22 @@ describe('CMS controls', () => {
 });
 
 describe('friend search and request feedback', () => {
+    it('describes the sample code character by character instead of treating X as a Roman numeral', () => {
+        render(<FriendSearch />);
+        const field = screen.getByRole('textbox', { name: 'Név és azonosító vagy barátkód' });
+        expect(field).toHaveAccessibleDescription(/Karakterenként: a, hét, bé, kötőjel, kilenc, iksz, kettő/);
+        expect(screen.getByText('A7B-9X2')).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    it.each([
+        ['DL7-WG', 'dé, el, hét, kötőjel, dupla vé, gé'],
+        ['IV-12', 'i, vé, kötőjel, egy, kettő'],
+    ])('spells the displayed identifier %s with an unambiguous accessible alternative', (code, spoken) => {
+        render(<div role="group" aria-labelledby="test-spoken-code"><span id="test-spoken-code"><AccessibleCode code={code} /></span></div>);
+        expect(screen.getByRole('group')).toHaveAccessibleName(`Karakterenként: ${spoken}`);
+        expect(screen.getByText(code)).toHaveAttribute('aria-hidden', 'true');
+    });
+
     it('labels the identifier, retains focus during sending and blocks duplicate requests', async () => {
         let resolveRequest;
         api.post.mockImplementation(() => new Promise(resolve => { resolveRequest = resolve; }));
@@ -156,6 +228,7 @@ describe('friend search and request feedback', () => {
         api.post.mockImplementation(() => new Promise(resolve => { resolveAction = resolve; }));
         render(<PendingRequests />);
         const accept = await screen.findByRole('button', { name: 'Elfogad: Tesztelő#42' });
+        expect(screen.getByRole('heading', { name: 'Tesztelő #42', level: 3 })).toBeInTheDocument();
         accept.focus();
         fireEvent.click(accept);
         fireEvent.click(screen.getByRole('button', { name: 'Elutasít: Tesztelő#42' }));
@@ -196,6 +269,7 @@ describe('friend list and challenge form', () => {
     it('names friend actions, labels all challenge fields and restores focus after closing', async () => {
         render(<MemoryRouter><FriendList /></MemoryRouter>);
         const open = await screen.findByRole('button', { name: 'Kihívás: Tesztelő#42' });
+        expect(screen.getByRole('heading', { name: 'Tesztelő', level: 3 })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Barát törlése: Tesztelő#42' })).toBeInTheDocument();
         open.focus();
         fireEvent.click(open);

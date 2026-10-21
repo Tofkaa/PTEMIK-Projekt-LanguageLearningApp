@@ -122,15 +122,16 @@ const Leaderboard = ({defaultScope = 'global'}) => {
                 )}
 
                 {!loading && !error && players.length > 0 && (
-                    <div className="table-responsive">
-                        <Table size="sm" hover variant="dark" className="mb-0 text-center align-middle">
+                    <div className="table-responsive" role="region" tabIndex={0}
+                        aria-label={`${scope === 'global' ? 'Globális' : 'Barátok'} ranglista, ${sortBy === 'xp' ? 'XP' : 'napi sorozat'} szerint, görgethető táblázat`}>
+                        <Table size="sm" hover variant="dark" className="leaderboard-table mb-0 text-center align-middle">
                             <caption className="visually-hidden">{scope === 'global' ? 'Globális' : 'Barátok'} ranglista, {sortBy === 'xp' ? 'XP' : 'napi sorozat'} szerint</caption>
                             <thead className="text-uppercase text-secondary" style={{ fontSize: '0.85rem' }}>
                                 <tr>
-                                    <th className="py-3 border-secondary">Hely.</th>
-                                    <th className="text-start py-3 border-secondary">Játékos</th>
-                                    <th className="py-3 border-secondary">Szint</th>
-                                    <th className="py-3 border-secondary">{sortBy === 'xp' ? 'Összes XP' : 'Napi Sorozat'}</th>
+                                    <th scope="col" className="py-3 border-secondary">Hely.</th>
+                                    <th scope="col" className="text-start py-3 border-secondary">Játékos</th>
+                                    <th scope="col" className="py-3 border-secondary">Szint</th>
+                                    <th scope="col" className="py-3 border-secondary">{sortBy === 'xp' ? 'Összes XP' : 'Napi Sorozat'}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -140,7 +141,7 @@ const Leaderboard = ({defaultScope = 'global'}) => {
                                     return (
                                         <tr key={player.userId} className={isMe ? 'table-active' : ''}>
                                             <td className="fw-bold">{getRankIcon(player.rank)}</td>
-                                            <td className="text-start">
+                                            <th scope="row" className="text-start fw-normal">
                                                 <span className={`fw-bold ${isMe ? 'text-info' : 'text-light'}`}>
                                                     {player.name}
                                                 </span>
@@ -148,9 +149,9 @@ const Leaderboard = ({defaultScope = 'global'}) => {
                                                     #{player.userTag}
                                                 </span>
                                                 {isMe && <Badge bg="info" className="ms-2">Te</Badge>}
-                                            </td>
+                                            </th>
                                             <td>
-                                                <Badge bg="secondary" pill className="px-3 py-2 border border-secondary">
+                                                <Badge bg="secondary" pill className="leaderboard-level px-3 py-2 border border-secondary">
                                                     {calculateLevel(player.xp)}. szint
                                                 </Badge>
                                             </td>

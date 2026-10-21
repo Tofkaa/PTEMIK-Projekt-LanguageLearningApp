@@ -110,6 +110,18 @@ describe('remaining admin operations', () => {
 });
 
 describe('community ranking and challenge navigation', () => {
+    it('provides a keyboard-scrollable leaderboard with explicit row and column headers', async () => {
+        api.get.mockResolvedValue({ data: [{ userId: 'me', name: 'Teszt', userTag: '42', xp: 1000, rank: 1 }] });
+        render(<Leaderboard />);
+        const region = await screen.findByRole('region', { name: 'Globális ranglista, XP szerint, görgethető táblázat' });
+        expect(region).toHaveAttribute('tabindex', '0');
+        region.focus();
+        expect(region).toHaveFocus();
+        for (const header of within(region).getAllByRole('columnheader')) expect(header).toHaveAttribute('scope', 'col');
+        expect(within(region).getByRole('rowheader', { name: /Teszt/ })).toHaveAttribute('scope', 'row');
+        expect(within(region).getByText('11. szint')).toHaveClass('leaderboard-level');
+    });
+
     it('gives independent names and radio groups to multiple leaderboard instances', async () => {
         api.get.mockResolvedValue({ data: [{ userId: 'me', name: 'Teszt', userTag: '42', xp: 80, rank: 1, streak: 3 }] });
         render(<><Leaderboard /><Leaderboard defaultScope="friends" /></>);

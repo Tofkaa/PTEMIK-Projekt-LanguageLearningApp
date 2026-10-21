@@ -152,6 +152,41 @@ describe.each(['light', 'dark'])('%s theme colour regressions', theme => {
         }
     });
 
+    it('keeps the current-player accent readable on the highlighted leaderboard row', () => {
+        surface(<table className="table table-dark"><tbody><tr className="table-active">
+            <th scope="row"><span className="text-info">Saját név</span></th>
+        </tr></tbody></table>);
+        const accent = foreground(screen.getByText('Saját név'));
+        // The real browser paints this Bootstrap active-row surface using an inset shadow.
+        const activeSurface = rgba(theme === 'light' ? '#e2e3e5' : '#373b3e');
+        expect(ratio(accent, activeSurface)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('keeps friend codes and level labels intact rather than wrapping each character', () => {
+        surface(<><span className="badge community-code">ABC-12</span>
+            <span className="badge leaderboard-level">11. szint</span></>);
+        for (const element of document.querySelectorAll('.community-code, .leaderboard-level')) {
+            expect(getComputedStyle(element).whiteSpace).toBe('nowrap');
+            expect(getComputedStyle(element).overflowWrap).toBe('normal');
+            expect(getComputedStyle(element).flexShrink).toBe('0');
+        }
+    });
+
+    it('keeps inactive classroom tabs readable on the page background', () => {
+        surface(<nav className="custom-dark-tabs" style={{ backgroundColor: theme === 'light' ? '#f8f9fa' : '#212529' }}>
+            <button className="nav-link">Statisztika és haladás</button>
+        </nav>);
+        expect(textContrast(screen.getByRole('button', { name: 'Statisztika és haladás' }))).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('keeps the heatmap scores readable on success and danger surfaces', () => {
+        surface(<table className="table table-dark classroom-heatmap"><tbody><tr>
+            <td className="bg-success text-light"><div>90%</div></td>
+            <td className="bg-danger text-light"><div>20%</div></td>
+        </tr></tbody></table>);
+        for (const score of ['90%', '20%']) expect(textContrast(screen.getByText(score))).toBeGreaterThanOrEqual(4.5);
+    });
+
     it('keeps recent-result dates readable on their actual translucent card surface', async () => {
         api.get.mockResolvedValue({ data: [{ lessonTitle: 'Lecke', score: 80, difficulty: 'EASY', submittedAt: '2026-10-18T12:00:00Z', correctAnswers: 4, totalQuestions: 5 }] });
         surface(<RecentResultsSection />);

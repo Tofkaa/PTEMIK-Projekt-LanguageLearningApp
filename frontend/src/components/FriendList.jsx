@@ -11,6 +11,7 @@ import api from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import LearningFeedback from './LearningFeedback';
+import AccessibleCode from './AccessibleCode';
 
 const AVAILABLE_COURSES = {
     'en': { name: 'Angol', flag: '🇬🇧' },
@@ -217,17 +218,17 @@ const FriendList = () => {
                     <Col md={6} key={friend.friendshipId} className="mb-3">
                         <Card className="bg-dark border-secondary h-100 shadow-sm friend-card">
                             <Card.Body className="d-flex flex-column justify-content-between">
-                                <div className="d-flex justify-content-between align-items-start mb-3">
+                                <div className="d-flex flex-wrap gap-2 justify-content-between align-items-start mb-3">
                                     <div>
-                                        <h5 className="text-light mb-0 fw-bold">
+                                        <h3 className="h5 text-light mb-0 fw-bold">
                                             {friend.name}
-                                        </h5>
+                                        </h3>
                                         <div className="text-light small">
                                             #{friend.userTag}
                                         </div>
                                     </div>
-                                    <Badge bg="secondary" text="light" className="font-monospace">
-                                        {friend.friendCode}
+                                    <Badge bg="secondary" text="light" className="community-code font-monospace">
+                                        <AccessibleCode code={friend.friendCode} />
                                     </Badge>
                                 </div>
                                 

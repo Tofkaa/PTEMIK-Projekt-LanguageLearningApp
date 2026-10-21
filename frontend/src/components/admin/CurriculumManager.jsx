@@ -11,6 +11,14 @@ const AVAILABLE_COURSES = {
     'de': { name: 'Német', flag: '🇩🇪' }
 };
 
+const EXERCISE_TYPE_LABELS = {
+    MULTIPLE_CHOICE: 'Feleletválasztás',
+    WORD_BANK: 'Szóbank',
+    TRANSLATION: 'Fordítás',
+    IMAGE_CHOICE: 'Képes választás',
+};
+const exerciseTypeLabel = type => EXERCISE_TYPE_LABELS[type] || 'Ismeretlen feladattípus';
+
 const CurriculumManager = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -202,7 +210,9 @@ const CurriculumManager = () => {
                                     value={importLevel}
                                     disabled={isLoading}
                                     onChange={(e) => {
-                                        setImportLevel(e.target.value);
+                                        const nextLevel = e.currentTarget.value;
+                                        if (!['FULL_TOPIC', 'LESSON', 'EXERCISE'].includes(nextLevel) || nextLevel === importLevel) return;
+                                        setImportLevel(nextLevel);
                                         setTargetTopicId('');
                                         setTargetLessonId('');
                                     }}
@@ -361,25 +371,27 @@ const CurriculumManager = () => {
                                                             </Card.Header>
                                                             <Card.Body className="p-0">
                                                                 <ListGroup variant="flush">
-                                                                    {lesson.exercises?.map(exercise => (
+                                                                    {lesson.exercises?.map((exercise, exerciseIndex) => (
                                                                         <ListGroup.Item key={exercise.exerciseId} className={`bg-transparent border-bottom border-secondary border-opacity-50 text-light d-flex flex-wrap justify-content-between align-items-center py-3 px-4 ${!exercise.active ? 'bg-danger bg-opacity-10' : ''}`}>
                                                                             <div className="d-flex flex-wrap align-items-center gap-2 pe-3 mb-2 mb-md-0">
+                                                                                <span className="text-secondary">{exerciseIndex + 1}. feladat</span>
                                                                                <Badge bg="info" text="dark" pill className="me-3 px-3 py-2 fw-bold" style={{ minWidth: '130px' }}>
-                                                                                    🧩 {exercise.type}
+                                                                                    <span aria-hidden="true">🧩 </span>{exerciseTypeLabel(exercise.type)}
                                                                                 </Badge>
                                                                                 <Badge bg={getDifficultyBadge(exercise.difficulty)} pill className="me-3">{exercise.difficulty}</Badge>
                                                                                 <span className="text-secondary">
-                                                                                    {getPreview(exercise.content)}
+                                                                                    <LanguageText text={getPreview(exercise.content)}
+                                                                                        lang={exercise.content?.questionLang || 'hu'} parts={exercise.content?.questionParts} />
                                                                                 </span>
                                                                                 {!exercise.active && <Badge bg="danger" className="ms-3">Felfüggesztve</Badge>}
                                                                             </div>
                                                                             
                                                                             <div className="d-flex flex-wrap align-items-center gap-2">
-                                                                                <Button aria-label={`Megtekintés: ${lesson.title}, ${getPreview(exercise.content)}`} variant="outline-info" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" onClick={() => handleShowPreview(exercise)}>
+                                                                                <Button aria-label={`Megtekintés: ${lesson.title}, ${exerciseIndex + 1}. feladat`} variant="outline-info" size="sm" className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2" onClick={() => handleShowPreview(exercise)}>
                                                                                     <span aria-hidden="true">👁️</span> Megtekintés
                                                                                 </Button>
                                                                                 <Button
-                                                                                    aria-label={`${exercise.active ? 'Felfüggesztés' : 'Visszaállítás'}: ${lesson.title}, ${getPreview(exercise.content)}`}
+                                                                                    aria-label={`${exercise.active ? 'Felfüggesztés' : 'Visszaállítás'}: ${lesson.title}, ${exerciseIndex + 1}. feladat`}
                                                                                     aria-disabled={statusBusy}
                                                                                     variant={exercise.active ? "outline-danger" : "outline-success"} 
                                                                                     size="sm" 
@@ -416,8 +428,8 @@ const CurriculumManager = () => {
             {/* FELADAT ELŐNÉZET MODAL */}
             <Modal show={previewModal.show} onHide={() => setPreviewModal({ show: false, exercise: null })} aria-labelledby="curriculum-preview-title" centered size="lg">
                 <Modal.Header closeButton closeLabel="Előnézet bezárása" className="bg-dark border-secondary">
-                    <Modal.Title as="h2" id="curriculum-preview-title" className="h4 app-accent-text fw-bold">
-                        <span aria-hidden="true">🧩 </span>{previewModal.exercise?.type} - Előnézet
+                    <Modal.Title as="h2" lang="hu" id="curriculum-preview-title" className="h4 app-accent-text fw-bold">
+                        <span aria-hidden="true">🧩 </span>{exerciseTypeLabel(previewModal.exercise?.type)} – Előnézet
                     </Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="bg-dark text-light p-4">
@@ -432,7 +444,9 @@ const CurriculumManager = () => {
                             {previewModal.exercise.content?.options && (
                                 <div className="mb-4">
                                     <strong className="text-secondary text-uppercase small tracking-wide">Válaszlehetőségek:</strong>
-                                    <div className="d-flex flex-wrap gap-2 mt-2">
+                                    <div className="d-flex flex-wrap gap-2 mt-2" role="group" tabIndex={0}
+                                        lang={previewModal.exercise.content?.answerLang || 'hu'}
+                                        aria-label={previewModal.exercise.content.options.join(', ')}>
                                         {previewModal.exercise.content.options.map((opt, i) => (
                                             <Badge key={i} lang={previewModal.exercise.content?.answerLang} bg="secondary" className="fs-6 py-2 px-3 fw-normal rounded-pill">
                                                 {opt}
