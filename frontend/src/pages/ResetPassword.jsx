@@ -52,6 +52,7 @@ const ResetPassword = () => {
                 <Alert variant="danger" className="text-center p-4 rounded-4 shadow-lg">
                     <h1 ref={headingRef} tabIndex={-1} className="h4"><span aria-hidden="true">⚠️</span> Hiányzó azonosító</h1>
                     <p>Érvénytelen vagy hiányzó visszaállító link.</p>
+                    <Link to="/forgot-password" className="app-accent-link d-block">Új visszaállító link kérése</Link>
                     <Link to="/login" className="btn btn-outline-danger mt-2">Vissza a belépéshez</Link>
                 </Alert>
             </Container>
@@ -67,6 +68,7 @@ const ResetPassword = () => {
                             <h1 ref={headingRef} tabIndex={-1} className="h2 text-center mb-4 fw-bold">Új jelszó beállítása</h1>
                             
                             <LearningFeedback error={status === 'error' ? message : ''} feedback={status === 'success' ? { type: 'success', msg: message } : null} />
+                            {status === 'error' && <Link to="/forgot-password" className="app-accent-link d-block mb-3">Új visszaállító link kérése</Link>}
                             {status === 'success' && <Link to="/login" className="app-accent-link d-block mt-3">Vissza a belépéshez</Link>}
 
                             {status !== 'success' && (

@@ -84,6 +84,22 @@ describe('form and classroom accessibility', () => {
         expect(screen.getByRole('link', { name: 'Vissza a belépéshez' })).toBeInTheDocument();
     });
 
+    it('allows a deliberate new reset request without retyping the email or sending automatically', async () => {
+        authApi.forgotPassword.mockResolvedValue({ data: 'Ha létezik a fiók, elküldtük a linket.' });
+        render(<MemoryRouter><ForgotPassword /></MemoryRouter>);
+        const email = screen.getByRole('textbox', { name: 'Email cím' });
+        expect(email).toHaveAccessibleDescription(/1 óráig érvényes/);
+        fireEvent.change(email, { target: { value: 'student@example.test' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Visszaállító link küldése' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Új visszaállító link kérése' }));
+        expect(screen.getByRole('textbox', { name: 'Email cím' })).toHaveValue('student@example.test');
+        expect(authApi.forgotPassword).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus());
+        fireEvent.click(screen.getByRole('button', { name: 'Visszaállító link küldése' }));
+        await screen.findByRole('button', { name: 'Új visszaállító link kérése' });
+        expect(authApi.forgotPassword.mock.calls).toEqual([['student@example.test'], ['student@example.test']]);
+    });
+
     it('announces mismatched passwords without transmitting them', async () => {
         render(<MemoryRouter initialEntries={['/reset-password?token=test']}><ResetPassword /></MemoryRouter>);
         fireEvent.change(screen.getByLabelText('Új jelszó', { exact: true }), { target: { value: 'password-one' } });

@@ -37,6 +37,9 @@ const ForgotPassword = () => {
                             <p className="text-center text-secondary mb-4">
                                 Add meg a fiókodhoz tartozó e-mail címet, és küldünk egy linket a jelszavad visszaállításához.
                             </p>
+                            <p id="reset-link-help" className="text-secondary">
+                                A link a kérés indításától számított 1 óráig érvényes. Ha lejárt, új linket kérhetsz.
+                            </p>
                             
                             <LearningFeedback error={status === 'error' ? message : ''} feedback={status === 'success' ? { type: 'success', msg: message } : null} />
 
@@ -47,6 +50,7 @@ const ForgotPassword = () => {
                                         <Form.Control 
                                             type="email" 
                                             autoComplete="email"
+                                            aria-describedby="reset-link-help"
                                             placeholder="pelda@email.com" 
                                             value={email} 
                                             onChange={(e) => setEmail(e.target.value)} 
@@ -59,6 +63,12 @@ const ForgotPassword = () => {
                                         {status === 'loading' ? 'Küldés folyamatban...' : 'Visszaállító link küldése'}
                                     </Button>
                                 </Form>
+                            )}
+                            {status === 'success' && (
+                                <Button type="button" variant="outline-info" className="w-100 mt-3"
+                                    onClick={() => { setMessage(''); setStatus('idle'); }}>
+                                    Új visszaállító link kérése
+                                </Button>
                             )}
                             
                             <div className="text-center mt-3">

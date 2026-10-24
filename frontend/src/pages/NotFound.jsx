@@ -11,7 +11,7 @@ const NotFound = () => {
 
     return (
         <Container className="d-flex flex-column justify-content-center align-items-center min-vh-100 text-light text-center">
-            <h1 className="display-1 fw-bold" style={{ color: 'var(--primary-cyan)', fontSize: '6rem' }}>404</h1>
+            <h1 className="display-1 fw-bold app-accent-text" style={{ fontSize: '6rem' }}>404</h1>
             <h2 className="mb-4 fw-bold">Hoppá, eltévedtél!</h2>
             <p className="text-light opacity-75 mb-4 fs-5">
                 Az oldal, amit keresel, a sötét anyagba veszett, vagy sosem létezett.

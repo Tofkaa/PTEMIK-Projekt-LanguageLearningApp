@@ -21,7 +21,7 @@ return (
                 <h1 className="fw-bold text-info mb-4">Adatkezelési Tájékoztató (GDPR)</h1>
                 <p className="text-secondary mb-4">Utolsó frissítés: 2026. október 12.</p>
 
-                <h4 className="fw-bold text-light mt-4">1. Milyen adatokat gyűjtünk?</h4>
+                <h2 className="h4 fw-bold text-light mt-4">1. Milyen adatokat gyűjtünk?</h2>
                 <p className="opacity-75">
                     A regisztráció és a platform használata során a következő személyes és tevékenységi adatokat kezeljük:
                 </p>
@@ -31,13 +31,13 @@ return (
                     <li><strong>Tanulási adatok:</strong> Megoldott leckék, pontszámok (XP), hibázott kérdések, napi belépési sorozat (Streak).</li>
                 </ul>
 
-                <h4 className="fw-bold text-light mt-4">2. Miért gyűjtjük ezeket az adatokat?</h4>
+                <h2 className="h4 fw-bold text-light mt-4">2. Miért gyűjtjük ezeket az adatokat?</h2>
                 <p className="opacity-75">
                     Az adataidat kizárólag a szolgáltatás biztosítása céljából kezeljük. A tanulási eredmények a 
                     dinamikus nehézségi motor (adaptív algoritmus) működéséhez szükségesek. Az e-mail címedet fiók-helyreállításra (jelszó visszaállítás) használjuk.
                 </p>
 
-                <h4 className="fw-bold text-light mt-4">3. Kivel osztjuk meg az adataidat? (Nyilvánosság)</h4>
+                <h2 className="h4 fw-bold text-light mt-4">3. Kivel osztjuk meg az adataidat? (Nyilvánosság)</h2>
                 <p className="opacity-75">
                     Személyes adataidat (e-mail cím, jelszó) soha nem adjuk el, és nem osztjuk meg harmadik féllel. 
                     Ugyanakkor a platform közösségi jellege miatt a <strong>Felhasználóneved, Tag-ed, Profilképed, Streaked és a megszerzett XP-d nyilvánosak</strong>:
@@ -48,14 +48,14 @@ return (
                     <li>Láthatóak a Barátlistádon szereplő felhasználók számára.</li>
                 </ul>
 
-                <h4 className="fw-bold text-light mt-4">4. Sütik (Cookies) és adattárolás</h4>
+                <h2 className="h4 fw-bold text-light mt-4">4. Sütik (Cookies) és adattárolás</h2>
                 <p className="opacity-75">
                     Az alkalmazás a böngésződ helyi tárhelyét (Local Storage / Session Storage) használja a bejelentkezési token (JWT) 
                     és a téma-beállítások tárolására. Külső nyomkövető sütiket (pl. marketing célú trackerek) <strong>nem</strong> használunk, így az oldal működéséhez 
                     szükséges tárolás nem igényel külön süti-elfogadó sávot.
                 </p>
 
-                <h4 className="fw-bold text-light mt-4">5. A Te jogaid (GDPR)</h4>
+                <h2 className="h4 fw-bold text-light mt-4">5. A Te jogaid (GDPR)</h2>
                 <p className="opacity-75">
                     Az Európai Unió Általános Adatvédelmi Rendelete (GDPR) értelmében a Beállítások menüpontban az alábbi jogokat gyakorolhatod:
                 </p>

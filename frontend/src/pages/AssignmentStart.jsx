@@ -78,7 +78,7 @@ const AssignmentStart = () => {
                         
                         {details.test ? (
                             <Alert variant="warning">
-                                <h5 className="fw-bold">Figyelem! Ez egy szigorú teszt.</h5>
+                                <h2 className="h5 fw-bold">Figyelem! Ez egy szigorú teszt.</h2>
                                 <p className="mb-0">
                                     Amint rányomsz az indításra, az időmérés megkezdődik. 
                                     Ne frissíts rá az oldalra, és ne zárd be az ablakot, amíg nem küldted be a válaszaidat!
@@ -86,7 +86,7 @@ const AssignmentStart = () => {
                             </Alert>
                         ) : (
                             <Alert variant="info">
-                                <h5 className="fw-bold">Gyakorló feladatsor</h5>
+                                <h2 className="h5 fw-bold">Gyakorló feladatsor</h2>
                                 <p className="mb-0">Minden feladatra azonnali visszajelzést fogsz kapni, és újra próbálkozhatsz a hibás válaszokkal.</p>
                             </Alert>
                         )}
@@ -99,6 +99,9 @@ const AssignmentStart = () => {
                             </p>
                             <p className="mb-0"><strong>Kérdések száma:</strong> {details.exerciseCount} db</p>
                             <p><strong>Rád érvényes beadási határidő:</strong> {details.availableUntil ? formatToLocalDisplay(details.availableUntil) : 'Nincs'}</p>
+                            {(details.timeLimitMinutes || details.availableUntil) && <p className="small text-body-secondary">
+                                A tanárod egyéni időkeretet és beadási határidőt állíthat be. Ha erre van szükséged, még az indítás előtt egyeztess vele.
+                            </p>}
                             <p className="mb-0 text-info mt-2 border-top border-secondary pt-2">
                                 <strong>Felhasznált próbálkozások:</strong> {details.attemptsUsed || 0} / {details.maxAttempts ? details.maxAttempts : 'Végtelen'}
                             </p>

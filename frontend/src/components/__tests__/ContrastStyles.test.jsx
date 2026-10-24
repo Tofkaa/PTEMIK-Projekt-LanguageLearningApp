@@ -7,7 +7,10 @@ import RecentResultsSection from '../profile/RecentResultsSection';
 import api from '../../services/api';
 import NavigationBar from '../NavigationBar';
 import GlobalErrorToast from '../GlobalErrorToast';
+import NotFound from '../../pages/NotFound';
 import { MemoryRouter } from 'react-router-dom';
+import { Form } from 'react-bootstrap';
+import ImageCropControls from '../ImageCropControls';
 
 vi.mock('../../services/api', () => ({ default: { get: vi.fn() } }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ user: { userId: 'badge-test', name: 'Teszt', activeCourseCode: 'en', role: 'STUDENT' } }) }));
@@ -89,6 +92,11 @@ describe.each(['light', 'dark'])('%s theme colour regressions', theme => {
         return render(<div className="bg-dark p-4">{children}</div>);
     }
 
+    it('keeps the large 404 heading readable in both themes', () => {
+        surface(<MemoryRouter><NotFound /></MemoryRouter>);
+        expect(textContrast(screen.getByRole('heading', { name: '404', exact: true }))).toBeGreaterThanOrEqual(3);
+    });
+
     it('keeps text, filled badges, buttons and selected menu items above 4.5:1', () => {
         surface(<>
             {['primary', 'info', 'warning', 'success', 'danger', 'secondary', 'muted'].map(colour => <span key={colour} data-testid={`text-${colour}`} className={`text-${colour}`}>Szöveg</span>)}
@@ -138,6 +146,41 @@ describe.each(['light', 'dark'])('%s theme colour regressions', theme => {
         const description = await screen.findByText('Tanulj öt egymást követő napon.');
         expect(textContrast(description)).toBeGreaterThanOrEqual(4.5);
         expect(screen.getByText('– még nem szerezted meg')).toBeInTheDocument();
+    });
+
+    it('keeps off-switch thumbs and selected radio/check marks distinguishable', () => {
+        surface(<>
+            <Form.Check type="switch" id="contrast-switch" label="Kapcsoló" />
+            <Form.Check type="checkbox" id="contrast-check" label="Jelölőnégyzet" defaultChecked />
+            <Form.Check type="radio" id="contrast-radio" label="Választógomb" defaultChecked />
+        </>);
+        const off = screen.getByRole('checkbox', { name: 'Kapcsoló' });
+        // jsdom misorders Bootstrap's inherited dark-mode SVG and :not() rules.
+        // Measure the shipped override palette here; application is checked in Chromium.
+        const selector = `${theme === 'dark' ? '[data-bs-theme="dark"] ' : ''}.form-switch .form-check-input:not(:checked)`;
+        const rule = [...stylesheet.sheet.cssRules].findLast(rule => rule.selectorText === selector);
+        const svg = decodeURIComponent(rule.style.getPropertyValue('--bs-form-switch-bg')).replace(/\\/g, '');
+        const fill = svg.match(/fill=['"]([^'"]+)['"]/)[1];
+        expect(ratio(rgba(fill), background(off))).toBeGreaterThanOrEqual(3);
+        for (const input of [screen.getByRole('checkbox', { name: 'Jelölőnégyzet' }), screen.getByRole('radio')]) {
+            expect(ratio(rgba('#fff'), background(input))).toBeGreaterThanOrEqual(3);
+            expect(ratio(background(input), background(input.parentElement))).toBeGreaterThanOrEqual(3);
+        }
+    });
+
+    it('keeps crop zoom thumb and invalid-field boundaries above 3:1', () => {
+        surface(<>
+            <ImageCropControls crop={{ x: 0, y: 0 }} onCropChange={() => {}} zoom={1} onZoomChange={() => {}} />
+            <input aria-label="Hibás mező" className="form-control is-invalid" aria-invalid="true" />
+        </>);
+        const slider = screen.getByRole('slider', { name: 'Nagyítás (Zoom)' });
+        expect(ratio(rgba(resolve(slider, variable(slider, '--app-range-thumb'))),
+            rgba(resolve(slider, variable(slider, '--app-range-track'))))).toBeGreaterThanOrEqual(3);
+        const field = screen.getByRole('textbox', { name: 'Hibás mező' });
+        // As with the existing control-border test, jsdom does not reliably apply
+        // the important border shorthand. The real browser checks its application.
+        const border = rgba(resolve(field, variable(field, '--bs-danger-text-emphasis')));
+        expect(ratio(border, background(field))).toBeGreaterThanOrEqual(3);
     });
 
     it('keeps two-digit navbar counters unbroken and reserves their width in the flex layout', () => {
