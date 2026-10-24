@@ -8,6 +8,7 @@ import WordBankExercise from '../components/exercises/WordBankExercise';
 import LearningFeedback from '../components/LearningFeedback';
 import useStageFocus from '../hooks/useStageFocus';
 import LanguageText from '../components/LanguageText';
+import { exerciseTypeLabel } from '../utils/exerciseTypeLabel';
 
 const VocabularyPractice = () => {
     const navigate = useNavigate();
@@ -179,7 +180,7 @@ const VocabularyPractice = () => {
                             <span aria-hidden="true">Feladat: {currentIndex + 1} / {exercises.length}</span>
                             <span lang="hu" className="visually-hidden">{currentIndex + 1}. feladat, összesen {exercises.length}.</span>
                         </span>
-                        <span className="text-uppercase text-info">{currentEx.type}</span>
+                        <span className="text-uppercase text-info">{exerciseTypeLabel(currentEx.type)}</span>
                     </div>
                     <ProgressBar 
                         now={progressPercentage} 

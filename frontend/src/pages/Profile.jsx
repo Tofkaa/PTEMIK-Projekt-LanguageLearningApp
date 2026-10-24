@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import AchievementsSection from '../components/profile/AchievementSection.jsx';
 import RecentResultsSection from '../components/profile/RecentResultsSection.jsx';
+import AccessibleCode from '../components/AccessibleCode';
 
 const Profile = () => {
     const { user } = useAuth();
@@ -60,7 +61,7 @@ const Profile = () => {
                                         {user.name} <span className="text-info fs-5">#{user.userTag}</span>
                                     </p>
                                     <Badge bg="dark" border="secondary" className="border text-light font-monospace px-3 py-2 mt-2 fs-6">
-                                        Barátkód: <span className="text-warning">{user.friendCode}</span>
+                                        Barátkód: <span className="text-warning"><AccessibleCode code={user.friendCode} /></span>
                                     </Badge>
                                 </div>
                                 <Badge bg="info" text="dark" className="px-3 py-2 rounded-pill mb-4 fw-bold">

@@ -3,6 +3,7 @@ import { Badge } from 'react-bootstrap';
 import ExerciseImage from './ExerciseImage';
 import LanguageText from './LanguageText';
 import TranslationHint from './TranslationHint';
+import { exerciseTypeLabel } from '../utils/exerciseTypeLabel';
 
 const ExercisePreviewCard = ({ exercise, serverCorrectAnswer }) => {
     if (!exercise) return <div className="text-secondary small">Nincs elérhető feladat adat.</div>;
@@ -13,7 +14,7 @@ const ExercisePreviewCard = ({ exercise, serverCorrectAnswer }) => {
         <div className="p-3 bg-black bg-opacity-50 rounded border border-info small shadow-inner text-light mt-2">
             
             <div className="mb-2 border-bottom border-secondary pb-2">
-                <Badge bg="secondary" className="mb-3">{exercise.type}</Badge>
+                <Badge bg="secondary" className="mb-3">{exerciseTypeLabel(exercise.type)}</Badge>
                 
                 <ExerciseImage exercise={exercise} maxHeight={180} />
                 

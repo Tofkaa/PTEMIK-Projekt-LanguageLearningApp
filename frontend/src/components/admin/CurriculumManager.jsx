@@ -4,20 +4,13 @@ import { adminApi } from '../../services/adminApi';
 import LanguageText from '../LanguageText';
 import ExerciseImage from '../ExerciseImage';
 import LearningFeedback from '../LearningFeedback';
+import { exerciseTypeLabel } from '../../utils/exerciseTypeLabel';
 
 const AVAILABLE_COURSES = {
     'en': { name: 'Angol', flag: '🇬🇧' },
     'es': { name: 'Spanyol', flag: '🇪🇸' },
     'de': { name: 'Német', flag: '🇩🇪' }
 };
-
-const EXERCISE_TYPE_LABELS = {
-    MULTIPLE_CHOICE: 'Feleletválasztás',
-    WORD_BANK: 'Szóbank',
-    TRANSLATION: 'Fordítás',
-    IMAGE_CHOICE: 'Képes választás',
-};
-const exerciseTypeLabel = type => EXERCISE_TYPE_LABELS[type] || 'Ismeretlen feladattípus';
 
 const CurriculumManager = () => {
     const [selectedFile, setSelectedFile] = useState(null);

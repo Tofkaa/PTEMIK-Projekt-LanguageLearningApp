@@ -7,6 +7,7 @@ import Cropper from 'react-easy-crop';
 import getCroppedImg from '../utils/cropImage.js';
 import ImageCropControls from '../components/ImageCropControls';
 import LearningFeedback from '../components/LearningFeedback';
+import AccessibleCode from '../components/AccessibleCode';
 
 const Settings = () => {
     const { user, setUser, logout } = useAuth();
@@ -446,7 +447,7 @@ const Settings = () => {
                                         </Button>
                                     </div>
                                     <Form.Text id="settings-name-help" className="text-secondary">
-                                        A felhasználónév módosítása új, négyjegyű azonosítót (#tag) generál a neved mellé, a barátkódod ({user.friendCode}) viszont változatlan marad.
+                                        A felhasználónév módosítása új, négyjegyű azonosítót (#tag) generál a neved mellé, a barátkódod (<AccessibleCode code={user.friendCode} />) viszont változatlan marad.
                                     </Form.Text>
                                 </Form.Group>
                             </Form>
