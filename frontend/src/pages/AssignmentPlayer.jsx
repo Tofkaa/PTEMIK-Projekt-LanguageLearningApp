@@ -18,6 +18,7 @@ import LearningFeedback from '../components/LearningFeedback.jsx';
 import TranslationHint from '../components/TranslationHint.jsx';
 import DurationText from '../components/DurationText.jsx';
 import useStageFocus from '../hooks/useStageFocus';
+import AssignmentReview from '../components/AssignmentReview';
 
 /**
  * @component
@@ -43,13 +44,15 @@ const AssignmentPlayer = () => {
     
     const [timeLeft, setTimeLeft] = useState(null);
     const [showSummary, setShowSummary] = useState(false);
+    const [reviewing, setReviewing] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [feedback, setFeedback] = useState(null);
     const [isChecking, setIsChecking] = useState(false);
     const [checkError, setCheckError] = useState(null);
     const [submissionError, setSubmissionError] = useState(null);
-    const headingRef = useStageFocus(showSummary ? 'summary' : `question-${currentIndex}`);
+    const headingRef = useStageFocus(showSummary ? 'summary' : reviewing ? 'review' : `question-${currentIndex}`);
+    const submissionInFlight = useRef(false);
 
     const isAutoSubmitting = useRef(false);
     const latestAutoSubmit = useRef(null);
@@ -60,7 +63,7 @@ const AssignmentPlayer = () => {
         ? parseServerDate(sessionData.timing.serverNow).getTime() - Date.now() : 0);
     const [timingError, setTimingError] = useState('');
     const [timingNotice, setTimingNotice] = useState('');
-    const previousDeadline = useRef(sessionData?.timing?.deadline);
+    const previousDeadline = useRef(parseServerDate(sessionData?.timing?.deadline)?.getTime() ?? null);
     const latestTimingValue = useRef(sessionData?.timing);
     const latestServerTime = useRef(parseServerDate(sessionData?.timing?.serverNow)?.getTime() || 0);
 
@@ -73,8 +76,9 @@ const AssignmentPlayer = () => {
         latestTimingValue.current = value;
         setTiming(value);
         if (value.serverNow) setServerOffset(parseServerDate(value.serverNow).getTime() - Date.now());
-        if (value.deadline !== previousDeadline.current) setTimingNotice('A tanár frissítette az időbeállításaidat.');
-        previousDeadline.current = value.deadline;
+        const nextDeadline = parseServerDate(value.deadline)?.getTime() ?? null;
+        if (nextDeadline !== previousDeadline.current) setTimingNotice('A tanár frissítette az időbeállításaidat.');
+        previousDeadline.current = nextDeadline;
         setTimingError('');
         if (value.finished) setShowSummary(true);
         return value;
@@ -227,7 +231,7 @@ const AssignmentPlayer = () => {
         if (currentIndex < exercises.length - 1 || wasJustCloned) {
             setCurrentIndex(prev => prev + 1);
         } else {
-            submitAssignment(finalAnswers);
+            setReviewing(true);
         }
     };
 
@@ -258,7 +262,10 @@ const AssignmentPlayer = () => {
      * @param {Array<Object>} answersToSubmit - Array containing the user's finalized answers.
      */
     const submitAssignment = async (answersToSubmit) => {
+        if (submissionInFlight.current || showSummary) return;
+        submissionInFlight.current = true;
         setIsSubmitting(true);
+        setSubmissionError(null);
         try {
             const payload = answersToSubmit.map(ans => ({
                 exerciseId: ans.exerciseId,
@@ -275,6 +282,7 @@ const AssignmentPlayer = () => {
             console.error('Nem sikerült beküldeni a tesztet.', error);
             setSubmissionError('Nem sikerült beküldeni a tesztet. Ellenőrizd a kapcsolatod, majd próbáld újra.');
         } finally {
+            submissionInFlight.current = false;
             setIsSubmitting(false);
         }
     };
@@ -308,7 +316,7 @@ const AssignmentPlayer = () => {
 
     if (currentIndex === exercises.length - 1) {
         if (!hasFeedback || (feedback && feedback.type !== 'warning')) {
-            buttonText = 'Teszt Beküldése';
+            buttonText = 'Válaszok áttekintése';
             buttonVariant = 'success';
         }
     }
@@ -336,6 +344,28 @@ const AssignmentPlayer = () => {
                 </Container>
             </div>
         );
+    }
+
+    if (reviewing) {
+        const hasEmptyAnswer = exercises.some(exercise => !collectedAnswers.find(answer => answer.exerciseId === exercise.exerciseId)?.answer.trim());
+        return <Container className="py-4 text-light">
+            <h1 ref={headingRef} tabIndex={-1} className="h2">Válaszok áttekintése</h1>
+            <p>A beadás előtt ellenőrizd a válaszaidat. Bármelyik feladat válaszát javíthatod. Az esetleges időkorlát az áttekintés alatt is érvényes.</p>
+            {deadlineMs !== null && timeLeft !== null && <p role="timer" aria-live="off"><DurationText
+                seconds={timeLeft / 1000} overtime={timeLeft < 0} label={timeLeft < 0 ? 'Időtúllépés' : 'Hátralévő idő'} /></p>}
+            <div role="status" aria-atomic="true">{timingNotice}</div>
+            <AssignmentReview exercises={exercises} answers={collectedAnswers} submitting={isSubmitting}
+                timingNotice={timingNotice} error={isSubmitting ? null : submissionError || timingError}
+                timeLeft={deadlineMs !== null ? timeLeft : null} onAnswerChange={(exerciseId, answer) => {
+                    if (!isSubmitting) setCollectedAnswers(previous => previous.map(item => item.exerciseId === exerciseId ? { ...item, answer } : item));
+                }} />
+            <LearningFeedback error={isSubmitting ? null : submissionError || timingError} />
+            {hasEmptyAnswer && <p>Beadás előtt töltsd ki az üresen hagyott válaszokat.</p>}
+            <Button variant="success" aria-disabled={isSubmitting || hasEmptyAnswer} aria-busy={isSubmitting}
+                onClick={() => { if (!isSubmitting && !hasEmptyAnswer) submitAssignment(collectedAnswers); }}>
+                {isSubmitting ? 'Beküldés folyamatban...' : submissionError ? 'Beadás újrapróbálása' : 'Végleges beadás'}
+            </Button>
+        </Container>;
     }
 
     const TaskHeading = 'h1';

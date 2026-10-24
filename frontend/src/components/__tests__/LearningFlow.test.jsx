@@ -249,7 +249,9 @@ describe('assignment flow', () => {
         expect(screen.getByText('Fordítsd le: körte')).toBeInTheDocument();
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
         typeAnswer('pear');
-        activate('Teszt Beküldése');
+        activate('Válaszok áttekintése');
+        expect(assignmentApi.submitAssignment).not.toHaveBeenCalled();
+        activate('Végleges beadás');
         const summary = await screen.findByRole('heading', { name: 'Sikeres Beküldés!' });
         expect(summary).toHaveFocus();
         expect(api.post).not.toHaveBeenCalled();
@@ -271,7 +273,8 @@ describe('assignment flow', () => {
         assignmentApi.submitAssignment.mockRejectedValueOnce(new Error('offline'));
         openAssignment({ items: [questions[0]] });
         typeAnswer('apple');
-        activate('Teszt Beküldése');
+        activate('Válaszok áttekintése');
+        activate('Végleges beadás');
         const retry = await screen.findByRole('button', { name: 'Beadás újrapróbálása' });
         expect(retry).toHaveFocus();
         activate('Beadás újrapróbálása');

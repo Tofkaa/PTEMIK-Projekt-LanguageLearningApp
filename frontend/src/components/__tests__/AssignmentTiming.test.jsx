@@ -70,6 +70,17 @@ describe('teacher timing editor', () => {
 });
 
 describe('authoritative assignment countdown', () => {
+    it('does not announce a teacher change for equivalent deadline timestamp formats', async () => {
+        vi.useFakeTimers(); vi.setSystemTime(NOW);
+        openPlayer('2026-10-18T12:10:00Z');
+        assignmentApi.getSessionTiming.mockImplementation(async () => ({ data: {
+            deadline: '2026-10-18T12:10:00+00:00', serverNow: new Date(Date.now()).toISOString(),
+            allowLateSubmission: false, finished: false,
+        } }));
+        await act(async () => vi.advanceTimersByTimeAsync(5000));
+        expect(screen.queryByText('A tanár frissítette az időbeállításaidat.')).not.toBeInTheDocument();
+        expect(assignmentApi.submitAssignment).not.toHaveBeenCalled();
+    });
     it('uses the session deadline instead of stale common settings', async () => {
         vi.useFakeTimers(); vi.setSystemTime(NOW);
         openPlayer(new Date(NOW + 600000).toISOString());
