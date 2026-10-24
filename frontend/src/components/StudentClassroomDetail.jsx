@@ -86,13 +86,15 @@ const StudentClassroomDetail = ({ classroom }) => {
     }, [isLoading, activeMainTab, activeSubTab, unseenAssignmentsList, unseenResultsList, user?.userId]);
 
     const activeAssignments = assignments.filter(a => {
-        if (a.completed) return false; 
+        if (a.completed && !a.ongoingSessionId) return false;
         const availableUntil = parseServerDate(a.availableUntil);
-        if (availableUntil && availableUntil.getTime() <= currentTime) return false;
+        if (availableUntil && availableUntil.getTime() <= currentTime && !(a.ongoingSessionId && a.allowLateSubmission)) return false;
         return true;
     });
 
     const completedAssignments = assignments.filter(a => {
+        const until = parseServerDate(a.availableUntil);
+        if (a.ongoingSessionId && (!until || until.getTime() > currentTime || a.allowLateSubmission)) return false;
         if (a.completed) return true; 
         const availableUntil = parseServerDate(a.availableUntil);
         if (availableUntil && availableUntil.getTime() <= currentTime) return true; 
@@ -199,13 +201,14 @@ const StudentClassroomDetail = ({ classroom }) => {
                                                         const isFuture = availableFrom && availableFrom.getTime() > currentTime;
                                                         return (
                                                             <Button 
-                                                                aria-label={`${isFuture ? 'Még nem elérhető' : 'Indítás'}: ${a.title}`}
+                                                                aria-label={`${isFuture ? 'Még nem elérhető' : a.ongoingSessionId ? 'Folytatás' : 'Indítás'}: ${a.title}`}
                                                                 variant={isFuture ? "secondary" : "primary"} 
                                                                 className="w-100 fw-bold shadow-sm" 
                                                                 disabled={isFuture}
-                                                                onClick={() => navigate(`/assignment/${a.assignmentId}/start`, { state: { assignmentDetails: a } })}
+                                                                onClick={() => a.ongoingSessionId ? navigate(`/assignment/session/${a.ongoingSessionId}/play`)
+                                                                    : navigate(`/assignment/${a.assignmentId}/start`, { state: { assignmentDetails: a } })}
                                                             >
-                                                                {isFuture ? 'Még nem elérhető' : 'Indítás'}
+                                                                {isFuture ? 'Még nem elérhető' : a.ongoingSessionId ? 'Folytatás' : 'Indítás'}
                                                             </Button>
                                                         );
                                                     })()}

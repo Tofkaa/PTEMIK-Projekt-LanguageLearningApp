@@ -73,4 +73,24 @@ describe('scheduled classroom assignment', () => {
 
         expect(screen.getByRole('button', { name: 'Indítás: TimeZoneTest' })).toBeEnabled();
     });
+
+    it.each([false, true])('keeps an ongoing late-enabled attempt visible after the deadline (previous completion=%s)', async completed => {
+        vi.setSystemTime(start + 120000);
+        assignmentApi.getClassroomAssignments.mockResolvedValue({data:[{
+            assignmentId:'assignment',title:'Late test',completed,attemptsUsed: completed ? 1 : 0,
+            availableUntil:new Date(start+60000).toISOString(),allowLateSubmission:true,ongoingSessionId:'ongoing',
+        }]});
+        await openClassroom();
+        expect(screen.getByRole('button',{name:'Folytatás: Late test'})).toBeEnabled();
+    });
+
+    it('does not offer a new late attempt when there is no ongoing session', async () => {
+        vi.setSystemTime(start+120000);
+        assignmentApi.getClassroomAssignments.mockResolvedValue({data:[{
+            assignmentId:'assignment',title:'Expired test',completed:false,attemptsUsed:0,
+            availableUntil:new Date(start+60000).toISOString(),allowLateSubmission:true,
+        }]});
+        await openClassroom();
+        expect(screen.queryByRole('button',{name:'Indítás: Expired test'})).not.toBeInTheDocument();
+    });
 });
