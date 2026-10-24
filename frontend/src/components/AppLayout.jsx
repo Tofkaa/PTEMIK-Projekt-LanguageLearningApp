@@ -28,7 +28,7 @@ const pageTitles = [
 ];
 
 /** Keep route changes discoverable without stealing focus on in-page updates. */
-export default function AppLayout({ navigation, children }) {
+export default function AppLayout({ navigation, children, footer }) {
     const { pathname } = useLocation();
     const mainRef = useRef(null);
     const shellRef = useRef(null);
@@ -77,5 +77,6 @@ export default function AppLayout({ navigation, children }) {
         <main id="main-content" ref={mainRef} tabIndex={-1} aria-label="Fő tartalom">
             {children}
         </main>
+        {footer}
     </div>;
 }

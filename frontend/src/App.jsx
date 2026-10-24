@@ -20,6 +20,7 @@ import AssignmentSubmissions from './pages/AssignmentSubmissions.jsx';
 import AdminRoute from './components/AdminRoute.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import GlobalErrorToast from './components/GlobalErrorToast.jsx';
+import AccessibilityFooter from './components/AccessibilityFooter.jsx';
 import VocabularyHub from './pages/VocabularyHub.jsx';
 import VocabularyPractice from './pages/VocabularyPractice.jsx';
 import FlashcardPractice from './pages/FlashcardPractice.jsx';
@@ -74,7 +75,7 @@ function App() {
         <AuthProvider>
             <NotificationProvider>
                 <Router>
-                    <AppLayout navigation={<NavigationBar />}>
+                    <AppLayout navigation={<NavigationBar />} footer={<AccessibilityFooter />}>
                     <VerificationBanner />
                     <GlobalErrorToast />
                     <Routes>

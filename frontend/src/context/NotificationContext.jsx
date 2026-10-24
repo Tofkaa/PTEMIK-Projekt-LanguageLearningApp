@@ -51,8 +51,13 @@ export const NotificationProvider = ({ children }) => {
     const { user } = useAuth();
     const userId = user?.userId;
 
-    const [notifications, setNotifications] = useState(EMPTY_NOTIFICATIONS);
+    const [notificationState, setNotificationState] = useState({ userId: null, data: EMPTY_NOTIFICATIONS });
+    const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(() => {
+        try { return localStorage.getItem('notificationAutoRefresh') !== 'paused'; }
+        catch { return true; }
+    });
     const requestCounterRef = useRef(0);
+    const invalidateRequests = useCallback(() => { requestCounterRef.current += 1; }, []);
 
     /**
      * Manuális és automatikus frissítést indító függvény
@@ -73,20 +78,23 @@ export const NotificationProvider = ({ children }) => {
 
             const data = response.data;
             pruneViewedStore(userId, data);
-            setNotifications(mapSummaryData(data));
+            setNotificationState({ userId, data: mapSummaryData(data) });
+            return true;
         } catch (error) {
             if (error.response?.status !== 403) {
                 console.error("Értesítések lekérése sikertelen", error);
             }
+            return false;
         }
     }, [userId]);
 
     useEffect(() => {
-        if (!userId) return;
+        if (!userId || !autoRefreshEnabled) return;
 
         let isMounted = true;
 
         const loadInitialData = async () => {
+            if (!isMounted) return;
             const currentToken = localStorage.getItem('token') || sessionStorage.getItem('token');
             if (!currentToken || currentToken === 'null') return;
 
@@ -100,7 +108,7 @@ export const NotificationProvider = ({ children }) => {
                 if (isMounted && requestId === requestCounterRef.current) {
                     const data = response.data;
                     pruneViewedStore(userId, data);
-                    setNotifications(mapSummaryData(data));
+                    setNotificationState({ userId, data: mapSummaryData(data) });
                 }
             } catch (error) {
                 if (error.response?.status !== 403) {
@@ -137,18 +145,23 @@ export const NotificationProvider = ({ children }) => {
 
         return () => {
             isMounted = false;
-            requestCounterRef.current++;
+            invalidateRequests();
             if (eventSource) eventSource.close();
             clearInterval(intervalId);
             window.removeEventListener('focus', handleFocus);
-            setNotifications(EMPTY_NOTIFICATIONS);
         };
-    }, [userId]);
+    }, [userId, autoRefreshEnabled, invalidateRequests]);
 
-    const activeNotifications = user ? notifications : EMPTY_NOTIFICATIONS;
+    const setAutomaticRefresh = enabled => {
+        setAutoRefreshEnabled(enabled);
+        try { localStorage.setItem('notificationAutoRefresh', enabled ? 'enabled' : 'paused'); }
+        catch { /* The setting still applies to this page when browser storage is unavailable. */ }
+    };
+    const activeNotifications = user && notificationState.userId === userId ? notificationState.data : EMPTY_NOTIFICATIONS;
 
     return (
-        <NotificationContext.Provider value={{ notifications: activeNotifications, refreshNotifications: fetchSummary }}>
+        <NotificationContext.Provider value={{ notifications: activeNotifications, refreshNotifications: fetchSummary,
+            autoRefreshEnabled, setAutomaticRefresh }}>
             {children}
         </NotificationContext.Provider>
     );
