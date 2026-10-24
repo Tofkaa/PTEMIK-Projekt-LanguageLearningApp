@@ -26,7 +26,7 @@ class AssignmentTimeContractTest {
 
             AssignmentResponse response = new AssignmentResponse(null, "TimeZoneTest", null, false,
                     null, request.getAvailableFrom(), null, 0, false, false, false, false,
-                    false, false, null, 0, false);
+                    false, false, null, 0, false, null);
             var json = mapper.readTree(mapper.writeValueAsString(response));
             assertEquals("2026-10-16T16:00:00Z", json.get("availableFrom").asString());
             assertTrue(json.get("availableUntil").isNull());

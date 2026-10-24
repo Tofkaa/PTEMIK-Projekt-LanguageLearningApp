@@ -104,7 +104,7 @@ class AssignmentServiceTest {
         // Arrange
         // Adunk az assignment-nek 5 feladatot, de a beállítás szerint egy diák csak 2-t kaphat!
         List<Exercise> allExercises = new ArrayList<>();
-        for(int i=0; i<5; i++) allExercises.add(new Exercise());
+        for(int i=0; i<5; i++) { Exercise exercise = new Exercise(); exercise.setExerciseId(UUID.randomUUID()); allExercises.add(exercise); }
 
         assignment.setExercises(allExercises);
         assignment.setGenerationMode("RANDOM_SUBSET");

@@ -101,7 +101,7 @@ api.interceptors.response.use(
                 if ([400, 401, 403].includes(refreshError.response?.status)) {
                     clearTokens();
                     window.location.href = '/login';
-                } else {
+                } else if (!originalRequest.skipGlobalError) {
                     // A temporary transport/server failure does not invalidate the session.
                     // Keep the current page mounted so users can retry without losing their input.
                     window.dispatchEvent(new CustomEvent('api-error', {
@@ -115,7 +115,7 @@ api.interceptors.response.use(
         }
         
         // --- GLOBÁLIS HIBAKEZELÉS ---
-        if (!originalRequest.url.includes('/auth/login')) {
+        if (!originalRequest.skipGlobalError && !originalRequest.url.includes('/auth/login')) {
             let errorMsg = 'Ismeretlen hiba történt.';
             
             if (!error.response) {

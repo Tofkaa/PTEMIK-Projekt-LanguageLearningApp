@@ -81,7 +81,8 @@ const AssignmentStart = () => {
                                 <h2 className="h5 fw-bold">Figyelem! Ez egy szigorú teszt.</h2>
                                 <p className="mb-0">
                                     Amint rányomsz az indításra, az időmérés megkezdődik. 
-                                    Ne frissíts rá az oldalra, és ne zárd be az ablakot, amíg nem küldted be a válaszaidat!
+                                    A válaszaid automatikusan mentődnek. Újratöltés után a szerveren mentett állapotból folytathatod;
+                                    az idő közben tovább telik. Bezárás előtt várd meg a mentés visszaigazolását.
                                 </p>
                             </Alert>
                         ) : (

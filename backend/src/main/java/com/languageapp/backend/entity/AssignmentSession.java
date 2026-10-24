@@ -47,6 +47,14 @@ public class AssignmentSession {
     @Column(name = "raw_answers", columnDefinition = "TEXT")
     private String rawAnswers;
 
+    @Column(columnDefinition = "TEXT")
+    private String allocatedExerciseIds;
+    @Column(columnDefinition = "TEXT")
+    private String draftState;
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long draftRevision;
+    private Instant draftSavedAt;
+
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean timingInitialized;
     private Integer effectiveTimeLimitMinutes;

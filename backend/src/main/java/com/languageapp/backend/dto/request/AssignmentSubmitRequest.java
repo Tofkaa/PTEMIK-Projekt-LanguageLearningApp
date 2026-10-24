@@ -16,4 +16,7 @@ public class AssignmentSubmitRequest {
     @NotNull(message = "The list of answers cannot be null")
     @Valid
     private List<ExerciseSubmission> answers;
+
+    @NotNull(message = "A mentési verzió kötelező")
+    private Long revision;
 }

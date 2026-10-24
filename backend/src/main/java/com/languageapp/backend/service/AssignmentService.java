@@ -211,17 +211,7 @@ public class AssignmentService {
 
         initializeTiming(session);
 
-        List<Exercise> exercises = new ArrayList<>(assignment.getExercises());
-
-        // Anti-Cheat Engine: Shuffle and Subset allocation
-        if (assignment.isRandomized() || "RANDOM_SUBSET".equals(assignment.getGenerationMode())) {
-            java.util.Collections.shuffle(exercises);
-        }
-
-        if ("RANDOM_SUBSET".equals(assignment.getGenerationMode()) && assignment.getQuestionCount() != null && assignment.getQuestionCount() > 0) {
-            int limit = Math.min(assignment.getQuestionCount(), exercises.size());
-            exercises = exercises.subList(0, limit);
-        }
+        List<Exercise> exercises = sessionExercises(session);
 
         return new AssignmentStartResponse(
                 session.getSessionId(),
@@ -257,26 +247,21 @@ public class AssignmentService {
             throw new BadRequestException("Unauthorized access to session.");
         }
 
-        if (session.getFinishedAt() != null) {
-            throw new BadRequestException("Assignment already submitted.");
-        }
-
-        // JAVÍTÁS: Kivettük a szigorú 'throw new BadRequestException'-t!
-        // Ha a diák késve küldi be (vagy beragadt egy lejárt tesztbe),
-        // a rendszer csak logol, de feldolgozza és LEZÁRJA a tesztet, hogy ne ragadjon be örökre.
+        // A lost HTTP response may cause a deliberate retry. Never evaluate twice.
+        if (session.getFinishedAt() != null) return;
+        requireAcceptedMember(session.getAssignment(), session.getUser().getUserId());
         initializeTiming(session);
-        Instant deadline = timingResponse(session).deadline();
-        if (deadline != null) {
-            if (clock.instant().isAfter(deadline.plus(2, ChronoUnit.MINUTES))) {
-                log.warn("Late submission for user {}. Accepting to prevent session lock.", email);
-            }
-        }
+        sessionExercises(session);
+        if (finishExpired(session)) return;
+        checkRevision(session, request.getRevision());
+        finishSession(session, request.getAnswers(), clock.instant());
+    }
 
-        List<Exercise> assignmentExercises = session.getAssignment().getExercises();
+    private void finishSession(AssignmentSession session, List<ExerciseSubmission> submitted, Instant finishedAt) {
+        List<Exercise> assignmentExercises = sessionExercises(session);
         List<MistakeDTO> mistakes = new ArrayList<>();
-
-        // Biztonságos null-ellenőrzés
-        List<ExerciseSubmission> rawAnswers = request.getAnswers() != null ? request.getAnswers() : new ArrayList<>();
+        List<ExerciseSubmission> rawAnswers = submitted != null ? submitted : List.of();
+        validateAnswers(assignmentExercises, rawAnswers);
 
         LessonSubmitRequest dummyRequest = new LessonSubmitRequest();
         dummyRequest.setAnswers(rawAnswers);
@@ -291,43 +276,16 @@ public class AssignmentService {
         // Dinamikus feladatszámítás
         int totalExercises = assignmentExercises.size();
 
-        if ("RANDOM_SUBSET".equals(session.getAssignment().getGenerationMode())
-                && session.getAssignment().getQuestionCount() != null
-                && session.getAssignment().getQuestionCount() > 0) {
-            totalExercises = Math.min(session.getAssignment().getQuestionCount(), assignmentExercises.size());
-        }
-
         int correctCount = details.getCorrectCount();
         int finalScore = totalExercises == 0 ? 0 : (int) Math.round(((double) correctCount / totalExercises) * 100);
 
-        session.setFinishedAt(clock.instant());
+        session.setFinishedAt(finishedAt);
         session.setFinalScore(finalScore);
 
         List<AssignmentSessionResponse.AnswerDetail> detailedAnswers = new ArrayList<>();
 
         // Hogy a tanár lássa a hiányzó kérdéseket is, végigmegyünk a kiosztott feladatokon
         List<Exercise> targetExercises = assignmentExercises;
-        if ("RANDOM_SUBSET".equals(session.getAssignment().getGenerationMode())) {
-            if (rawAnswers.isEmpty() && totalExercises < assignmentExercises.size()) {
-                targetExercises = assignmentExercises.subList(0, totalExercises);
-            } else {
-                List<UUID> submittedIds = rawAnswers.stream().map(ExerciseSubmission::getExerciseId).toList();
-                targetExercises = assignmentExercises.stream()
-                        .filter(e -> submittedIds.contains(e.getExerciseId()))
-                        .toList();
-
-                // Ha kevesebbet küldött be, mint amennyit kellett volna, feltöltjük hiányzókkal
-                if (targetExercises.size() < totalExercises) {
-                    List<Exercise> remaining = assignmentExercises.stream()
-                            .filter(e -> !submittedIds.contains(e.getExerciseId()))
-                            .toList();
-                    List<Exercise> modifiableTarget = new ArrayList<>(targetExercises);
-                    int needed = totalExercises - modifiableTarget.size();
-                    modifiableTarget.addAll(remaining.subList(0, Math.min(needed, remaining.size())));
-                    targetExercises = modifiableTarget;
-                }
-            }
-        }
 
         for (Exercise ex : targetExercises) {
             ExerciseSubmission studentSub = rawAnswers.stream()
@@ -388,7 +346,7 @@ public class AssignmentService {
         try {
             session.setRawAnswers(objectMapper.writeValueAsString(detailedAnswers));
         } catch (Exception e) {
-            log.error("Hiba a válaszok JSON-re alakításakor", e);
+            throw new IllegalStateException("A válaszok mentése nem sikerült.", e);
         }
 
         sessionRepository.save(session);
@@ -397,7 +355,134 @@ public class AssignmentService {
         streakService.updateActivity(session.getUser());
 
         log.info("Student {} successfully submitted assignment '{}'. Score: {}%",
-                email, session.getAssignment().getTitle(), finalScore);
+                session.getUser().getEmail(), session.getAssignment().getTitle(), finalScore);
+    }
+
+    private AssignmentSession lockedSession(UUID id) {
+        UUID assignmentId = sessionRepository.findAssignmentId(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+        assignmentRepository.findLockedById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
+        return sessionRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+    }
+
+    private void requireStudentSession(AssignmentSession s, String email) {
+        if (!s.getUser().getEmail().equals(email)) throw new BadRequestException("Nincs jogosultságod ehhez a próbálkozáshoz.");
+        requireAcceptedMember(s.getAssignment(), s.getUser().getUserId());
+    }
+
+    /** Persist allocation once. Reloading can never re-roll the subset or its order. */
+    private List<Exercise> sessionExercises(AssignmentSession s) {
+        List<Exercise> pool = s.getAssignment().getExercises();
+        if (s.getAllocatedExerciseIds() == null) {
+            List<Exercise> chosen = new ArrayList<>(pool);
+            if (s.getAssignment().isRandomized() || "RANDOM_SUBSET".equals(s.getAssignment().getGenerationMode())) java.util.Collections.shuffle(chosen);
+            Integer count = s.getAssignment().getQuestionCount();
+            if ("RANDOM_SUBSET".equals(s.getAssignment().getGenerationMode()) && count != null && count > 0)
+                chosen = new ArrayList<>(chosen.subList(0, Math.min(count, chosen.size())));
+            s.setAllocatedExerciseIds(json(chosen.stream().map(Exercise::getExerciseId).toList()));
+            return chosen;
+        }
+        try {
+            List<UUID> ids = objectMapper.readValue(s.getAllocatedExerciseIds(), new TypeReference<List<UUID>>() {});
+            return ids.stream().map(id -> pool.stream().filter(e -> id.equals(e.getExerciseId())).findFirst()
+                    .orElseThrow(() -> new BadRequestException("A kiosztott feladat megváltozott. Kérj segítséget a tanártól."))).toList();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException("Invalid exercise allocation", e); }
+    }
+
+    private String json(Object value) {
+        try { return objectMapper.writeValueAsString(value); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException("A mentés nem sikerült.", e); }
+    }
+
+    private AssignmentDraftRequest draft(AssignmentSession s) {
+        if (s.getDraftState() == null) return null;
+        try { return objectMapper.readValue(s.getDraftState(), AssignmentDraftRequest.class); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException("Invalid saved draft", e); }
+    }
+
+    private void checkRevision(AssignmentSession s, Long revision) {
+        if (revision == null || revision != s.getDraftRevision()) throw new com.languageapp.backend.exception.ConflictException(
+                "A próbálkozás egy másik ablakban megváltozott. Töltsd újra a szerveren mentett állapotot; az itteni nem mentett módosítások nem írják felül azt.");
+    }
+
+    private void validateAnswers(List<Exercise> exercises, List<ExerciseSubmission> answers) {
+        var allowed = exercises.stream().map(Exercise::getExerciseId).collect(java.util.stream.Collectors.toSet());
+        var seen = new java.util.HashSet<UUID>();
+        for (ExerciseSubmission a : answers) {
+            if (a == null || !allowed.contains(a.getExerciseId()) || !seen.add(a.getExerciseId()) || a.getAnswer() == null
+                    || a.getAnswer().toString().length() > 10000) throw new BadRequestException("Érvénytelen vagy ismételt feladatválasz.");
+        }
+    }
+
+    @Transactional
+    public AssignmentRecoveryResponse recoverSession(UUID id, String email) {
+        AssignmentSession s = lockedSession(id);
+        requireStudentSession(s, email);
+        if (s.getFinishedAt() == null) initializeTiming(s);
+        List<Exercise> exercises = s.getFinishedAt() != null && s.getAllocatedExerciseIds() == null
+                ? List.of() : sessionExercises(s);
+        finishExpired(s);
+        var a = s.getAssignment();
+        return new AssignmentRecoveryResponse(new AssignmentStartResponse(id, s.getStartedAt(), s.getEffectiveTimeLimitMinutes(),
+                a.isAllowRetries(), a.isHasFeedback(), exercises, a.getClassroom().getClassroomId(), timingResponse(s)),
+                mapToResponse(a, email), draft(s), s.getDraftRevision(), s.getDraftSavedAt());
+    }
+
+    @Transactional
+    public AssignmentDraftResponse saveDraft(UUID id, AssignmentDraftRequest request, String email) {
+        AssignmentSession s = lockedSession(id);
+        requireStudentSession(s, email);
+        initializeTiming(s);
+        List<Exercise> exercises = sessionExercises(s);
+        if (s.getFinishedAt() != null || finishExpired(s)) return new AssignmentDraftResponse(s.getDraftRevision(), s.getDraftSavedAt(), timingResponse(s));
+        checkRevision(s, request.getRevision());
+        validateAnswers(exercises, request.getAnswers());
+        List<UUID> base = exercises.stream().map(Exercise::getExerciseId).toList();
+        var queue = request.getQueue();
+        if (queue == null || queue.size() < base.size() || queue.size() > base.size() * 2
+                || !queue.subList(0, base.size()).equals(base) || queue.stream().anyMatch(idValue -> !base.contains(idValue))
+                || (!s.getAssignment().isAllowRetries() && queue.size() != base.size())
+                || queue.stream().anyMatch(idValue -> java.util.Collections.frequency(queue, idValue) > 2)
+                || request.getCurrentIndex() < 0 || request.getCurrentIndex() >= queue.size()
+                || request.getCurrentAnswer() == null || request.getCurrentAnswer().length() > 10000)
+            throw new BadRequestException("Érvénytelen folytatási állapot.");
+        String savedState = json(request);
+        Instant acceptedAt = clock.instant();
+        if (finishExpired(s, acceptedAt)) return new AssignmentDraftResponse(s.getDraftRevision(), s.getDraftSavedAt(), timingResponse(s));
+        s.setDraftState(savedState);
+        s.setDraftRevision(s.getDraftRevision() + 1);
+        s.setDraftSavedAt(acceptedAt);
+        return new AssignmentDraftResponse(s.getDraftRevision(), s.getDraftSavedAt(), timingResponse(s));
+    }
+
+    /** Reject late edits, but close using the last snapshot accepted before the deadline. */
+    private boolean finishExpired(AssignmentSession s) {
+        return finishExpired(s, clock.instant());
+    }
+
+    private boolean finishExpired(AssignmentSession s, Instant now) {
+        if (s.getFinishedAt() != null) return true;
+        Instant end = timingResponse(s).deadline();
+        if (s.getAssignment().isAllowLateSubmission() || end == null || now.isBefore(end)) return false;
+        AssignmentDraftRequest saved = draft(s);
+        List<ExerciseSubmission> answers = saved == null ? new ArrayList<>() : new ArrayList<>(saved.getAnswers());
+        if (saved != null && !saved.isReviewing() && !saved.getCurrentAnswer().isBlank()) {
+            UUID current = saved.getQueue().get(saved.getCurrentIndex());
+            boolean retried = answers.stream().anyMatch(a -> a.getExerciseId().equals(current));
+            answers.removeIf(a -> a.getExerciseId().equals(current));
+            ExerciseSubmission answer = new ExerciseSubmission();
+            answer.setExerciseId(current); answer.setAnswer(saved.getCurrentAnswer()); answer.setRetried(retried);
+            answers.add(answer);
+        }
+        finishSession(s, answers, end);
+        return true;
+    }
+
+    @Transactional
+    public void closeExpiredSession(UUID id) {
+        AssignmentSession s = lockedSession(id);
+        if (s.getAllocatedExerciseIds() != null) finishExpired(s);
     }
 
     /**
@@ -539,6 +624,7 @@ public class AssignmentService {
         boolean isCompleted = false;
         int attemptsUsed = 0;
         boolean hasGradedSession = false;
+        UUID ongoingSessionId = null;
         Integer effectiveMinutes = positiveLimit(a.getTimeLimitMinutes());
         Instant effectiveUntil = a.getAvailableUntil();
 
@@ -552,10 +638,13 @@ public class AssignmentService {
                 if (!a.getClassroom().getTeacher().getEmail().equals(email)) {
                     effectiveMinutes = configuredMinutes(a, userOpt.get().getUserId());
                     effectiveUntil = configuredDeadline(a, userOpt.get().getUserId());
-                    Optional<AssignmentSession> ongoing = sessions.stream().filter(s -> s.getFinishedAt() == null && s.isTimingInitialized()).findFirst();
+                    Optional<AssignmentSession> ongoing = sessions.stream().filter(s -> s.getFinishedAt() == null).findFirst();
                     if (ongoing.isPresent()) {
-                        effectiveMinutes = ongoing.get().getEffectiveTimeLimitMinutes();
-                        effectiveUntil = ongoing.get().getEffectiveAvailableUntil();
+                        ongoingSessionId = ongoing.get().getSessionId();
+                        if (ongoing.get().isTimingInitialized()) {
+                            effectiveMinutes = ongoing.get().getEffectiveTimeLimitMinutes();
+                            effectiveUntil = ongoing.get().getEffectiveAvailableUntil();
+                        }
                     }
                 }
             }
@@ -578,7 +667,8 @@ public class AssignmentService {
                 isCompleted,
                 a.getMaxAttempts(),
                 attemptsUsed,
-                hasGradedSession
+                hasGradedSession,
+                ongoingSessionId
         );
     }
 

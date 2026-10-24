@@ -7,7 +7,7 @@ import { assignmentApi } from '../../services/assignmentApi';
 import { formatToLocalInput, formatToUtcForServer } from '../../utils/dateUtils';
 
 vi.mock('../../services/assignmentApi', () => ({ assignmentApi: {
-    getAccommodations: vi.fn(), updateAccommodation: vi.fn(), getSessionTiming: vi.fn(), submitAssignment: vi.fn(),
+    getAccommodations: vi.fn(), updateAccommodation: vi.fn(), getSessionTiming: vi.fn(), submitAssignment: vi.fn(), getSession: vi.fn(), saveDraft: vi.fn(),
 } }));
 vi.mock('../../services/api', () => ({ default: { post: vi.fn() } }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ user: { activeCourseCode: 'en' }, vocabularyMap: {} }) }));
@@ -21,6 +21,7 @@ beforeEach(() => {
     assignmentApi.getAccommodations.mockResolvedValue({ data: [student] });
     assignmentApi.updateAccommodation.mockResolvedValue({});
     assignmentApi.submitAssignment.mockResolvedValue({});
+    assignmentApi.saveDraft.mockImplementation(async (_, draft) => ({ data: { revision: draft.revision + 1, timing: { finished: false } } }));
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -28,14 +29,19 @@ async function selectStudent() {
     render(<AssignmentTimingModal assignment={assignment} onHide={vi.fn()} />);
     fireEvent.change(await screen.findByRole('combobox', { name: 'Tanuló' }), { target: { value: 'student' } });
 }
-function openPlayer(deadline, serverNow = new Date(NOW).toISOString()) {
+async function openPlayer(deadline, serverNow = new Date(NOW).toISOString()) {
     const timing = { deadline, serverNow, allowLateSubmission: false, finished: false, timeLimitMinutes: 10 };
     assignmentApi.getSessionTiming.mockImplementation(async () => ({ data: { ...timing, serverNow: new Date(Date.now()).toISOString() } }));
+    assignmentApi.getSession.mockResolvedValue({ data: { sessionData: { startedAt: new Date(NOW).toISOString(), timing,
+        exercises: [{ exerciseId: 'word', type: 'TRANSLATION', content: { question: 'Fordítsd le: alma', answerLang: 'en' } }] },
+        assignmentDetails: { timeLimitMinutes: 1, test: true, hasFeedback: false, allowRetries: false, allowLateSubmission: false }, revision: 0 } });
+    await act(async () => {
     render(<MemoryRouter initialEntries={[{ pathname: '/assignment/session/session/play', state: {
         sessionData: { sessionId: 'session', startedAt: new Date(NOW).toISOString(), timing, exercises: [
             { exerciseId: 'word', type: 'TRANSLATION', content: { question: 'Fordítsd le: alma', answerLang: 'en' } },
         ] }, assignmentDetails: { timeLimitMinutes: 1, test: true, hasFeedback: false, allowRetries: false, allowLateSubmission: false },
     } }]}><Routes><Route path="/assignment/session/:sessionId/play" element={<AssignmentPlayer />} /></Routes></MemoryRouter>);
+    });
 }
 
 describe('teacher timing editor', () => {
@@ -72,7 +78,7 @@ describe('teacher timing editor', () => {
 describe('authoritative assignment countdown', () => {
     it('does not announce a teacher change for equivalent deadline timestamp formats', async () => {
         vi.useFakeTimers(); vi.setSystemTime(NOW);
-        openPlayer('2026-10-18T12:10:00Z');
+        await openPlayer('2026-10-18T12:10:00Z');
         assignmentApi.getSessionTiming.mockImplementation(async () => ({ data: {
             deadline: '2026-10-18T12:10:00+00:00', serverNow: new Date(Date.now()).toISOString(),
             allowLateSubmission: false, finished: false,
@@ -83,13 +89,13 @@ describe('authoritative assignment countdown', () => {
     });
     it('uses the session deadline instead of stale common settings', async () => {
         vi.useFakeTimers(); vi.setSystemTime(NOW);
-        openPlayer(new Date(NOW + 600000).toISOString());
+        await openPlayer(new Date(NOW + 600000).toISOString());
         await act(async () => vi.advanceTimersByTimeAsync(1000));
         expect(screen.getByRole('timer')).toHaveTextContent('09:59');
     });
     it('rechecks at expiry and applies a just-granted extension without losing the answer', async () => {
         vi.useFakeTimers(); vi.setSystemTime(NOW);
-        openPlayer(new Date(NOW + 2000).toISOString());
+        await openPlayer(new Date(NOW + 2000).toISOString());
         assignmentApi.getSessionTiming.mockImplementation(async () => ({ data: {
             deadline: new Date(NOW + 600000).toISOString(), serverNow: new Date(Date.now()).toISOString(), allowLateSubmission: false,
         } }));
@@ -101,15 +107,15 @@ describe('authoritative assignment countdown', () => {
     });
     it('includes the current typed answer in automatic submission', async () => {
         vi.useFakeTimers(); vi.setSystemTime(NOW);
-        openPlayer(new Date(NOW + 2000).toISOString());
+        await openPlayer(new Date(NOW + 2000).toISOString());
         fireEvent.change(screen.getByRole('textbox', { name: 'Válaszod' }), { target: { value: 'apple' } });
         await act(async () => vi.advanceTimersByTimeAsync(3000));
-        expect(assignmentApi.submitAssignment).toHaveBeenCalledWith('session', [{ exerciseId: 'word', answer: 'apple', isRetry: undefined, retried: false }]);
+        expect(assignmentApi.submitAssignment).toHaveBeenCalledWith('session', [{ exerciseId: 'word', answer: 'apple', isRetry: undefined, retried: false }], expect.any(Number));
         expect(screen.getByRole('heading', { name: 'Sikeres Beküldés!' })).toHaveFocus();
     });
     it('retains answers when server expiry verification is unavailable', async () => {
         vi.useFakeTimers(); vi.setSystemTime(NOW);
-        openPlayer(new Date(NOW + 2000).toISOString());
+        await openPlayer(new Date(NOW + 2000).toISOString());
         assignmentApi.getSessionTiming.mockRejectedValue(new Error('offline'));
         fireEvent.change(screen.getByRole('textbox', { name: 'Válaszod' }), { target: { value: 'apple' } });
         await act(async () => vi.advanceTimersByTimeAsync(3000));
@@ -119,7 +125,7 @@ describe('authoritative assignment countdown', () => {
     });
     it('does not restore a common timer when the authoritative deadline is unlimited', async () => {
         vi.useFakeTimers(); vi.setSystemTime(NOW);
-        openPlayer(null);
+        await openPlayer(null);
         await act(async () => vi.advanceTimersByTimeAsync(61000));
         expect(screen.queryByRole('timer')).not.toBeInTheDocument();
         expect(assignmentApi.submitAssignment).not.toHaveBeenCalled();

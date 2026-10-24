@@ -17,6 +17,9 @@ import java.util.UUID;
 @Repository
 public interface AssignmentSessionRepository extends JpaRepository<AssignmentSession, UUID> {
 
+    @Query("SELECT s.sessionId FROM AssignmentSession s WHERE s.finishedAt IS NULL AND s.allocatedExerciseIds IS NOT NULL")
+    List<UUID> findRecoverableOngoingIds();
+
     @Query("SELECT s.assignment.assignmentId FROM AssignmentSession s WHERE s.sessionId = :id")
     Optional<UUID> findAssignmentId(@Param("id") UUID id);
 

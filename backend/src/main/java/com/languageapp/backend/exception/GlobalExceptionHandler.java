@@ -31,6 +31,12 @@ import java.time.Clock;
 public class GlobalExceptionHandler {
     private final Clock clock;
 
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(buildErrorResponse(
+                HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI()));
+    }
+
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleUnsupportedMethod(
             HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {

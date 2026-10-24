@@ -16,6 +16,12 @@ beforeEach(async () => {
 });
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
 
+it('lets a background autosave report its own network error without a duplicate global alert', async () => {
+    api.defaults.adapter = config => reject(config);
+    await expect(api.put('/assignments/sessions/test/draft', {}, { skipGlobalError: true })).rejects.toThrow();
+    expect(browser.dispatchEvent).not.toHaveBeenCalled();
+});
+
 it.each([false, true])('refreshes a short access token without leaving the page (remember=%s)', async remember => {
     const storage = remember ? localStorage : sessionStorage;
     storage.setItem('token', 'old-test-token');

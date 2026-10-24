@@ -42,7 +42,8 @@ public interface ClassroomAssignmentRepository extends JpaRepository<ClassroomAs
             "WHERE cm.user.userId = :userId " +
             "AND cm.status = 'ACCEPTED' " +
             "AND (a.availableFrom IS NULL OR a.availableFrom <= :now) " +
-            "AND (COALESCE(ac.availableUntilOverride, a.availableUntil) IS NULL OR COALESCE(ac.availableUntilOverride, a.availableUntil) > :now)")
+            "AND (COALESCE(ac.availableUntilOverride, a.availableUntil) IS NULL OR COALESCE(ac.availableUntilOverride, a.availableUntil) > :now " +
+            "OR (a.allowLateSubmission = true AND EXISTS (SELECT s.sessionId FROM AssignmentSession s WHERE s.assignment = a AND s.user.userId = :userId AND s.finishedAt IS NULL)))")
     List<ClassroomAssignment> findActiveAssignmentsForStudent(@Param("userId") UUID userId,
                                                            @Param("now") Instant now);
 }

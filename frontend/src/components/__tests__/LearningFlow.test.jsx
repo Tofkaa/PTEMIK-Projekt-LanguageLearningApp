@@ -8,7 +8,7 @@ import api from '../../services/api';
 import { assignmentApi } from '../../services/assignmentApi';
 
 vi.mock('../../services/api', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
-vi.mock('../../services/assignmentApi', () => ({ assignmentApi: { submitAssignment: vi.fn() } }));
+vi.mock('../../services/assignmentApi', () => ({ assignmentApi: { submitAssignment: vi.fn(), getSession: vi.fn(), saveDraft: vi.fn() } }));
 const auth = vi.hoisted(() => ({ user: { xp: 0, streak: 0 }, updateProfile: vi.fn(), vocabularyMap: {} }));
 vi.mock('../../context/AuthContext', () => ({
     useAuth: () => auth,
@@ -34,6 +34,7 @@ beforeEach(() => {
     api.post.mockImplementation(async url => ({ data: url.endsWith('/check')
         ? { correct: true, feedbackMessage: 'Helyes válasz.' } : lessonResult }));
     assignmentApi.submitAssignment.mockResolvedValue({ data: {} });
+    assignmentApi.saveDraft.mockImplementation(async (_, draft) => ({ data: { revision: draft.revision + 1, timing: { finished: false } } }));
 });
 afterEach(() => {
     cleanup();
@@ -49,13 +50,17 @@ async function openLesson() {
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus());
 }
 
-function openAssignment({ feedback = false, items = questions, dictionary = false } = {}) {
+async function openAssignment({ feedback = false, items = questions, dictionary = false } = {}) {
+    assignmentApi.getSession.mockResolvedValue({ data: { sessionData: { exercises: items, classroomId: 'classroom' },
+        assignmentDetails: { hasFeedback: feedback, allowRetries: false, test: true, allowDictionary: dictionary }, revision: 0 } });
+    await act(async () => {
     render(<MemoryRouter initialEntries={[{ pathname: '/assignment/session/example/play', state: {
         sessionData: { exercises: items, classroomId: 'classroom' },
         assignmentDetails: { hasFeedback: feedback, allowRetries: false, test: true, allowDictionary: dictionary },
     } }]}>
         <Routes><Route path="/assignment/session/:sessionId/play" element={<AssignmentPlayer />} /></Routes>
     </MemoryRouter>);
+    });
 }
 
 async function openPractice() {
@@ -230,8 +235,8 @@ describe('lesson focus and feedback', () => {
 });
 
 describe('assignment flow', () => {
-    it.each([true, false])('respects teacher dictionary policy for bilingual hints: %s', dictionary => {
-        openAssignment({ dictionary, items: [{ ...questions[0], content: { ...questions[0].content,
+    it.each([true, false])('respects teacher dictionary policy for bilingual hints: %s', async dictionary => {
+        await openAssignment({ dictionary, items: [{ ...questions[0], content: { ...questions[0].content,
             hint: 'alma = apple', hintDirection: 'hu-to-target', hintParts: [
                 { text: 'alma = ', lang: 'hu' }, { text: 'apple', lang: 'en' },
             ],
@@ -240,14 +245,14 @@ describe('assignment flow', () => {
         else expect(screen.queryByText('apple')).not.toBeInTheDocument();
     });
     it('focuses the next question and summary without revealing test feedback', async () => {
-        openAssignment();
+        await openAssignment();
         expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
         expect(screen.getByRole('progressbar', { name: 'Feladatsor előrehaladása' })).toBeInTheDocument();
         typeAnswer('apple');
         activate('Tovább');
         expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
         expect(screen.getByText('Fordítsd le: körte')).toBeInTheDocument();
-        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        expect(screen.queryByText('Helyes válasz.')).not.toBeInTheDocument();
         typeAnswer('pear');
         activate('Válaszok áttekintése');
         expect(assignmentApi.submitAssignment).not.toHaveBeenCalled();
@@ -259,10 +264,10 @@ describe('assignment flow', () => {
     });
 
     it('announces practice feedback without moving focus', async () => {
-        openAssignment({ feedback: true });
+        await openAssignment({ feedback: true });
         typeAnswer('apple');
         const action = activate('Ellenőrzés');
-        await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Helyes válasz.'));
+        await waitFor(() => expect(screen.getByText('Helyes válasz.').closest('[role="status"]')).toBeInTheDocument());
         expect(action).toHaveFocus();
         activate('Tovább');
         expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
@@ -271,7 +276,7 @@ describe('assignment flow', () => {
     it('retries a failed submission without losing or duplicating answers', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         assignmentApi.submitAssignment.mockRejectedValueOnce(new Error('offline'));
-        openAssignment({ items: [questions[0]] });
+        await openAssignment({ items: [questions[0]] });
         typeAnswer('apple');
         activate('Válaszok áttekintése');
         activate('Végleges beadás');

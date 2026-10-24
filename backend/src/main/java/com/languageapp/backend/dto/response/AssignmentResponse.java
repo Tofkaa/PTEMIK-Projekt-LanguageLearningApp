@@ -32,4 +32,5 @@ public class AssignmentResponse {
 
     @JsonProperty("hasGradedSession")
     private boolean hasGradedSession;
+    private UUID ongoingSessionId;
 }

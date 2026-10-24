@@ -22,6 +22,19 @@ public class AssignmentController {
 
     private final AssignmentService assignmentService;
 
+    @GetMapping("/sessions/{sessionId}")
+    public ResponseEntity<AssignmentRecoveryResponse> recover(@PathVariable UUID sessionId, Authentication auth) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(assignmentService.recoverSession(sessionId, auth.getName()));
+    }
+
+    @PutMapping("/sessions/{sessionId}/draft")
+    public ResponseEntity<AssignmentDraftResponse> saveDraft(@PathVariable UUID sessionId,
+            @Valid @RequestBody com.languageapp.backend.dto.request.AssignmentDraftRequest request, Authentication auth) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(assignmentService.saveDraft(sessionId, request, auth.getName()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<AssignmentResponse> getDetails(@PathVariable UUID id, Authentication auth) {
         return ResponseEntity.ok(assignmentService.getAssignmentDetails(id, auth.getName()));

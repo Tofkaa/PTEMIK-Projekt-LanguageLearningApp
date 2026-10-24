@@ -4,8 +4,8 @@
  * Handles countdown timers, immediate feedback mapping, client-side progression, and final API submission.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Card, Button, ProgressBar, Spinner, Form } from 'react-bootstrap';
 import api from '../services/api';
 import { assignmentApi } from '../services/assignmentApi';
@@ -19,6 +19,7 @@ import TranslationHint from '../components/TranslationHint.jsx';
 import DurationText from '../components/DurationText.jsx';
 import useStageFocus from '../hooks/useStageFocus';
 import AssignmentReview from '../components/AssignmentReview';
+import useAssignmentDraft from '../hooks/useAssignmentDraft';
 
 /**
  * @component
@@ -26,25 +27,54 @@ import AssignmentReview from '../components/AssignmentReview';
  */
 const AssignmentPlayer = () => {
     const { sessionId } = useParams();
-    const navigate = useNavigate();
-    const location = useLocation();
+    return <AssignmentLoader key={sessionId} sessionId={sessionId} />;
+};
 
-    const sessionData = location.state?.sessionData;
-    const details = location.state?.assignmentDetails;
+const AssignmentLoader = ({ sessionId }) => {
+    const [attempt, setAttempt] = useState(null);
+    const [error, setError] = useState('');
+    const [reload, setReload] = useState(0);
+    useEffect(() => {
+        let active = true;
+        assignmentApi.getSession(sessionId).then(({ data }) => {
+            if (active) { setAttempt(data); setError(''); }
+        }).catch(err => {
+            if (active) setError(err.response?.data?.message || 'A próbálkozás betöltése nem sikerült. A szerveren mentett válaszaid megmaradtak.');
+        });
+        return () => { active = false; };
+    }, [sessionId, reload]);
+    if (!attempt || error) return <Container className="py-5">
+        <h1 className="h3">{error ? 'A vizsga nem tölthető be' : 'Vizsga betöltése…'}</h1>
+        <LearningFeedback error={error} />
+        {error && <Button onClick={() => setReload(value => value + 1)}>Betöltés újrapróbálása</Button>}
+    </Container>;
+    return <AssignmentPlayerSession key={`${sessionId}:${reload}`} attempt={attempt} onReload={() => {
+        setAttempt(null); setReload(value => value + 1);
+    }} />;
+};
+
+const AssignmentPlayerSession = ({ attempt, onReload }) => {
+    const { sessionId } = useParams();
+    const navigate = useNavigate();
+    const sessionData = attempt.sessionData;
+    const details = attempt.assignmentDetails;
+    const draft = attempt.draft;
 
     // --- LOGIC FLAGS ---
     const hasFeedback = details?.hasFeedback === true || sessionData?.hasFeedback === true;
     const allowRetries = details?.allowRetries === true || sessionData?.allowRetries === true;
 
     // --- STATE MANAGEMENT ---
-    const [exercises, setExercises] = useState(sessionData?.exercises || []);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [currentAnswer, setCurrentAnswer] = useState('');
-    const [collectedAnswers, setCollectedAnswers] = useState([]);
+    const [exercises, setExercises] = useState(() => draft ? draft.queue.map((id, index) => ({
+        ...sessionData.exercises.find(exercise => exercise.exerciseId === id), isRetry: index >= sessionData.exercises.length,
+    })) : sessionData.exercises);
+    const [currentIndex, setCurrentIndex] = useState(draft?.currentIndex || 0);
+    const [currentAnswer, setCurrentAnswer] = useState(draft?.currentAnswer || '');
+    const [collectedAnswers, setCollectedAnswers] = useState(draft?.answers || []);
     
     const [timeLeft, setTimeLeft] = useState(null);
-    const [showSummary, setShowSummary] = useState(false);
-    const [reviewing, setReviewing] = useState(false);
+    const [showSummary, setShowSummary] = useState(sessionData.timing?.finished === true);
+    const [reviewing, setReviewing] = useState(draft?.reviewing || false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [feedback, setFeedback] = useState(null);
@@ -66,6 +96,23 @@ const AssignmentPlayer = () => {
     const previousDeadline = useRef(parseServerDate(sessionData?.timing?.deadline)?.getTime() ?? null);
     const latestTimingValue = useRef(sessionData?.timing);
     const latestServerTime = useRef(parseServerDate(sessionData?.timing?.serverNow)?.getTime() || 0);
+    const snapshot = useMemo(() => ({ queue: exercises.map(exercise => exercise.exerciseId),
+        answers: collectedAnswers, currentIndex, currentAnswer, reviewing }),
+    [exercises, collectedAnswers, currentIndex, currentAnswer, reviewing]);
+    const initialDraft = useMemo(() => draft ? { queue: draft.queue, answers: draft.answers,
+        currentIndex: draft.currentIndex, currentAnswer: draft.currentAnswer, reviewing: draft.reviewing } : null, [draft]);
+    const finishRecovered = useCallback(() => setShowSummary(true), []);
+    const saving = useAssignmentDraft({ sessionId, snapshot, revision: attempt.revision, initialDraft,
+        enabled: !showSummary && !isSubmitting, onFinished: finishRecovered });
+    const saveStatus = <div className="mb-3">
+        <p role="status" aria-label="Válaszok mentési állapota" aria-live="polite" className="small text-body-secondary mb-1">{saving.status === 'saved'
+            ? 'A válaszaid mentve vannak a szerveren.' : saving.status === 'saving' ? 'Válaszok mentése…'
+                : 'Vannak még nem mentett változtatások.'}</p>
+        <LearningFeedback error={saving.error} />
+        {saving.conflict ? <><p>A szerveres állapot betöltése elveti az itteni nem mentett változtatásokat.</p>
+            <Button variant="outline-info" onClick={onReload}>Szerveren mentett állapot betöltése</Button></>
+            : saving.status === 'error' && <Button variant="outline-info" onClick={() => { void saving.flush(); }}>Mentés újrapróbálása</Button>}
+    </div>;
 
     const readTiming = useCallback(async () => {
         const response = await assignmentApi.getSessionTiming(sessionId);
@@ -92,13 +139,6 @@ const AssignmentPlayer = () => {
         document.addEventListener('visibilitychange', onVisibility);
         return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisibility); };
     }, [sessionData?.timing, showSummary, readTiming]);
-
-    useEffect(() => {
-        if (!sessionData || !details) {
-            alert("A munkamenet megszakadt. Kérlek, indítsd újra a feladatot az osztályteremből!");
-            navigate('/classrooms');
-        }
-    }, [sessionData, details, navigate]);
 
    // --- TIMER ---
     const allowLate = timing ? timing.allowLateSubmission : details?.allowLateSubmission === true;
@@ -141,7 +181,7 @@ const AssignmentPlayer = () => {
      * @function handleCheckOrNext
      */
     const handleCheckOrNext = async () => {
-        if (isChecking || isSubmitting || !currentAnswer.trim()) return;
+        if (isChecking || isSubmitting || saving.conflict || (!allowLate && timeLeft !== null && timeLeft <= 0) || !currentAnswer.trim()) return;
         setCheckError(null);
         
         // 1. Strict test mode (no feedback, no retries) -> Immediate progression
@@ -239,7 +279,7 @@ const AssignmentPlayer = () => {
      * Handles automatic submission when the countdown timer reaches zero.
      */
     const handleAutoSubmit = () => {
-        setTimingNotice('Az idő lejárt. A rendszer beküldi az eddigi válaszaidat.');
+        setTimingNotice('Az idő lejárt. A vizsga a határidőig szerverre mentett válaszokkal zárul.');
         const answers = [...collectedAnswers];
         const current = exercises[currentIndex];
         if (current && currentAnswer.trim()) {
@@ -267,6 +307,8 @@ const AssignmentPlayer = () => {
         setIsSubmitting(true);
         setSubmissionError(null);
         try {
+            const saved = await saving.flush();
+            if (!saved.ok || saved.finished) return;
             const payload = answersToSubmit.map(ans => ({
                 exerciseId: ans.exerciseId,
                 answer: ans.answer,
@@ -274,26 +316,30 @@ const AssignmentPlayer = () => {
                 retried: ans.retried
             }));
 
-            await assignmentApi.submitAssignment(sessionId, payload);
+            await assignmentApi.submitAssignment(sessionId, payload, saved.revision);
 
             setShowSummary(true);
             
            } catch (error) {
             console.error('Nem sikerült beküldeni a tesztet.', error);
-            setSubmissionError('Nem sikerült beküldeni a tesztet. Ellenőrizd a kapcsolatod, majd próbáld újra.');
+            if (error.response?.status === 409) saving.markConflict();
+            setSubmissionError(error.response?.data?.message || 'Nem sikerült beküldeni a tesztet. Ellenőrizd a kapcsolatod, majd próbáld újra.');
         } finally {
             submissionInFlight.current = false;
             setIsSubmitting(false);
         }
     };
 
-    if (!exercises.length) return null;
+    if (!exercises.length && !showSummary) return <Container className="py-5">
+        <LearningFeedback error="Ehhez a próbálkozáshoz nem érhető el feladat. Kérj segítséget a tanártól." />
+    </Container>;
 
     const currentExercise = exercises[currentIndex];
     const progressPercentage = (currentIndex / exercises.length) * 100;
     
     // Disable inputs while verifying or if a definitive feedback is shown
-    const isInputDisabled = isChecking || isSubmitting || !!(hasFeedback && feedback && feedback.type !== 'warning');
+    const expired = !allowLate && timeLeft !== null && timeLeft <= 0;
+    const isInputDisabled = isChecking || isSubmitting || saving.conflict || expired || !!(hasFeedback && feedback && feedback.type !== 'warning');
 
     // --- DYNAMIC BUTTON TEXT ---
     let buttonText = 'Ellenőrzés';
@@ -350,19 +396,20 @@ const AssignmentPlayer = () => {
         const hasEmptyAnswer = exercises.some(exercise => !collectedAnswers.find(answer => answer.exerciseId === exercise.exerciseId)?.answer.trim());
         return <Container className="py-4 text-light">
             <h1 ref={headingRef} tabIndex={-1} className="h2">Válaszok áttekintése</h1>
+            {saveStatus}
             <p>A beadás előtt ellenőrizd a válaszaidat. Bármelyik feladat válaszát javíthatod. Az esetleges időkorlát az áttekintés alatt is érvényes.</p>
             {deadlineMs !== null && timeLeft !== null && <p role="timer" aria-live="off"><DurationText
                 seconds={timeLeft / 1000} overtime={timeLeft < 0} label={timeLeft < 0 ? 'Időtúllépés' : 'Hátralévő idő'} /></p>}
             <div role="status" aria-atomic="true">{timingNotice}</div>
-            <AssignmentReview exercises={exercises} answers={collectedAnswers} submitting={isSubmitting}
+            <AssignmentReview exercises={exercises} answers={collectedAnswers} submitting={isSubmitting || saving.conflict || expired}
                 timingNotice={timingNotice} error={isSubmitting ? null : submissionError || timingError}
                 timeLeft={deadlineMs !== null ? timeLeft : null} onAnswerChange={(exerciseId, answer) => {
-                    if (!isSubmitting) setCollectedAnswers(previous => previous.map(item => item.exerciseId === exerciseId ? { ...item, answer } : item));
+                    if (!isSubmitting && !saving.conflict && !expired) setCollectedAnswers(previous => previous.map(item => item.exerciseId === exerciseId ? { ...item, answer } : item));
                 }} />
             <LearningFeedback error={isSubmitting ? null : submissionError || timingError} />
             {hasEmptyAnswer && <p>Beadás előtt töltsd ki az üresen hagyott válaszokat.</p>}
-            <Button variant="success" aria-disabled={isSubmitting || hasEmptyAnswer} aria-busy={isSubmitting}
-                onClick={() => { if (!isSubmitting && !hasEmptyAnswer) submitAssignment(collectedAnswers); }}>
+            <Button variant="success" aria-disabled={isSubmitting || hasEmptyAnswer || saving.conflict} aria-busy={isSubmitting}
+                onClick={() => { if (!isSubmitting && !hasEmptyAnswer && !saving.conflict) submitAssignment(collectedAnswers); }}>
                 {isSubmitting ? 'Beküldés folyamatban...' : submissionError ? 'Beadás újrapróbálása' : 'Végleges beadás'}
             </Button>
         </Container>;
@@ -372,6 +419,7 @@ const AssignmentPlayer = () => {
     return (
         <div className="min-vh-100 pb-5 text-light d-flex align-items-center">
             <Container>
+                {saveStatus}
                 {/* Header Section */}
                 <div aria-live="polite" aria-atomic="true">{timingNotice}</div>
                 <div className="mb-4">
