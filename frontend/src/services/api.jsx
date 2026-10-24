@@ -98,8 +98,16 @@ api.interceptors.response.use(
 
             } catch (refreshError) {
                 processQueue(refreshError, null);
-                clearTokens();
-                window.location.href = '/login'; 
+                if ([400, 401, 403].includes(refreshError.response?.status)) {
+                    clearTokens();
+                    window.location.href = '/login';
+                } else {
+                    // A temporary transport/server failure does not invalidate the session.
+                    // Keep the current page mounted so users can retry without losing their input.
+                    window.dispatchEvent(new CustomEvent('api-error', {
+                        detail: 'A munkamenet frissítése most nem sikerült. Ellenőrizd a kapcsolatot, majd próbáld újra.',
+                    }));
+                }
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
