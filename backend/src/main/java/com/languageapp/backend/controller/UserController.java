@@ -143,11 +143,10 @@ public class UserController {
 
     @DeleteMapping("/me")
     public ResponseEntity<Void> deleteMyAccount(
-            @RequestBody Map<String, String> body,
+            @RequestBody DeleteAccountRequest request,
             Authentication authentication) {
 
-        String password = body.get("password");
-        userService.deleteAndAnonymizeMyAccount(authentication.getName(), password);
+        userService.deleteAndAnonymizeMyAccount(authentication.getName(), request.getPassword(), request.isConfirmed());
 
         return ResponseEntity.noContent().build();
     }

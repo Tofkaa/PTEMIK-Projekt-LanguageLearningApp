@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -29,6 +30,14 @@ import java.time.Clock;
 @RequiredArgsConstructor
 public class GlobalExceptionHandler {
     private final Clock clock;
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMethod(
+            HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).headers(ex.getHeaders())
+                .body(buildErrorResponse(HttpStatus.METHOD_NOT_ALLOWED,
+                        "Ez a HTTP-művelet itt nem használható.", request.getRequestURI()));
+    }
 
     /** Missing, empty or invalid query parameters are client errors. */
     @ExceptionHandler(MissingServletRequestParameterException.class)

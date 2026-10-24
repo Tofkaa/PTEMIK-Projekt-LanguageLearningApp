@@ -346,7 +346,7 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteAndAnonymizeMyAccount(String email, String confirmationInput) {
+    public void deleteAndAnonymizeMyAccount(String email, String confirmationInput, boolean confirmed) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User nem található."));
 
@@ -354,16 +354,21 @@ public class UserService {
                 && user.getPasswordHash() != null;
 
         if (isLocalWithPassword) {
+            if (!confirmed) {
+                throw new BadRequestException("A fióktörléshez külön meg kell erősítened a törlési szándékodat.");
+            }
             if (confirmationInput == null || !passwordEncoder.matches(confirmationInput, user.getPasswordHash())) {
                 throw new BadRequestException("A megadott jelszó hibás!");
             }
         } else {
-            if (!"TÖRLÉS".equals(confirmationInput)) {
-                throw new BadRequestException("Kérlek, írd be pontosan a 'TÖRLÉS' szót a megerősítéshez!");
-            }
+            throw new BadRequestException("Google- vagy Discord-fiók törléséhez kérj e-mailes jóváhagyó linket a Beállításokban.");
         }
 
+        anonymizeAccount(user);
+    }
 
+    /** Only called after local credentials or an email challenge have been verified. */
+    void anonymizeAccount(User user) {
         friendshipRepository.deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
         refreshTokenRepository.deleteByUserUserId(user.getUserId());
         emailChangeTokenRepository.deleteByUser_UserId(user.getUserId());

@@ -80,6 +80,19 @@ public class EmailService {
         }
     }
 
+    @Async
+    public void sendAccountDeletionConfirmation(String recipient, String token) {
+        // Fragment keeps the secret out of HTTP URLs, referrers and proxy access logs.
+        String url = frontendUrl + "/account-deletion#token=" + token;
+        String body = "<h1>Fióktörlés jóváhagyása</h1>"
+                + "<p>Kérést kaptunk LanguageApp-fiókod végleges megszüntetésére. A link 15 percig érvényes.</p>"
+                + "<p>A link megnyitása nem törli a fiókot. Először áttekintheted a következményeket, majd külön megerősítheted a törlést.</p>"
+                + "<p>A kérést indító böngészőprofilban nyisd meg, és addig ne jelentkezz ki. Új belépés után új link szükséges.</p>"
+                + "<a href='" + url + "' style='display:inline-block;padding:10px 20px;background-color:#0056B3;color:#FFF;text-decoration:underline;border-radius:5px;'>Fióktörlés áttekintése</a>"
+                + "<p>Ha nem te indítottad a kérést, ne hagyd jóvá. A levél figyelmen kívül hagyása nem törli a fiókodat.</p>";
+        sendHtmlEmail(recipient, "Fióktörlés jóváhagyása – LanguageApp", body);
+    }
+
     /** Mailtrap's SMTP 550 throttle uses a ten-second window despite its per-second wording. */
     private void sendWithRateLimitRetry(MimeMessage message) {
         for (int attempt = 1; attempt <= 3; attempt++) {

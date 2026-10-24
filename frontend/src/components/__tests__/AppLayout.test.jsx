@@ -82,6 +82,7 @@ describe('accessible application layout', () => {
     });
     it.each([
         ['/login', 'Bejelentkezés'],
+        ['/account-deletion#token=test-secret', 'Fióktörlés áttekintése'],
         ['/assignment/session/123/play', 'Feladatmegoldás'],
         ['/assignment/123/submissions', 'Beadások értékelése'],
         ['/missing', 'Az oldal nem található'],
@@ -94,6 +95,13 @@ describe('accessible application layout', () => {
         render(<MemoryRouter initialEntries={['/login']}><ExamplePage /></MemoryRouter>);
         fireEvent.click(screen.getByRole('button', { name: 'Gyakorlás' }));
         expect(document.title).toBe('Szókincsgyakorlás | LanguageApp');
+        expect(screen.getByRole('main', { name: 'Fő tartalom' })).toHaveFocus();
+    });
+
+    it('skips to the main content without replacing an approval token fragment', () => {
+        render(<MemoryRouter initialEntries={['/account-deletion#token=test-secret']}><ExamplePage /></MemoryRouter>);
+        const skip = screen.getByRole('link', { name: 'Ugrás a tartalomra' });
+        expect(fireEvent.click(skip)).toBe(false); // Prevent the native #main-content fragment navigation.
         expect(screen.getByRole('main', { name: 'Fő tartalom' })).toHaveFocus();
     });
 

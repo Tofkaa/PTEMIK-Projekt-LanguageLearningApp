@@ -21,7 +21,7 @@ vi.mock('../../context/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('../../context/NotificationContext', () => ({ useNotifications: () => ({ notifications: {} }) }));
 vi.mock('../../context/ThemeContext', () => ({ useTheme: () => ({ theme: 'light' }) }));
 vi.mock('../ThemeToggle', () => ({ default: () => null }));
-vi.mock('../../services/api', () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn() } }));
+vi.mock('../../services/api', () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
 vi.mock('../../services/adminApi', () => ({ adminApi: {
     getAllAchievements: vi.fn(), importAchievements: vi.fn(), toggleAchievementStatus: vi.fn(),
     getAllClassrooms: vi.fn(), toggleClassroomStatus: vi.fn(), getSystemLogs: vi.fn(),
@@ -238,6 +238,94 @@ describe('persistent settings feedback and grading', () => {
         fireEvent.submit(screen.getByRole('button', { name: 'Jelszó frissítése' }).closest('form'));
         expect(screen.getByRole('alert', { name: 'Jelszó: hiba' })).toHaveTextContent('Az új jelszavak nem egyeznek!');
         expect(api.put).not.toHaveBeenCalled();
+    });
+
+    it('retains the requested email and credentials when an expired code is replaced', async () => {
+        sessionStorage.setItem('settingsActiveTab', 'security');
+        api.post.mockImplementation(url => url.endsWith('/verify')
+            ? Promise.reject({ response: { data: { message: 'Az ellenőrző kód lejárt!' } } })
+            : Promise.resolve({ data: {} }));
+        render(<MemoryRouter><Settings /></MemoryRouter>);
+        fireEvent.change(screen.getByLabelText('Új e-mail cím'), { target: { value: 'new@example.test' } });
+        fireEvent.change(screen.getByLabelText('Jelenlegi jelszó (megerősítéshez)'), { target: { value: 'test-only-password' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Ellenőrző kód küldése' }));
+        fireEvent.change(await screen.findByRole('textbox', { name: '6-jegyű ellenőrző kód (OTP)' }), { target: { value: '123456' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Kód megerősítése' }));
+        expect(await screen.findByRole('alert', { name: 'E-mail cím: hiba' })).toHaveTextContent('lejárt');
+        fireEvent.click(screen.getByRole('button', { name: 'Mégse', exact: true }));
+        expect(screen.getByLabelText('Új e-mail cím')).toHaveValue('new@example.test');
+        expect(screen.getByLabelText('Jelenlegi jelszó (megerősítéshez)')).toHaveValue('test-only-password');
+        fireEvent.click(screen.getByRole('button', { name: 'Ellenőrző kód küldése' }));
+        const freshCode = await screen.findByRole('textbox', { name: '6-jegyű ellenőrző kód (OTP)' });
+        expect(freshCode).toHaveValue('');
+        expect(freshCode).toHaveFocus();
+        expect(api.post.mock.calls.filter(([url]) => url.endsWith('/request'))).toHaveLength(2);
+        expect(auth.logout).not.toHaveBeenCalled();
+    });
+
+    it('requires one password and an unchecked deliberate confirmation before account deletion', async () => {
+        sessionStorage.setItem('settingsActiveTab', 'privacy');
+        render(<MemoryRouter><Settings /></MemoryRouter>);
+        const opener = screen.getByRole('button', { name: /Fiók.*törlése/i });
+        opener.focus(); fireEvent.click(opener);
+        const dialog = await screen.findByRole('dialog');
+        const first = within(dialog).getByLabelText('Jelszó', { exact: true });
+        const confirm = within(dialog).getByRole('checkbox', { name: 'Megértettem a fióktörlés következményeit, és kérem a fiókom törlését.' });
+        const finalDelete = within(dialog).getByRole('button', { name: 'Igen, törlöm a fiókom!' });
+        expect(finalDelete).toBeDisabled();
+        expect(confirm).not.toBeChecked();
+        expect(within(dialog).queryByLabelText('Jelszó megerősítése', { exact: true })).not.toBeInTheDocument();
+        expect(first).toHaveAttribute('autocomplete', 'current-password');
+        fireEvent.change(first, { target: { value: 'test-only-password' } });
+        expect(finalDelete).toBeDisabled();
+        expect(within(dialog).queryByRole('button', { name: 'Megerősítő mező kitöltése az első jelszóval' })).not.toBeInTheDocument();
+        fireEvent.click(confirm);
+        expect(finalDelete).toBeEnabled();
+        expect(first).toHaveAttribute('type', 'password');
+        expect(dialog.textContent).not.toContain('test-only-password');
+        expect(api.delete).not.toHaveBeenCalled();
+        expect(api.post).not.toHaveBeenCalled();
+        expect(auth.logout).not.toHaveBeenCalled();
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Mégse', exact: true }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        await waitFor(() => expect(opener).toHaveFocus());
+        fireEvent.click(opener);
+        const reopened = await screen.findByRole('dialog');
+        expect(within(reopened).getByRole('checkbox')).not.toBeChecked();
+        expect(within(reopened).getByLabelText('Jelszó', { exact: true })).toHaveValue('');
+        fireEvent.click(within(reopened).getByRole('button', { name: 'Mégse', exact: true }));
+        await waitFor(() => expect(opener).toHaveFocus());
+    });
+
+    it('keeps the password and confirmation on rejection and sends both only on explicit final submission', async () => {
+        sessionStorage.setItem('settingsActiveTab', 'privacy');
+        api.delete.mockRejectedValueOnce({ response: { data: { message: 'A megadott jelszó hibás!' } } })
+            .mockResolvedValueOnce({});
+        render(<MemoryRouter><Settings /></MemoryRouter>);
+        const opener = screen.getByRole('button', { name: /Fiók.*törlése/i });
+        opener.focus(); fireEvent.click(opener);
+        const dialog = await screen.findByRole('dialog');
+        const password = within(dialog).getByLabelText('Jelszó', { exact: true });
+        const confirmed = within(dialog).getByRole('checkbox');
+        fireEvent.click(confirmed);
+        const submit = within(dialog).getByRole('button', { name: 'Igen, törlöm a fiókom!' });
+        expect(submit).toBeDisabled();
+        fireEvent.change(password, { target: { value: 'test-only-password' } });
+        expect(api.delete).not.toHaveBeenCalled();
+        fireEvent.click(submit);
+        await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveTextContent('A megadott jelszó hibás!'));
+        expect(password).toHaveValue('test-only-password');
+        expect(confirmed).toBeChecked();
+        expect(auth.logout).not.toHaveBeenCalled();
+        fireEvent.change(password, { target: { value: 'corrected-test-password' } });
+        fireEvent.click(submit);
+        await waitFor(() => expect(auth.logout).toHaveBeenCalledExactlyOnceWith(true));
+        expect(api.delete.mock.calls).toEqual([
+            ['/users/me', { data: { password: 'test-only-password', confirmed: true } }],
+            ['/users/me', { data: { password: 'corrected-test-password', confirmed: true } }],
+        ]);
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        await waitFor(() => expect(opener).toHaveFocus());
     });
 
     it('preserves the email-change confirmation on the login screen without a timed redirect', async () => {

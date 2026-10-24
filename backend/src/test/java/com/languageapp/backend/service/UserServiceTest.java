@@ -6,11 +6,14 @@ import com.languageapp.backend.entity.EmailChangeToken;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.DifficultyLevel;
 import com.languageapp.backend.enums.Role;
+import com.languageapp.backend.enums.AuthProvider;
 import com.languageapp.backend.exception.BadRequestException;
 import com.languageapp.backend.repository.CourseRepository;
 import com.languageapp.backend.repository.EmailChangeTokenRepository;
 import com.languageapp.backend.repository.ProgressRepository;
 import com.languageapp.backend.repository.UserRepository;
+import com.languageapp.backend.repository.FriendshipRepository;
+import com.languageapp.backend.repository.RefreshTokenRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -58,10 +61,71 @@ class UserServiceTest {
     @Mock
     private CourseRepository courseRepository; // ÚJ: Mockoljuk a CourseRepository-t
 
+    @Mock private FriendshipRepository friendshipRepository;
+    @Mock private RefreshTokenRepository refreshTokenRepository;
+
     @InjectMocks
     private UserService userService;
 
+    @Test
+    void deletionWithoutConfirmationCannotModifyAccountOrRevokeSessions() {
+        User user = createTestUserWithCourse("local@example.test");
+        user.setAuthProvider(AuthProvider.LOCAL);
+        user.setPasswordHash("stored-hash");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        assertThrows(BadRequestException.class,
+                () -> userService.deleteAndAnonymizeMyAccount(user.getEmail(), "password", false));
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder, friendshipRepository, refreshTokenRepository, emailChangeTokenRepository);
+        assertEquals("local@example.test", user.getEmail());
+    }
+
+    @Test
+    void confirmedDeletionWithWrongPasswordCannotModifyAccount() {
+        User user = createTestUserWithCourse("local@example.test");
+        user.setAuthProvider(AuthProvider.LOCAL);
+        user.setPasswordHash("stored-hash");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "stored-hash")).thenReturn(false);
+        assertThrows(BadRequestException.class,
+                () -> userService.deleteAndAnonymizeMyAccount(user.getEmail(), "wrong", true));
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(friendshipRepository, refreshTokenRepository, emailChangeTokenRepository);
+    }
+
+    @Test
+    void confirmedDeletionVerifiesPasswordOnceAndAnonymizesAccount() {
+        User user = createTestUserWithCourse("local@example.test");
+        user.setAuthProvider(AuthProvider.LOCAL);
+        user.setPasswordHash("stored-hash");
+        user.setActive(true);
+        user.setVerified(true);
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("correct", "stored-hash")).thenReturn(true);
+        userService.deleteAndAnonymizeMyAccount(user.getEmail(), "correct", true);
+        verify(passwordEncoder).matches("correct", "stored-hash");
+        verify(refreshTokenRepository).deleteByUserUserId(user.getUserId());
+        verify(emailChangeTokenRepository).deleteByUser_UserId(user.getUserId());
+        verify(friendshipRepository).deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
+        verify(userRepository).save(user);
+        assertFalse(user.isActive());
+        assertFalse(user.isVerified());
+        assertEquals("DELETED", user.getPasswordHash());
+        assertTrue(user.getEmail().startsWith("deleted_"));
+    }
+
     // Segédmetódus a teszt User létrehozására Course-al
+    @Test
+    void oauthCannotBypassEmailApprovalThroughLegacyDeletionEndpoint() {
+        User user = createTestUserWithCourse("oauth@example.test");
+        user.setAuthProvider(AuthProvider.DISCORD);
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        assertThrows(BadRequestException.class,
+                () -> userService.deleteAndAnonymizeMyAccount(user.getEmail(), "TÖRLÉS", true));
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(friendshipRepository, refreshTokenRepository, emailChangeTokenRepository);
+    }
+
     private User createTestUserWithCourse(String email) {
         User user = new User();
         user.setUserId(UUID.randomUUID());

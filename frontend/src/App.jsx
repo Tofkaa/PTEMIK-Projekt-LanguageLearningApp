@@ -28,6 +28,7 @@ import VerifyEmail from './components/VerifyEmail.jsx';
 import VerifiedRoute from './components/VerifiedRoute.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
+import AccountDeletion from './pages/AccountDeletion.jsx';
 import Settings from './pages/Settings.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import OAuth2RedirectHandler from './components/OAuth2RedirectHandler.jsx';
@@ -85,9 +86,10 @@ function App() {
                         {/* Guest Routes */}
                         <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
                         <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
-                        <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
                         {/* Recovery is authorized by its token, including when a session already exists. */}
                         <Route path="/reset-password" element={<ResetPassword />} />
+                        <Route path="/account-deletion" element={<AccountDeletion />} />
                         <Route path="/terms" element={<Terms />} />
                         <Route path="/privacy" element={<PrivacyPolicy />} />
                         

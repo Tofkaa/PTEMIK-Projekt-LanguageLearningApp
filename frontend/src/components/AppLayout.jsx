@@ -7,6 +7,7 @@ const pageTitles = [
     ['/register', 'Regisztráció'],
     ['/forgot-password', 'Elfelejtett jelszó'],
     ['/reset-password', 'Új jelszó beállítása'],
+    ['/account-deletion', 'Fióktörlés áttekintése'],
     ['/terms', 'Felhasználási feltételek'],
     ['/privacy', 'Adatkezelési tájékoztató'],
     ['/dashboard', 'Áttekintés'],
@@ -70,7 +71,11 @@ export default function AppLayout({ navigation, children, footer }) {
     }, [pathname]);
 
     return <div ref={shellRef}>
-        <a className="skip-link" href="#main-content" onClick={() => mainRef.current?.focus()}>
+        <a className="skip-link" href="#main-content" onClick={event => {
+            // Moving focus must not overwrite a recovery/approval secret in the URL fragment.
+            event.preventDefault();
+            mainRef.current?.focus();
+        }}>
             Ugrás a tartalomra
         </a>
         {navigation}

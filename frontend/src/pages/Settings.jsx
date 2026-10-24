@@ -61,7 +61,7 @@ const Settings = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [deletePassword, setDeletePassword] = useState('');
-    const [deleteConfirmPassword, setDeleteConfirmPassword] = useState('');
+    const [deleteConfirmed, setDeleteConfirmed] = useState(false);
     const [deleteMessage, setDeleteMessage] = useState({ type: '', text: '' });
 
 
@@ -331,25 +331,32 @@ const Settings = () => {
     };
 
     // --- GDPR: SOFT DELETE ---
+    const handleRequestOAuthDeletion = async () => {
+        if (isDeleting) return;
+        setIsDeleting(true);
+        setDeleteMessage({ type: '', text: '' });
+        try {
+            const { data } = await api.post('/users/me/deletion/request');
+            setDeleteMessage({ type: 'info', text: `A jóváhagyó levél küldését elindítottuk a(z) ${data.email} címre. A kézbesítés eltarthat egy ideig. A linket ebben a böngészőprofilban nyisd meg, és addig ne jelentkezz ki.` });
+        } catch (error) {
+            setDeleteMessage({ type: 'danger', text: error.response?.data?.message || 'A jóváhagyó link kérése nem sikerült. Próbáld újra később.' });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
    const handleDeleteAccount = async () => {
         if (isDeleting) return;
-        if (!isOAuthUser) {
-            if (!deletePassword || deletePassword !== deleteConfirmPassword) {
-                setDeleteMessage({ type: 'danger', text: 'A megadott jelszavak nem egyeznek vagy üresek!' });
-                return;
-            }
-        } else {
-            if (deletePassword !== 'TÖRLÉS') {
-                setDeleteMessage({ type: 'danger', text: 'Kérlek, gépeld be pontosan a "TÖRLÉS" szót!' });
-                return;
-            }
+        if (isOAuthUser || !deletePassword || !deleteConfirmed) {
+            setDeleteMessage({ type: 'danger', text: 'Add meg a jelenlegi jelszavadat, és erősítsd meg a törlési szándékodat a jelölőnégyzettel.' });
+            return;
         }
 
         setIsDeleting(true);
         setDeleteMessage({ type: '', text: '' });
 
         try {
-            await api.delete('/users/me', { data: { password: deletePassword } });
+            await api.delete('/users/me', { data: { password: deletePassword, confirmed: deleteConfirmed } });
             setShowDeleteModal(false);
             await logout(true); 
         } catch (error) {
@@ -500,6 +507,7 @@ const Settings = () => {
                                             autoComplete="email"
                                             className="bg-secondary bg-opacity-25 text-light border-secondary"
                                             placeholder="uj.cim@pelda.hu"
+                                            aria-describedby="settings-email-request-help"
                                             value={emailForm.newEmail}
                                             onChange={(e) => setEmailForm({ ...emailForm, newEmail: e.target.value })}
                                             required
@@ -520,6 +528,9 @@ const Settings = () => {
                                         />
                                     </Form.Group>
 
+                                    <p id="settings-email-request-help" className="small text-secondary">
+                                        Az ellenőrző kód a kérés indításától számított 15 percig érvényes. Lejárat után új kódot kérhetsz.
+                                    </p>
                                     <Button 
                                         ref={emailRequestRef}
                                         variant="info" 
@@ -550,7 +561,8 @@ const Settings = () => {
                                             readOnly={isProcessingEmail}
                                         />
                                         <Form.Text id="settings-code-help" className="text-secondary">
-                                            Add meg az új e-mail címre küldött 6 számjegyű kódot.
+                                            Add meg az új e-mail címre küldött 6 számjegyű kódot. A kódot be is másolhatod.
+                                            {' '}Ha lejárt, a Mégse gombbal visszatérhetsz az új kód kéréséhez; a megadott adataid megmaradnak.
                                         </Form.Text>
                                     </Form.Group>
 
@@ -650,7 +662,7 @@ const Settings = () => {
 
                            {/* Legal docs */}
                             <div className="mb-4 pb-4 border-bottom border-secondary">
-                                <h6 className="text-light fw-bold">Jogi dokumentumok</h6>
+                                <h3 className="h6 text-light fw-bold">Jogi dokumentumok</h3>
                                 <p className="text-secondary small mb-3">
                                     Bármikor újraolvashatod a szolgáltatás használatára vonatkozó szabályzatokat.
                                 </p>
@@ -675,7 +687,7 @@ const Settings = () => {
                             </div>
 
                             <div className="mb-5 pb-4 border-bottom border-secondary">
-                                <h6 className="text-light fw-bold">Adataim Letöltése</h6>
+                                <h3 className="h6 text-light fw-bold">Adataim Letöltése</h3>
                                 <p className="text-secondary small">
                                     Kérj egy teljes másolatot a fiókodról, a tanulási előzményeidről és a profiladataidról, amelyeket gépileg olvasható JSON formátumban kapsz meg.
                                 </p>
@@ -690,7 +702,7 @@ const Settings = () => {
                             </div>
 
                             <div>
-                                <h6 className="text-danger fw-bold">Fiók Törlése</h6>
+                                <h3 className="h6 text-danger fw-bold">Fiók Törlése</h3>
                                 <p className="text-secondary small">
                                     A fiókod és a személyes adataid (PII) véglegesen törlésre kerülnek. A tanulási eredményeid név nélkül (anonimizálva) megmaradnak, hogy az osztálytermek és a közösség statisztikái ne sérüljenek. <strong className="text-light">Ez a művelet nem vonható vissza!</strong>
                                 </p>
@@ -699,7 +711,7 @@ const Settings = () => {
                                     className="fw-bold px-4" 
                                     onClick={() => {
                                         setDeletePassword('');
-                                        setDeleteConfirmPassword('');
+                                        setDeleteConfirmed(false);
                                         setDeleteMessage({type:'', text:''});
                                         setShowDeleteModal(true);
                                     }}
@@ -757,15 +769,17 @@ const Settings = () => {
             {/* --- GDPR: ACCOUNT DELETION CONFIRMATION  MODAL --- */}
            <Modal show={showDeleteModal} onHide={() => !isDeleting && setShowDeleteModal(false)} aria-labelledby="account-delete-title" centered backdrop="static" contentClassName="bg-dark text-light border-danger">
                 <Modal.Header closeButton closeLabel="Ablak bezárása" className="border-secondary bg-danger bg-opacity-25">
-                    <Modal.Title id="account-delete-title" className="fw-bold text-danger">⚠️ Fiók Törlése</Modal.Title>
+                    <Modal.Title as="h2" id="account-delete-title" className="h4 fw-bold text-danger"><span aria-hidden="true">⚠️</span> Fiók Törlése</Modal.Title>
                 </Modal.Header>
                 <Modal.Body className="p-4">
-                    <LearningFeedback error={deleteMessage.type === 'danger' ? deleteMessage.text : ''} />
+                    <LearningFeedback error={deleteMessage.type === 'danger' ? deleteMessage.text : ''}
+                        feedback={deleteMessage.type === 'info' ? { type: 'info', msg: deleteMessage.text } : null} />
                     
                     <p className="fs-5">Biztosan törölni szeretnéd a fiókodat?</p>
                     <p className="text-secondary small">
-                        Ez a művelet <strong>VÉGLEGES</strong> és nem vonható vissza! Személyes adataid azonnal törlődnek. 
-                        A folytatáshoz kérlek, erősítsd meg a jelenlegi jelszavaddal.
+                        Ez a művelet <strong>VÉGLEGES</strong> és nem vonható vissza! Fiókod megszűnik, profiladataid anonimizálódnak.
+                        {' '}A korábbi tanulási eredmények törölt felhasználóhoz kapcsolva megmaradhatnak.
+                        {!isOAuthUser && ' A folytatáshoz kérlek, add meg a jelenlegi jelszavadat, és erősítsd meg a törlési szándékodat.'}
                     </p>
                     
                     <Form.Group className="mt-4">
@@ -781,32 +795,19 @@ const Settings = () => {
                                     disabled={isDeleting}
                                     autoComplete="current-password"
                                 />
-                                <Form.Label htmlFor="delete-confirm-password" className="text-light opacity-75 small">Jelszó megerősítése</Form.Label>
-                                <Form.Control 
-                                    id="delete-confirm-password"
-                                    type="password" 
-                                    className="bg-secondary bg-opacity-25 text-light border-danger"
-                                    value={deleteConfirmPassword}
-                                    onChange={(e) => setDeleteConfirmPassword(e.target.value)}
+                                <Form.Check
+                                    id="delete-account-confirmation"
+                                    type="checkbox"
+                                    label="Megértettem a fióktörlés következményeit, és kérem a fiókom törlését."
+                                    checked={deleteConfirmed}
+                                    onChange={(e) => setDeleteConfirmed(e.target.checked)}
                                     disabled={isDeleting}
-                                    autoComplete="current-password"
                                 />
                             </>
                         ) : (
                             <>
-                                <Form.Label htmlFor="delete-oauth-confirmation" className="text-light opacity-75 small">
-                                    Mivel {user.authProvider} fiókkal léptél be, a megerősítéshez gépeld be: <strong className="text-light">TÖRLÉS</strong>
-                                </Form.Label>
-                                <Form.Control 
-                                    id="delete-oauth-confirmation"
-                                    type="text" 
-                                    placeholder="TÖRLÉS"
-                                    className="bg-secondary bg-opacity-25 text-light border-danger text-center fw-bold fs-5"
-                                    value={deletePassword}
-                                    onChange={(e) => setDeletePassword(e.target.value)}
-                                    disabled={isDeleting}
-                                    autoComplete="off"
-                                />
+                                <p>{user.authProvider} fiókodhoz jóváhagyó linket küldünk a már rögzített e-mail-címedre: <strong>{user.email}</strong>.</p>
+                                <p className="small text-secondary">A link 15 percig érvényes. A levél kérése és a link megnyitása még nem töröl fiókot. Ugyanebben a böngészőprofilban megnyitva külön áttekintés, megerősítő jelölőnégyzet és végső törlésgomb következik. Új belépés után új link szükséges.</p>
                             </>
                         )}
                     </Form.Group>
@@ -818,10 +819,10 @@ const Settings = () => {
                     <Button 
                         variant="danger" 
                         className="fw-bold px-4" 
-                        onClick={handleDeleteAccount} 
-                        disabled={isDeleting || (!isOAuthUser ? (!deletePassword || !deleteConfirmPassword) : deletePassword !== 'TÖRLÉS')}
+                        onClick={isOAuthUser ? handleRequestOAuthDeletion : handleDeleteAccount}
+                        disabled={isDeleting || (!isOAuthUser && (!deletePassword || !deleteConfirmed))}
                     >
-                        {isDeleting ? <><Spinner size="sm" className="me-2" />Törlés folyamatban...</> : 'Igen, törlöm a fiókom!'}
+                        {isDeleting ? <><Spinner size="sm" className="me-2" aria-hidden="true" />{isOAuthUser ? 'Kérés folyamatban...' : 'Törlés folyamatban...'}</> : isOAuthUser ? 'Jóváhagyó link kérése' : 'Igen, törlöm a fiókom!'}
                     </Button>
                 </Modal.Footer>
             </Modal>

@@ -93,13 +93,14 @@ class EmailServiceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"verification", "reset", "otp", "security"})
+    @ValueSource(strings = {"verification", "reset", "otp", "security", "deletion"})
     void emailDocumentsHaveHungarianLanguageReadableContentAndFunctionalLinks(String type) throws Exception {
         switch (type) {
             case "verification" -> emailService.sendVerificationEmail("student@example.test", "Teszt Diák", "test-token");
             case "reset" -> emailService.sendPasswordResetEmail("student@example.test", "test-token");
             case "otp" -> emailService.sendEmailChangeOtp("student@example.test", "123456");
             case "security" -> emailService.sendEmailChangeSecurityAlert("student@example.test", "new@example.test");
+            case "deletion" -> emailService.sendAccountDeletionConfirmation("student@example.test", "test-token");
             default -> throw new IllegalArgumentException(type);
         }
         mimeMessage.saveChanges();
@@ -121,6 +122,11 @@ class EmailServiceTest {
             assertTrue(html.contains("123456</div>"));
             assertTrue(html.contains("background-color:#17a2b8;color:#212529"));
             assertTrue(contrast("#17A2B8", "#212529") >= 4.5);
+        } else if (type.equals("deletion")) {
+            assertTrue(html.contains("http://localhost:3000/account-deletion#token=test-token"));
+            assertTrue(html.contains("Fióktörlés áttekintése</a>"));
+            assertTrue(html.contains("15 percig"));
+            assertTrue(contrast("#0056B3", "#FFFFFF") >= 4.5);
         } else {
             assertTrue(html.contains("new@example.test"));
         }
