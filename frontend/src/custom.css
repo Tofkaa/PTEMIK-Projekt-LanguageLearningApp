@@ -110,6 +110,8 @@ body { overflow-wrap: anywhere; }
 .admin-data-table { min-width: 42rem; }
 .leaderboard-table { min-width: 24rem; }
 .classroom-statistics-table { min-width: 40rem; }
+.submission-table { min-width: 42rem; }
+.vocabulary-table { min-width: 36rem; }
 [data-bs-theme] .classroom-heatmap td.bg-success { background-color: #198754 !important; color: #fff !important; }
 [data-bs-theme] .classroom-heatmap td.bg-danger { background-color: #dc3545 !important; color: #fff !important; }
 .custom-dark-tabs .nav-link:not(.active) { color: var(--app-accent-text); }
@@ -245,6 +247,7 @@ body { overflow-wrap: anywhere; }
 }
 
 .toast.global-error-toast {
+    max-width: 40rem;
     --bs-toast-bg: var(--bs-danger-bg-subtle);
     --bs-toast-color: var(--bs-danger-text-emphasis);
     --bs-toast-border-color: var(--bs-danger-border-subtle);

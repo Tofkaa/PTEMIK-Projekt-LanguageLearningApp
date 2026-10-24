@@ -123,21 +123,23 @@ const VocabularyHub = () => {
 
             {/* Vocabulary Table */}
             <Card className="bg-dark border-secondary shadow-lg rounded-4 overflow-hidden">
-                <Table responsive hover variant="dark" className="align-middle mb-0 text-center">
+                <div className="table-responsive" role="region" tabIndex={0} aria-label="Szószedet, görgethető táblázat">
+                <Table hover variant="dark" className="vocabulary-table align-middle mb-0 text-center">
+                    <caption className="visually-hidden">Szószedet, jelentések és ismétlési időpontok</caption>
                     <thead>
                         <tr className="text-secondary text-uppercase fs-7" style={{ letterSpacing: '1px' }}>
-                            <th className="py-3 text-start ps-4">Célszó (Idegen nyelv)</th>
-                            <th className="py-3 text-start">Jelentés (Magyar)</th>
-                            <th className="py-3">SRS Szint</th>
-                            <th className="py-3 pe-4">Következő Ismétlés</th>
+                            <th scope="col" className="py-3 text-start ps-4">Célszó (Idegen nyelv)</th>
+                            <th scope="col" className="py-3 text-start">Jelentés (Magyar)</th>
+                            <th scope="col" className="py-3">SRS Szint</th>
+                            <th scope="col" className="py-3 pe-4">Következő Ismétlés</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredVocabulary.length > 0 ? (
                             filteredVocabulary.map((item, idx) => (
                                 <tr key={idx} className="border-secondary">
-                                    <td className="text-start ps-4 fw-bold app-accent-text">{item.word}</td>
-                                    <td className="text-start text-light opacity-90">{item.translation}</td>
+                                    <th scope="row" lang={user?.activeCourseCode || 'en'} className="text-start ps-4 fw-bold app-accent-text">{item.word}</th>
+                                    <td lang="hu" className="text-start text-light opacity-90">{item.translation}</td>
                                     <td>
                                         <Badge bg={getSrsBadgeVariant(item.srsLevel)} className="px-3 py-2 rounded-pill">
                                             Szint {item.srsLevel}
@@ -157,6 +159,7 @@ const VocabularyHub = () => {
                         )}
                     </tbody>
                 </Table>
+                </div>
             </Card>
         </Container>
     );

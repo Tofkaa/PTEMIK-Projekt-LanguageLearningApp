@@ -39,7 +39,7 @@ const SessionErrorToast = () => {
     };
 
     return (
-        <ToastContainer position="bottom-end" className="p-4" style={{ zIndex: 9999, position: 'fixed' }}>
+        <ToastContainer className="position-static w-100 p-3" hidden={!show}>
             <Toast 
                 ref={toastRef}
                 onClose={close}
@@ -51,10 +51,10 @@ const SessionErrorToast = () => {
                     }
                 }}
                 show={show} 
-                className="global-error-toast shadow-lg rounded-4"
+                className="global-error-toast w-100 mx-auto shadow-lg rounded-4"
             >
                 <Toast.Header closeLabel="Hibaüzenet bezárása" className="rounded-top-4">
-                    <strong className="me-auto">⚠️ Rendszerüzenet</strong>
+                    <strong className="me-auto"><span aria-hidden="true">⚠️ </span>Rendszerüzenet</strong>
                 </Toast.Header>
                 <Toast.Body className="fw-bold">
                     {message}

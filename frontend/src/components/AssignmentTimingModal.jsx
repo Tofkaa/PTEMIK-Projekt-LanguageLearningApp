@@ -51,7 +51,7 @@ export default function AssignmentTimingModal({ assignment, onHide }) {
 
     return <Modal show onHide={() => { if (!saving) onHide(); }} aria-labelledby={`${id}-title`} centered>
         <Modal.Header closeButton closeLabel="Időbeállítások bezárása">
-            <Modal.Title id={`${id}-title`}>Egyéni időbeállítások: {assignment.title}</Modal.Title>
+            <Modal.Title as="h2" className="h4" id={`${id}-title`}>Egyéni időbeállítások: {assignment.title}</Modal.Title>
         </Modal.Header>
         <Form onSubmit={save}>
             <Modal.Body>

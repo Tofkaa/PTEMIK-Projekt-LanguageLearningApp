@@ -218,16 +218,17 @@ const AssignmentSubmissions = () => {
 
             <Card className="bg-dark text-light border-secondary shadow-lg">
                 <Card.Body className="p-0">
-                    <Table hover variant="dark" className="m-0" responsive>
+                    <div className="table-responsive" role="region" tabIndex={0} aria-label="Beadások, görgethető táblázat">
+                    <Table hover variant="dark" className="submission-table m-0">
                         <caption className="visually-hidden">Beadások, pontszámok és értékelési műveletek</caption>
                         <thead className="border-secondary">
                             <tr>
-                                <th>Diák Neve</th>
-                                <th>Beküldve</th>
-                                <th className="text-center">Automata Pont</th>
-                                <th className="text-center">Tanári Pont</th>
-                                <th className="text-center">Státusz</th>
-                                <th className="text-end">Művelet</th>
+                                <th scope="col">Diák Neve</th>
+                                <th scope="col">Beküldve</th>
+                                <th scope="col" className="text-center">Automata Pont</th>
+                                <th scope="col" className="text-center">Tanári Pont</th>
+                                <th scope="col" className="text-center">Státusz</th>
+                                <th scope="col" className="text-end">Művelet</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -239,10 +240,10 @@ const AssignmentSubmissions = () => {
 
                                     return (
                                         <tr key={session.sessionId} className="align-middle">
-                                            <td>
+                                            <th scope="row" className="fw-normal">
                                                 <div className="fw-bold">{session.studentName}</div>
                                                 <div className="small text-secondary">{session.studentEmail}</div>
-                                            </td>
+                                            </th>
                                             <td>
                                                 <div>{formatToLocalDisplay(session.finishedAt)}</div>
                                                 {lateString && (
@@ -273,6 +274,7 @@ const AssignmentSubmissions = () => {
                             )}
                         </tbody>
                     </Table>
+                    </div>
                 </Card.Body>
             </Card>
 

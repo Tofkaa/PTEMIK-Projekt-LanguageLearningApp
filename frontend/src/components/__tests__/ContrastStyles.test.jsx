@@ -1,11 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import AchievementsSection from '../profile/AchievementSection';
 import RecentResultsSection from '../profile/RecentResultsSection';
 import api from '../../services/api';
 import NavigationBar from '../NavigationBar';
+import GlobalErrorToast from '../GlobalErrorToast';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../services/api', () => ({ default: { get: vi.fn() } }));
@@ -185,6 +186,21 @@ describe.each(['light', 'dark'])('%s theme colour regressions', theme => {
             <td className="bg-danger text-light"><div>20%</div></td>
         </tr></tbody></table>);
         for (const score of ['90%', '20%']) expect(textContrast(screen.getByText(score))).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('keeps persistent errors in document flow instead of covering subsequent controls', async () => {
+        surface(<><GlobalErrorToast /><button>Folytatás</button></>);
+        const continueButton = screen.getByRole('button', { name: 'Folytatás' });
+        continueButton.focus();
+        act(() => window.dispatchEvent(new CustomEvent('api-error', { detail: 'Nem sikerült betölteni az adatokat.' })));
+        const alert = await screen.findByRole('alert');
+        await waitFor(() => expect(alert).toHaveClass('show'));
+        expect(continueButton).toHaveFocus();
+        expect(getComputedStyle(alert.parentElement).position).toBe('static');
+        expect(getComputedStyle(alert).maxWidth).toBe('40rem');
+        const body = alert.querySelector('.toast-body');
+        // Bootstrap's entering toast is transparent; measure after that transition finishes.
+        await waitFor(() => expect(textContrast(body)).toBeGreaterThanOrEqual(4.5));
     });
 
     it('keeps recent-result dates readable on their actual translucent card surface', async () => {

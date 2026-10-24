@@ -779,7 +779,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
                 centered 
             >
                 <Modal.Header closeButton closeLabel="Ablak bezárása">
-                    <Modal.Title id="assignment-builder-title" className="fw-bold app-accent-text">Feladat / Tananyag Összeállítása</Modal.Title>
+                    <Modal.Title as="h2" id="assignment-builder-title" className="h4 fw-bold app-accent-text">Feladat / Tananyag Összeállítása</Modal.Title>
                 </Modal.Header>
                 <Form onSubmit={handleAssignmentSubmit}>
                     <Modal.Body>
@@ -938,7 +938,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
 
                             {/* RIGHT: SUMMARY */}
                             <Col lg={4} className="border-start">
-                                <h6 className="fw-bold text-success mb-3">Kiválasztott tartalom ({selectedExercisesData.length} db)</h6>
+                                <h3 className="h6 fw-bold text-success mb-3">Kiválasztott tartalom ({selectedExercisesData.length} db)</h3>
                                 <div style={{ maxHeight: '450px', overflowY: 'auto' }} className="pe-2 custom-scrollbar">
                                     {selectedExercisesData.length === 0 ? <p className="small opacity-75">Még nem választottál feladatot.</p> : (
                                         <ListGroup variant="flush">
