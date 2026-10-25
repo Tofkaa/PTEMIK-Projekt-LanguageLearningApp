@@ -475,9 +475,9 @@ const Settings = () => {
                                     <Form.Label className="fw-bold text-light opacity-75">Célzott Nehézség</Form.Label>
                                     <Form.Select className="border-secondary p-2" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
                                         <option value="DYNAMIC">🔵 Dinamikus (DYNAMIC) - Nehézség a teljesítményed alapján</option>
-                                        <option value="EASY">🟢 Kezdő (EASY) - Több kártyás feladat</option>
-                                        <option value="MEDIUM">🟡 Haladó (MEDIUM) - Vegyes feladatok</option>
-                                        <option value="HARD">🔴 Profi (HARD) - Csak gépelés</option>
+                                        <option value="EASY">Kezdő (EASY) – Kezdő szintű feladatok</option>
+                                        <option value="MEDIUM">Haladó (MEDIUM) – Haladó szintű feladatok</option>
+                                        <option value="HARD">Profi (HARD) – Profi szintű feladatok</option>
                                     </Form.Select>
                                 </Form.Group>
                                 <Button variant="info" type="submit" className="fw-bold text-dark" aria-disabled={isUpdatingDiff || difficulty === user.preferredDifficulty} aria-busy={isUpdatingDiff}>

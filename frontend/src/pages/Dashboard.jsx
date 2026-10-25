@@ -5,6 +5,8 @@ import api from '../services/api.jsx';
 import { useNavigate } from 'react-router-dom';
 import Leaderboard from '../components/Leaderboard.jsx';
 import TutorialTour from '../components/TutorialTour.jsx';
+import LessonMastery from '../components/LessonMastery.jsx';
+import { getMasteryRecommendation, LEVEL_NAMES } from '../utils/mastery';
 
 /**
  * Dashboard Component
@@ -14,6 +16,7 @@ import TutorialTour from '../components/TutorialTour.jsx';
 const Dashboard = () => {
     // --- CONTEXT & ROUTING ---
     const { user } = useAuth();
+    const hasUser = Boolean(user);
     const navigate = useNavigate();
 
     // --- LOCAL STATE ---
@@ -37,18 +40,38 @@ const Dashboard = () => {
     let heroState = null;
 
     if (!isLoading && !error && totalLessonsCount > 0) {
-        const nextLesson = lessons.find(lesson => !lesson.completed);
+        const playable = lessons.filter(lesson => !lesson.availableDifficulties || lesson.availableDifficulties.includes(lesson.difficulty));
+        const nextLesson = playable.find(lesson => !lesson.completed);
+        const mastery = getMasteryRecommendation(lessons);
 
-        if (!nextLesson && completedLessonsCount > 0) {
-            // Everything completed
-            const randomLesson = lessons[Math.floor(Math.random() * totalLessonsCount)];
+        if (completedLessonsCount === totalLessonsCount && mastery) {
             heroState = {
-                type: 'ALL_DONE',
-                title: 'Minden elérhető leckét teljesítettél!',
-                titleIcon: '🎉',
-                subtitle: 'Fantasztikus munka! Frissítsd fel a tudásod egy korábbi lecke ismétlésével.',
-                lesson: randomLesson,
-                buttonText: 'Tudás felfrissítése',
+                type: 'MASTERY',
+                title: mastery.remaining === 1 ? 'Már csak egy csillag hiányzik ebből a leckéből!' : 'Gyűjtsd össze a hiányzó csillagokat!',
+                titleIcon: '⭐',
+                subtitle: `${mastery.lesson.title} – szerezd meg a ${LEVEL_NAMES[mastery.difficulty].toLocaleLowerCase('hu')} szint csillagát!`,
+                lesson: mastery.lesson,
+                replayDifficulty: mastery.difficulty,
+                buttonText: 'Következő csillag',
+                buttonVariant: 'info',
+                borderColor: 'border-info',
+            };
+        } else if (completedLessonsCount === totalLessonsCount && completedLessonsCount > 0
+            && (playable.length > 0 || lessons.some(lesson => lesson.availableDifficulties?.length))) {
+            // Everything completed
+            const practiceLesson = playable[0] || lessons.find(lesson => lesson.availableDifficulties?.length);
+            const allMastered = lessons.every(lesson => !lesson.availableDifficulties?.length || lesson.mastered)
+                && lessons.some(lesson => lesson.mastered);
+            heroState = {
+                type: allMastered ? 'ALL_MASTERED' : 'ALL_DONE',
+                title: allMastered ? 'Minden csillagot megszereztél!' : 'Minden elérhető leckét teljesítettél!',
+                titleIcon: allMastered ? '🏆' : '🎉',
+                subtitle: allMastered ? 'A kurzus minden elérhető szintjét sikeresen teljesítetted. A megszerzett csillagaid megmaradnak: gyakorolj kedvedre!'
+                    : 'Fantasztikus munka! Frissítsd fel a tudásod egy korábbi lecke ismétlésével.',
+                lesson: practiceLesson,
+                replayDifficulty: allMastered ? (practiceLesson.availableDifficulties.includes(practiceLesson.difficulty)
+                    ? practiceLesson.difficulty : practiceLesson.availableDifficulties[0]) : undefined,
+                buttonText: allMastered ? 'Szabad gyakorlás' : 'Tudás felfrissítése',
                 buttonIcon: '🔄',
                 buttonVariant: 'warning',
                 borderColor: 'border-warning'
@@ -88,6 +111,7 @@ const Dashboard = () => {
     useEffect(() => {
         const fetchLessons = async () => {
             setIsLoading(true);
+            setError('');
             try {
                 const response = await api.get('/lessons');
                 setLessons(response.data);
@@ -99,12 +123,12 @@ const Dashboard = () => {
             }
         };
 
-        if (user) {
+        if (hasUser) {
             fetchLessons();
         }
         
     
-    }, [user?.activeCourseCode]);
+    }, [hasUser, user?.activeCourseCode, user?.preferredDifficulty]);
 
     // --- DATA TRANSFORMATION ---
     const groupedLessons = lessons.reduce((acc, lesson) => {
@@ -121,9 +145,9 @@ const Dashboard = () => {
      */
     const getDifficultyBadge = (difficulty) => {
         switch (difficulty) {
-            case 'HARD': return <Badge bg="danger" pill>HARD</Badge>;
-            case 'MEDIUM': return <Badge bg="warning" text="dark" pill>MEDIUM</Badge>;
-            case 'EASY': return <Badge bg="success" pill>EASY</Badge>;
+            case 'HARD': return <Badge bg="danger" pill><span aria-hidden="true">HARD</span><span className="visually-hidden">Profi</span></Badge>;
+            case 'MEDIUM': return <Badge bg="warning" text="dark" pill><span aria-hidden="true">MEDIUM</span><span className="visually-hidden">Haladó</span></Badge>;
+            case 'EASY': return <Badge bg="success" pill><span aria-hidden="true">EASY</span><span className="visually-hidden">Kezdő</span></Badge>;
             default: return <Badge bg="primary" pill>{difficulty}</Badge>;
         }
     };
@@ -152,7 +176,7 @@ const Dashboard = () => {
                             {/* HERO WIDGET */}
                             {heroState && (
                                 <Card 
-                                    className={`tour-hero-widget border-2 ${heroState.borderColor} bg-dark rounded-4`}
+                                    className={`tour-hero-widget border-2 ${heroState.borderColor} bg-dark rounded-4${heroState.type === 'MASTERY' || heroState.type === 'ALL_MASTERED' ? ' mastery-hero' : ''}`}
                                     style={{ boxShadow: heroState.glow || 'none' }}
                                 >
                                     <Card.Body className="d-flex flex-column flex-md-row flex-wrap gap-3 align-items-md-center justify-content-between p-4 p-md-5">
@@ -167,8 +191,8 @@ const Dashboard = () => {
                                                 variant={heroState.buttonVariant} 
                                                 size="lg" 
                                                 className="px-5 py-3 rounded-pill fw-bold shadow-sm"
-                                                aria-label={`${heroState.buttonText}: ${heroState.lesson.title}`}
-                                                onClick={() => navigate(`/lesson/${heroState.lesson.lessonId}`)}
+                                                aria-label={`${heroState.buttonText}: ${heroState.lesson.title}${heroState.replayDifficulty ? `, ${LEVEL_NAMES[heroState.replayDifficulty]} szint` : ''}`}
+                                                onClick={() => navigate(`/lesson/${heroState.lesson.lessonId}${heroState.replayDifficulty ? `?difficulty=${heroState.replayDifficulty}` : ''}`)}
                                             >
                                                 {heroState.buttonText} <span aria-hidden="true">{heroState.buttonIcon}</span>
                                             </Button>
@@ -183,6 +207,13 @@ const Dashboard = () => {
                                     <h2 className="h4 tour-learning-path fw-bold border-bottom border-secondary pb-3 mb-4 d-flex align-items-center gap-2">
                                         <span aria-hidden="true">📚</span> Tanulási Útvonal
                                     </h2>
+                                    <details className="mastery-guide">
+                                        <summary>Hogyan működnek a csillagok?</summary>
+                                        <p>A csillagok balról jobbra a Kezdő, Haladó és Profi szintet jelölik.
+                                            A sikeres teljesítés számít a masterybe, nem kell hibátlanul megoldanod a leckét.
+                                            Az első teljesítésért szintenként jár XP; a kézzel választott ismétlés nem változtatja a dinamikus ajánlást.
+                                            Minden elérhető szint teljesítésével leckemasteryt, a témakör összes leckéjével témakörmasteryt szerezhetsz.</p>
+                                    </details>
 
                                     {/* UI State: Loading */}
                                     {isLoading && (
@@ -202,6 +233,10 @@ const Dashboard = () => {
                                                     <h3 className="app-accent-text fw-bold mb-3 px-1 text-uppercase tracking-wide small">
                                                         {topicName}
                                                     </h3>
+                                                    {topicLessons.some(lesson => lesson.availableDifficulties?.length) && <p className="small px-1">
+                                                        {topicLessons.every(lesson => lesson.topicMastered) ? <Badge bg="success"><span aria-hidden="true">🏆 </span>Témakörmastery</Badge>
+                                                            : `Mastery: ${topicLessons.filter(lesson => lesson.mastered).length} / ${topicLessons.filter(lesson => lesson.availableDifficulties?.length).length} lecke`}
+                                                    </p>}
                                                     <Row className="g-3">
                                                         {topicLessons.map((lesson) => (
                                                             <Col md={6} key={lesson.lessonId}> 
@@ -220,18 +255,24 @@ const Dashboard = () => {
                                                                         </Card.Text>
                                                                         
                                                                         <div className="d-flex justify-content-between align-items-center mt-auto pt-3 border-top border-secondary border-opacity-25">
-                                                                            {lesson.completedDifficulty ? getDifficultyBadge(lesson.completedDifficulty) : <Badge bg="secondary" pill>Nincs elkezdve</Badge>}
+                                                                            <span className="small">Következő szint: {getDifficultyBadge(lesson.difficulty)}</span>
                                                                             <Button
                                                                                 variant={lesson.completed ? "outline-success" : "info"} 
                                                                                 size="sm" 
                                                                                 className="rounded-pill px-4 fw-bold"
                                                                                 aria-label={`${lesson.completed ? 'Ismétlés' : 'Indítás'}: ${lesson.title}`}
                                                                                 aria-describedby={`lesson-description-${lesson.lessonId}`}
+                                                                                disabled={lesson.availableDifficulties && !lesson.availableDifficulties.includes(lesson.difficulty)}
                                                                                 onClick={() => navigate(`/lesson/${lesson.lessonId}`)}
                                                                             > 
                                                                                 {lesson.completed ? 'Ismétlés' : 'Indítás'}
                                                                             </Button>
                                                                         </div>
+                                                                        {lesson.availableDifficulties && !lesson.availableDifficulties.includes(lesson.difficulty) && <p className="small mt-2 mb-0">
+                                                                            A beállított szinten nincs feladat. Válassz másik nehézséget a beállításokban{lesson.completed ? ', vagy az alábbi ismétlésnél' : ''}.
+                                                                        </p>}
+                                                                        <LessonMastery key={`${lesson.lessonId}-${lesson.completedDifficulties?.join('-')}`} lesson={lesson}
+                                                                            onReplay={level => navigate(`/lesson/${lesson.lessonId}?difficulty=${level}`)} />
                                                                     </Card.Body>
                                                                 </Card>
                                                             </Col>

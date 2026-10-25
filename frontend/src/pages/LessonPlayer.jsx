@@ -43,6 +43,8 @@ const LessonPlayer = () => {
 
     const [searchParams] = useSearchParams();
     const challengeId = searchParams.get('challengeId');
+    const replayDifficulty = searchParams.get('difficulty');
+    const [attempt, setAttempt] = useState(null);
     
     // --- STATE MANAGEMENT ---
     const [exercises, setExercises] = useState([]);
@@ -71,28 +73,33 @@ const LessonPlayer = () => {
    
     // --- PHASE 1: DATA FETCHING ---
     useEffect(() => {
+        let cancelled = false;
         const fetchExercises = async () => {
             try {
-                const endpoint = challengeId 
-                    ? `/lessons/${lessonId}/exercises?challengeId=${challengeId}` 
-                    : `/lessons/${lessonId}/exercises`;
-                const response = await api.get(endpoint);
-                if (response.data.length === 0) {
+                const params = new URLSearchParams();
+                if (challengeId) params.set('challengeId', challengeId);
+                if (replayDifficulty) params.set('difficulty', replayDifficulty);
+                const response = await api.post(`/lessons/${lessonId}/attempts${params.size ? `?${params}` : ''}`);
+                if (cancelled) return;
+                if (response.data.exercises.length === 0) {
                     setError('Ehhez a leckéhez nem található feladat.');
                 } else {
-                    setExercises(response.data);
+                    setAttempt(response.data);
+                    setExercises(response.data.exercises);
                     setStartTime(Date.now());
                 }
             } catch (err) {
+                if (cancelled) return;
                 console.error("Error fetching exercises:", err);
                 setError('Nem sikerült betölteni a feladatokat.');
             } finally {
-                setIsLoading(false);
+                if (!cancelled) setIsLoading(false);
             }
         };
 
         fetchExercises();
-    }, [challengeId, lessonId]);
+        return () => { cancelled = true; };
+    }, [challengeId, lessonId, replayDifficulty]);
 
     useEffect(() => {
         let timer;
@@ -130,7 +137,7 @@ const LessonPlayer = () => {
             if (currentExercise.type === 'TRANSLATION') {
                 // CASE #1: Translation (typing!!) -> Call backend (typo handling ect.)
                 try {
-                    const response = await api.post(`/exercises/${currentExercise.exerciseId}/check`, {
+                    const response = await api.post(`/lessons/${lessonId}/attempts/${attempt.attemptId}/exercises/${currentExercise.exerciseId}/check`, {
                         answer: currentAnswer.trim()
                     });
 
@@ -211,6 +218,7 @@ const LessonPlayer = () => {
         setIsSubmitting(true);
         setSubmissionError(null);
         const payload = {
+            attemptId: attempt.attemptId,
             timeTakenSeconds: elapsedTime,
             answers: finalAnswers
         };
@@ -274,6 +282,10 @@ const LessonPlayer = () => {
                     </div>
                     <h1 ref={headingRef} tabIndex={-1} className="fw-bold display-5 mb-2">{isPassed ? 'Sikeres Lecke!' : 'Gyakorolj még egy kicsit!'}</h1>
                     <p className="text-light opacity-75 fs-5 fst-italic">"{lessonResult.feedback}"</p>
+                    {(lessonResult.lessonMastered || lessonResult.topicMastered) && <div className="border border-success rounded p-3 mt-3">
+                        <h2 className="h4">{lessonResult.topicMastered ? 'Témakörmastery teljesítve!' : 'Leckemastery teljesítve!'}</h2>
+                        <p className="mb-0">Minden elérhető nehézségi szintet sikeresen teljesítettél {lessonResult.topicMastered ? 'ebben a témakörben' : 'ebben a leckében'}.</p>
+                    </div>}
                 </div>
 
                 {(lessonResult.isLevelUp || lessonResult.levelUp) && (
@@ -559,6 +571,10 @@ const LessonPlayer = () => {
         <div className="min-vh-100 pb-5 text-light d-flex align-items-center">
             <Container>
                 {/* Progress Bar Header */}
+                {attempt && <p className="small text-body-secondary">
+                    {attempt.manualPractice ? 'Kézzel választott ismétlés' : 'A lecke szintje'}: {attempt.difficulty}.
+                    {attempt.manualPractice && ' A dinamikus ajánlásod változatlan marad.'}
+                </p>}
                 <div className="mb-4">
                     <div className="d-flex justify-content-between align-items-center mb-2 fw-bold text-light opacity-75 small">
                         <span style={{ width: '60px' }}><span aria-hidden="true">{currentIndex + 1} / {exercises.length}</span><span lang="hu" className="visually-hidden">{currentIndex + 1}. feladat, összesen {exercises.length}.</span></span>
@@ -607,4 +623,8 @@ const LessonPlayer = () => {
     );
 };
 
-export default LessonPlayer;
+export default function LessonPlayerRoute() {
+    const { id } = useParams();
+    const [params] = useSearchParams();
+    return <LessonPlayer key={`${id}-${params.get('challengeId') || ''}-${params.get('difficulty') || ''}`} />;
+}

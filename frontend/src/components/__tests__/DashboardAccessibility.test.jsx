@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from '../../pages/Dashboard';
 import NavigationBar from '../NavigationBar';
@@ -28,11 +28,53 @@ afterEach(cleanup);
 function openDashboard() {
     render(<MemoryRouter initialEntries={['/dashboard']}><Routes>
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/lesson/:id" element={<h1>Leckelejátszó</h1>} />
+        <Route path="/lesson/:id" element={<LessonDestination />} />
     </Routes></MemoryRouter>);
 }
 
+function LessonDestination() {
+    const { search } = useLocation();
+    return <><h1>Leckelejátszó</h1><p>{search}</p></>;
+}
+
 describe('dashboard screen reader context', () => {
+    it('provides one shared, initially collapsed explanation instead of repeating the rules on cards', async () => {
+        api.get.mockResolvedValue({ data: lessons.map(lesson => ({ ...lesson, difficulty: 'MEDIUM',
+            availableDifficulties: ['EASY', 'MEDIUM', 'HARD'], completedDifficulties: lesson.completed ? ['EASY'] : [] })) });
+        openDashboard();
+        await screen.findByRole('button', { name: 'Folytatás: Ételek' });
+        const explanation = screen.getByText('Hogyan működnek a csillagok?').closest('details');
+        expect(explanation).not.toHaveAttribute('open');
+        expect(screen.getAllByText(/Az első teljesítésért szintenként jár XP/)).toHaveLength(1);
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    });
+    it('recommends a missing star with an explicit replay level instead of repeating the profile level', async () => {
+        api.get.mockResolvedValue({ data: [{ ...lessons[0], difficulty: 'MEDIUM',
+            availableDifficulties: ['EASY', 'MEDIUM', 'HARD'], completedDifficulties: ['EASY', 'MEDIUM'] }] });
+        openDashboard();
+        const action = await screen.findByRole('button', { name: 'Következő csillag: Bemutatkozás, Profi szint' });
+        expect(screen.getByRole('heading', { name: 'Már csak egy csillag hiányzik ebből a leckéből!' })).toBeInTheDocument();
+        fireEvent.click(action);
+        expect(screen.getByText('?difficulty=HARD')).toBeInTheDocument();
+    });
+
+    it('prioritises a new lesson over mastery replays', async () => {
+        api.get.mockResolvedValue({ data: lessons.map(lesson => ({ ...lesson, difficulty: 'MEDIUM',
+            availableDifficulties: ['EASY', 'MEDIUM', 'HARD'], completedDifficulties: lesson.completed ? ['EASY'] : [] })) });
+        openDashboard();
+        expect(await screen.findByRole('button', { name: 'Folytatás: Ételek' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /^Következő csillag/ })).not.toBeInTheDocument();
+    });
+
+    it('celebrates a fully mastered course and offers replay even when the profile level is unavailable', async () => {
+        api.get.mockResolvedValue({ data: [{ ...lessons[0], difficulty: 'HARD', mastered: true,
+            availableDifficulties: ['EASY', 'MEDIUM'], completedDifficulties: ['EASY', 'MEDIUM'] }] });
+        openDashboard();
+        const action = await screen.findByRole('button', { name: 'Szabad gyakorlás: Bemutatkozás, Kezdő szint' });
+        expect(screen.getByRole('heading', { name: 'Minden csillagot megszereztél!' })).toBeInTheDocument();
+        fireEvent.click(action);
+        expect(screen.getByText('?difficulty=EASY')).toBeInTheDocument();
+    });
     it('includes each lesson title and description when its action receives focus', async () => {
         openDashboard();
         const start = await screen.findByRole('button', { name: 'Indítás: Ételek' });

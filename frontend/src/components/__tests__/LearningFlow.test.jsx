@@ -31,7 +31,7 @@ beforeEach(() => {
     vi.resetAllMocks();
     api.get.mockImplementation(async url => ({ data: url.startsWith('/lessons/') ? questions
         : url === '/vocabulary/practice/generate' ? practice : { xp: 20, streak: 1 } }));
-    api.post.mockImplementation(async url => ({ data: url.endsWith('/check')
+    api.post.mockImplementation(async url => ({ data: /\/attempts(?:\?|$)/.test(url) ? { attemptId: 'attempt', difficulty: 'EASY', exercises: questions } : url.endsWith('/check')
         ? { correct: true, feedbackMessage: 'Helyes válasz.' } : lessonResult }));
     assignmentApi.submitAssignment.mockResolvedValue({ data: {} });
     assignmentApi.saveDraft.mockImplementation(async (_, draft) => ({ data: { revision: draft.revision + 1, timing: { finished: false } } }));
@@ -48,6 +48,7 @@ async function openLesson() {
     </MemoryRouter>);
     await screen.findByRole('textbox', { name: 'Válaszod' });
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus());
+    api.post.mockClear();
 }
 
 async function openAssignment({ feedback = false, items = questions, dictionary = false } = {}) {
@@ -83,10 +84,17 @@ function activate(name) {
 }
 
 describe('lesson focus and feedback', () => {
+    it('starts a server-owned replay at the explicitly chosen level', async () => {
+        render(<MemoryRouter initialEntries={['/lesson/example?difficulty=MEDIUM']}>
+            <Routes><Route path="/lesson/:id" element={<LessonPlayer />} /></Routes>
+        </MemoryRouter>);
+        await screen.findByRole('textbox', { name: 'Válaszod' });
+        expect(api.post).toHaveBeenCalledWith('/lessons/example/attempts?difficulty=MEDIUM');
+    });
     it('focuses the Hungarian task type before a separately focusable foreign question', async () => {
-        api.get.mockResolvedValueOnce({ data: [{ exerciseId: 'choice', type: 'MULTIPLE_CHOICE', content: {
+        api.post.mockResolvedValueOnce({ data: { attemptId: 'attempt', exercises: [{ exerciseId: 'choice', type: 'MULTIPLE_CHOICE', content: {
             question: 'What color is a ripe banana?', questionLang: 'en', answerLang: 'en', options: ['Yellow', 'Red'],
-        } }] });
+        } }] } });
         render(<MemoryRouter initialEntries={['/lesson/example']}>
             <Routes><Route path="/lesson/:id" element={<LessonPlayer />} /></Routes>
         </MemoryRouter>);
@@ -114,11 +122,11 @@ describe('lesson focus and feedback', () => {
         expect(api.post).not.toHaveBeenCalled();
     });
     it('renders explicit bilingual hint segments in the lesson', async () => {
-        api.get.mockResolvedValueOnce({ data: [{ ...questions[0], content: { ...questions[0].content,
+        api.post.mockResolvedValueOnce({ data: { attemptId: 'attempt', exercises: [{ ...questions[0], content: { ...questions[0].content,
             hint: 'alma = apple', hintDirection: 'hu-to-target', hintParts: [
                 { text: 'alma = ', lang: 'hu' }, { text: 'apple', lang: 'en' },
             ],
-        } }] });
+        } }] } });
         await openLesson();
         const instruction = screen.getByRole('heading', { level: 1 });
         expect(instruction).toHaveFocus();
@@ -137,10 +145,10 @@ describe('lesson focus and feedback', () => {
     });
     it('retains question segments and answer languages in the final mistake review', async () => {
         const question = "How do you say 'Anya'?";
-        api.get.mockResolvedValueOnce({ data: [{ exerciseId: 'mixed', type: 'TRANSLATION', content: {
+        api.post.mockResolvedValueOnce({ data: { attemptId: 'attempt', exercises: [{ exerciseId: 'mixed', type: 'TRANSLATION', content: {
             question, questionLang: 'en', answerLang: 'en',
             questionParts: [{ text: 'How do you say ', lang: 'en' }, { text: "'Anya'", lang: 'hu' }, { text: '?', lang: 'en' }],
-        } }] });
+        } }] } });
         api.post.mockImplementation(async (url, payload) => ({ data: url.endsWith('/check')
             ? { correct: payload.answer === 'Mother', feedbackMessage: payload.answer === 'Mother' ? 'Helyes válasz.' : 'Helytelen válasz.' }
             : { ...lessonResult, passed: false, correctAnswersCount: 0, totalQuestionsCount: 1, mistakes: [
@@ -217,7 +225,7 @@ describe('lesson focus and feedback', () => {
 
     it('offers retry with the same collected answers after a save failure', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
-        api.get.mockResolvedValueOnce({ data: [questions[0]] });
+        api.post.mockResolvedValueOnce({ data: { attemptId: 'attempt', exercises: [questions[0]] } });
         await openLesson();
         typeAnswer('apple');
         activate('Ellenőrzés');
