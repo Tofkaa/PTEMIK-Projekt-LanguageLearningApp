@@ -30,6 +30,8 @@ public class AchievementService {
     private final AchievementRepository achievementRepository;
     private final UserAchievementRepository userAchievementRepository;
     private final ProgressRepository progressRepository;
+    private final MasteryService masteryService;
+    private final UserRepository userRepository;
 
     // Dependencies for social and engagement achievements
     private final FriendshipService friendshipService;
@@ -45,9 +47,13 @@ public class AchievementService {
      */
     @Transactional
     public void checkAndAwardAchievements(User user, int currentLessonScore) {
+        // Vocabulary practice can trigger achievements too: all award paths share this user lock.
+        userRepository.findForLearningUpdate(user.getUserId())
+                .orElseThrow(() -> new com.languageapp.backend.exception.ResourceNotFoundException("User not found"));
         List<Achievement> allAchievements = achievementRepository.findAll();
 
         for (Achievement achievement : allAchievements) {
+            if (!achievement.isActive()) continue;
             // OPTIMIZATION: Check if the user already has this trophy to prevent redundant processing
             if (userAchievementRepository
                     .existsByUserUserIdAndAchievementAchievementId(
@@ -82,11 +88,16 @@ public class AchievementService {
 
         try {
             // Helper metric: Total successfully completed lessons
-            long completedCount = progressRepository.findAll().stream()
-                    .filter(p -> p.getUser().getUserId().equals(user.getUserId()) && p.getIsCompleted())
+            long completedCount = progressRepository.findByUserUserId(user.getUserId()).stream()
+                    .filter(p -> Boolean.TRUE.equals(p.getIsCompleted()))
+                    .map(p -> p.getLesson().getLessonId()).distinct()
                     .count();
 
             switch (type) {
+                case "LESSON_MASTERY":
+                    return masteryService.countMastered(user, false) >= Integer.parseInt(String.valueOf(criteria.get("target")));
+                case "TOPIC_MASTERY":
+                    return masteryService.countMastered(user, true) >= Integer.parseInt(String.valueOf(criteria.get("target")));
                 case "FIRST_LESSON":
                     return completedCount >= 1;
 
@@ -148,9 +159,18 @@ public class AchievementService {
      * @param userId The UUID of the authenticated user.
      * @return List of {@link AchievementResponse} DTOs.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<AchievementResponse> getUserAchievements(UUID userId) {
+        // Reconcile new mastery trophies with historical passes under the same lock as lesson submissions.
+        User user = userRepository.findForLearningUpdate(userId)
+                .orElseThrow(() -> new com.languageapp.backend.exception.ResourceNotFoundException("User not found"));
         List<Achievement> allAchievements = achievementRepository.findAll();
+        for (Achievement achievement : allAchievements) {
+            Object type = achievement.getCriteria() == null ? null : achievement.getCriteria().get("type");
+            if (achievement.isActive() && ("LESSON_MASTERY".equals(type) || "TOPIC_MASTERY".equals(type))
+                    && !userAchievementRepository.existsByUserUserIdAndAchievementAchievementId(userId, achievement.getAchievementId())
+                    && isEligible(user, achievement, 0)) awardAchievement(user, achievement);
+        }
         List<UserAchievement> userAchievements = userAchievementRepository.findByUserUserId(userId);
 
         return allAchievements.stream().map(ach -> {

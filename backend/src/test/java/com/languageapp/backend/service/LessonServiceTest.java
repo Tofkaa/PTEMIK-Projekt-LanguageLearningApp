@@ -97,9 +97,6 @@ class LessonServiceTest {
         challenge.setLesson(lesson);
         challenge.setTargetDifficulty("EASY"); // Beállítjuk a kihívás nehézségét
 
-        // Mockok: a normál szűrés helyett a Challenge szintet használja
-        when(userDifficultyCalculator.determineTargetDifficulty(any())).thenReturn("EASY");
-
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
         when(lessonRepository.findById(lesson.getLessonId())).thenReturn(Optional.of(lesson));
         when(challengeRepository.findById(challengeId)).thenReturn(Optional.of(challenge));
@@ -121,9 +118,6 @@ class LessonServiceTest {
         challenge.setChallenger(otherChallenger);
         challenge.setOpponent(otherOpponent);
         challenge.setLesson(lesson);
-
-        // A kalkulátor hívása kötelező a service-ben
-        when(userDifficultyCalculator.determineTargetDifficulty(any())).thenReturn("EASY");
 
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
         when(lessonRepository.findById(lesson.getLessonId())).thenReturn(Optional.of(lesson));

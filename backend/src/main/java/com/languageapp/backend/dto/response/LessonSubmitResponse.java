@@ -2,6 +2,8 @@ package com.languageapp.backend.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import java.util.List;
 import java.util.UUID;
@@ -13,6 +15,8 @@ import java.util.UUID;
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class LessonSubmitResponse {
     private UUID resultId;
     private int score; // Percentage (0-100)
@@ -26,4 +30,7 @@ public class LessonSubmitResponse {
     private String newDifficulty;
     private boolean isLevelUp;
     private boolean isLevelDown;
+    private boolean manualPractice;
+    private boolean lessonMastered;
+    private boolean topicMastered;
 }

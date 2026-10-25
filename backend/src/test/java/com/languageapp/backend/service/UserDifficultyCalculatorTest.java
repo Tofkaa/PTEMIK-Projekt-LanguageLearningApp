@@ -53,11 +53,28 @@ class UserDifficultyCalculatorTest {
 
     @Test
     void determineTargetDifficulty_NoHistoryInCourse_ReturnsEasy() {
-        when(resultRepository.findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdOrderBySubmittedAtDesc(
+        when(resultRepository.findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseAndManualPracticeFalseAndIsTestResultFalseOrderBySubmittedAtDesc(
                 eq(user.getUserId()), eq(course.getCourseId()))).thenReturn(List.of());
 
         String diff = calculator.determineTargetDifficulty(user);
 
         assertEquals("EASY", diff, "Előzmények nélkül az adott kurzuson az alapértelmezett szint az EASY.");
+    }
+
+    @Test void dynamicPromotionWaitsForThreeNormalAttempts() {
+        Result result = new Result(); result.setScore(100); result.setDifficulty("EASY");
+        when(resultRepository.findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseAndManualPracticeFalseAndIsTestResultFalseOrderBySubmittedAtDesc(user.getUserId(), course.getCourseId()))
+                .thenReturn(List.of(result));
+        when(resultRepository.countByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseAndManualPracticeFalseAndIsTestResultFalse(user.getUserId(), course.getCourseId()))
+                .thenReturn(2L, 3L);
+        assertEquals("EASY", calculator.determineTargetDifficulty(user));
+        assertEquals("MEDIUM", calculator.determineTargetDifficulty(user));
+    }
+
+    @Test void dynamicDifficultyCanStepDownAfterWeakPerformance() {
+        Result result = new Result(); result.setScore(40); result.setDifficulty("MEDIUM");
+        when(resultRepository.findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseAndManualPracticeFalseAndIsTestResultFalseOrderBySubmittedAtDesc(user.getUserId(), course.getCourseId()))
+                .thenReturn(List.of(result));
+        assertEquals("EASY", calculator.determineTargetDifficulty(user));
     }
 }

@@ -92,6 +92,21 @@ public class LessonController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/{id}/attempts")
+    public ResponseEntity<com.languageapp.backend.dto.response.LessonStartResponse> startAttempt(
+            @PathVariable UUID id, @RequestParam(required = false) UUID challengeId,
+            @RequestParam(required = false) String difficulty, Authentication authentication) {
+        return ResponseEntity.ok(lessonService.startAttempt(id, authentication.getName(), challengeId, difficulty));
+    }
+
+    @PostMapping("/{id}/attempts/{attemptId}/exercises/{exerciseId}/check")
+    public ResponseEntity<ExerciseCheckResponse> checkAttemptExercise(@PathVariable UUID id,
+            @PathVariable UUID attemptId, @PathVariable UUID exerciseId,
+            @RequestBody ExerciseCheckRequest request, Authentication authentication) {
+        return ResponseEntity.ok(evaluationService.checkAttemptExercise(id, attemptId, exerciseId,
+                authentication.getName(), request.getAnswer()));
+    }
+
     /**
      * Retrieves basic metadata for all lessons regardless of difficulty.
      * Safe endpoint designed specifically for populating the Challenge creation dropdown menu.

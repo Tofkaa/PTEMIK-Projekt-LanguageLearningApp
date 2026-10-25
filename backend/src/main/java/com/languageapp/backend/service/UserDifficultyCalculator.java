@@ -32,15 +32,17 @@ public class UserDifficultyCalculator {
      * @return the calculated or preferred difficulty level ("EASY", "MEDIUM", or "HARD")
      */
     public String determineTargetDifficulty(User user) {
+        return determineTargetDifficulty(user, user.getActiveCourse().getCourseId());
+    }
+
+    public String determineTargetDifficulty(User user, UUID activeCourseId) {
         // 1. Check for manual difficulty override
         if (!"DYNAMIC".equals(user.getPreferredDifficulty().name())) {
             return user.getPreferredDifficulty().name();
         }
 
-        UUID activeCourseId = user.getActiveCourse().getCourseId();
-
         List<Result> recentResults = resultRepository
-                .findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseOrderBySubmittedAtDesc(user.getUserId(), activeCourseId);
+                .findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseAndManualPracticeFalseAndIsTestResultFalseOrderBySubmittedAtDesc(user.getUserId(), activeCourseId);
         // Default to EASY if the user has no prior history IN THIS SPECIFIC COURSE
         if (recentResults.isEmpty()) {
             return DifficultyLevel.EASY.name();
@@ -58,7 +60,7 @@ public class UserDifficultyCalculator {
                 user.getEmail(), user.getActiveCourse().getLanguageCode(), lastDifficulty, String.format("%.2f", weightedScore));
 
         long totalLifetimeAttempts = resultRepository
-                .countByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalse(user.getUserId(), activeCourseId);
+                .countByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseAndManualPracticeFalseAndIsTestResultFalse(user.getUserId(), activeCourseId);
 
         return calculateNextDifficulty(lastDifficulty, weightedScore, (int) totalLifetimeAttempts);
     }

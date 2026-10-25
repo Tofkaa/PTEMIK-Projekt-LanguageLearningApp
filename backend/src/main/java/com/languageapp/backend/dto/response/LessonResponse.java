@@ -23,4 +23,21 @@ public class LessonResponse {
     private boolean isCompleted;
     private String completedDifficulty;
     private String difficulty;
+    private java.util.List<String> availableDifficulties;
+    private java.util.List<String> completedDifficulties;
+    private boolean mastered;
+    private boolean topicMastered;
+
+    public LessonResponse(UUID lessonId, String topicName, String title, Integer orderIndex, String language,
+                          String description, boolean isCompleted, String completedDifficulty, String difficulty) {
+        this.lessonId = lessonId;
+        this.topicName = topicName;
+        this.title = title;
+        this.orderIndex = orderIndex;
+        this.language = language;
+        this.description = description;
+        this.isCompleted = isCompleted;
+        this.completedDifficulty = completedDifficulty;
+        this.difficulty = difficulty;
+    }
 }

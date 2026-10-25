@@ -2,10 +2,14 @@ package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.response.ExerciseResponse;
 import com.languageapp.backend.dto.response.LessonResponse;
+import com.languageapp.backend.dto.response.LessonStartResponse;
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
+import com.languageapp.backend.exception.ConflictException;
+import com.languageapp.backend.repository.LessonAttemptRepository;
+import java.time.Clock;
 import com.languageapp.backend.repository.ChallengeRepository;
 import com.languageapp.backend.repository.CourseRepository;
 import com.languageapp.backend.repository.LessonRepository;
@@ -46,6 +50,9 @@ public class LessonService {
     private final ProgressRepository progressRepository;
     private final ChallengeRepository challengeRepository;
     private final CourseRepository courseRepository;
+    private final MasteryService masteryService;
+    private final LessonAttemptRepository attemptRepository;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<LessonResponse> getAllLessonsForUser(String userEmail) {
@@ -95,7 +102,7 @@ public class LessonService {
                             .findFirst()
                             .orElse(null);
 
-                    return new LessonResponse(
+                    LessonResponse response = new LessonResponse(
                             lesson.getLessonId(),
                             lesson.getTopic().getName(),
                             lesson.getTitle(),
@@ -106,6 +113,11 @@ public class LessonService {
                             completedDiff,
                             currentDifficulty // Ezt látja a Dashboard a kártyákon
                     );
+                    response.setAvailableDifficulties(masteryService.availableLevels(lesson));
+                    response.setCompletedDifficulties(masteryService.completedLevels(lesson, userProgress));
+                    response.setMastered(masteryService.isMastered(lesson, userProgress));
+                    response.setTopicMastered(masteryService.isTopicMastered(lesson.getTopic().getTopicId(), courseLessons, userProgress));
+                    return response;
                 })
                 .toList();
     }
@@ -167,6 +179,50 @@ public class LessonService {
                 .filter(exercise -> finalTargetDifficulty.equalsIgnoreCase(exercise.getDifficulty()))
                 .map(this::mapToExerciseResponse)
                 .toList();
+    }
+
+    @Transactional
+    public LessonStartResponse startAttempt(
+            UUID lessonId, String email, UUID challengeId, String requestedDifficulty) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
+        if (!lesson.isActive() || !lesson.getTopic().isActive()) throw new ForbiddenException("Lesson unavailable");
+        boolean manual = requestedDifficulty != null;
+        if (manual && challengeId != null) throw new ForbiddenException("Challenge difficulty cannot be overridden");
+        String difficulty;
+        List<ExerciseResponse> exercises;
+        if (challengeId != null) {
+            exercises = getExercisesByLessonId(lessonId, email, challengeId);
+            difficulty = exercises.isEmpty() ? null : exercises.getFirst().getDifficulty();
+        } else {
+            if (!lesson.getTopic().getCourse().getCourseId().equals(user.getActiveCourse().getCourseId()))
+                throw new ForbiddenException("Select this course before starting its lessons");
+            difficulty = manual ? requestedDifficulty : userDifficultyCalculator.determineTargetDifficulty(user);
+            if (!masteryService.availableLevels(lesson).contains(difficulty))
+                throw new ConflictException("Ehhez a leckéhez ezen a szinten nincs elérhető feladat.");
+            if (manual && progressRepository.findByUserUserId(user.getUserId()).stream().noneMatch(p ->
+                    lessonId.equals(p.getLesson().getLessonId()) && Boolean.TRUE.equals(p.getIsCompleted())))
+                throw new ForbiddenException("Complete the lesson before choosing a replay level");
+            final String level = difficulty;
+            exercises = lesson.getExercises().stream().filter(Exercise::isActive)
+                    .filter(e -> level.equalsIgnoreCase(e.getDifficulty())).map(this::mapToExerciseResponse).toList();
+        }
+        if (exercises.isEmpty()) throw new ConflictException("Nincs elérhető feladat.");
+        LessonAttempt attempt = new LessonAttempt();
+        attempt.setUser(user);
+        attempt.setLesson(lesson);
+        attempt.setChallengeId(challengeId);
+        attempt.setDifficulty(difficulty);
+        attempt.setManualPractice(manual);
+        attempt.setStartedAt(clock.instant());
+        attempt.setExerciseIds(exercises.stream().map(ExerciseResponse::getExerciseId).toList());
+        attempt.setExerciseSnapshot(lesson.getExercises().stream()
+                .filter(e -> attempt.getExerciseIds().contains(e.getExerciseId()))
+                .map(LessonAttempt.AllocatedExercise::capture).toList());
+        attemptRepository.save(attempt);
+        return new LessonStartResponse(attempt.getAttemptId(), difficulty, manual, exercises);
     }
 
     @Transactional(readOnly = true)

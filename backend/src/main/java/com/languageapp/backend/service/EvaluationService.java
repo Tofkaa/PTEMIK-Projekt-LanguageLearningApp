@@ -44,6 +44,8 @@ public class EvaluationService {
     private final ChallengeService challengeService;
     private final AssignmentSessionRepository sessionRepository;
     private final StreakService streakService;
+    private final LessonAttemptRepository attemptRepository;
+    private final MasteryService masteryService;
 
     /**
      * Orchestrates the entire submission process for a completed lesson.
@@ -59,8 +61,16 @@ public class EvaluationService {
     public LessonSubmitResponse evaluateLesson(UUID userId, UUID lessonId, UUID challengeId, LessonSubmitRequest request) {
         log.debug("Starting evaluation for user: {} and lesson: {}", userId, lessonId);
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findForLearningUpdate(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (request.getAttemptId() == null) throw new ForbiddenException("Start a lesson attempt before submitting");
+        LessonAttempt attempt = attemptRepository.findForSubmission(request.getAttemptId())
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson attempt not found"));
+        if (!attempt.getUser().getUserId().equals(userId) || !attempt.getLesson().getLessonId().equals(lessonId)
+                || !Objects.equals(attempt.getChallengeId(), challengeId))
+            throw new ForbiddenException("This attempt belongs to another user, lesson or challenge");
+        if (attempt.getSubmissionResult() != null) return attempt.getSubmissionResult();
 
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
@@ -87,19 +97,32 @@ public class EvaluationService {
             }
 
             log.info("Difficulty securely overridden by challenge ID: {}", challengeId);
-            currentAttemptDifficulty = challenge.getTargetDifficulty();
+            currentAttemptDifficulty = attempt.getDifficulty();
         } else {
             // Standard gameplay: Use current adaptive difficulty
-            currentAttemptDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+            currentAttemptDifficulty = attempt.getDifficulty();
         }
 
         // Fetch progress specifically mapped to the current difficulty level
         var existingProgressOpt = progressRepository.findByUserUserIdAndLessonLessonIdAndCompletedDifficulty(userId, lessonId, currentAttemptDifficulty);
 
         // Filter the exercises that were actually evaluated in this session
-        List<Exercise> activeExercises = lesson.getExercises().stream()
-                .filter(ex -> currentAttemptDifficulty.equals(ex.getDifficulty()) && ex.isActive())
-                .toList();
+        List<Exercise> activeExercises = attempt.getExerciseSnapshot().stream()
+                .map(LessonAttempt.AllocatedExercise::asExercise).toList();
+
+        if (activeExercises.size() != attempt.getExerciseIds().size())
+            throw new com.languageapp.backend.exception.ConflictException("A feladatsor megváltozott. Indítsd újra a leckét.");
+        Set<UUID> submittedIds = new HashSet<>();
+        Set<UUID> retriedIds = new HashSet<>();
+        for (ExerciseSubmission answer : request.getAnswers()) {
+            if (!attempt.getExerciseIds().contains(answer.getExerciseId()))
+                throw new ForbiddenException("Answer outside the allocated lesson");
+            if (!answer.isRetry() && !submittedIds.add(answer.getExerciseId()))
+                throw new ForbiddenException("Duplicate initial answer");
+            if (answer.isRetry() && !retriedIds.add(answer.getExerciseId()))
+                throw new ForbiddenException("Duplicate retry answer");
+        }
+        if (submittedIds.size() != activeExercises.size()) throw new ForbiddenException("Missing allocated answers");
 
         int totalQuestions = activeExercises.size();
         List<MistakeDTO> mistakes = new ArrayList<>();
@@ -147,17 +170,18 @@ public class EvaluationService {
         boolean isLevelDown = false;
 
         
-        if (challenge == null) {
-            oldDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+        if (challenge == null && !attempt.isManualPractice()) {
+            oldDifficulty = userDifficultyCalculator.determineTargetDifficulty(user, lesson.getTopic().getCourse().getCourseId());
         }
 
 
         Result savedResult = saveResult(user, lesson, request, correctAnswersCount, totalQuestions, score, challenge, currentAttemptDifficulty);
+        savedResult.setManualPractice(attempt.isManualPractice());
         updateProgress(progress, score, passed);
 
 
-        if (challenge == null) {
-            newDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
+        if (challenge == null && !attempt.isManualPractice()) {
+            newDifficulty = userDifficultyCalculator.determineTargetDifficulty(user, lesson.getTopic().getCourse().getCourseId());
             isLevelUp = checkLevelUp(oldDifficulty, newDifficulty);
             isLevelDown = checkLevelDown(oldDifficulty, newDifficulty);
         }
@@ -170,7 +194,9 @@ public class EvaluationService {
         String feedback = passed ? "Gratulálunk, sikeresen teljesítetted a leckét!" : "Gyakorolj tovább, menni fog!";
         achievementService.checkAndAwardAchievements(user, score);
 
-        return LessonSubmitResponse.builder()
+        var userProgress = progressRepository.findByUserUserId(userId);
+        var courseLessons = lessonRepository.findByTopic_Course_CourseId(lesson.getTopic().getCourse().getCourseId());
+        LessonSubmitResponse response = LessonSubmitResponse.builder()
                 .resultId(savedResult.getResultId())
                 .score(score)
                 .correctAnswersCount(correctAnswersCount)
@@ -183,7 +209,13 @@ public class EvaluationService {
                 .newDifficulty(newDifficulty)
                 .isLevelUp(isLevelUp)
                 .isLevelDown(isLevelDown)
+                .manualPractice(attempt.isManualPractice())
+                .lessonMastered(masteryService.isMastered(lesson, userProgress))
+                .topicMastered(masteryService.isTopicMastered(lesson.getTopic().getTopicId(), courseLessons, userProgress))
                 .build();
+        attempt.setSubmissionResult(response);
+        attemptRepository.save(attempt);
+        return response;
     }
 
     // --- CORE EVALUATION LOGIC ---
@@ -325,6 +357,21 @@ public class EvaluationService {
     public ExerciseCheckResponse checkSingleExercise(UUID exerciseId, String userAnswer) {
         Exercise exercise = exerciseRepository.findById(exerciseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Exercise not found"));
+        return checkExerciseAnswer(exercise, userAnswer);
+    }
+
+    @Transactional(readOnly = true)
+    public ExerciseCheckResponse checkAttemptExercise(UUID lessonId, UUID attemptId, UUID exerciseId, String email, String answer) {
+        LessonAttempt attempt = attemptRepository.findById(attemptId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson attempt not found"));
+        if (!attempt.getUser().getEmail().equals(email) || !attempt.getLesson().getLessonId().equals(lessonId))
+            throw new ForbiddenException("This attempt belongs to another user or lesson");
+        Exercise exercise = attempt.getExerciseSnapshot().stream().filter(e -> e.exerciseId().equals(exerciseId))
+                .findFirst().orElseThrow(() -> new ForbiddenException("Exercise outside the allocated lesson")).asExercise();
+        return checkExerciseAnswer(exercise, answer);
+    }
+
+    private ExerciseCheckResponse checkExerciseAnswer(Exercise exercise, String userAnswer) {
 
         if (exercise.getCorrectAnswer() == null || !exercise.getCorrectAnswer().containsKey("answer")) {
             return ExerciseCheckResponse.builder().isCorrect(true).build();

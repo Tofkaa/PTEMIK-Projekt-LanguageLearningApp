@@ -39,6 +39,7 @@ public class UserService {
     private final ResultRepository resultRepository;
     private final FriendshipRepository friendshipRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final LessonAttemptRepository lessonAttemptRepository;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -330,6 +331,18 @@ public class UserService {
             return res;
         }).toList();
         exportData.put("learningResults", resultData);
+        exportData.put("lessonAttempts", lessonAttemptRepository.findByUserUserId(user.getUserId()).stream().map(a -> {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("attemptId", a.getAttemptId());
+            data.put("lessonId", a.getLesson().getLessonId());
+            data.put("challengeId", a.getChallengeId());
+            data.put("difficulty", a.getDifficulty());
+            data.put("manualPractice", a.isManualPractice());
+            data.put("startedAt", a.getStartedAt());
+            data.put("exerciseIds", a.getExerciseIds());
+            data.put("result", a.getSubmissionResult());
+            return data;
+        }).toList());
 
         // 3. Progress
         List<Progress> progress = progressRepository.findByUserUserId(user.getUserId());
@@ -369,6 +382,7 @@ public class UserService {
 
     /** Only called after local credentials or an email challenge have been verified. */
     void anonymizeAccount(User user) {
+        lessonAttemptRepository.deleteByUserUserId(user.getUserId());
         friendshipRepository.deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
         refreshTokenRepository.deleteByUserUserId(user.getUserId());
         emailChangeTokenRepository.deleteByUser_UserId(user.getUserId());

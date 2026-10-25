@@ -25,6 +25,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AchievementServiceTest {
+    @Mock private MasteryService masteryService;
+    @Mock private com.languageapp.backend.repository.UserRepository userRepository;
     @Spy private Clock clock = Clock.fixed(Instant.parse("2026-10-16T16:00:00Z"), ZoneOffset.UTC);
 
     @Mock
@@ -45,12 +47,50 @@ class AchievementServiceTest {
     private Achievement perfectScoreAch;
     private Achievement socialFriendsAch;
 
+    @Test void masteryTrophyAcceptsAnImperfectSuccessfulCompletion() {
+        perfectScoreAch.setCriteria(Map.of("type", "LESSON_MASTERY", "target", 1));
+        when(achievementRepository.findAll()).thenReturn(List.of(perfectScoreAch));
+        when(masteryService.countMastered(testUser, false)).thenReturn(1L);
+        achievementService.checkAndAwardAchievements(testUser, 67);
+        verify(userAchievementRepository).save(any());
+    }
+
+    @Test void historicalMasteryIsReconciledWhenViewingAchievements() {
+        perfectScoreAch.setCriteria(Map.of("type", "TOPIC_MASTERY", "target", 1));
+        when(userRepository.findForLearningUpdate(testUser.getUserId())).thenReturn(java.util.Optional.of(testUser));
+        when(achievementRepository.findAll()).thenReturn(List.of(perfectScoreAch));
+        when(masteryService.countMastered(testUser, true)).thenReturn(1L);
+        achievementService.getUserAchievements(testUser.getUserId());
+        verify(userAchievementRepository).save(any());
+    }
+
+    @Test void suspendedTrophiesCannotBeAwarded() {
+        perfectScoreAch.setActive(false);
+        when(achievementRepository.findAll()).thenReturn(List.of(perfectScoreAch));
+        achievementService.checkAndAwardAchievements(testUser, 100);
+        verify(userAchievementRepository, never()).save(any());
+    }
+
+    @Test void completingThreeLevelsOfOneLessonDoesNotCountAsThreeLessons() {
+        perfectScoreAch.setCriteria(Map.of("type", "LESSON_COUNT", "target", 2));
+        when(achievementRepository.findAll()).thenReturn(List.of(perfectScoreAch));
+        var lesson = new com.languageapp.backend.entity.Lesson(); lesson.setLessonId(UUID.randomUUID());
+        var levels = java.util.stream.Stream.of("EASY", "MEDIUM", "HARD").map(level -> {
+            var p = new com.languageapp.backend.entity.Progress(); p.setUser(testUser); p.setLesson(lesson);
+            p.setIsCompleted(true); p.setCompletedDifficulty(level); return p;
+        }).toList();
+        when(progressRepository.findByUserUserId(testUser.getUserId())).thenReturn(levels);
+        achievementService.checkAndAwardAchievements(testUser, 100);
+        verify(userAchievementRepository, never()).save(any());
+    }
+
     @BeforeEach
     void setUp() {
         testUser = new User();
         testUser.setUserId(UUID.randomUUID());
         testUser.setEmail("diak@test.com");
         testUser.setStreak(5); // A streak teszteléséhez
+        lenient().when(userRepository.findForLearningUpdate(testUser.getUserId())).thenReturn(java.util.Optional.of(testUser));
 
         // Tökéletes Teszt Kitüntetés (Meglévő logika)
         perfectScoreAch = new Achievement();

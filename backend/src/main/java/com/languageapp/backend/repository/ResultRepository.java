@@ -22,6 +22,10 @@ public interface ResultRepository extends JpaRepository<Result, UUID> {
 
     List<Result> findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseOrderBySubmittedAtDesc(UUID userId, UUID courseId);
 
+    long countByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseAndManualPracticeFalseAndIsTestResultFalse(UUID userId, UUID courseId);
+
+    List<Result> findTop5ByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseAndManualPracticeFalseAndIsTestResultFalseOrderBySubmittedAtDesc(UUID userId, UUID courseId);
+
     List<Result> findTop5ByUserUserIdOrderBySubmittedAtDesc(UUID userId);
 
     @EntityGraph(attributePaths = {"lesson"})

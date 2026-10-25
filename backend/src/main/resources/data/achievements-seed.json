@@ -88,5 +88,32 @@
     "description": "Legalább 50 szót juttattál mesteri (6-os) szintre.",
     "criteria": { "type": "MASTERED_VOCAB_COUNT", "target": 50 },
     "iconUrl": "🧠"
+  },
+{
+    "name": "Sokoldalú tanuló",
+    "description": "Egy lecke minden elérhető nehézségi szintjét sikeresen teljesítetted.",
+    "criteria": {
+      "target": 1,
+      "type": "LESSON_MASTERY"
+    },
+    "iconUrl": "🏅"
+  },
+  {
+    "name": "Témakör mestere",
+    "description": "Egy témakör minden leckéjét minden elérhető nehézségen sikeresen teljesítetted.",
+    "criteria": {
+      "target": 1,
+      "type": "TOPIC_MASTERY"
+    },
+    "iconUrl": "🏆"
+  },
+  {
+    "name": "Mesterek útján",
+    "description": "Három lecke minden elérhető nehézségi szintjét sikeresen teljesítetted.",
+    "criteria": {
+      "target": 3,
+      "type": "LESSON_MASTERY"
+    },
+    "iconUrl": "💎"
   }
 ]

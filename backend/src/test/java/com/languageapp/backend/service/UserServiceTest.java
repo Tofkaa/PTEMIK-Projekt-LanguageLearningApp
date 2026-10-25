@@ -38,6 +38,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
+    @Mock private com.languageapp.backend.repository.LessonAttemptRepository lessonAttemptRepository;
+    @Mock private com.languageapp.backend.repository.ResultRepository resultRepository;
     @Spy private Clock clock = Clock.fixed(Instant.parse("2026-10-16T16:00:00Z"), ZoneOffset.UTC);
 
     @Mock
@@ -105,6 +107,7 @@ class UserServiceTest {
         userService.deleteAndAnonymizeMyAccount(user.getEmail(), "correct", true);
         verify(passwordEncoder).matches("correct", "stored-hash");
         verify(refreshTokenRepository).deleteByUserUserId(user.getUserId());
+        verify(lessonAttemptRepository).deleteByUserUserId(user.getUserId());
         verify(emailChangeTokenRepository).deleteByUser_UserId(user.getUserId());
         verify(friendshipRepository).deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
         verify(userRepository).save(user);
@@ -115,6 +118,22 @@ class UserServiceTest {
     }
 
     // Segédmetódus a teszt User létrehozására Course-al
+    @Test void dataExportIncludesOnlyTheOwnersLessonAttempts() {
+        User user = createTestUserWithCourse("export@example.test");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        var attempt = new com.languageapp.backend.entity.LessonAttempt();
+        var lesson = new com.languageapp.backend.entity.Lesson(); lesson.setLessonId(UUID.randomUUID());
+        attempt.setAttemptId(UUID.randomUUID()); attempt.setUser(user); attempt.setLesson(lesson);
+        attempt.setDifficulty("EASY"); attempt.setManualPractice(true);
+        when(lessonAttemptRepository.findByUserUserId(user.getUserId())).thenReturn(java.util.List.of(attempt));
+        var exported = userService.exportUserData(user.getEmail());
+        var records = assertInstanceOf(java.util.List.class, exported.get("lessonAttempts"));
+        assertEquals(1, records.size());
+        var record = assertInstanceOf(java.util.Map.class, records.getFirst());
+        assertEquals(attempt.getAttemptId(), record.get("attemptId")); assertEquals(true, record.get("manualPractice"));
+        verify(lessonAttemptRepository).findByUserUserId(user.getUserId());
+    }
+
     @Test
     void oauthCannotBypassEmailApprovalThroughLegacyDeletionEndpoint() {
         User user = createTestUserWithCourse("oauth@example.test");

@@ -12,6 +12,9 @@ import java.util.List;
  */
 @Data
 public class LessonSubmitRequest {
+    private java.util.UUID attemptId;
+    @jakarta.validation.constraints.NotNull
+    @jakarta.validation.constraints.Min(0)
     private Integer timeTakenSeconds = 0;
 
     @NotEmpty(message = "The List of answers can not be empty")
