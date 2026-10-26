@@ -1,5 +1,23 @@
 TESZTELÉSRE:
 
+Automatizált backendtesztek Java 21-gyel, a `backend` mappából:
+
+```powershell
+.\mvnw.cmd test
+```
+
+Alapesetben az egységtesztek adatbázis nélkül futnak. A Spring Boot/persistence
+tesztek külön bekapcsolhatóak, és csak a tesztosztályukban rögzített nevű,
+eldobható PostgreSQL-adatbázist fogadják el. A kihagyott integrációs teszt nem
+jelent sikeres adatbázisos ellenőrzést.
+
+Az alkalmazásindítási smoke teszthez az `APPLICATION_SMOKE_TEST_DATABASE_URL`
+környezeti változó szükséges, `jdbc:postgresql://host:port/languageapp_smoke_check_...`
+alakban. A sémát újraépíti; kizárólag előre létrehozott, eldobható tesztadatbázist
+adj meg. A seeder, levélküldő, képtároló, SSE és vizsga/kihívás háttérjobok ebben
+a tesztben mockoltak. A további persistence tesztek saját opt-in változóikat és
+adatbázisnév-előtagjukat használják a tesztforrásokban.
+
 A backendhez kötelező egy helyben generált JWT-aláírókulcs a gyökér `.env`
 `JWT_SECRET` változójában (közvetlen backendindításnál a környezetben).
 PowerShellben generálható:
