@@ -1,3 +1,4 @@
+import InvitationShare from './InvitationShare';
 import { useId, useState } from 'react';
 import { Form, Button, InputGroup, Badge } from 'react-bootstrap';
 import api from '../services/api';
@@ -53,6 +54,7 @@ const FriendSearch = () => {
                     </div>
                 </div>
             )}
+            <InvitationShare targetName={user?.name} />
             <h2 className="h5 text-light mb-2">Hozzáadás azonosító alapján</h2>
             <p id={`${identifierId}-help`} className="text-light small mb-4">
                 Keress név alapján (pl. <strong className="text-info">Username#1234</strong>) vagy barátkóddal (pl. <strong className="text-info"><AccessibleCode code="A7B-9X2" /></strong>).

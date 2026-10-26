@@ -1,3 +1,4 @@
+import InvitationShare from '../components/InvitationShare';
 import api from '../services/api';
 import { useEffect, useRef } from 'react';
 import { Container, Row, Col, Card, Badge, Button } from 'react-bootstrap';
@@ -83,6 +84,7 @@ const Profile = () => {
                                         Barátkód: <span className="text-warning"><AccessibleCode code={user.friendCode} /></span>
                                     </Badge>
                                 </div>
+                                <InvitationShare targetName={user.name} />
                                 <Badge bg="info" text="dark" className="px-3 py-2 rounded-pill mb-4 fw-bold">
                                     {roleLabels[user.role] || 'Diák'}
                                 </Badge>

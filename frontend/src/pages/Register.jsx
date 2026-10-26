@@ -1,3 +1,4 @@
+import { readInvitation } from '../utils/invitationIntent';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Form, Button, Card, Container, Row, Col, ButtonGroup, ToggleButton } from 'react-bootstrap';
@@ -28,6 +29,7 @@ const Register = () => {
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRegistered, setIsRegistered] = useState(false);
+    const [hasInvitation] = useState(() => Boolean(readInvitation()));
     const headingRef = useStageFocus(isRegistered);
 
     const navigate = useNavigate();
@@ -108,6 +110,9 @@ const Register = () => {
                                     A fiókod használatához előbb rá kell kattintanod a levélben található linkre. 
                                     Ha nem találod a levelet, nézd meg a Spam mappában is!
                                 </p>
+                                {hasInvitation && <p>
+                                    Az emailcímed megerősítése után térj vissza erre a lapra, és jelentkezz be a meghívó folytatásához.
+                                </p>}
                                 <Button variant="outline-info" onClick={() => navigate('/login')} className="w-100 fw-bold">
                                     Vissza a bejelentkezéshez
                                 </Button>

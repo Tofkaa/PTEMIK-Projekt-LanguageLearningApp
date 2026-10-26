@@ -1,3 +1,4 @@
+import { postLoginDestination } from '../utils/invitationIntent';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Form, Button, Card, Container, Row, Col } from 'react-bootstrap';
@@ -32,10 +33,10 @@ const Login = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (isLoading) return;
+        const destination = postLoginDestination();
         setError(''); 
         setIsLoading(true);
         
-        console.log(`Initiating login attempt for: ${email}`);
 
         try {
             // 1. Send authentication request to the backend
@@ -46,7 +47,6 @@ const Login = () => {
             });
             
             const token = response.data.accessToken;
-            console.log("Token received!");
 
             localStorage.removeItem('token');
             sessionStorage.removeItem('token');
@@ -62,16 +62,14 @@ const Login = () => {
 
             // 3. Fetch the authenticated user's profile
             const userResponse = await api.get('/users/me');
-            console.log("Profile data fetched:", userResponse.data);
 
             // 4. Synchronize the global authentication state (Context)
-           login(token, userResponse.data, rememberMe);
+           await login(token, userResponse.data, rememberMe);
 
             // 5. Redirect to the protected Dashboard view
-            navigate('/dashboard');
+            navigate(destination, { replace: true });
 
-        } catch (err) {
-            console.error("Login error:", err);
+        } catch {
             // Display a generic error message to the user for security reasons
             setError('Hibás email cím vagy jelszó!');
         } finally {

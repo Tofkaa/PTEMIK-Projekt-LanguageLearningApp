@@ -14,7 +14,7 @@ vi.mock('../../services/classroomApi', () => ({ classroomApi: { getMembers: vi.f
 vi.mock('../../services/lessonApi', () => ({ lessonApi: { getAllLessonsForChallenge: vi.fn(), getLessonExercises: vi.fn() } }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ user: { userId: 'teacher' } }) }));
 vi.mock('../../context/NotificationContext', () => ({ useNotifications: () => ({ notifications: {} }) }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 beforeEach(() => {
     vi.clearAllMocks();
     classroomApi.moderateMember.mockReset();
@@ -147,4 +147,21 @@ it('retains individual fields and announces a rejected publication for correctio
     await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveTextContent('A tanuló már nem osztálytag.'));
     expect(within(dialog).getByRole('spinbutton', { name: 'Többletidő (perc)' })).toHaveValue(15);
     expect(within(dialog).getByRole('textbox', { name: 'Cím', exact: true })).toHaveValue('Időpróba');
+});
+
+it('dismisses membership success without removing the list or moving focus', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined);
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    let processed = false;
+    classroomApi.moderateMember.mockImplementation(async () => { processed = true; });
+    const accept = await openPendingMember(() => processed);
+    fireEvent.click(accept);
+    const message = await screen.findByText('Az osztálytagság módosítása sikerült.');
+    const heading = screen.getByRole('heading', { name: 'Tagság kezelése' });
+    heading.focus();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    fireEvent.mouseEnter(message.closest('.alert')); fireEvent.mouseLeave(message.closest('.alert'));
+    act(() => vi.advanceTimersByTime(10000));
+    expect(screen.queryByText('Az osztálytagság módosítása sikerült.')).not.toBeInTheDocument();
+    expect(heading).toHaveFocus();
 });

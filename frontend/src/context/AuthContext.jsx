@@ -1,3 +1,4 @@
+import { clearInvitation } from '../utils/invitationIntent';
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import api from '../services/api';
 import { vocabularyApi } from '../services/vocabularyApi';
@@ -99,6 +100,7 @@ export const AuthProvider = ({ children }) => {
             // 3. Reset the React state, which triggers a redirect to the Login page via PrivateRoute
             setUser(null);
             setVocabularyMap({});
+            clearInvitation();
         }
     };
 

@@ -1,3 +1,4 @@
+import { postLoginDestination } from '../utils/invitationIntent';
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -11,19 +12,22 @@ const OAuth2RedirectHandler = () => {
     const token = searchParams.get('token');
 
     useEffect(() => {
+        let current = true;
+        const destination = postLoginDestination();
         const authenticateUser = async () => {
             if (token) {
                 try {
                     localStorage.setItem('token', token);
             
                     const response = await api.get('/users/me');
+                    if (!current) return;
                  
                     await login(token, response.data, true);
                     
-                    navigate('/dashboard', { replace: true });
-                } catch (error) {
-                    console.error('Hiba az OAuth2 token feldolgozásakor:', error);
-                    localStorage.removeItem('token');
+                    if (current) navigate(destination, { replace: true });
+                } catch {
+                    if (!current) return;
+                    if (localStorage.getItem('token') === token) localStorage.removeItem('token');
                     navigate('/login', { state: { error: 'Sikertelen közösségi bejelentkezés.' } });
                 }
             } else {
@@ -32,6 +36,7 @@ const OAuth2RedirectHandler = () => {
         };
 
         authenticateUser();
+        return () => { current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

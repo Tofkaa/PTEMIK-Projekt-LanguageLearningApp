@@ -1,3 +1,4 @@
+import { postLoginDestination } from '../utils/invitationIntent';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -11,10 +12,9 @@ import { useAuth } from '../context/AuthContext.jsx';
  */
 const GuestRoute = ({ children }) => {
     const { user } = useAuth();
-    const token = localStorage.getItem('token');
 
-    if (user || token) {
-        return <Navigate to="/dashboard" replace />;
+    if (user) {
+        return <Navigate to={postLoginDestination()} replace />;
     }
 
     return children;

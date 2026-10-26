@@ -1,3 +1,4 @@
+import InvitationShare from './InvitationShare';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, Form, Spinner, Table, ProgressBar } from 'react-bootstrap';
@@ -13,6 +14,7 @@ import { getUnseenIds, markAsViewed } from '../utils/viewedStore';
 import AssignmentTimingModal from './AssignmentTimingModal';
 import AssignmentInitialTiming from './AssignmentInitialTiming';
 import LearningFeedback from './LearningFeedback';
+import TimedSuccessFeedback from './TimedSuccessFeedback';
 import LanguageText from './LanguageText';
 
 /**
@@ -37,6 +39,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
     const [memberError, setMemberError] = useState('');
     const [memberFeedback, setMemberFeedback] = useState(null);
     const memberHeadingRef = useRef(null);
+    const memberFeedbackSequence = useRef(0);
     const restoreMemberFocus = useRef(false);
     useEffect(() => {
         if (restoreMemberFocus.current) {
@@ -177,7 +180,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
             else await classroomApi.moderateMember(classroomId, studentId, action === 'approve');
             restoreMemberFocus.current = document.activeElement === origin;
             await fetchDashboardData(true);
-            setMemberFeedback({ type: 'success', msg: 'Az osztálytagság módosítása sikerült.' });
+            setMemberFeedback({ id: ++memberFeedbackSequence.current, text: 'Az osztálytagság módosítása sikerült.' });
         } catch (error) {
             setMemberError(error.response?.data?.message || 'Nem sikerült módosítani az osztálytagságot. Próbáld újra!');
         } finally {
@@ -478,6 +481,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
                 </div>
             </div>
 
+          <InvitationShare kind="classroom" classroomId={classroomId} targetName={classroomName} />
           <Tabs id="teacher-classroom-tabs" aria-label="Osztályterem kezelése" activeKey={activeMainTab} onSelect={(key) => setActiveMainTab(key)} className="mb-4 custom-dark-tabs">
 
                 <Tab eventKey="assignments" title={
@@ -533,7 +537,9 @@ const TeacherClassroomDetail = ({ classroom }) => {
                     </span>}>
 
                     <h2 ref={memberHeadingRef} tabIndex={-1} className="h4 mt-3">Tagság kezelése</h2>
-                    <LearningFeedback error={memberError} feedback={memberFeedback} />
+                    <LearningFeedback error={memberError} />
+                    <TimedSuccessFeedback message={memberFeedback} focusTarget={memberHeadingRef}
+                        onDismiss={() => setMemberFeedback(current => current?.id === memberFeedback?.id ? null : current)} />
                     <Row className="g-4 mt-1">
                         <Col md={6}>
                             <Card className="bg-dark border-secondary h-100">

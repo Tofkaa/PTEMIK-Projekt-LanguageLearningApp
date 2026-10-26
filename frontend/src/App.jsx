@@ -1,3 +1,4 @@
+import Invitation from './pages/Invitation';
 import { AchievementFeedbackProvider } from './context/AchievementFeedbackContext';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Alert, Container, Button } from 'react-bootstrap';
@@ -84,6 +85,8 @@ function App() {
                     <Routes>
                         {/* Default route redirects to login */}
                         <Route path="/" element={<Navigate to="/login" replace />} />
+
+                        <Route path="/invite/:kind" element={<Invitation />} />
 
                         {/* Guest Routes */}
                         <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />

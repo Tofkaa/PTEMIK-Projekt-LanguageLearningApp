@@ -4,6 +4,7 @@ import { wrapModalFocus } from '../utils/modalFocus';
 
 const pageTitles = [
     ['/login', 'Bejelentkezés'],
+    ['/invite/:kind', 'Meghívó'],
     ['/register', 'Regisztráció'],
     ['/forgot-password', 'Elfelejtett jelszó'],
     ['/reset-password', 'Új jelszó beállítása'],
