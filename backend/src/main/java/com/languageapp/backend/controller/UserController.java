@@ -71,9 +71,6 @@ public class UserController {
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
 
-        if (file.isEmpty() || file.getContentType() == null || !file.getContentType().startsWith("image/")) {
-            return ResponseEntity.badRequest().body("Érvénytelen fájl! Csak képformátum (JPG, PNG, stb.) engedélyezett.");
-        }
         log.info("REST request to upload profile picture for user: {}", authentication.getName());
 
         String newImageUrl = userService.updateProfilePicture(authentication.getName(), file);

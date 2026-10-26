@@ -51,6 +51,7 @@ class UserServiceTest {
 
     @Mock
     private ImageStorageService imageStorageService;
+    @Spy private ProfileImageSanitizer profileImageSanitizer = new ProfileImageSanitizer();
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -172,12 +173,12 @@ class UserServiceTest {
                 "file",
                 "avatar.jpg",
                 "image/jpeg",
-                "fiktiv_kep_tartalom".getBytes()
+                validProfilePng()
         );
 
         // Szabályok megadása a mockok számára
         when(userRepository.findByEmail(testEmail)).thenReturn(Optional.of(mockUser));
-        when(imageStorageService.uploadProfileImage(mockFile)).thenReturn(expectedUrl);
+        when(imageStorageService.uploadProfileImage(any(byte[].class))).thenReturn(expectedUrl);
 
         // 2. Act: A tesztelendő metódus meghívása
         String actualUrl = userService.updateProfilePicture(testEmail, mockFile);
@@ -188,7 +189,28 @@ class UserServiceTest {
 
         // Ellenőrizzük, hogy a mentés és a feltöltés pontosan egyszer futott-e le
         verify(userRepository, times(1)).save(mockUser);
-        verify(imageStorageService, times(1)).uploadProfileImage(mockFile);
+        ArgumentCaptor<byte[]> upload = ArgumentCaptor.forClass(byte[].class);
+        verify(imageStorageService, times(1)).uploadProfileImage(upload.capture());
+        var normalized = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(upload.getValue()));
+        assertEquals(250, normalized.getWidth());
+        assertEquals(250, normalized.getHeight());
+    }
+
+    private byte[] validProfilePng() throws Exception {
+        var output = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", output);
+        return output.toByteArray();
+    }
+
+    @Test void invalidProfileCannotReachStorageOrChangeTheExistingUrl() {
+        User user = createTestUserWithCourse("image@example.test");
+        user.setProfilePictureUrl("https://example.test/original.png");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        var file = new MockMultipartFile("file", "avatar.png", "image/png", "<svg onload='alert(1)'/>".getBytes());
+        assertThrows(BadRequestException.class, () -> userService.updateProfilePicture(user.getEmail(), file));
+        assertEquals("https://example.test/original.png", user.getProfilePictureUrl());
+        verifyNoInteractions(imageStorageService);
+        verify(userRepository, never()).save(any());
     }
 
     @Test

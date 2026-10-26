@@ -90,6 +90,49 @@ class SecurityFoundationsPersistenceTest {
     }
     String classroomPath(Fixture f) { return "/api/assignments/classroom/"+f.classroom; }
 
+    byte[] profilePng() throws Exception {
+        var output=new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3,2,java.awt.image.BufferedImage.TYPE_INT_RGB),"png",output);
+        return output.toByteArray();
+    }
+    @Test void anonymousProfileUploadIsRejectedBeforeStorage() throws Exception {
+        mvc.perform(multipart("/api/users/me/profile-picture").file(
+                new org.springframework.mock.web.MockMultipartFile("file","avatar.png","image/png",profilePng())))
+                .andExpect(status().isUnauthorized());
+        org.mockito.Mockito.verifyNoInteractions(images);
+    }
+    @Test void profileUploadDecodesPixelsAndNeverSendsOriginalPayloadToStorage() throws Exception {
+        var f=fixture();String url="https://res.cloudinary.com/test/image/upload/normalized.png";
+        org.mockito.Mockito.when(images.uploadProfileImage(org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn(url);
+        mvc.perform(multipart("/api/users/me/profile-picture").file(
+                new org.springframework.mock.web.MockMultipartFile("file","fake.svg","application/octet-stream",profilePng()))
+                .header("Authorization",auth(f.student)))
+                .andExpect(status().isOk()).andExpect(content().string(url));
+        var payload=org.mockito.ArgumentCaptor.forClass(byte[].class);
+        org.mockito.Mockito.verify(images).uploadProfileImage(payload.capture());
+        var image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(payload.getValue()));
+        assertEquals(250,image.getWidth());assertEquals(250,image.getHeight());
+        assertEquals(url,users.findById(f.student.getUserId()).orElseThrow().getProfilePictureUrl());
+    }
+    @Test void invalidProfileUploadReturnsStructured400AndLeavesExistingUrlIntact() throws Exception {
+        var f=fixture();String old="https://example.test/old.png";
+        tx.executeWithoutResult(status->users.findById(f.student.getUserId()).orElseThrow().setProfilePictureUrl(old));
+        mvc.perform(multipart("/api/users/me/profile-picture").file(
+                new org.springframework.mock.web.MockMultipartFile("file","avatar.png","image/png","<svg onload='alert(1)'/>".getBytes(StandardCharsets.UTF_8)))
+                .header("Authorization",auth(f.student)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400));
+        org.mockito.Mockito.verifyNoInteractions(images);
+        assertEquals(old,users.findById(f.student.getUserId()).orElseThrow().getProfilePictureUrl());
+    }
+    @Test void oversizedProfileUploadReturnsStructured413BeforeStorage() throws Exception {
+        var f=fixture();
+        mvc.perform(multipart("/api/users/me/profile-picture").file(
+                new org.springframework.mock.web.MockMultipartFile("file","avatar.png","image/png",new byte[ProfileImageSanitizer.MAX_BYTES+1]))
+                .header("Authorization",auth(f.student)))
+                .andExpect(status().is(413)).andExpect(jsonPath("$.status").value(413));
+        org.mockito.Mockito.verifyNoInteractions(images);
+    }
+
     Map<String,Object> importedExercise(String answer) {
         return Map.of("type","MULTIPLE_CHOICE","difficulty","EASY","content",
                 Map.of("question","Kérdés","questionLang","hu","answerLang","en","options",List.of("Apple","Banana")),

@@ -32,6 +32,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final ProgressRepository progressRepository;
     private final ImageStorageService imageStorageService;
+    private final ProfileImageSanitizer profileImageSanitizer;
     private final PasswordEncoder passwordEncoder;
     private final EmailChangeTokenRepository emailChangeTokenRepository;
     private final EmailService emailService;
@@ -154,7 +155,8 @@ public class UserService {
 
         try {
 
-            String imageUrl = imageStorageService.uploadProfileImage(file);
+            byte[] image = profileImageSanitizer.sanitize(file);
+            String imageUrl = imageStorageService.uploadProfileImage(image);
 
             user.setProfilePictureUrl(imageUrl);
             userRepository.save(user);
