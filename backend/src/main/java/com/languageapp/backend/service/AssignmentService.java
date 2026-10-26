@@ -409,6 +409,8 @@ public class AssignmentService {
     }
 
     private void validateAnswers(List<Exercise> exercises, List<ExerciseSubmission> answers) {
+        com.languageapp.backend.validation.AnswerLimits.requireSubmissions(answers,
+                com.languageapp.backend.validation.AnswerLimits.MAX_ASSIGNMENT_SUBMISSIONS);
         var allowed = exercises.stream().map(Exercise::getExerciseId).collect(java.util.stream.Collectors.toSet());
         var seen = new java.util.HashSet<UUID>();
         for (ExerciseSubmission a : answers) {

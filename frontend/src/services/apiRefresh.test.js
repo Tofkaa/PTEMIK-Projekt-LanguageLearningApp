@@ -73,6 +73,14 @@ it('does not refresh or discard credentials for a genuine permission denial', as
     expect(api.defaults.adapter).toHaveBeenCalledTimes(1);
     expect(sessionStorage.getItem('token')).toBe('current-token');
 });
+it.each([409,413])('reports answer-bound failures without refreshing or losing authentication (%s)', async status => {
+    sessionStorage.setItem('token','kept-token');
+    api.defaults.adapter=vi.fn(config=>reject(config,status));
+    await expect(api.post('/exercises/id/check',{answer:'draft'})).rejects.toThrow();
+    expect(api.defaults.adapter).toHaveBeenCalledTimes(1);expect(session.getAccessToken()).toBe('kept-token');
+    expect(browser.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({type:'api-error'}));
+    expect(browser.dispatchEvent.mock.calls[0][0].detail).not.toBe('Ismeretlen hiba történt.');
+});
 
 it('reports a shared refresh failure once when foreground work joins a silent background save', async () => {
     sessionStorage.setItem('token','old-token');let finish;

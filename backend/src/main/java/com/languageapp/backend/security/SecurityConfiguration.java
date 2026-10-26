@@ -41,6 +41,8 @@ public class SecurityConfiguration {
     private final CustomUserDetailsService userDetailsService;
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
+    private final tools.jackson.databind.ObjectMapper objectMapper;
+    private final java.time.Clock clock;
 
     /**
      * Configures the main security filter chain.
@@ -91,7 +93,8 @@ public class SecurityConfiguration {
                 .authenticationProvider(authenticationProvider())
 
                 // Insert the JWT filter before the standard Spring UsernamePassword filter
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new AnswerPayloadFilter(objectMapper, clock), org.springframework.security.web.access.intercept.AuthorizationFilter.class);
 
         return http.build();
     }

@@ -9,6 +9,7 @@ import com.languageapp.backend.entity.*;
 import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.*;
+import com.languageapp.backend.validation.AnswerLimits;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -59,6 +60,7 @@ public class EvaluationService {
      */
     @Transactional
     public LessonSubmitResponse evaluateLesson(UUID userId, UUID lessonId, UUID challengeId, LessonSubmitRequest request) {
+        AnswerLimits.requireSubmissions(request.getAnswers(), AnswerLimits.MAX_LESSON_SUBMISSIONS);
         log.debug("Starting evaluation for user: {} and lesson: {}", userId, lessonId);
 
         User user = userRepository.findForLearningUpdate(userId)
@@ -232,6 +234,7 @@ public class EvaluationService {
      * @return EvaluationDetails containing the correct answer count and the dynamically calculated XP.
      */
     public EvaluationDetails calculateEvaluationDetails(List<Exercise> exercises, LessonSubmitRequest request, List<MistakeDTO> mistakes) {
+        AnswerLimits.requireSubmissions(request.getAnswers(), AnswerLimits.MAX_LESSON_SUBMISSIONS);
         int correctCount = 0;
         int potentialXp = 0;
 
@@ -242,6 +245,7 @@ public class EvaluationService {
         for (Exercise exercise : exercises) {
             if (exercise.getCorrectAnswer() != null && exercise.getCorrectAnswer().containsKey("answer")) {
                 String rawExpected = String.valueOf(exercise.getCorrectAnswer().get("answer"));
+                requireExpectedAnswer(rawExpected);
                 String cleanExpected = normalizeText(rawExpected);
 
                 List<ExerciseSubmission> subs = subsByExercise.getOrDefault(exercise.getExerciseId(), new ArrayList<>());
@@ -356,6 +360,7 @@ public class EvaluationService {
 
     @Transactional(readOnly = true)
     public ExerciseCheckResponse checkSingleExercise(UUID exerciseId, String userAnswer) {
+        AnswerLimits.requireText(userAnswer);
         Exercise exercise = exerciseRepository.findById(exerciseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Exercise not found"));
         return checkExerciseAnswer(exercise, userAnswer);
@@ -363,6 +368,7 @@ public class EvaluationService {
 
     @Transactional(readOnly = true)
     public ExerciseCheckResponse checkAttemptExercise(UUID lessonId, UUID attemptId, UUID exerciseId, String email, String answer) {
+        AnswerLimits.requireText(answer);
         LessonAttempt attempt = attemptRepository.findById(attemptId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lesson attempt not found"));
         if (!attempt.getUser().getEmail().equals(email) || !attempt.getLesson().getLessonId().equals(lessonId))
@@ -379,6 +385,7 @@ public class EvaluationService {
         }
 
         String rawExpected = String.valueOf(exercise.getCorrectAnswer().get("answer"));
+        requireExpectedAnswer(rawExpected);
         String normExpected = normalizeText(rawExpected);
         String normUser = normalizeText(userAnswer);
 
@@ -406,8 +413,7 @@ public class EvaluationService {
                 }
             }
         } else {
-            int distance = calculateLevenshteinDistance(normExpected, normUser);
-            if (distance <= 2 && normExpected.length() > 4) {
+            if (normExpected.length() > 4 && TypoTolerance.withinTwoEdits(normExpected, normUser)) {
                 isAlmostCorrect = true;
                 feedbackMsg = "Majdnem jó! Ellenőrizd az elgépelést!";
             }
@@ -420,22 +426,8 @@ public class EvaluationService {
                 .build();
     }
 
-    private int calculateLevenshteinDistance(String a, String b) {
-        int[][] dp = new int[a.length() + 1][b.length() + 1];
-        for (int i = 0; i <= a.length(); i++) {
-            for (int j = 0; j <= b.length(); j++) {
-                if (i == 0) dp[i][j] = j;
-                else if (j == 0) dp[i][j] = i;
-                else dp[i][j] = min(dp[i - 1][j - 1] +
-                                    costOfSubstitution(a.charAt(i - 1), b.charAt(j - 1)),
-                            dp[i - 1][j] + 1, dp[i][j - 1] + 1);
-            }
-        }
-        return dp[a.length()][b.length()];
-    }
-
-    private int costOfSubstitution(char a, char b) { return a == b ? 0 : 1; }
-    private int min(int a, int b, int c) {
-        return Math.min(Math.min(a, b), c);
+    private void requireExpectedAnswer(String answer) {
+        if (answer.length() > AnswerLimits.MAX_CHARACTERS)
+            throw new com.languageapp.backend.exception.ConflictException("A feladat megoldása túl hosszú az értékeléshez. Jelezd az oktatónak.");
     }
 }

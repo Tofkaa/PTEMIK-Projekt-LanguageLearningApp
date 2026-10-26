@@ -23,6 +23,24 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class EvaluationServiceTest {
+    @Test void rejectsOversizedImmediateInputBeforeQueryingTheExercise() {
+        assertThrows(com.languageapp.backend.exception.BadRequestException.class,
+                () -> evaluationService.checkSingleExercise(UUID.randomUUID(),"x".repeat(10_001)));
+        verifyNoInteractions(exerciseRepository);
+    }
+    @Test void rejectsStructuredAnswersBeforeLockingOrUpdatingTheUser() {
+        var answer = new ExerciseSubmission(); answer.setExerciseId(UUID.randomUUID());answer.setAnswer(Map.of("nested",List.of("not text")));
+        var request = new LessonSubmitRequest();request.setAnswers(List.of(answer));
+        assertThrows(com.languageapp.backend.exception.BadRequestException.class,
+                () -> evaluationService.evaluateLesson(UUID.randomUUID(),UUID.randomUUID(),null,request));
+        verifyNoInteractions(userRepository,resultRepository,progressRepository);
+    }
+    @Test void rejectsOversizedStoredSolutionWithoutExpensiveComparison() {
+        testExercise.setCorrectAnswer(Map.of("answer","x".repeat(10_001)));
+        when(exerciseRepository.findById(testExercise.getExerciseId())).thenReturn(Optional.of(testExercise));
+        assertThrows(com.languageapp.backend.exception.ConflictException.class,
+                () -> evaluationService.checkSingleExercise(testExercise.getExerciseId(),"small answer"));
+    }
     @Spy private Clock clock = Clock.fixed(Instant.parse("2026-10-16T16:00:00Z"), ZoneOffset.UTC);
 
     @Mock private UserRepository userRepository;

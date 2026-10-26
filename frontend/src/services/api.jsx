@@ -77,9 +77,11 @@ api.interceptors.response.use(response => {
         else if (error.response.status === 404) message = 'A keresett adat vagy végpont nem található (404).';
         else if (error.response.status === 403) message = 'Nincs megfelelő jogosultságod ehhez a művelethez! (403)';
         else if (error.response.status === 401) message = 'A művelethez be kell jelentkezned.';
-        else if (error.response.status === 400) {
+        else if (error.response.status === 413) message = 'A beküldött válaszok összmérete túl nagy. Rövidítsd a választ, majd próbáld újra.';
+        else if ([400, 409].includes(error.response.status)) {
             const backend = error.response.data?.message || error.response.data;
-            message = typeof backend === 'string' ? backend : 'Hibás vagy érvénytelen kérés (400).';
+            message = typeof backend === 'string' ? backend : error.response.status === 409
+                ? 'Az adatok időközben megváltoztak (409).' : 'Hibás vagy érvénytelen kérés (400).';
         }
         report(message);
     }

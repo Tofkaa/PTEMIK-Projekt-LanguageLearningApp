@@ -14,8 +14,9 @@ import java.util.List;
 public class AssignmentSubmitRequest {
 
     @NotNull(message = "The list of answers cannot be null")
+    @jakarta.validation.constraints.Size(max = com.languageapp.backend.validation.AnswerLimits.MAX_ASSIGNMENT_SUBMISSIONS)
     @Valid
-    private List<ExerciseSubmission> answers;
+    private List<@NotNull ExerciseSubmission> answers;
 
     @NotNull(message = "A mentési verzió kötelező")
     private Long revision;

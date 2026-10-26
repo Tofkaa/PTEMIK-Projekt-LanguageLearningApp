@@ -12,6 +12,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -82,6 +83,74 @@ class SecurityFoundationsPersistenceTest {
                 .password("test-only").authorities("ROLE_"+u.getRole().name()).build(),session.id());
     }
     String classroomPath(Fixture f) { return "/api/assignments/classroom/"+f.classroom; }
+
+    @ParameterizedTest @ValueSource(strings={"lookup","known-batch","practice/submit"})
+    void vocabularyWordBoundsAreValidatedBeforeExternalOrRewardWork(String operation) throws Exception {
+        var f=fixture();String word="x".repeat(101);
+        String body=switch(operation) {
+            case "lookup" -> "{\"word\":\""+word+"\"}";
+            case "known-batch" -> "{\"words\":[\""+word+"\"]}";
+            default -> "{\"results\":[{\"targetWord\":\""+word+"\",\"isCorrect\":true}]}";
+        };
+        mvc.perform(post("/api/vocabulary/"+operation).header("Authorization",auth(f.student)).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest());
+    }
+    @Test void vocabularyBatchListIsBoundedAndAnEmptyBatchKeepsItsContract() throws Exception {
+        var f=fixture();String header=auth(f.student);
+        mvc.perform(post("/api/vocabulary/known-batch").header("Authorization",header).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"words\":["+String.join(",",Collections.nCopies(1001,"\"apple\""))+"]}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/vocabulary/known-batch").header("Authorization",header).contentType(MediaType.APPLICATION_JSON).content("{\"words\":[]}"))
+                .andExpect(status().isOk());
+    }
+
+    @ParameterizedTest @ValueSource(strings={"/api/exercises/{id}/check","/api/lessons/{id}/attempts/{id}/exercises/{id}/check"})
+    void immediateAnswerBoundsAreValidatedAtBothControllers(String template) throws Exception {
+        var f=fixture();String path=template.replace("{id}",UUID.randomUUID().toString());
+        mvc.perform(post(path).header("Authorization",auth(f.student)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"answer\":\""+"x".repeat(10_001)+"\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400));
+    }
+    @ParameterizedTest @ValueSource(strings={"lesson","assignment","draft"})
+    void nestedNonTextAnswersAreRejectedOnEverySubmissionPath(String kind) throws Exception {
+        var f=fixture();String id=UUID.randomUUID().toString();
+        String path=kind.equals("lesson")?"/api/lessons/"+id+"/submit":"/api/assignments/sessions/"+id+"/"+(kind.equals("draft")?"draft":"submit");
+        var request=kind.equals("draft")?put(path):post(path);
+        mvc.perform(request.header("Authorization",auth(f.student)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"revision\":0,\"answers\":[{\"exerciseId\":\""+id+"\",\"answer\":{\"nested\":[\"not text\"]}}]}"))
+                .andExpect(status().isBadRequest());
+    }
+    @Test void oversizedBodiesAreRejectedByTheRealSecurityChainButAnonymousRequestsStillNeedAuthentication() throws Exception {
+        var f=fixture();String path="/api/exercises/"+UUID.randomUUID()+"/check";
+        String large="{\"answer\":\""+"x".repeat(65_536)+"\"}";
+        mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(large)).andExpect(status().isUnauthorized());
+        mvc.perform(post(path).header("Authorization",auth(f.student)).contentType(MediaType.APPLICATION_JSON).content(large))
+                .andExpect(status().isPayloadTooLarge()).andExpect(jsonPath("$.status").value(413))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("összmérete túl nagy")));
+    }
+    @Test void aBoundaryLengthAnswerAndTwoTyposKeepTheirOriginalFeedback() throws Exception {
+        var f=fixture();String expected="a".repeat(10_000);
+        UUID id=tx.execute(status -> {
+            var topic=new LessonTopic();topic.setName("Limits");topic.setCourse(em.getReference(User.class,f.student.getUserId()).getActiveCourse());em.persist(topic);
+            var lesson=new Lesson();lesson.setTitle("Limits");lesson.setTopic(topic);em.persist(lesson);
+            var exercise=new Exercise();exercise.setLesson(lesson);exercise.setType("TRANSLATION");exercise.setDifficulty("HARD");
+            exercise.setContent(Map.of("question","Limits"));exercise.setCorrectAnswer(Map.of("answer",expected));em.persist(exercise);em.flush();return exercise.getExerciseId();
+        });
+        String path="/api/exercises/"+id+"/check";String header=auth(f.student);
+        mvc.perform(post(path).header("Authorization",header).contentType(MediaType.APPLICATION_JSON).content("{\"answer\":\""+expected+"\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.correct").value(true));
+        mvc.perform(post(path).header("Authorization",header).contentType(MediaType.APPLICATION_JSON).content("{\"answer\":\""+expected.substring(0,9998)+"bb\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.correct").value(false)).andExpect(jsonPath("$.almostCorrect").value(true));
+    }
+    @ParameterizedTest @ValueSource(strings={"lesson","assignment"})
+    void oversizedCollectionsFailValidationBeforeAnyDomainMutation(String kind) throws Exception {
+        var f=fixture();String id=UUID.randomUUID().toString();int count=kind.equals("lesson")?2001:1001;
+        String item="{\"exerciseId\":\""+id+"\",\"answer\":\"\"}";
+        String path=kind.equals("lesson")?"/api/lessons/"+id+"/submit":"/api/assignments/sessions/"+id+"/submit";
+        mvc.perform(post(path).header("Authorization",auth(f.student)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"revision\":0,\"answers\":["+String.join(",",Collections.nCopies(count,item))+"]}"))
+                .andExpect(status().isBadRequest());
+    }
     @Test void anonymousStatisticsAreUnauthorized() throws Exception {
         var f=fixture();mvc.perform(get(classroomPath(f)+"/statistics")).andExpect(status().isUnauthorized());
     }
