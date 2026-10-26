@@ -38,28 +38,47 @@ public class FriendshipService {
         User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new BadRequestException("Sender not found."));
 
+        ConnectionChecks.requireVerified(sender);
         // Resolve the target user using the hybrid smart search
         User target = findUserByIdentifier(targetIdentifier);
 
-        // Security Validation 1: Prevent self-requests
-        if (sender.getUserId().equals(target.getUserId())) {
-            throw new BadRequestException("You cannot send a friend request to yourself.");
-        }
+        ConnectionChecks.requireAvailableTarget(target);
+        if (sender.getUserId().equals(target.getUserId()))
+            throw new BadRequestException("Saját magadnak nem küldhetsz barátkérelmet.");
+        lockPair(sender.getUserId(), target.getUserId());
+        if (friendshipRepository.existsFriendshipBetween(sender, target))
+            throw new BadRequestException("Már barátok vagytok, vagy egy kérelmetek jóváhagyásra vár.");
+        createRequest(sender, target);
+    }
 
-        // Security Validation 2: Prevent duplicate requests or establishing multiple connections
-        if (friendshipRepository.existsFriendshipBetween(sender, target)) {
-            throw new BadRequestException("A connection or pending request already exists between you and this user.");
-        }
+    public enum RequestState { CREATED, OUTGOING_PENDING, INCOMING_PENDING, CONNECTED }
 
+    /** Same transaction-scoped pair lock as manual-code requests; no automatic acceptance. */
+    @Transactional
+    public RequestState requestFromInvitation(User sender, User target) {
+        ConnectionChecks.requireVerified(sender);
+        ConnectionChecks.requireAvailableTarget(target);
+        if (sender.getUserId().equals(target.getUserId()))
+            throw new BadRequestException("Ez a saját meghívólinked.");
+        lockPair(sender.getUserId(), target.getUserId());
+        var existing = friendshipRepository.findConnectionsBetween(sender.getUserId(), target.getUserId());
+        if (existing.stream().anyMatch(f -> f.getStatus() == FriendshipStatus.ACCEPTED)) return RequestState.CONNECTED;
+        if (!existing.isEmpty()) return existing.getFirst().getUser().getUserId().equals(sender.getUserId())
+                ? RequestState.OUTGOING_PENDING : RequestState.INCOMING_PENDING;
+        createRequest(sender, target);
+        return RequestState.CREATED;
+    }
+
+    private void lockPair(UUID a, UUID b) {
+        String first = a.toString(), second = b.toString();
+        friendshipRepository.lockConnectionPair(first.compareTo(second) < 0 ? first+":"+second : second+":"+first);
+    }
+
+    private void createRequest(User sender, User target) {
         Friendship request = new Friendship();
-        request.setUser(sender);
-        request.setFriend(target);
-        request.setStatus(FriendshipStatus.PENDING);
-
+        request.setUser(sender); request.setFriend(target); request.setStatus(FriendshipStatus.PENDING);
         friendshipRepository.save(request);
-        log.info("Friend request successfully sent from {} to {}", sender.getEmail(), target.getEmail());
-
-        sseService.sendPing(target.getEmail());
+        sseService.sendPingAfterCommit(target.getEmail());
     }
 
     /**
@@ -116,6 +135,9 @@ public class FriendshipService {
             throw new BadRequestException("You are not authorized to accept this request.");
         }
 
+        ConnectionChecks.requireVerified(friendship.getFriend());
+        ConnectionChecks.requireAvailableTarget(friendship.getUser());
+
         if (friendship.getStatus() == FriendshipStatus.ACCEPTED) {
             throw new BadRequestException("This request has already been accepted.");
         }
@@ -125,7 +147,7 @@ public class FriendshipService {
         log.info("Friendship request {} ACCEPTED by user {}", friendshipId, receiverId);
 
         events.publishEvent(new SocialAchievementEvent(List.of(friendship.getUser().getUserId(), friendship.getFriend().getUserId())));
-        sseService.sendPing(friendship.getUser().getEmail());
+        sseService.sendPingAfterCommit(friendship.getUser().getEmail());
     }
 
     /**

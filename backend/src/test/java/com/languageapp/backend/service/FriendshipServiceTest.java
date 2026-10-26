@@ -38,12 +38,12 @@ class FriendshipServiceTest {
 
     @BeforeEach
     void setUp() {
-        sender = new User();
+        sender = new User(); sender.setVerified(true);
         sender.setUserId(UUID.randomUUID());
         sender.setName("Sender");
         sender.setEmail("sender@test.com");
 
-        target = new User();
+        target = new User(); target.setVerified(true);
         target.setUserId(UUID.randomUUID());
         target.setName("Target");
         target.setUserTag("1234");
@@ -75,7 +75,7 @@ class FriendshipServiceTest {
         assertEquals(FriendshipStatus.PENDING, captor.getValue().getStatus());
         assertEquals(sender, captor.getValue().getUser());
         assertEquals(target, captor.getValue().getFriend());
-        verify(sseService, times(1)).sendPing(target.getEmail());
+        verify(sseService, times(1)).sendPingAfterCommit(target.getEmail());
     }
 
     // --- 2. TESZT: Biztonság - Saját magunk jelölése ---
@@ -107,7 +107,7 @@ class FriendshipServiceTest {
         assertEquals(FriendshipStatus.ACCEPTED, pendingRequest.getStatus());
         verify(events).publishEvent(new SocialAchievementEvent(java.util.List.of(sender.getUserId(), target.getUserId())));
         verify(friendshipRepository, times(1)).save(pendingRequest);
-        verify(sseService, times(1)).sendPing(sender.getEmail());
+        verify(sseService, times(1)).sendPingAfterCommit(sender.getEmail());
     }
 
     // --- 4. TESZT: Biztonság - Küldő próbálja elfogadni a saját kérését ---
@@ -124,4 +124,17 @@ class FriendshipServiceTest {
         assertEquals(FriendshipStatus.PENDING, pendingRequest.getStatus()); // Változatlan marad
         verify(friendshipRepository, never()).save(any());
     }
+    @Test void unverifiedSenderCannotUseTheManualCodeEntryPoint() {
+        sender.setVerified(false); when(userRepository.findById(sender.getUserId())).thenReturn(Optional.of(sender));
+        assertThrows(com.languageapp.backend.exception.ForbiddenException.class,
+                () -> friendshipService.sendFriendRequest(sender.getUserId(), "ABC-123"));
+        verify(userRepository, never()).findByFriendCode(anyString()); verifyNoInteractions(friendshipRepository);
+    }
+    @Test void invitationAndManualRequestsShareACanonicalPairLock() {
+        friendshipService.requestFromInvitation(sender, target);
+        friendshipService.requestFromInvitation(target, sender);
+        var keys = ArgumentCaptor.forClass(String.class); verify(friendshipRepository, times(2)).lockConnectionPair(keys.capture());
+        assertEquals(keys.getAllValues().get(0), keys.getAllValues().get(1));
+    }
+
 }

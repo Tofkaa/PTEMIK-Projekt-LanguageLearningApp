@@ -38,6 +38,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
+    @Mock private com.languageapp.backend.repository.InvitationLinkRepository invitationLinkRepository;
     @Mock private com.languageapp.backend.repository.UserAchievementRepository userAchievementRepository;
     @Mock private com.languageapp.backend.repository.LessonAttemptRepository lessonAttemptRepository;
     @Mock private com.languageapp.backend.repository.ResultRepository resultRepository;
@@ -378,6 +379,32 @@ class UserServiceTest {
         verify(courseRepository, never()).findByLanguageCode(anyString());
         verify(userRepository, never()).save(any());
     }
+    @Test void accountAnonymizationRevokesReusableInvitationLinks() {
+        User user = createTestUserWithCourse("invitation-deletion@example.test");
+        UUID ownerId = user.getUserId();
+        userService.anonymizeAccount(user);
+        verify(invitationLinkRepository).revokeAllForOwner(ownerId, clock.instant());
+        assertFalse(user.isActive());
+        assertFalse(user.isVerified());
+    }
+
+    @Test void dataExportIncludesInvitationMetadataWithoutReusableToken() {
+        User user = createTestUserWithCourse("invitation-export@example.test");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        var link = new com.languageapp.backend.entity.InvitationLink();
+        link.setInvitationId(UUID.randomUUID()); link.setKind("friend"); link.setOwner(user);
+        link.setToken("a".repeat(43)); link.setCreatedAt(clock.instant());
+        when(invitationLinkRepository.findByOwnerUserId(user.getUserId())).thenReturn(java.util.List.of(link));
+        var exported = userService.exportUserData(user.getEmail());
+        var records = assertInstanceOf(java.util.List.class, exported.get("invitationLinks"));
+        var record = assertInstanceOf(java.util.Map.class, records.getFirst());
+        assertEquals(link.getInvitationId(), record.get("invitationId"));
+        assertEquals("friend", record.get("kind"));
+        assertEquals(clock.instant(), record.get("createdAt"));
+        assertFalse(record.containsKey("token"));
+        assertFalse(record.toString().contains(link.getToken()));
+    }
+
     @Test void dataExportIncludesAchievementPresentationAndReadState() {
         User user = createTestUserWithCourse("achievement-export@example.test");
         when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));

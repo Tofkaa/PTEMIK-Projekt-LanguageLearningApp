@@ -30,6 +30,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ClassroomServiceTest {
+    @Mock private SseService sseService;
 
     @Mock private ClassroomRepository classroomRepository;
     @Mock private ClassroomMemberRepository classroomMemberRepository;
@@ -46,12 +47,12 @@ class ClassroomServiceTest {
 
     @BeforeEach
     void setUp() {
-        teacher = new User();
+        teacher = new User(); teacher.setVerified(true);
         teacher.setUserId(UUID.randomUUID());
         teacher.setEmail("tanar@test.com");
         teacher.setRole(Role.TEACHER); // Fontos a létrehozás teszteléséhez!
 
-        student = new User();
+        student = new User(); student.setVerified(true);
         student.setUserId(UUID.randomUUID());
         student.setEmail("diak@test.com");
         student.setRole(Role.STUDENT);
@@ -120,7 +121,7 @@ class ClassroomServiceTest {
     void joinClassroom_ValidInviteCode_ShouldCreatePendingMembership() {
         // Arrange
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
-        when(classroomRepository.findByInviteCode("TESTCODE")).thenReturn(Optional.of(classroom));
+        when(classroomRepository.findByInviteCodeForJoin("TESTCODE")).thenReturn(Optional.of(classroom));
         // A diák még nem tagja
         when(classroomMemberRepository.existsByClassroom_ClassroomIdAndUser_UserId(classroom.getClassroomId(), student.getUserId())).thenReturn(false);
 
@@ -140,7 +141,7 @@ class ClassroomServiceTest {
     @Test
     void joinClassroom_InvalidCode_ShouldExplainCorrectionInHungarianWithoutCreatingMembership() {
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
-        when(classroomRepository.findByInviteCode("__A11Y__")).thenReturn(Optional.empty());
+        when(classroomRepository.findByInviteCodeForJoin("__A11Y__")).thenReturn(Optional.empty());
 
         BadRequestException exception = assertThrows(BadRequestException.class,
                 () -> classroomService.joinClassroom("__A11Y__", student.getEmail()));
@@ -170,4 +171,15 @@ class ClassroomServiceTest {
         verify(classroomMemberRepository, times(1)).save(pendingMember);
         verify(classroomMemberRepository, never()).delete(any()); // Nem töröltük ki
     }
+    @Test void teacherCannotBypassStudentRoleThroughAManualCode() {
+        when(userRepository.findByEmail(teacher.getEmail())).thenReturn(Optional.of(teacher));
+        assertThrows(com.languageapp.backend.exception.ForbiddenException.class, () -> classroomService.joinClassroom("TESTCODE", teacher.getEmail()));
+        verifyNoInteractions(classroomRepository, classroomMemberRepository);
+    }
+    @Test void unverifiedStudentCannotJoinThroughAManualCode() {
+        student.setVerified(false); when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
+        assertThrows(com.languageapp.backend.exception.ForbiddenException.class, () -> classroomService.joinClassroom("TESTCODE", student.getEmail()));
+        verifyNoInteractions(classroomRepository, classroomMemberRepository);
+    }
+
 }

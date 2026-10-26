@@ -37,6 +37,7 @@ public class ClassroomService {
     private final ClassroomMemberRepository classroomMemberRepository;
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
+    private final SseService sseService;
 
     private static final String INVITE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int INVITE_CODE_LENGTH = 8;
@@ -84,7 +85,8 @@ public class ClassroomService {
         User student = userRepository.findByEmail(studentEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found."));
 
-        Classroom classroom = classroomRepository.findByInviteCode(inviteCode.toUpperCase())
+        ConnectionChecks.requireStudent(student);
+        Classroom classroom = classroomRepository.findByInviteCodeForJoin(inviteCode.trim().toUpperCase(java.util.Locale.ROOT))
                 .orElseThrow(() -> new BadRequestException("Érvénytelen meghívókód. Ellenőrizd a tanárodtól kapott kódot!"));
 
         if (classroom.getTeacher().getUserId().equals(student.getUserId())) {
@@ -95,13 +97,25 @@ public class ClassroomService {
             throw new BadRequestException("Már tagja vagy ennek az osztályteremnek, vagy a kérelmed jóváhagyásra vár.");
         }
 
-        ClassroomMember member = new ClassroomMember();
-        member.setClassroom(classroom);
-        member.setUser(student);
-        member.setStatus(MembershipStatus.PENDING);
+        requestMembership(classroom, student);
+    }
 
+    /** Caller holds the classroom row lock, for both code and invitation paths. */
+    @Transactional
+    public MembershipStatus requestMembership(Classroom classroom, User student) {
+        ConnectionChecks.requireStudent(student);
+        if (!classroom.isActive() || !classroom.getTeacher().isActive() || !classroom.getTeacher().isVerified()
+                || classroom.getTeacher().getRole() != Role.TEACHER)
+            throw new BadRequestException("Ez az osztályterem jelenleg nem elérhető.");
+        if (classroom.getTeacher().getUserId().equals(student.getUserId()))
+            throw new BadRequestException("Saját osztálytermedhez nem küldhetsz csatlakozási kérelmet.");
+        var existing = classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(classroom.getClassroomId(), student.getUserId());
+        if (existing.isPresent()) return existing.get().getStatus();
+        ClassroomMember member = new ClassroomMember();
+        member.setClassroom(classroom); member.setUser(student); member.setStatus(MembershipStatus.PENDING);
         classroomMemberRepository.save(member);
-        log.info("Join request created for student {} to classroom {}", student.getEmail(), classroom.getName());
+        sseService.sendPingAfterCommit(classroom.getTeacher().getEmail());
+        return MembershipStatus.PENDING;
     }
 
     /**

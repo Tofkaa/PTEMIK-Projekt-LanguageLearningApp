@@ -41,6 +41,7 @@ public class UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final LessonAttemptRepository lessonAttemptRepository;
     private final UserAchievementRepository userAchievementRepository;
+    private final InvitationLinkRepository invitationLinkRepository;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -366,6 +367,14 @@ public class UserService {
             entry.put("readAt", a.getReadAt());
             return entry;
         }).toList());
+        exportData.put("invitationLinks", invitationLinkRepository.findByOwnerUserId(user.getUserId()).stream().map(link -> {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("invitationId", link.getInvitationId()); entry.put("kind", link.getKind());
+            entry.put("classroomId", link.getClassroom() == null ? null : link.getClassroom().getClassroomId());
+            entry.put("createdAt", link.getCreatedAt()); entry.put("updatedAt", link.getUpdatedAt());
+            entry.put("expiresAt", link.getExpiresAt()); entry.put("revokedAt", link.getRevokedAt());
+            return entry;
+        }).toList());
         return exportData;
     }
 
@@ -393,6 +402,7 @@ public class UserService {
 
     /** Only called after local credentials or an email challenge have been verified. */
     void anonymizeAccount(User user) {
+        invitationLinkRepository.revokeAllForOwner(user.getUserId(), clock.instant());
         lessonAttemptRepository.deleteByUserUserId(user.getUserId());
         friendshipRepository.deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
         refreshTokenRepository.deleteByUserUserId(user.getUserId());

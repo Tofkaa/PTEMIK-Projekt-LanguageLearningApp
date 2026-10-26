@@ -23,4 +23,12 @@ public interface ClassroomRepository extends JpaRepository<Classroom, UUID> {
     @Modifying
     @Query(value = "UPDATE classrooms SET is_active = :status WHERE classroom_id = :classroomId", nativeQuery = true)
     void updateClassroomStatus(@Param("classroomId") java.util.UUID classroomId, @Param("status") boolean status);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Classroom c where c.inviteCode=:code")
+    Optional<Classroom> findByInviteCodeForJoin(@Param("code") String code);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Classroom c where c.classroomId=:id")
+    Optional<Classroom> findForInvitationUpdate(@Param("id") UUID id);
+
 }

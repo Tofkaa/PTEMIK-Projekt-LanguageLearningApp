@@ -46,4 +46,11 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
     int countByUserUserIdAndStatus(UUID userId, FriendshipStatus friendshipStatus);
 
     void deleteByUserUserIdOrFriendUserId(UUID userId1, UUID userId2);
+    /** PostgreSQL transaction lock: both directions of a pair use the same key. */
+    @Query(value = "select 1 from pg_advisory_xact_lock(hashtextextended(:pair, 0))", nativeQuery = true)
+    Integer lockConnectionPair(@Param("pair") String pair);
+
+    @Query("select f from Friendship f where (f.user.userId=:a and f.friend.userId=:b) or (f.user.userId=:b and f.friend.userId=:a)")
+    List<Friendship> findConnectionsBetween(@Param("a") UUID a, @Param("b") UUID b);
+
 }
