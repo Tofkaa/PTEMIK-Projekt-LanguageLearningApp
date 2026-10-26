@@ -11,7 +11,9 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "progress")
+@Table(name = "progress", indexes = {
+        @Index(name = "idx_progress_user_lesson_level", columnList = "user_id, lesson_id, completed_difficulty")
+})
 
 public class Progress {
 

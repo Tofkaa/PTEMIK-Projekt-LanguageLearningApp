@@ -16,7 +16,9 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "student_vocabulary")
+@Table(name = "student_vocabulary", indexes = {
+        @Index(name = "idx_vocab_user_course_due", columnList = "user_id, course_id, next_practice_at")
+})
 public class StudentVocabulary {
 
     @Id

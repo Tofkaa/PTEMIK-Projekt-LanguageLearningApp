@@ -12,7 +12,10 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "refresh_tokens")
+@Table(name = "refresh_tokens", indexes = {
+        @Index(name = "idx_refresh_token_hash", columnList = "token_hash"),
+        @Index(name = "idx_refresh_user", columnList = "user_id")
+})
 
 public class RefreshToken {
 

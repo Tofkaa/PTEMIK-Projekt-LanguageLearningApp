@@ -12,7 +12,11 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-@Table(name = "challenges")
+@Table(name = "challenges", indexes = {
+        @Index(name = "idx_challenges_challenger_status", columnList = "challenger_id, status"),
+        @Index(name = "idx_challenges_opponent_status", columnList = "opponent_id, status"),
+        @Index(name = "idx_challenges_status_end", columnList = "status, end_time")
+})
 
 public class Challenge {
 

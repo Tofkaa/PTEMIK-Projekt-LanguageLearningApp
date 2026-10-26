@@ -92,6 +92,25 @@ class SecurityFoundationsPersistenceTest {
     }
     String classroomPath(Fixture f) { return "/api/assignments/classroom/"+f.classroom; }
 
+    static java.util.stream.Stream<Class<?>> indexedEntities() {
+        return java.util.stream.Stream.of(StudentVocabulary.class,Result.class,AssignmentSession.class,Progress.class,
+                UserAchievement.class,Friendship.class,Challenge.class,RefreshToken.class);
+    }
+    @ParameterizedTest @org.junit.jupiter.params.provider.MethodSource("indexedEntities")
+    void hotPathIndexesAreCreatedWithTheDeclaredColumnOrderAndWithoutChangingUniqueness(Class<?> entity) {
+        var table=entity.getAnnotation(jakarta.persistence.Table.class);
+        tx.executeWithoutResult(status->{
+            for(var index:table.indexes()) {
+                var definitions=em.createNativeQuery("select indexdef from pg_indexes where schemaname = current_schema() and tablename = :table and indexname = :name",String.class)
+                        .setParameter("table",table.name()).setParameter("name",index.name()).getResultList();
+                assertEquals(1,definitions.size(),index.name());
+                String definition=definitions.getFirst().toString().toLowerCase(Locale.ROOT).replaceAll("\\s+","");
+                assertTrue(definition.endsWith("("+index.columnList().toLowerCase(Locale.ROOT).replaceAll("\\s+","")+")"),index.name()+": "+definition);
+                assertFalse(index.unique());assertFalse(definition.contains("uniqueindex"));
+            }
+        });
+    }
+
     byte[] profilePng() throws Exception {
         var output=new java.io.ByteArrayOutputStream();
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(3,2,java.awt.image.BufferedImage.TYPE_INT_RGB),"png",output);
