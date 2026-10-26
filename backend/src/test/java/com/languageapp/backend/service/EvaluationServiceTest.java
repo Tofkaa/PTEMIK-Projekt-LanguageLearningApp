@@ -23,6 +23,26 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class EvaluationServiceTest {
+    @Test void missingOrMalformedSolutionsCannotBeReportedAsCorrectOrGrantXp() {
+        when(exerciseRepository.findById(testExercise.getExerciseId())).thenReturn(Optional.of(testExercise));
+        var submission=new ExerciseSubmission();submission.setExerciseId(testExercise.getExerciseId());submission.setAnswer("");
+        var request=new LessonSubmitRequest();request.setAnswers(List.of(submission));
+        for(var value:List.of(java.util.Map.<String,Object>of(),java.util.Map.<String,Object>of("answer",42),
+                java.util.Map.<String,Object>of("answer",""),java.util.Map.<String,Object>of("answer","..."))) {
+            testExercise.setCorrectAnswer(value);
+            assertThrows(com.languageapp.backend.exception.ConflictException.class,()->evaluationService.checkSingleExercise(testExercise.getExerciseId(),""));
+            assertThrows(com.languageapp.backend.exception.ConflictException.class,()->evaluationService.calculateEvaluationDetails(List.of(testExercise),request,new ArrayList<>()));
+        }
+        testExercise.setCorrectAnswer(null);
+        assertThrows(com.languageapp.backend.exception.ConflictException.class,()->evaluationService.checkSingleExercise(testExercise.getExerciseId(),""));
+        verifyNoInteractions(resultRepository,progressRepository);
+    }
+    @Test void theGermanWordNullIsARealAnswerAndDoesNotMatchEmptyInput() {
+        testExercise.setCorrectAnswer(Map.of("answer","null"));
+        when(exerciseRepository.findById(testExercise.getExerciseId())).thenReturn(Optional.of(testExercise));
+        assertFalse(evaluationService.checkSingleExercise(testExercise.getExerciseId(),"").isCorrect());
+        assertTrue(evaluationService.checkSingleExercise(testExercise.getExerciseId(),"null").isCorrect());
+    }
     @Test void rejectsOversizedImmediateInputBeforeQueryingTheExercise() {
         assertThrows(com.languageapp.backend.exception.BadRequestException.class,
                 () -> evaluationService.checkSingleExercise(UUID.randomUUID(),"x".repeat(10_001)));

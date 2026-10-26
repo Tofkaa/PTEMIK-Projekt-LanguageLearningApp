@@ -28,6 +28,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class CurriculumService {
+    private static final int IMPORT_LIMIT = com.languageapp.backend.validation.CurriculumRules.MAX_ITEMS;
 
     private final LessonTopicRepository topicRepository;
     private final LessonRepository lessonRepository;
@@ -35,7 +36,23 @@ public class CurriculumService {
     private final CourseRepository courseRepository;
 
     @Transactional
+    public void importCurriculum(List<TopicImportRequest> requests) {
+        com.languageapp.backend.validation.CurriculumRules.list(requests,100);
+        int total=0;
+        int totalLessons=0;
+        for(var request:requests) {
+            validateTopic(request);
+            totalLessons+=request.getLessons()==null?0:request.getLessons().size();
+            if(totalLessons>IMPORT_LIMIT) throw new BadRequestException("Egy import legfeljebb 1000 leckét tartalmazhat.");
+            if(request.getLessons()!=null) for(var lesson:request.getLessons()) if(lesson.getExercises()!=null) total+=lesson.getExercises().size();
+        }
+        if(total>IMPORT_LIMIT) throw new BadRequestException("Egy import legfeljebb 1000 feladatot tartalmazhat.");
+        for(var request:requests) importTopicAndLessons(request);
+    }
+
+    @Transactional
     public void importTopicAndLessons(TopicImportRequest request) {
+        validateTopic(request);
         log.info("Starting curriculum import for topic: {}", request.getTopicName());
         String targetCourseCode = request.getCourseCode() != null ? request.getCourseCode() : "en";
 
@@ -58,20 +75,26 @@ public class CurriculumService {
 
     @Transactional
     public void importLessonsToExistingTopic(UUID topicId, List<LessonImportRequest> lessonRequests) {
+        com.languageapp.backend.validation.CurriculumRules.list(lessonRequests,IMPORT_LIMIT);
         log.info("Importing {} new lessons to existing topic ID: {}", lessonRequests.size(), topicId);
 
         LessonTopic existingTopic = topicRepository.findById(topicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Topic nem található az importáláshoz!"));
+
+        validateLessons(lessonRequests);
 
         importLessonsInternal(existingTopic, lessonRequests);
     }
 
     @Transactional
     public void importExercisesToExistingLesson(UUID lessonId, List<ExerciseImportRequest> exerciseRequests) {
+        com.languageapp.backend.validation.CurriculumRules.list(exerciseRequests,IMPORT_LIMIT);
         log.info("Importing {} new exercises to existing lesson ID: {}", exerciseRequests.size(), lessonId);
 
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lecke nem található az importáláshoz!"));
+
+        validateExercises(exerciseRequests);
 
         importExercisesInternal(lesson, exerciseRequests);
     }
@@ -94,7 +117,6 @@ public class CurriculumService {
     }
 
     private void importExercisesInternal(Lesson parentLesson, List<ExerciseImportRequest> exerciseRequests) {
-        exerciseRequests.forEach(this::validateAccessibilityMetadata);
         for (ExerciseImportRequest exerciseReq : exerciseRequests) {
             Exercise exercise = new Exercise();
             exercise.setLesson(parentLesson);
@@ -111,6 +133,26 @@ public class CurriculumService {
         }
     }
 
+    private void validateTopic(TopicImportRequest request) {
+        com.languageapp.backend.validation.CurriculumRules.topic(request);
+        if(request.getLessons()!=null) validateLessons(request.getLessons());
+    }
+    private void validateLessons(List<LessonImportRequest> requests) {
+        com.languageapp.backend.validation.CurriculumRules.list(requests,IMPORT_LIMIT);
+        int total=0;
+        for(var lesson:requests) {
+            com.languageapp.backend.validation.CurriculumRules.lesson(lesson);
+            if(lesson.getExercises()!=null) { validateExercises(lesson.getExercises());total+=lesson.getExercises().size(); }
+        }
+        if(total>IMPORT_LIMIT) throw new BadRequestException("Egy import legfeljebb 1000 feladatot tartalmazhat.");
+    }
+    private void validateExercises(List<ExerciseImportRequest> requests) {
+        com.languageapp.backend.validation.CurriculumRules.list(requests,IMPORT_LIMIT);
+        for(var request:requests) {
+            com.languageapp.backend.validation.CurriculumRules.exercise(request);
+            validateAccessibilityMetadata(request);
+        }
+    }
     private void validateAccessibilityMetadata(ExerciseImportRequest request) {
         var content = request.getContent();
         if (content == null) throw new BadRequestException("A feladat content mezője kötelező.");
@@ -133,6 +175,7 @@ public class CurriculumService {
                     throw new BadRequestException("Minden " + partsField + " elemhez text és lang szükséges.");
                 }
                 requireLanguage(segment.get("lang"));
+                if(textValue.length()+text.length()>10_000) throw new BadRequestException("Túl hosszú nyelvjelölt szöveg.");
                 textValue.append(text);
             }
             if (!textValue.toString().equals(content.get(field))) {
@@ -153,8 +196,6 @@ public class CurriculumService {
     }
 
     private void requireLanguage(Object value) {
-        if (!(value instanceof String tag) || tag.isBlank()) throw new BadRequestException("Hiányzó nyelvjelölés (BCP 47 lang).");
-        try { new java.util.Locale.Builder().setLanguageTag(tag).build(); }
-        catch (java.util.IllformedLocaleException e) { throw new BadRequestException("Érvénytelen nyelvjelölés: " + tag); }
+        com.languageapp.backend.validation.CurriculumRules.language(value);
     }
 }

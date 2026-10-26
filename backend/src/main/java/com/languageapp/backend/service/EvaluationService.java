@@ -243,42 +243,22 @@ public class EvaluationService {
                 .collect(Collectors.groupingBy(ExerciseSubmission::getExerciseId));
 
         for (Exercise exercise : exercises) {
-            if (exercise.getCorrectAnswer() != null && exercise.getCorrectAnswer().containsKey("answer")) {
-                String rawExpected = String.valueOf(exercise.getCorrectAnswer().get("answer"));
-                requireExpectedAnswer(rawExpected);
-                String cleanExpected = normalizeText(rawExpected);
-
-                List<ExerciseSubmission> subs = subsByExercise.getOrDefault(exercise.getExerciseId(), new ArrayList<>());
-
-                ExerciseSubmission firstAttempt = subs.stream().filter(s -> !s.isRetry()).findFirst().orElse(null);
-                ExerciseSubmission retryAttempt = subs.stream().filter(ExerciseSubmission::isRetry).findFirst().orElse(null);
-
-                String firstAnswer = (firstAttempt != null && firstAttempt.getAnswer() != null) ? firstAttempt.getAnswer().toString() : "";
-                boolean firstCorrect = cleanExpected.equals(normalizeText(firstAnswer));
-
-                if (firstCorrect) {
-                    // CASE 1: Flawless execution. Award a point and full XP.
+            String rawExpected = expectedAnswer(exercise);
+            String cleanExpected = normalizeText(rawExpected);
+            List<ExerciseSubmission> subs = subsByExercise.getOrDefault(exercise.getExerciseId(), List.of());
+            ExerciseSubmission first = subs.stream().filter(s -> !s.isRetry()).findFirst().orElse(null);
+            ExerciseSubmission retry = subs.stream().filter(ExerciseSubmission::isRetry).findFirst().orElse(null);
+            String firstAnswer = first == null ? "" : (String) first.getAnswer();
+            if (cleanExpected.equals(normalizeText(firstAnswer))) {
+                correctCount++;
+                potentialXp += XP_PER_CORRECT_ANSWER;
+            } else {
+                String question = exercise.getContent() != null && exercise.getContent().containsKey("question")
+                        ? String.valueOf(exercise.getContent().get("question")) : "Unknown question";
+                mistakes.add(new MistakeDTO(exercise.getExerciseId(),question,firstAnswer,rawExpected));
+                if (retry != null && cleanExpected.equals(normalizeText((String)retry.getAnswer()))) {
                     correctCount++;
-                    potentialXp += XP_PER_CORRECT_ANSWER;
-                } else {
-                    // Log the mistake for the frontend Summary Screen using the initial wrong answer
-                    String questionText = exercise.getContent() != null && exercise.getContent().containsKey("question")
-                            ? String.valueOf(exercise.getContent().get("question"))
-                            : "Unknown question";
-                    mistakes.add(new MistakeDTO(exercise.getExerciseId(), questionText, firstAnswer, rawExpected));
-
-                    // CASE 2: The user failed initially, but we check if they fixed it via the retry queue
-                    if (retryAttempt != null) {
-                        String retryAnswer = retryAttempt.getAnswer() != null ? retryAttempt.getAnswer().toString() : "";
-                        boolean retryCorrect = cleanExpected.equals(normalizeText(retryAnswer));
-
-                        if (retryCorrect) {
-                            // The user learned from the mistake. Count it towards passing the lesson.
-                            correctCount++;
-                            // Apply penalty: award only half XP for requiring a second attempt.
-                            potentialXp += (XP_PER_CORRECT_ANSWER / 2);
-                        }
-                    }
+                    potentialXp += XP_PER_CORRECT_ANSWER / 2;
                 }
             }
         }
@@ -348,14 +328,7 @@ public class EvaluationService {
     }
 
     private String normalizeText(String input) {
-        if (input == null || input.isBlank() || "null".equals(input)) {
-            return "";
-        }
-        return input
-                .replaceAll("\\p{Punct}", "")
-                .toLowerCase()
-                .replaceAll("\\s+", " ")
-                .trim();
+        return com.languageapp.backend.validation.AnswerText.normalize(input);
     }
 
     @Transactional(readOnly = true)
@@ -380,12 +353,7 @@ public class EvaluationService {
 
     private ExerciseCheckResponse checkExerciseAnswer(Exercise exercise, String userAnswer) {
 
-        if (exercise.getCorrectAnswer() == null || !exercise.getCorrectAnswer().containsKey("answer")) {
-            return ExerciseCheckResponse.builder().isCorrect(true).build();
-        }
-
-        String rawExpected = String.valueOf(exercise.getCorrectAnswer().get("answer"));
-        requireExpectedAnswer(rawExpected);
+        String rawExpected = expectedAnswer(exercise);
         String normExpected = normalizeText(rawExpected);
         String normUser = normalizeText(userAnswer);
 
@@ -429,5 +397,14 @@ public class EvaluationService {
     private void requireExpectedAnswer(String answer) {
         if (answer.length() > AnswerLimits.MAX_CHARACTERS)
             throw new com.languageapp.backend.exception.ConflictException("A feladat megoldása túl hosszú az értékeléshez. Jelezd az oktatónak.");
+    }
+    private String expectedAnswer(Exercise exercise) {
+        Object value = exercise.getCorrectAnswer() == null ? null : exercise.getCorrectAnswer().get("answer");
+        if (!(value instanceof String text))
+            throw new com.languageapp.backend.exception.ConflictException("A feladat mintamegoldása hiányzik vagy érvénytelen. Jelezd az oktatónak.");
+        requireExpectedAnswer(text);
+        if (normalizeText(text).isEmpty())
+            throw new com.languageapp.backend.exception.ConflictException("A feladat mintamegoldása hiányzik vagy érvénytelen. Jelezd az oktatónak.");
+        return text;
     }
 }

@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 /** Bounds authenticated answer JSON before deserialization, including bodies without Content-Length. */
 public final class AnswerPayloadFilter extends OncePerRequestFilter {
     private static final Pattern CHECK = Pattern.compile("/api/(?:exercises/[^/]+/check|lessons/[^/]+/attempts/[^/]+/exercises/[^/]+/check|vocabulary/(?:lookup|[^/]+/practice)|assignments/sessions/[^/]+/grade)");
-    private static final Pattern BATCH = Pattern.compile("/api/(?:lessons/[^/]+/submit|assignments/sessions/[^/]+/(?:submit|draft)|vocabulary/(?:known-batch|practice/submit))");
+    private static final Pattern BATCH = Pattern.compile("/api/(?:lessons/[^/]+/submit|assignments/sessions/[^/]+/(?:submit|draft)|vocabulary/(?:known-batch|practice/submit)|admin/curriculum/(?:import|topic/[^/]+/lesson/import|lesson/[^/]+/exercise/import))");
     private final ObjectMapper mapper;
     private final Clock clock;
     public AnswerPayloadFilter(ObjectMapper mapper, Clock clock) { this.mapper = mapper; this.clock = clock; }

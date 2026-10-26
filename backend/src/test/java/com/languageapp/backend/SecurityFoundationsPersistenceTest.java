@@ -51,6 +51,10 @@ class SecurityFoundationsPersistenceTest {
     @Autowired Clock clock;
     @Autowired AssignmentService grading;
     @Autowired AssignmentSessionRepository examSessions;
+    @Autowired LessonTopicRepository topics;
+    @Autowired LessonRepository lessons;
+    @Autowired ExerciseRepository exercises;
+    @Autowired tools.jackson.databind.ObjectMapper transportJson;
     @MockitoBean DataSeeder seeder;
     @MockitoBean EmailService mail;
     @MockitoBean SseService sse;
@@ -86,6 +90,61 @@ class SecurityFoundationsPersistenceTest {
     }
     String classroomPath(Fixture f) { return "/api/assignments/classroom/"+f.classroom; }
 
+    Map<String,Object> importedExercise(String answer) {
+        return Map.of("type","MULTIPLE_CHOICE","difficulty","EASY","content",
+                Map.of("question","Kérdés","questionLang","hu","answerLang","en","options",List.of("Apple","Banana")),
+                "correctAnswer",Map.of("answer",answer));
+    }
+    Map<String,Object> importedTopic(String course,String answer) {
+        return Map.of("courseCode",course,"topicName","Import "+UUID.randomUUID(),"lessons",
+                List.of(Map.of("title","Imported lesson","language","en","exercises",List.of(importedExercise(answer)))));
+    }
+    String admin(Fixture f) {
+        tx.executeWithoutResult(status->users.findById(f.teacher.getUserId()).orElseThrow().setRole(Role.ADMIN));return auth(f.teacher);
+    }
+    @Test void curriculumImportIsAtomicForSchemaErrorsAndForALaterMissingCourse() throws Exception {
+        var f=fixture();String header=admin(f);String course=tx.execute(status->users.findById(f.student.getUserId()).orElseThrow().getActiveCourse().getLanguageCode());
+        long topicCount=topics.count(),lessonCount=lessons.count(),exerciseCount=exercises.count();
+        mvc.perform(post("/api/admin/curriculum/import").header("Authorization",header).contentType(MediaType.APPLICATION_JSON)
+                .content(transportJson.writeValueAsString(List.of(importedTopic(course,"Apple"),importedTopic(course,"Pear")))))
+                .andExpect(status().isBadRequest());
+        assertEquals(topicCount,topics.count());assertEquals(lessonCount,lessons.count());assertEquals(exerciseCount,exercises.count());
+        mvc.perform(post("/api/admin/curriculum/import").header("Authorization",header).contentType(MediaType.APPLICATION_JSON)
+                .content(transportJson.writeValueAsString(List.of(importedTopic(course,"Apple"),importedTopic("absent-xy","Apple")))))
+                .andExpect(status().isNotFound());
+        assertEquals(topicCount,topics.count());assertEquals(lessonCount,lessons.count());assertEquals(exerciseCount,exercises.count());
+        mvc.perform(post("/api/admin/curriculum/import").header("Authorization",header).contentType(MediaType.APPLICATION_JSON)
+                .content(transportJson.writeValueAsString(List.of(importedTopic(course,"Apple")))))
+                .andExpect(status().isOk());
+        assertEquals(topicCount+1,topics.count());assertEquals(lessonCount+1,lessons.count());assertEquals(exerciseCount+1,exercises.count());
+    }
+    @ParameterizedTest @ValueSource(strings={"lesson","exercise"})
+    void partialImportRoutesRejectInvalidExerciseSchemasWithoutSaving(String operation) throws Exception {
+        var f=fixture();String header=admin(f);
+        Lesson lesson=tx.execute(status->{
+            var topic=new LessonTopic();topic.setName("Import target");topic.setCourse(users.findById(f.student.getUserId()).orElseThrow().getActiveCourse());em.persist(topic);
+            var row=new Lesson();row.setTitle("Import target");row.setTopic(topic);em.persist(row);em.flush();return row;
+        });
+        long lessonCount=lessons.count(),exerciseCount=exercises.count();
+        String path=operation.equals("lesson")?"/api/admin/curriculum/topic/"+lesson.getTopic().getTopicId()+"/lesson/import"
+                :"/api/admin/curriculum/lesson/"+lesson.getLessonId()+"/exercise/import";
+        Object body=operation.equals("lesson")?List.of(Map.of("title","Invalid","exercises",List.of(importedExercise("Pear"))))
+                :List.of(importedExercise("Pear"));
+        mvc.perform(post(path).header("Authorization",header).contentType(MediaType.APPLICATION_JSON).content(transportJson.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+        assertEquals(lessonCount,lessons.count());assertEquals(exerciseCount,exercises.count());
+    }
+    @Test void corruptStoredSolutionReturnsConflictInsteadOfACorrectFeedback() throws Exception {
+        var f=fixture();UUID exerciseId=tx.execute(status->{
+            var topic=new LessonTopic();topic.setName("Legacy");topic.setCourse(users.findById(f.student.getUserId()).orElseThrow().getActiveCourse());em.persist(topic);
+            var lesson=new Lesson();lesson.setTitle("Legacy");lesson.setTopic(topic);em.persist(lesson);
+            var exercise=new Exercise();exercise.setLesson(lesson);exercise.setType("TRANSLATION");exercise.setDifficulty("EASY");
+            exercise.setContent(Map.of("question","Question"));exercise.setCorrectAnswer(Map.of());em.persist(exercise);em.flush();return exercise.getExerciseId();
+        });
+        mvc.perform(post("/api/exercises/"+exerciseId+"/check").header("Authorization",auth(f.student)).contentType(MediaType.APPLICATION_JSON).content("{\"answer\":\"\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.correct").doesNotExist());
+    }
+
     UUID gradingSession(Fixture f, boolean finished) {
         return tx.execute(status -> {
             var session=new AssignmentSession();session.setAssignment(em.getReference(ClassroomAssignment.class,f.assignment));
@@ -101,6 +160,7 @@ class SecurityFoundationsPersistenceTest {
     @Test void gradingInputBoundsAreEnforcedBeforeWriting() throws Exception {
         var f=fixture();UUID id=gradingSession(f,true);String header=auth(f.teacher);String path="/api/assignments/sessions/"+id+"/grade";
         for(String body:List.of(gradeBody(-1,0),gradeBody(101,0),"{\"teacherScore\":75}",
+                "{\"teacherScore\":100.9,\"revision\":0}","{\"teacherScore\":4294967296,\"revision\":0}",
                 "{\"teacherScore\":75,\"revision\":0,\"teacherComment\":\""+"x".repeat(4001)+"\"}"))
             mvc.perform(post(path).header("Authorization",header).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
         var saved=examSessions.findById(id).orElseThrow();assertFalse(saved.isGraded());assertEquals(0,saved.getDraftRevision());assertNull(saved.getTeacherScore());

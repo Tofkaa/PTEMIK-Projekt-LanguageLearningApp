@@ -30,6 +30,66 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CurriculumServiceTest {
+    @Mock private com.languageapp.backend.repository.CourseRepository courseRepository;
+
+    @Test void allBundledCurriculaPassTheSameSchemaAndAccessibilityChecksAsImports() throws Exception {
+        var course=new com.languageapp.backend.entity.Course();course.setCourseId(UUID.randomUUID());
+        when(courseRepository.findByLanguageCode(anyString())).thenReturn(Optional.of(course));
+        when(topicRepository.save(any())).thenAnswer(i->i.getArgument(0));
+        when(lessonRepository.save(any())).thenAnswer(i->i.getArgument(0));
+        var mapper=tools.jackson.databind.json.JsonMapper.builder().build();
+        int count=0;
+        for(String language:List.of("en","de","es")) {
+            try(var input=getClass().getResourceAsStream("/data/curriculum-"+language+".json")) {
+                List<TopicImportRequest> topics=mapper.readValue(input,new tools.jackson.core.type.TypeReference<List<TopicImportRequest>>(){});
+                curriculumService.importCurriculum(topics);
+                count+=topics.stream().flatMap(t->t.getLessons().stream()).mapToInt(l->l.getExercises().size()).sum();
+            }
+        }
+        verify(exerciseRepository,times(count)).save(any());assertTrue(count>0);
+    }
+
+    private ExerciseImportRequest validChoice() {
+        var request=new ExerciseImportRequest();request.setType("MULTIPLE_CHOICE");request.setDifficulty("EASY");
+        request.setContent(new java.util.HashMap<>(java.util.Map.of("question","Kérdés","questionLang","hu","answerLang","en","options",List.of("Apple","Banana"))));
+        request.setCorrectAnswer(java.util.Map.of("answer","Apple"));return request;
+    }
+    @Test void rejectsInvalidSchemaVariantsBeforeSavingAnyExercise() {
+        when(lessonRepository.findById(mockLesson.getLessonId())).thenReturn(Optional.of(mockLesson));
+        List<java.util.function.Consumer<ExerciseImportRequest>> mutations=List.of(
+                r->r.setType("UNSUPPORTED"),r->r.setDifficulty("DYNAMIC"),r->r.setCorrectAnswer(null),
+                r->r.setCorrectAnswer(java.util.Map.of("answer",42)),r->r.setCorrectAnswer(java.util.Map.of("answer","...")),
+                r->r.setCorrectAnswer(java.util.Map.of("answer","Pear")),r->r.getContent().put("options",List.of("Apple","apple")),
+                r->r.getContent().put("options",List.of(42,"Apple")),r->r.getContent().remove("question"));
+        for(var mutation:mutations) {
+            var invalid=validChoice();mutation.accept(invalid);
+            assertThrows(BadRequestException.class,()->curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(),List.of(validChoice(),invalid)));
+        }
+        verifyNoInteractions(exerciseRepository);
+    }
+    @Test void wordBankChecksAvailableOccurrencesRatherThanOnlyDistinctWords() {
+        when(lessonRepository.findById(mockLesson.getLessonId())).thenReturn(Optional.of(mockLesson));
+        var request=validChoice();request.setType("WORD_BANK");request.setCorrectAnswer(java.util.Map.of("answer","The the"));
+        request.getContent().put("options",List.of("The"));
+        assertThrows(BadRequestException.class,()->curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(),List.of(request)));
+        verifyNoInteractions(exerciseRepository);
+        request.getContent().put("options",List.of("The","the"));
+        curriculumService.importExercisesToExistingLesson(mockLesson.getLessonId(),List.of(request));
+        verify(exerciseRepository).save(any());
+    }
+    @Test void validatesTheEntireTopicBatchBeforePersistingItsFirstTopic() {
+        var lesson=new LessonImportRequest();lesson.setTitle("Title");lesson.setExercises(List.of(validChoice()));
+        var first=new TopicImportRequest();first.setTopicName("Valid");first.setLessons(List.of(lesson));
+        var invalid=new TopicImportRequest();invalid.setTopicName(" ");
+        assertThrows(BadRequestException.class,()->curriculumService.importCurriculum(List.of(first,invalid)));
+        verifyNoInteractions(courseRepository,topicRepository,lessonRepository,exerciseRepository);
+    }
+    @Test void boundsTheTotalLessonCountAcrossTopicsBeforeAnyDatabaseWork() {
+        var lesson=new LessonImportRequest();lesson.setTitle("Empty lesson");
+        var topic=new TopicImportRequest();topic.setTopicName("Topic");topic.setLessons(Collections.nCopies(11,lesson));
+        assertThrows(BadRequestException.class,()->curriculumService.importCurriculum(Collections.nCopies(100,topic)));
+        verifyNoInteractions(courseRepository,topicRepository,lessonRepository,exerciseRepository);
+    }
 
     @Mock
     private LessonTopicRepository topicRepository;
@@ -102,7 +162,9 @@ class CurriculumServiceTest {
 
         ExerciseImportRequest exerciseReq = new ExerciseImportRequest();
         exerciseReq.setType("MULTIPLE_CHOICE");
-        exerciseReq.setContent(java.util.Map.of("questionLang", "hu", "answerLang", "en"));
+        exerciseReq.setDifficulty("EASY");
+        exerciseReq.setCorrectAnswer(java.util.Map.of("answer","Apple"));
+        exerciseReq.setContent(java.util.Map.of("questionLang", "hu", "answerLang", "en","question","Kérdés","options",List.of("Apple","Banana")));
 
         when(exerciseRepository.save(any(Exercise.class))).thenAnswer(i -> i.getArguments()[0]);
 
@@ -120,8 +182,10 @@ class CurriculumServiceTest {
 
     private ExerciseImportRequest imageRequest() {
         var request = new ExerciseImportRequest(); request.setType("IMAGE_CHOICE"); request.setImageUrl("/images/test.png");
+        request.setDifficulty("EASY");request.setCorrectAnswer(java.util.Map.of("answer","Apfel"));
         request.setContent(new java.util.HashMap<>(java.util.Map.of("questionLang", "hu", "answerLang", "de",
-                "imagePurpose", "visual-assessment", "imageAlt", "Képfelismerési szókincsfeladat", "imageAltLang", "hu")));
+                "imagePurpose", "visual-assessment", "imageAlt", "Képfelismerési szókincsfeladat", "imageAltLang", "hu",
+                "question","Képes kérdés","options",List.of("Apfel","Birne"))));
         return request;
     }
 
