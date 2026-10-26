@@ -47,7 +47,7 @@ class LessonMasteryPersistenceTest {
         return tx.execute(status -> {
             String key = UUID.randomUUID().toString().substring(0,8);
             Course course = new Course(); course.setLanguageCode(key); course.setLanguageName("Test"); em.persist(course);
-            User user = new User(); user.setName("Mastery test"); user.setEmail(key+"@example.test");
+            User user = new User(); user.setVerified(true); user.setName("Mastery test"); user.setEmail(key+"@example.test");
             user.setActiveCourse(course); user.setPreferredDifficulty(DifficultyLevel.EASY); user.setXp(0); em.persist(user);
             LessonTopic topic = new LessonTopic(); topic.setName("Mastery"); topic.setCourse(course); em.persist(topic);
             Lesson lesson = new Lesson(); lesson.setTitle("Fruit"); lesson.setTopic(topic); em.persist(lesson);
