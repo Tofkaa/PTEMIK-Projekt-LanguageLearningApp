@@ -153,8 +153,8 @@ public class AssignmentController {
     }
 
     @GetMapping("/classroom/{classroomId}/statistics")
-    public ResponseEntity<ClassroomStatisticsResponse> getClassroomStatistics(@PathVariable UUID classroomId) {
-        return ResponseEntity.ok(assignmentService.getClassroomStatistics(classroomId));
+    public ResponseEntity<ClassroomStatisticsResponse> getClassroomStatistics(@PathVariable UUID classroomId, Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getClassroomStatistics(classroomId, auth.getName()));
     }
 
 

@@ -4,6 +4,7 @@ import com.languageapp.backend.dto.request.*;
 import com.languageapp.backend.dto.response.*;
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.exception.BadRequestException;
+import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -129,6 +130,7 @@ public class AssignmentService {
      */
     @Transactional(readOnly = true)
     public List<AssignmentResponse> getAssignmentsByClassroom(UUID classroomId, String email) {
+        requireClassroomAccess(classroomId, email);
         return assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(classroomId)
                 .stream()
                 .map(a -> mapToResponse(a, email))
@@ -806,7 +808,16 @@ public class AssignmentService {
      * @return {@link ClassroomStatisticsResponse} containing class averages and individual student progress.
      */
     @Transactional(readOnly = true)
-    public ClassroomStatisticsResponse getClassroomStatistics(UUID classroomId) {
+    public ClassroomStatisticsResponse getClassroomStatistics(UUID classroomId, String email) {
+        Classroom classroom = findClassroom(classroomId);
+        if (!classroom.getTeacher().getEmail().equals(email)) {
+            throw new ForbiddenException("Csak az osztályterem tanára láthatja a teljes statisztikát.");
+        }
+        return calculateClassroomStatistics(classroomId);
+    }
+
+    /** Only called after the public entry point has authorized the classroom. */
+    private ClassroomStatisticsResponse calculateClassroomStatistics(UUID classroomId) {
         List<ClassroomAssignment> assignments = assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(classroomId);
         List<User> students = classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
                 .stream().map(ClassroomMember::getUser).toList();
@@ -860,7 +871,8 @@ public class AssignmentService {
      */
     @Transactional(readOnly = true)
     public java.util.Map<String, Object> getStudentClassroomStats(UUID classroomId, String email) {
-        ClassroomStatisticsResponse allStats = getClassroomStatistics(classroomId);
+        requireClassroomAccess(classroomId, email);
+        ClassroomStatisticsResponse allStats = calculateClassroomStatistics(classroomId);
 
         ClassroomStatisticsResponse.StudentProgressDTO myProgress = allStats.getStudentProgress().stream()
                 .filter(p -> p.getStudentEmail().equals(email))
@@ -876,6 +888,22 @@ public class AssignmentService {
                 "myAverage", myAvg,
                 "classAverage", allStats.getClassAverage()
         );
+    }
+
+    private Classroom findClassroom(UUID classroomId) {
+        return classroomRepository.findById(classroomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found."));
+    }
+
+    /** Authentication alone is insufficient: the caller must own or belong to this classroom. */
+    private void requireClassroomAccess(UUID classroomId, String email) {
+        Classroom classroom = findClassroom(classroomId);
+        if (classroom.getTeacher().getEmail().equals(email)) return;
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        boolean accepted = classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(classroomId, user.getUserId())
+                .filter(member -> member.getStatus() == MembershipStatus.ACCEPTED).isPresent();
+        if (!accepted) throw new ForbiddenException("Nincs jogosultságod az osztályterem adatainak megtekintéséhez.");
     }
 
     /**
