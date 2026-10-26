@@ -1,6 +1,9 @@
 package com.languageapp.backend.service;
 
 import com.languageapp.backend.dto.response.AchievementResponse;
+import com.languageapp.backend.dto.response.AchievementFeedback;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import com.languageapp.backend.entity.Achievement;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.entity.UserAchievement;
@@ -34,7 +37,8 @@ public class AchievementService {
     private final UserRepository userRepository;
 
     // Dependencies for social and engagement achievements
-    private final FriendshipService friendshipService;
+    private final FriendshipRepository friendshipRepository;
+    private final SseService sseService;
     private final ChallengeRepository challengeRepository;
     private final StudentVocabularyRepository vocabularyRepository;
 
@@ -46,7 +50,8 @@ public class AchievementService {
      * @param currentLessonScore The accuracy score (0-100) of the most recently completed lesson.
      */
     @Transactional
-    public void checkAndAwardAchievements(User user, int currentLessonScore) {
+    public List<AchievementFeedback> checkAndAwardAchievements(User user, int currentLessonScore) {
+        var awarded = new java.util.ArrayList<AchievementFeedback>();
         // Vocabulary practice can trigger achievements too: all award paths share this user lock.
         userRepository.findForLearningUpdate(user.getUserId())
                 .orElseThrow(() -> new com.languageapp.backend.exception.ResourceNotFoundException("User not found"));
@@ -64,9 +69,10 @@ public class AchievementService {
 
             // Evaluate the JSONB conditions dynamically
             if (isEligible(user, achievement, currentLessonScore)) {
-                awardAchievement(user, achievement);
+                awarded.add(toFeedback(awardAchievement(user, achievement)));
             }
         }
+        return awarded;
     }
 
     /**
@@ -114,7 +120,7 @@ public class AchievementService {
 
                 case "SOCIAL_FRIENDS":
                     int targetFriends = Integer.parseInt(String.valueOf(criteria.get("target")));
-                    int currentFriends = friendshipService.getMyFriends(user.getUserId()).size();
+                    int currentFriends = friendshipRepository.findAcceptedFriendships(user.getUserId(), com.languageapp.backend.enums.FriendshipStatus.ACCEPTED).size();
                     return currentFriends >= targetFriends;
 
                 case "SOCIAL_DUELS":
@@ -186,6 +192,8 @@ public class AchievementService {
                     .iconUrl(ach.getIconUrl())
                     .isUnlocked(unlockedAch != null)
                     .achievedAt(unlockedAch != null ? unlockedAch.getAchievedAt() : null)
+                    .userAchievementId(unlockedAch != null ? unlockedAch.getUserAchievementId() : null)
+                    .unread(unlockedAch != null && unlockedAch.isFeedbackEnabled() && unlockedAch.getReadAt() == null)
                     .build();
         }).collect(Collectors.toList());
     }
@@ -193,13 +201,54 @@ public class AchievementService {
     /**
      * Persists a newly earned achievement to the database and logs the event.
      */
-    private void awardAchievement(User user, Achievement achievement) {
+    private UserAchievement awardAchievement(User user, Achievement achievement) {
         UserAchievement newAward = new UserAchievement();
         newAward.setUser(user);
         newAward.setAchievement(achievement);
         newAward.setAchievedAt(clock.instant());
 
+        newAward.setFeedbackEnabled(true);
         userAchievementRepository.save(newAward);
+        // Never notify clients about an award whose transaction may still roll back.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            String email = user.getEmail();
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { sseService.sendPing(email); }
+            });
+        }
         log.info("🏆 Gamification: New achievement unlocked for user: {}, Achievement: {}", user.getEmail(), achievement.getName());
+        return newAward;
     }
+    private AchievementFeedback toFeedback(UserAchievement award) {
+        Achievement achievement = award.getAchievement();
+        return new AchievementFeedback(award.getUserAchievementId(), achievement.getName(),
+                achievement.getDescription(), achievement.getIconUrl(), award.getAchievedAt().toString());
+    }
+
+    @Transactional(readOnly = true)
+    public List<AchievementFeedback> getPendingFeedback(UUID userId) {
+        return userAchievementRepository
+                .findByUserUserIdAndFeedbackEnabledTrueAndPresentedAtIsNullOrderByAchievedAtAsc(userId)
+                .stream().map(this::toFeedback).toList();
+    }
+
+    @Transactional
+    public void acknowledgeFeedback(UUID userId, List<UUID> awardIds, boolean read) {
+        if (awardIds == null || awardIds.isEmpty()) return;
+        if (awardIds.size() > 100) throw new com.languageapp.backend.exception.BadRequestException("Túl sok kitüntetés.");
+        // Ownership is part of the selection: never acknowledge another user's award.
+        userRepository.findForLearningUpdate(userId)
+                .orElseThrow(() -> new com.languageapp.backend.exception.ResourceNotFoundException("User not found"));
+        for (UserAchievement award : userAchievementRepository.findByUserUserId(userId)) {
+            if (!award.isFeedbackEnabled() || !awardIds.contains(award.getUserAchievementId())) continue;
+            if (award.getPresentedAt() == null) award.setPresentedAt(clock.instant());
+            if (read && award.getReadAt() == null) award.setReadAt(clock.instant());
+        }
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void checkSocialAchievements(UUID userId) {
+        userRepository.findForLearningUpdate(userId).ifPresent(user -> checkAndAwardAchievements(user, -1));
+    }
+
 }

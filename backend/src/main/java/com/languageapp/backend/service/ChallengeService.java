@@ -36,6 +36,7 @@ public class ChallengeService {
     private final FriendshipService friendshipService;
     private final ResultRepository resultRepository;
     private final SseService sseService;
+    private final org.springframework.context.ApplicationEventPublisher events;
     private final UserDifficultyCalculator userDifficultyCalculator;
 
     @Transactional
@@ -123,7 +124,7 @@ public class ChallengeService {
             challenge.setStatus(ChallengeStatus.PENDING);
             challengeRepository.save(challenge);
 
-            sseService.sendPing(challenge.getOpponent().getEmail());
+            sseService.sendPingAfterCommit(challenge.getOpponent().getEmail());
 
             return;
         }
@@ -160,8 +161,9 @@ public class ChallengeService {
                 userRepository.save(winner);
             }
             challengeRepository.save(challenge);
-            sseService.sendPing(challenge.getChallenger().getEmail());
-            sseService.sendPing(challenge.getOpponent().getEmail());
+            events.publishEvent(new SocialAchievementEvent(List.of(challenge.getChallenger().getUserId(), challenge.getOpponent().getUserId())));
+            sseService.sendPingAfterCommit(challenge.getChallenger().getEmail());
+            sseService.sendPingAfterCommit(challenge.getOpponent().getEmail());
         }
     }
 

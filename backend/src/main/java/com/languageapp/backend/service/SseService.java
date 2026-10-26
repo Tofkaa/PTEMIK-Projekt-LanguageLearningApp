@@ -52,6 +52,16 @@ public class SseService {
         return emitter;
     }
 
+    /** Clients must never refresh a snapshot before its transaction is committed. */
+    public void sendPingAfterCommit(String targetEmail) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() { sendPing(targetEmail); }
+                    });
+        } else sendPing(targetEmail);
+    }
+
     public void sendPing(String targetEmail) {
         List<SseEmitter> userEmitters = emitters.get(targetEmail);
         if (userEmitters == null || userEmitters.isEmpty()) {

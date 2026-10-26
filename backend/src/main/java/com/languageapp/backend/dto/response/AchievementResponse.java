@@ -16,4 +16,6 @@ public class AchievementResponse {
     @JsonProperty("isUnlocked")
     private boolean isUnlocked;
     private Instant achievedAt;
+    private UUID userAchievementId;
+    private boolean unread;
 }

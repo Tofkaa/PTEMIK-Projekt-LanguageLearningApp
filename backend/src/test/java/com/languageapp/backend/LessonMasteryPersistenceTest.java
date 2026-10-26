@@ -30,6 +30,7 @@ class LessonMasteryPersistenceTest {
     @Autowired UserDifficultyCalculator calculator;
     @Autowired AchievementService achievements;
     @Autowired UserRepository users;
+    @Autowired FriendshipService friendships;
     @Autowired ResultRepository results;
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager manager;
@@ -117,4 +118,53 @@ class LessonMasteryPersistenceTest {
         try {var a=pool.submit(task);var b=pool.submit(task);gate.countDown();return List.of(a.get(20,TimeUnit.SECONDS),b.get(20,TimeUnit.SECONDS));}
         finally {pool.shutdownNow();}
     }
+    @Test void pendingAwardsSurviveReloadAndPresentationIsDistinctFromRead() {
+        Fixture f = fixture();
+        var start = lessons.startAttempt(f.lessonId(), f.email(), null, "EASY");
+        var result = evaluation.evaluateLesson(f.userId(), f.lessonId(), null, answers(start, false));
+        assertFalse(result.getNewAchievements().isEmpty());
+        var awardId = result.getNewAchievements().getFirst().userAchievementId();
+        assertTrue(achievements.getPendingFeedback(f.userId()).stream().anyMatch(a -> a.userAchievementId().equals(awardId)));
+        achievements.acknowledgeFeedback(f.userId(), List.of(awardId), false);
+        assertTrue(achievements.getPendingFeedback(f.userId()).stream().noneMatch(a -> a.userAchievementId().equals(awardId)));
+        assertTrue(achievements.getUserAchievements(f.userId()).stream().anyMatch(a -> awardId.equals(a.getUserAchievementId()) && a.isUnread()));
+        achievements.acknowledgeFeedback(f.userId(), List.of(awardId), true);
+        assertFalse(achievements.getUserAchievements(f.userId()).stream().anyMatch(a -> awardId.equals(a.getUserAchievementId()) && a.isUnread()));
+    }
+
+    @Test void rolledBackAwardsAreNeitherPersistedNorAnnounced() {
+        Fixture f = fixture();
+        tx.execute(status -> {
+            Achievement trophy = new Achievement(); trophy.setName("Rollback "+UUID.randomUUID());
+            trophy.setDescription("Only committed awards notify"); trophy.setIconUrl("star");
+            trophy.setCriteria(Map.of("type", "PERFECT_SCORE")); em.persist(trophy); return trophy;
+        });
+        org.mockito.Mockito.clearInvocations(sse);
+        tx.executeWithoutResult(status -> {
+            achievements.checkAndAwardAchievements(users.findById(f.userId()).orElseThrow(), 100);
+            org.mockito.Mockito.verifyNoInteractions(sse);
+            status.setRollbackOnly();
+        });
+        assertTrue(achievements.getPendingFeedback(f.userId()).isEmpty());
+        org.mockito.Mockito.verifyNoInteractions(sse);
+    }
+
+    @Test void friendAcceptanceAwardsBothParticipantsAfterCommit() {
+        Fixture a = fixture(), b = fixture();
+        UUID friendshipId = tx.execute(status -> {
+            Achievement trophy = new Achievement(); trophy.setName("Social "+UUID.randomUUID());
+            trophy.setDescription("Friendship trigger"); trophy.setIconUrl("star");
+            trophy.setCriteria(Map.of("type", "SOCIAL_FRIENDS", "target", 1)); em.persist(trophy);
+            Friendship friendship = new Friendship(); friendship.setUser(users.findById(a.userId()).orElseThrow());
+            friendship.setFriend(users.findById(b.userId()).orElseThrow());
+            friendship.setStatus(com.languageapp.backend.enums.FriendshipStatus.PENDING); em.persist(friendship);
+            em.flush(); return friendship.getFriendshipId();
+        });
+        assertTrue(achievements.getPendingFeedback(a.userId()).isEmpty());
+        assertTrue(achievements.getPendingFeedback(b.userId()).isEmpty());
+        friendships.acceptRequest(friendshipId, b.userId());
+        assertFalse(achievements.getPendingFeedback(a.userId()).isEmpty());
+        assertFalse(achievements.getPendingFeedback(b.userId()).isEmpty());
+    }
+
 }

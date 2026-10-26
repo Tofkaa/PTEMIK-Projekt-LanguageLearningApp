@@ -21,6 +21,7 @@ public class NotificationSummaryDTO {
 
     private long lastPingTime;
     private int dueVocabularyCount;
+    private int currentXp;
 
     public int getTotal() {
         return pendingFriendRequests + pendingChallenges +

@@ -38,6 +38,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
+    @Mock private com.languageapp.backend.repository.UserAchievementRepository userAchievementRepository;
     @Mock private com.languageapp.backend.repository.LessonAttemptRepository lessonAttemptRepository;
     @Mock private com.languageapp.backend.repository.ResultRepository resultRepository;
     @Spy private Clock clock = Clock.fixed(Instant.parse("2026-10-16T16:00:00Z"), ZoneOffset.UTC);
@@ -377,4 +378,19 @@ class UserServiceTest {
         verify(courseRepository, never()).findByLanguageCode(anyString());
         verify(userRepository, never()).save(any());
     }
+    @Test void dataExportIncludesAchievementPresentationAndReadState() {
+        User user = createTestUserWithCourse("achievement-export@example.test");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        var trophy = new com.languageapp.backend.entity.Achievement(); trophy.setAchievementId(UUID.randomUUID());
+        var award = new com.languageapp.backend.entity.UserAchievement(); award.setUserAchievementId(UUID.randomUUID());
+        award.setAchievement(trophy); award.setAchievedAt(clock.instant()); award.setFeedbackEnabled(true);
+        award.setPresentedAt(clock.instant());
+        when(userAchievementRepository.findByUserUserId(user.getUserId())).thenReturn(java.util.List.of(award));
+        var exported = userService.exportUserData(user.getEmail());
+        var records = assertInstanceOf(java.util.List.class, exported.get("achievements"));
+        var record = assertInstanceOf(java.util.Map.class, records.getFirst());
+        assertEquals(award.getUserAchievementId(), record.get("userAchievementId"));
+        assertEquals(clock.instant(), record.get("presentedAt")); assertNull(record.get("readAt"));
+    }
+
 }

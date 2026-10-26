@@ -192,11 +192,12 @@ public class EvaluationService {
         }
 
         String feedback = passed ? "Gratulálunk, sikeresen teljesítetted a leckét!" : "Gyakorolj tovább, menni fog!";
-        achievementService.checkAndAwardAchievements(user, score);
+        var newAchievements = achievementService.checkAndAwardAchievements(user, score);
 
         var userProgress = progressRepository.findByUserUserId(userId);
         var courseLessons = lessonRepository.findByTopic_Course_CourseId(lesson.getTopic().getCourse().getCourseId());
         LessonSubmitResponse response = LessonSubmitResponse.builder()
+                .newAchievements(newAchievements)
                 .resultId(savedResult.getResultId())
                 .score(score)
                 .correctAnswersCount(correctAnswersCount)

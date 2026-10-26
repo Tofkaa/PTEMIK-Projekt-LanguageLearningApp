@@ -33,6 +33,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ChallengeServiceTest {
+    @Mock private org.springframework.context.ApplicationEventPublisher events;
     @Spy private Clock clock = Clock.fixed(Instant.parse("2026-10-16T16:00:00Z"), ZoneOffset.UTC);
 
     @Mock
@@ -159,7 +160,7 @@ class ChallengeServiceTest {
         assertEquals(ChallengeStatus.PENDING, activeChallenge.getStatus());
         verify(challengeRepository, times(1)).save(activeChallenge);
         // Ellenőrizzük az értesítés küldését az ellenfélnek
-        verify(sseService, times(1)).sendPing(opponent.getEmail());
+        verify(sseService, times(1)).sendPingAfterCommit(opponent.getEmail());
     }
 
     // --- 4. TESZT: Értékelő motor - A második játékos jobb pontszámot ér el ---
@@ -181,6 +182,7 @@ class ChallengeServiceTest {
 
         // Assert
         assertEquals(ChallengeStatus.COMPLETED, activeChallenge.getStatus());
+        verify(events).publishEvent(new SocialAchievementEvent(java.util.List.of(challenger.getUserId(), opponent.getUserId())));
         assertEquals(opponent, activeChallenge.getWinner()); // Az ellenfél nyert
 
         // Ellenőrizzük, hogy a győztes kapott-e 50 XP-t
@@ -208,6 +210,7 @@ class ChallengeServiceTest {
 
         // Assert
         assertEquals(ChallengeStatus.COMPLETED, activeChallenge.getStatus());
+        verify(events).publishEvent(new SocialAchievementEvent(java.util.List.of(challenger.getUserId(), opponent.getUserId())));
         assertEquals(challenger, activeChallenge.getWinner(), "Azonos pontszám esetén a gyorsabb játékosnak kell nyernie!");
         verify(userRepository, times(1)).save(challenger); // A kihívó kapja az XP-t
     }

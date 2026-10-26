@@ -71,6 +71,7 @@ public class VocabularyService {
 
         log.info("New word '{}' added to user {}'s {} vocabulary", cleanWord, email, activeCourse.getLanguageCode());
 
+        achievementService.checkAndAwardAchievements(user, -1);
         return buildVocabularyResponse(newVoc, true);
     }
 
@@ -135,6 +136,7 @@ public class VocabularyService {
         voc.setNextPracticeAt(clock.instant().plus(daysToAdd, ChronoUnit.DAYS));
         StudentVocabulary updatedVoc = vocabularyRepository.save(voc);
 
+        achievementService.checkAndAwardAchievements(voc.getUser(), -1);
         return buildVocabularyResponse(updatedVoc, false);
     }
 
@@ -240,6 +242,7 @@ public class VocabularyService {
 
             vocabularyRepository.save(newVoc);
         }
+        achievementService.checkAndAwardAchievements(user, -1);
     }
 
     /**
@@ -400,9 +403,10 @@ public class VocabularyService {
         streakService.updateActivity(user);
         userRepository.save(user);
 
-        achievementService.checkAndAwardAchievements(user, (correctCount * 100) / (totalQuestions == 0 ? 1 : totalQuestions));
+        var newAchievements = achievementService.checkAndAwardAchievements(user, (correctCount * 100) / (totalQuestions == 0 ? 1 : totalQuestions));
 
         return Map.of(
+                "newAchievements", newAchievements,
                 "correctCount", correctCount,
                 "totalQuestions", totalQuestions,
                 "earnedXp", earnedXp,

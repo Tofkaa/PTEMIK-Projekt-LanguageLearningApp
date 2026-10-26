@@ -30,6 +30,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class VocabularyServiceTest {
+    @Mock private AchievementService achievementService;
     @Spy private Clock clock = Clock.fixed(Instant.parse("2026-10-16T16:00:00Z"), ZoneOffset.UTC);
 
     @Mock

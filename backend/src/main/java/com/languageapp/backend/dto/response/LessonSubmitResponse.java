@@ -33,4 +33,5 @@ public class LessonSubmitResponse {
     private boolean manualPractice;
     private boolean lessonMastered;
     private boolean topicMastered;
+    private List<AchievementFeedback> newAchievements;
 }

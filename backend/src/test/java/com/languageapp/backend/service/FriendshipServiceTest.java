@@ -23,6 +23,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class FriendshipServiceTest {
+    @Mock private org.springframework.context.ApplicationEventPublisher events;
 
     @Mock private FriendshipRepository friendshipRepository;
     @Mock private UserRepository userRepository;
@@ -104,6 +105,7 @@ class FriendshipServiceTest {
 
         // Assert
         assertEquals(FriendshipStatus.ACCEPTED, pendingRequest.getStatus());
+        verify(events).publishEvent(new SocialAchievementEvent(java.util.List.of(sender.getUserId(), target.getUserId())));
         verify(friendshipRepository, times(1)).save(pendingRequest);
         verify(sseService, times(1)).sendPing(sender.getEmail());
     }

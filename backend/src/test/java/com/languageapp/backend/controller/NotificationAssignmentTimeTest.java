@@ -44,6 +44,7 @@ class NotificationAssignmentTimeTest {
     void assignmentNotification_ShouldExpireExactlyAtDeadline(long secondsUntilDeadline) {
         User student = new User();
         student.setUserId(UUID.randomUUID());
+        student.setXp(525);
         Classroom classroom = new Classroom();
         classroom.setClassroomId(UUID.randomUUID());
         ClassroomMember membership = new ClassroomMember();
@@ -62,6 +63,7 @@ class NotificationAssignmentTimeTest {
         var summary = controller.getSummary(authentication).getBody();
 
         assertNotNull(summary);
+        assertEquals(525, summary.getCurrentXp());
         assertEquals(secondsUntilDeadline > 0 ? 1 : 0, summary.getStudentActiveAssignmentIds().size());
     }
 }

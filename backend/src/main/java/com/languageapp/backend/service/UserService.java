@@ -40,6 +40,7 @@ public class UserService {
     private final FriendshipRepository friendshipRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final LessonAttemptRepository lessonAttemptRepository;
+    private final UserAchievementRepository userAchievementRepository;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -355,6 +356,16 @@ public class UserService {
         }).toList();
         exportData.put("progress", progressData);
 
+        exportData.put("achievements", userAchievementRepository.findByUserUserId(user.getUserId()).stream().map(a -> {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("userAchievementId", a.getUserAchievementId());
+            entry.put("achievementId", a.getAchievement().getAchievementId());
+            entry.put("achievedAt", a.getAchievedAt());
+            entry.put("feedbackEnabled", a.isFeedbackEnabled());
+            entry.put("presentedAt", a.getPresentedAt());
+            entry.put("readAt", a.getReadAt());
+            return entry;
+        }).toList());
         return exportData;
     }
 

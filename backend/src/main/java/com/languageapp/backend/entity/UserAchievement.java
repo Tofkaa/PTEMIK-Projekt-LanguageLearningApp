@@ -32,4 +32,11 @@ public class UserAchievement {
     @CreationTimestamp
     @Column(name = "achieved_at", nullable = false, updatable = false)
     private Instant achievedAt;
+
+    // DEFAULT false keeps pre-feature awards out of the notification backlog on schema update.
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean feedbackEnabled;
+
+    private Instant presentedAt;
+    private Instant readAt;
 }

@@ -36,7 +36,8 @@ class AchievementServiceTest {
     @Mock
     private ProgressRepository progressRepository;
     @Mock
-    private FriendshipService friendshipService;
+    private com.languageapp.backend.repository.FriendshipRepository friendshipRepository;
+    @Mock private SseService sseService;
     @Mock
     private ChallengeRepository challengeRepository;
 
@@ -146,7 +147,7 @@ class AchievementServiceTest {
         when(mockFriendList.size()).thenReturn(5);
 
         // Ezt a kamu listát adjuk vissza a Service hívásakor
-        when(friendshipService.getMyFriends(testUser.getUserId())).thenReturn(mockFriendList);
+        when(friendshipRepository.findAcceptedFriendships(testUser.getUserId(), com.languageapp.backend.enums.FriendshipStatus.ACCEPTED)).thenReturn(mockFriendList);
 
         // Act: A diák befejez egy leckét (a pontszám itt nem számít)
         achievementService.checkAndAwardAchievements(testUser, 50);
@@ -169,4 +170,45 @@ class AchievementServiceTest {
         // Assert: A rendszer azonnal kilép (continue), a save() nem hívódik meg
         verify(userAchievementRepository, never()).save(any());
     }
+    @Test void awardCarriesStableIdentityAndOnlyNotifiesAfterCommit() {
+        when(achievementRepository.findAll()).thenReturn(List.of(perfectScoreAch));
+        UUID awardId = UUID.randomUUID();
+        when(userAchievementRepository.save(any())).thenAnswer(invocation -> {
+            com.languageapp.backend.entity.UserAchievement award = invocation.getArgument(0);
+            award.setUserAchievementId(awardId); return award;
+        });
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            var awards = achievementService.checkAndAwardAchievements(testUser, 100);
+            org.junit.jupiter.api.Assertions.assertEquals(awardId, awards.getFirst().userAchievementId());
+            verifyNoInteractions(sseService);
+            var callbacks = org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations();
+            callbacks.forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            verify(sseService).sendPing(testUser.getEmail());
+        } finally { org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization(); }
+    }
+
+    @Test void presentationDoesNotMarkReadAndForeignIdsAreIgnored() {
+        var award = new com.languageapp.backend.entity.UserAchievement();
+        award.setUserAchievementId(UUID.randomUUID()); award.setFeedbackEnabled(true);
+        when(userAchievementRepository.findByUserUserId(testUser.getUserId())).thenReturn(List.of(award));
+        achievementService.acknowledgeFeedback(testUser.getUserId(), List.of(UUID.randomUUID()), true);
+        org.junit.jupiter.api.Assertions.assertNull(award.getPresentedAt());
+        achievementService.acknowledgeFeedback(testUser.getUserId(), List.of(award.getUserAchievementId()), false);
+        org.junit.jupiter.api.Assertions.assertEquals(clock.instant(), award.getPresentedAt());
+        org.junit.jupiter.api.Assertions.assertNull(award.getReadAt());
+        achievementService.acknowledgeFeedback(testUser.getUserId(), List.of(award.getUserAchievementId()), true);
+        org.junit.jupiter.api.Assertions.assertEquals(clock.instant(), award.getReadAt());
+    }
+
+    @Test void preFeatureAwardsAreNotNewOrAcknowledged() {
+        var award = new com.languageapp.backend.entity.UserAchievement();
+        award.setUserAchievementId(UUID.randomUUID()); award.setAchievement(perfectScoreAch);
+        when(userAchievementRepository.findByUserUserId(testUser.getUserId())).thenReturn(List.of(award));
+        when(achievementRepository.findAll()).thenReturn(List.of(perfectScoreAch));
+        org.junit.jupiter.api.Assertions.assertFalse(achievementService.getUserAchievements(testUser.getUserId()).getFirst().isUnread());
+        achievementService.acknowledgeFeedback(testUser.getUserId(), List.of(award.getUserAchievementId()), true);
+        org.junit.jupiter.api.Assertions.assertNull(award.getReadAt());
+    }
+
 }

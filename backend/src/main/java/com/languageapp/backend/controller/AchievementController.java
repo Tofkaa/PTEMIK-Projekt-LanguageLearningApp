@@ -9,6 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import com.languageapp.backend.dto.response.AchievementFeedback;
+import java.util.UUID;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -45,4 +49,22 @@ public class AchievementController {
         // Delegate the business logic to the service layer using the validated User ID
         return ResponseEntity.ok(achievementService.getUserAchievements(user.getUserId()));
     }
+    public record FeedbackAcknowledgement(List<UUID> awardIds, boolean read) { }
+
+    @GetMapping("/pending")
+    public List<AchievementFeedback> pending(Authentication authentication) {
+        return achievementService.getPendingFeedback(currentUserId(authentication));
+    }
+
+    @PostMapping("/acknowledge")
+    public ResponseEntity<Void> acknowledge(Authentication authentication, @RequestBody FeedbackAcknowledgement request) {
+        achievementService.acknowledgeFeedback(currentUserId(authentication), request.awardIds(), request.read());
+        return ResponseEntity.noContent().build();
+    }
+
+    private UUID currentUserId(Authentication authentication) {
+        return userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found")).getUserId();
+    }
+
 }

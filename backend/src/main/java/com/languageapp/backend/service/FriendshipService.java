@@ -25,6 +25,7 @@ public class FriendshipService {
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
     private final SseService sseService;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     /**
      * Sends a friend request using either a Discord-style tag or a Steam-style friend code.
@@ -123,6 +124,7 @@ public class FriendshipService {
         friendshipRepository.save(friendship);
         log.info("Friendship request {} ACCEPTED by user {}", friendshipId, receiverId);
 
+        events.publishEvent(new SocialAchievementEvent(List.of(friendship.getUser().getUserId(), friendship.getFriend().getUserId())));
         sseService.sendPing(friendship.getUser().getEmail());
     }
 

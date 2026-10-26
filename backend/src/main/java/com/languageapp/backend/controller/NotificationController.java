@@ -110,7 +110,7 @@ public class NotificationController {
         return ResponseEntity.ok(new NotificationSummaryDTO(
                 pendingFriends, pendingChallenges, totalFriends, totalHistory,
                 tPendingIds, tUngradedIds, sActiveIds, sGradedIds,
-                now.toEpochMilli(), dueVocabCount
+                now.toEpochMilli(), dueVocabCount, user.getXp()
         ));
     }
 
