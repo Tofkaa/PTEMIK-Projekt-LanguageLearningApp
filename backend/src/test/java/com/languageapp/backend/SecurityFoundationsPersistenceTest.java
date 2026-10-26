@@ -49,6 +49,8 @@ class SecurityFoundationsPersistenceTest {
     @Autowired JwtService jwt;
     @Autowired PasswordEncoder encoder;
     @Autowired Clock clock;
+    @Autowired AssignmentService grading;
+    @Autowired AssignmentSessionRepository examSessions;
     @MockitoBean DataSeeder seeder;
     @MockitoBean EmailService mail;
     @MockitoBean SseService sse;
@@ -83,6 +85,65 @@ class SecurityFoundationsPersistenceTest {
                 .password("test-only").authorities("ROLE_"+u.getRole().name()).build(),session.id());
     }
     String classroomPath(Fixture f) { return "/api/assignments/classroom/"+f.classroom; }
+
+    UUID gradingSession(Fixture f, boolean finished) {
+        return tx.execute(status -> {
+            var session=new AssignmentSession();session.setAssignment(em.getReference(ClassroomAssignment.class,f.assignment));
+            session.setUser(em.getReference(User.class,f.student.getUserId()));session.setStartedAt(clock.instant().minusSeconds(600));
+            if (finished) session.setFinishedAt(clock.instant().minusSeconds(10));
+            session.setFinalScore(75);em.persist(session);em.flush();return session.getSessionId();
+        });
+    }
+    String gradeBody(int score,long revision) { return "{\"teacherScore\":"+score+",\"teacherComment\":\"Feedback\",\"revision\":"+revision+"}"; }
+    com.languageapp.backend.dto.request.TeacherGradeRequest gradeRequest(int score,long revision) {
+        var request=new com.languageapp.backend.dto.request.TeacherGradeRequest();request.setTeacherScore(score);request.setRevision(revision);return request;
+    }
+    @Test void gradingInputBoundsAreEnforcedBeforeWriting() throws Exception {
+        var f=fixture();UUID id=gradingSession(f,true);String header=auth(f.teacher);String path="/api/assignments/sessions/"+id+"/grade";
+        for(String body:List.of(gradeBody(-1,0),gradeBody(101,0),"{\"teacherScore\":75}",
+                "{\"teacherScore\":75,\"revision\":0,\"teacherComment\":\""+"x".repeat(4001)+"\"}"))
+            mvc.perform(post(path).header("Authorization",header).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
+        var saved=examSessions.findById(id).orElseThrow();assertFalse(saved.isGraded());assertEquals(0,saved.getDraftRevision());assertNull(saved.getTeacherScore());
+    }
+    @Test void onlyTheOwnerCanGradeFinishedSessionsAndStaleVersionsAreRejected() throws Exception {
+        var f=fixture();UUID open=gradingSession(f,false),closed=gradingSession(f,true);
+        mvc.perform(post("/api/assignments/sessions/"+open+"/grade").header("Authorization",auth(f.teacher)).contentType(MediaType.APPLICATION_JSON).content(gradeBody(70,0)))
+                .andExpect(status().isConflict());
+        tx.executeWithoutResult(status->users.findById(f.outsider.getUserId()).orElseThrow().setRole(Role.TEACHER));
+        mvc.perform(post("/api/assignments/sessions/"+closed+"/grade").header("Authorization",auth(f.outsider)).contentType(MediaType.APPLICATION_JSON).content(gradeBody(70,0)))
+                .andExpect(status().isForbidden());
+        String owner=auth(f.teacher);String path="/api/assignments/sessions/"+closed+"/grade";
+        mvc.perform(post(path).header("Authorization",owner).contentType(MediaType.APPLICATION_JSON).content(gradeBody(70,0)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.gradingRevision").value(1));
+        mvc.perform(post(path).header("Authorization",owner).contentType(MediaType.APPLICATION_JSON).content(gradeBody(90,0)))
+                .andExpect(status().isConflict());
+        mvc.perform(get("/api/assignments/"+f.assignment+"/sessions").header("Authorization",owner))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].gradingRevision").value(1));
+        assertEquals(70,examSessions.findById(closed).orElseThrow().getTeacherScore());
+    }
+    @Test void gradingRollbackDoesNotPublishANotificationAndDeliveryFailureDoesNotUndoCommit() {
+        var f=fixture();UUID id=gradingSession(f,true);
+        org.mockito.Mockito.clearInvocations(sse);
+        assertThrows(IllegalStateException.class,()->tx.executeWithoutResult(status->{
+            grading.gradeSession(id,gradeRequest(70,0),f.teacher.getEmail());
+            org.mockito.Mockito.verifyNoInteractions(sse);throw new IllegalStateException("synthetic rollback");
+        }));
+        assertEquals(0,examSessions.findById(id).orElseThrow().getDraftRevision());org.mockito.Mockito.verifyNoInteractions(sse);
+        org.mockito.Mockito.doThrow(new IllegalStateException("synthetic send failure")).when(sse).sendPing(f.student.getEmail());
+        assertEquals(1,grading.gradeSession(id,gradeRequest(80,0),f.teacher.getEmail()));
+        assertEquals(80,examSessions.findById(id).orElseThrow().getTeacherScore());
+    }
+    @Test void twoTeacherWindowsCannotSilentlyOverwriteTheSameVersion() throws Exception {
+        var f=fixture();UUID id=gradingSession(f,true);var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var start=new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.Callable<Boolean> first=()->{start.await();try{grading.gradeSession(id,gradeRequest(70,0),f.teacher.getEmail());return true;}catch(com.languageapp.backend.exception.ConflictException stale){return false;}};
+            java.util.concurrent.Callable<Boolean> second=()->{start.await();try{grading.gradeSession(id,gradeRequest(90,0),f.teacher.getEmail());return true;}catch(com.languageapp.backend.exception.ConflictException stale){return false;}};
+            var a=pool.submit(first);var b=pool.submit(second);start.countDown();
+            assertNotEquals(a.get(15,java.util.concurrent.TimeUnit.SECONDS),b.get(15,java.util.concurrent.TimeUnit.SECONDS));
+            var saved=examSessions.findById(id).orElseThrow();assertEquals(1,saved.getDraftRevision());assertTrue(Set.of(70,90).contains(saved.getTeacherScore()));
+        } finally {pool.shutdownNow();}
+    }
 
     @ParameterizedTest @ValueSource(strings={"lookup","known-batch","practice/submit"})
     void vocabularyWordBoundsAreValidatedBeforeExternalOrRewardWork(String operation) throws Exception {

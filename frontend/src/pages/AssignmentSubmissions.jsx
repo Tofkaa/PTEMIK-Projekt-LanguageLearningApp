@@ -4,7 +4,7 @@
  * Displays aggregate performance stats, individual sessions, and an interactive grading modal.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Card, Button, Badge, Table, Modal, Form, Spinner, Row, Col, Alert } from 'react-bootstrap';
 import { assignmentApi } from '../services/assignmentApi';
@@ -37,6 +37,10 @@ const AssignmentSubmissions = () => {
     const [expandedPreviewIndex, setExpandedPreviewIndex] = useState(null);
     const [loadError, setLoadError] = useState('');
     const [gradeError, setGradeError] = useState('');
+    const [gradeConflict, setGradeConflict] = useState(false);
+    const [isReloadingGrade, setIsReloadingGrade] = useState(false);
+    const [latestGrade, setLatestGrade] = useState(null);
+    const gradingView = useRef(0);
     const [feedback, setFeedback] = useState(null);
 
     /**
@@ -104,14 +108,44 @@ const AssignmentSubmissions = () => {
      * Prepares and opens the grading modal with the selected session's data.
      */
     const openGradingModal = (session) => {
+        gradingView.current += 1;
         setSelectedSession(session);
         setGradeForm({
             teacherScore: session.teacherScore ?? session.finalScore,
             teacherComment: session.teacherComment || ''
         });
         setGradeError('');
+        setGradeConflict(false);
+        setLatestGrade(null);
+        setIsReloadingGrade(false);
         setExpandedPreviewIndex(null);
         setIsGradingModalOpen(true);
+    };
+
+    const closeGradingModal = () => {
+        if (isSubmitting) return;
+        gradingView.current += 1;
+        setIsGradingModalOpen(false);
+    };
+    const reloadLatestGrade = async () => {
+        if (isReloadingGrade || isSubmitting) return;
+        const view = gradingView.current;
+        setIsReloadingGrade(true);
+        try {
+            const response = await assignmentApi.getAssignmentSessions(assignmentId);
+            if (view !== gradingView.current) return;
+            const current = response.data.find(session => session.sessionId === selectedSession.sessionId);
+            if (!current) { setGradeError('A beadás már nem található. Frissítsd a listát.'); return; }
+            setSessions(response.data);
+            setSelectedSession(current);
+            setLatestGrade(current);
+            setGradeConflict(false);
+            setGradeError('');
+        } catch {
+            if (view === gradingView.current) setGradeError('A legfrissebb értékelés betöltése nem sikerült. A saját módosításaid megmaradtak.');
+        } finally {
+            if (view === gradingView.current) setIsReloadingGrade(false);
+        }
     };
 
     /**
@@ -119,26 +153,29 @@ const AssignmentSubmissions = () => {
      */
     const handleGradeSubmit = async (e) => {
         e.preventDefault();
-        if (isSubmitting) return;
+        if (isSubmitting || isReloadingGrade || gradeConflict) return;
         const score = Number(gradeForm.teacherScore);
         if (gradeForm.teacherScore === '' || !Number.isInteger(score) || score < 0 || score > 100) {
             setGradeError('A végső pontszám 0 és 100 közötti egész szám legyen!');
             return;
         }
+        if (gradeForm.teacherComment.length > 4000) { setGradeError('A megjegyzés legfeljebb 4000 karakter lehet.'); return; }
         setIsSubmitting(true);
         setGradeError('');
 
         try {
-            await assignmentApi.gradeSession(selectedSession.sessionId, {
+            const response = await assignmentApi.gradeSession(selectedSession.sessionId, {
                 teacherScore: score,
-                teacherComment: gradeForm.teacherComment
+                teacherComment: gradeForm.teacherComment,
+                revision: selectedSession.gradingRevision ?? 0
             });
             setSessions(previous => previous.map(session => session.sessionId === selectedSession.sessionId
-                ? { ...session, teacherScore: score, teacherComment: gradeForm.teacherComment, graded: true } : session));
+                ? { ...session, teacherScore: score, teacherComment: gradeForm.teacherComment, graded: true,
+                    gradingRevision: response.data?.gradingRevision ?? (selectedSession.gradingRevision ?? 0) + 1 } : session));
             setFeedback({ type: 'success', msg: `Az értékelés publikálva: ${selectedSession.studentName}.` });
             setIsGradingModalOpen(false);
         } catch (error) {
-            console.error("Hiba az értékelés mentésekor:", error);
+            if (error.response?.status === 409) setGradeConflict(true);
             setGradeError(error.response?.data?.message || 'Nem sikerült elmenteni az értékelést. A pontszám és a megjegyzés megmaradt; próbáld újra!');
         } finally {
             setIsSubmitting(false);
@@ -279,7 +316,7 @@ const AssignmentSubmissions = () => {
             </Card>
 
             {/* GRADING MODAL */}
-            <Modal show={isGradingModalOpen} onHide={() => { if (!isSubmitting) setIsGradingModalOpen(false); }} aria-labelledby="grading-modal-title" size="lg" centered contentClassName="bg-dark text-light border-secondary">
+            <Modal show={isGradingModalOpen} onHide={closeGradingModal} aria-labelledby="grading-modal-title" size="lg" centered contentClassName="bg-dark text-light border-secondary">
                 <Modal.Header closeButton closeLabel="Értékelés bezárása" className="border-secondary">
                     <Modal.Title as="h2" id="grading-modal-title" className="fw-bold app-accent-text">
                         Dolgozat Értékelése: {selectedSession?.studentName}
@@ -288,6 +325,15 @@ const AssignmentSubmissions = () => {
                 <Form onSubmit={handleGradeSubmit}>
                     <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }} className="custom-scrollbar">
                         <LearningFeedback error={gradeError} />
+                        {(gradeConflict || latestGrade || isReloadingGrade) && <div className="mb-3">
+                            <Button variant="outline-info" onClick={reloadLatestGrade} aria-busy={isReloadingGrade}
+                                aria-disabled={isReloadingGrade || isSubmitting}>Legfrissebb értékelés betöltése</Button>
+                            {latestGrade && <section className="border rounded p-3 mt-2" aria-label="Legfrissebb publikált értékelés">
+                                <p role="status">A legfrissebb értékelést betöltöttük. A saját mezőid megmaradtak; összevetés után újra publikálhatsz.</p>
+                                <p>Legutóbbi pontszám: {latestGrade.teacherScore ?? latestGrade.finalScore}%</p>
+                                <p style={{ whiteSpace: 'pre-wrap' }}>{latestGrade.teacherComment || 'Nincs tanári megjegyzés.'}</p>
+                            </section>}
+                        </div>}
                         
                         {/* HATALMAS PIROS FIGYELMEZTETÉS A KÉSÉSRŐL A MODALBAN */}
                         {selectedSession && getLateInfo(selectedSession) && (
@@ -379,19 +425,22 @@ const AssignmentSubmissions = () => {
                                 <Form.Control 
                                     as="textarea" 
                                     rows={3} 
+                                    maxLength={4000}
+                                    aria-describedby="teacher-comment-help"
                                     className="bg-dark text-light border-secondary" 
                                     placeholder="Ide írhatsz szöveges visszajelzést a diáknak..."
                                     value={gradeForm.teacherComment} 
                                     readOnly={isSubmitting}
                                     onChange={e => setGradeForm({...gradeForm, teacherComment: e.target.value})} 
                                 />
+                                <Form.Text id="teacher-comment-help">Legfeljebb 4000 karakter.</Form.Text>
                             </Form.Group>
                         </div>
 
                     </Modal.Body>
                     <Modal.Footer className="border-secondary">
-                        <Button variant="outline-secondary" onClick={() => setIsGradingModalOpen(false)} disabled={isSubmitting}>Mégse</Button>
-                        <Button variant="success" type="submit" className="fw-bold px-4" aria-disabled={isSubmitting} aria-busy={isSubmitting}>
+                        <Button variant="outline-secondary" onClick={closeGradingModal} disabled={isSubmitting}>Mégse</Button>
+                        <Button variant="success" type="submit" className="fw-bold px-4" aria-disabled={isSubmitting || isReloadingGrade || gradeConflict} aria-busy={isSubmitting}>
                             {isSubmitting && <Spinner size="sm" aria-hidden="true" className="me-2" />}Eredmény Publikálása
                         </Button>
                     </Modal.Footer>

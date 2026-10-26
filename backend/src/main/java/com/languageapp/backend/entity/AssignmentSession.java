@@ -51,6 +51,7 @@ public class AssignmentSession {
     private String allocatedExerciseIds;
     @Column(columnDefinition = "TEXT")
     private String draftState;
+    /** Input revision while open; publication revision after the attempt is finished. */
     @Column(nullable = false, columnDefinition = "bigint default 0")
     private long draftRevision;
     private Instant draftSavedAt;

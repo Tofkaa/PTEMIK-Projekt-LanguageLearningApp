@@ -548,7 +548,8 @@ public class AssignmentService {
                             s.isGraded(),
                             answersList,
                             timingResponse(s).timeLimitMinutes(),
-                            timingResponse(s).deadline()
+                            timingResponse(s).deadline(),
+                            s.getDraftRevision()
                     );
                 }).toList();
     }
@@ -590,7 +591,8 @@ public class AssignmentService {
                             s.isGraded(),
                             answersList,
                             timingResponse(s).timeLimitMinutes(),
-                            timingResponse(s).deadline()
+                            timingResponse(s).deadline(),
+                            s.getDraftRevision()
                     );
                 }).toList();
     }
@@ -603,22 +605,42 @@ public class AssignmentService {
      * @param teacherEmail The email of the teacher performing the grading.
      */
     @Transactional
-    public void gradeSession(UUID sessionId, TeacherGradeRequest request, String teacherEmail) {
-        AssignmentSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+    public long gradeSession(UUID sessionId, TeacherGradeRequest request, String teacherEmail) {
+        if (request.getTeacherScore() == null || request.getTeacherScore() < 0 || request.getTeacherScore() > 100
+                || request.getRevision() == null || request.getRevision() < 0
+                || request.getTeacherComment() != null && request.getTeacherComment().length() > 4000)
+            throw new BadRequestException("A pontszám 0 és 100 közötti egész szám, a megjegyzés legfeljebb 4000 karakter, és érvényes mentési verzió szükséges.");
+        // Keep the existing assignment-before-session lock order; read the current revision only after the lock.
+        AssignmentSession session = lockedSession(sessionId);
 
         if (!session.getAssignment().getClassroom().getTeacher().getEmail().equals(teacherEmail)) {
-            throw new BadRequestException("Unauthorized to grade this session.");
+            throw new com.languageapp.backend.exception.ForbiddenException("Nincs jogosultságod ezt a beadást értékelni.");
         }
+
+        if (session.getFinishedAt() == null) throw new com.languageapp.backend.exception.ConflictException("Folyamatban lévő próbálkozás még nem értékelhető.");
+        if (session.getDraftRevision() != request.getRevision()) throw new com.languageapp.backend.exception.ConflictException(
+                "Az értékelés közben megváltozott. Töltsd be a legfrissebb értékelést, és vesd össze a saját módosításaiddal.");
 
         session.setTeacherScore(request.getTeacherScore());
         session.setTeacherComment(request.getTeacherComment());
         session.setGraded(true);
+        session.setDraftRevision(session.getDraftRevision() + 1);
 
         sessionRepository.save(session);
-        sseService.sendPing(session.getUser().getEmail());
+        String recipient = session.getUser().getEmail();
+        Runnable notify = () -> {
+            try { sseService.sendPing(recipient); }
+            catch (RuntimeException failure) { log.warn("Published grade notification could not be delivered for session {}", sessionId); }
+        };
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() { notify.run(); }
+                    });
+        } else notify.run();
 
         log.info("Teacher {} graded session {}. Published: true", teacherEmail, sessionId);
+        return session.getDraftRevision();
     }
 
     /**
