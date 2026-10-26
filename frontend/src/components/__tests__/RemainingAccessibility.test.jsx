@@ -258,7 +258,7 @@ describe('persistent settings feedback and grading', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Ellenőrző kód küldése' }));
         const freshCode = await screen.findByRole('textbox', { name: '6-jegyű ellenőrző kód (OTP)' });
         expect(freshCode).toHaveValue('');
-        expect(freshCode).toHaveFocus();
+        await waitFor(() => expect(freshCode).toHaveFocus());
         expect(api.post.mock.calls.filter(([url]) => url.endsWith('/request'))).toHaveLength(2);
         expect(auth.logout).not.toHaveBeenCalled();
     });

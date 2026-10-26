@@ -430,7 +430,7 @@ const Settings = () => {
                                     <Form.Label className="text-light opacity-75">
                                         Felhasználónév <span className="text-info ms-1">#{user.userTag}</span>
                                     </Form.Label>
-                                    <div className="d-flex gap-2">
+                                    <div className="d-flex flex-wrap flex-sm-nowrap gap-2">
                                         <Form.Control 
                                             type="text" 
                                             className="bg-secondary bg-opacity-25 text-light border-secondary" 
@@ -446,7 +446,7 @@ const Settings = () => {
                                         <Button 
                                             variant="info" 
                                             type="submit" 
-                                            className="fw-bold text-dark px-4"
+                                            className="fw-bold text-dark px-4 flex-shrink-0 text-nowrap"
                                             aria-disabled={isUpdatingName || name.trim() === user.name || name.trim().length < 3}
                                             aria-busy={isUpdatingName}
                                         >
