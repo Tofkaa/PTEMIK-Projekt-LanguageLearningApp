@@ -77,8 +77,9 @@ class SecurityFoundationsPersistenceTest {
         });
     }
     String auth(User u) {
-        return "Bearer "+jwt.generateToken(org.springframework.security.core.userdetails.User.withUsername(u.getEmail())
-                .password("test-only").authorities("ROLE_"+u.getRole().name()).build());
+        var session=refresh.createSession(u.getUserId());
+        return "Bearer "+jwt.generateSessionToken(org.springframework.security.core.userdetails.User.withUsername(u.getEmail())
+                .password("test-only").authorities("ROLE_"+u.getRole().name()).build(),session.id());
     }
     String classroomPath(Fixture f) { return "/api/assignments/classroom/"+f.classroom; }
     @Test void anonymousStatisticsAreUnauthorized() throws Exception {

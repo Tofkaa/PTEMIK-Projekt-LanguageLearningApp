@@ -25,6 +25,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final RefreshTokenService refreshTokenService;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -68,7 +69,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
-                if (userDetails.isEnabled() && jwtService.isTokenValid(jwt, userDetails)) {
+                if (userDetails.isEnabled() && jwtService.isTokenValid(jwt, userDetails)
+                        && refreshTokenService.isSessionActive(jwtService.extractSessionId(jwt), userEmail)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities()
                     );

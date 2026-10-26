@@ -15,6 +15,7 @@ import jakarta.annotation.PostConstruct;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.time.Clock;
 import java.time.Instant;
@@ -65,6 +66,23 @@ public class JwtService {
      */
     public String generateToken(UserDetails userDetails) {
         return generateToken(new HashMap<>(), userDetails);
+    }
+
+    public String generateSessionToken(UserDetails userDetails, UUID sessionId) {
+        if (sessionId == null) throw new IllegalArgumentException("A persisted session ID is required.");
+        return generateToken(new HashMap<>(Map.of("sid", sessionId.toString())), userDetails);
+    }
+
+    /** Legacy sid-less tokens deliberately cannot authenticate protected APIs. */
+    public UUID extractSessionId(String token) {
+        String sid = extractClaim(token, claims -> claims.get("sid", String.class));
+        try {
+            if (sid == null) return null;
+            UUID id = UUID.fromString(sid);
+            return id.toString().equals(sid) ? id : null;
+        } catch (IllegalArgumentException invalid) {
+            return null;
+        }
     }
 
     /**

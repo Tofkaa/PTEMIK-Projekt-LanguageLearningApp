@@ -31,6 +31,14 @@ import java.time.Clock;
 public class GlobalExceptionHandler {
     private final Clock clock;
 
+    /** Method-security denials must retain 403 rather than becoming generic server errors. */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(
+            org.springframework.security.access.AccessDeniedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(buildErrorResponse(
+                HttpStatus.FORBIDDEN, "Nincs jogosultságod ehhez a művelethez.", request.getRequestURI()));
+    }
+
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(buildErrorResponse(

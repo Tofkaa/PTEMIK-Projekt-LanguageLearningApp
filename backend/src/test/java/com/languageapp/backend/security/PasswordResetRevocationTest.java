@@ -30,6 +30,15 @@ class PasswordResetRevocationTest {
     @Mock CourseRepository courses;
     @InjectMocks AuthenticationService service;
 
+    @Test void unknownLoginStillUsesTheAuthenticationProvidersTimingProtection() {
+        var request = new com.languageapp.backend.dto.request.LoginRequest();
+        request.setEmail("unknown@example.test"); request.setPassword("wrong-password");
+        when(manager.authenticate(any())).thenThrow(new org.springframework.security.authentication.BadCredentialsException("Invalid credentials"));
+        assertThrows(org.springframework.security.authentication.BadCredentialsException.class, () -> service.authenticate(request));
+        verify(manager).authenticate(any());
+        verifyNoInteractions(sessions);
+    }
+
     PasswordResetToken token(long seconds) {
         var user = new User(); user.setUserId(UUID.randomUUID()); user.setEmail("reset@example.test"); user.setPasswordHash("old-hash");
         var token = new PasswordResetToken(); token.setUser(user); token.setToken("reset-proof");
@@ -37,6 +46,8 @@ class PasswordResetRevocationTest {
     }
     @Test void resetRevokesByUserRatherThanTreatingTheUserIdAsARawToken() {
         var token = token(60); when(resets.findByToken("reset-proof")).thenReturn(Optional.of(token));
+        when(resets.findUserIdByToken("reset-proof")).thenReturn(Optional.of(token.getUser().getUserId()));
+        when(users.findForSessionUpdate(token.getUser().getUserId())).thenReturn(Optional.of(token.getUser()));
         when(encoder.encode("new-password")).thenReturn("new-hash");
         service.resetPassword("reset-proof", "new-password");
         assertEquals("new-hash", token.getUser().getPasswordHash());
@@ -46,6 +57,8 @@ class PasswordResetRevocationTest {
     }
     @Test void anExpiredResetCannotRevokeSessionsOrChangeThePassword() {
         var token = token(0); when(resets.findByToken("reset-proof")).thenReturn(Optional.of(token));
+        when(resets.findUserIdByToken("reset-proof")).thenReturn(Optional.of(token.getUser().getUserId()));
+        when(users.findForSessionUpdate(token.getUser().getUserId())).thenReturn(Optional.of(token.getUser()));
         assertThrows(BadRequestException.class, () -> service.resetPassword("reset-proof", "new-password"));
         assertEquals("old-hash", token.getUser().getPasswordHash());
         verifyNoInteractions(sessions, encoder); verify(users, never()).save(any());

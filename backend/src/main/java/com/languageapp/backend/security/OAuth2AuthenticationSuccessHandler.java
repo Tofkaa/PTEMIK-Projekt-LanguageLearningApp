@@ -46,8 +46,9 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                 .build();
 
         // Generate Tokens
-        String jwtToken = jwtService.generateToken(userDetails);
-        String refreshToken = refreshTokenService.createRefreshToken(user.getUserId());
+        var session = refreshTokenService.createSession(user.getUserId());
+        String jwtToken = jwtService.generateSessionToken(userDetails, session.id());
+        String refreshToken = session.rawToken();
 
         // Refresh token into HttpOnly cookie
         ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)

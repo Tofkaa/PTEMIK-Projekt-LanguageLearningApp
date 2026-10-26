@@ -21,6 +21,13 @@ használható valódi környezetben. Kulcscsere után a korábbi access tokenek
 32 bájtnál rövidebb kulccsal a backend nem indul el. A `.env.example` nem tartalmaz
 használható aláírókulcsot.
 
+A bejelentkezések eszközönként külön munkamenetet kapnak. Kijelentkezés csak az
+adott munkamenetet zárja le; az ahhoz kiadott access token sem használható tovább.
+Jelszó-visszaállítás az összes korábbi munkamenetet visszavonja. A munkamenethez
+nem kötött régi access tokeneket az új backend elutasítja; érvényes refresh cookie
+esetén háttérfrissítés, egyébként új belépés szükséges. Az API-válaszok és cookie-k
+formátuma változatlan.
+
 Helyi HTTPS és az oktatói gépeken szükséges tanúsítványgenerálás:
 [Helyi HTTPS beállítása](docs/local-https.md).
 

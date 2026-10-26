@@ -38,11 +38,10 @@ class TokenTimeTest {
         token.setExpiryDate(NOW.plusSeconds(secondsUntilExpiry));
         if (secondsUntilExpiry > 0) {
             assertSame(token, refreshService.verifyExpiration(token));
-            verify(refreshTokenRepository, never()).delete(any());
         } else {
             assertThrows(BadRequestException.class, () -> refreshService.verifyExpiration(token));
-            verify(refreshTokenRepository).delete(token);
         }
+        verifyNoInteractions(refreshTokenRepository);
     }
 
     @Test
