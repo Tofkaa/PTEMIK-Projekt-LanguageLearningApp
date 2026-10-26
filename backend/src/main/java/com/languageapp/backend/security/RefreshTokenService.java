@@ -118,6 +118,12 @@ public class RefreshTokenService {
         }).orElse("Unknown user (deleted/expired token)");
     }
 
+    /** Revoke every refresh session atomically with a password-reset transaction. */
+    @Transactional
+    public void revokeAllForUser(UUID userId) {
+        refreshTokenRepository.deleteByUserUserId(userId);
+    }
+
     /**
      * Generates a one-way SHA-256 hash of the provided token string.
      *

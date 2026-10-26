@@ -224,7 +224,7 @@ public class AuthenticationService {
         passwordResetTokenRepository.delete(resetToken);
 
         // Security step: log out all sessions
-        refreshTokenService.deleteByRawToken(user.getUserId().toString());
+        refreshTokenService.revokeAllForUser(user.getUserId());
         log.info("Password successfully reset for user: {}", user.getEmail());
     }
 
