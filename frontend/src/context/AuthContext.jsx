@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import api from '../services/api';
 import { vocabularyApi } from '../services/vocabularyApi';
 import { userApi } from '../services/userApi';
@@ -115,6 +115,12 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    // Notification snapshots may contain XP earned while the user was elsewhere (e.g. a duel).
+    const syncXp = useCallback((userId, xp) => {
+        if (!Number.isFinite(xp) || xp < 0) return;
+        setUser(current => current?.userId === userId && current.xp !== xp ? { ...current, xp } : current);
+    }, []);
+
     // Display a loading spinner while verifying the token on initial mount
     if (loading) {
         return (
@@ -128,7 +134,7 @@ export const AuthProvider = ({ children }) => {
 
     // Provide the authentication state and methods to the rest of the application
     return (
-        <AuthContext.Provider value={{ user,setUser, login, logout, vocabularyMap, changeLanguage, updateProfile }}>
+        <AuthContext.Provider value={{ user,setUser, login, logout, vocabularyMap, changeLanguage, updateProfile, syncXp }}>
             {children}
         </AuthContext.Provider>
     );

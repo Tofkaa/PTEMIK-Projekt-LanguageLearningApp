@@ -1,3 +1,4 @@
+import { AchievementFeedbackProvider } from './context/AchievementFeedbackContext';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Alert, Container, Button } from 'react-bootstrap';
 import Login from './pages/Login.jsx';
@@ -77,6 +78,7 @@ function App() {
             <NotificationProvider>
                 <Router>
                     <AppLayout navigation={<NavigationBar />} footer={<AccessibilityFooter />}>
+                    <AchievementFeedbackProvider>
                     <VerificationBanner />
                     <GlobalErrorToast />
                     <Routes>
@@ -129,6 +131,7 @@ function App() {
                         {/* 404 Route: Catch-all for undefined URLs */}
                         <Route path="*" element={<NotFound />} />
                     </Routes>
+                    </AchievementFeedbackProvider>
                     </AppLayout>
                 </Router>
             </NotificationProvider>

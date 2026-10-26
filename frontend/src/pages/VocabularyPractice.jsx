@@ -1,3 +1,4 @@
+import EarnedAchievements from '../components/EarnedAchievements';
 import { useState, useEffect, useRef } from 'react';
 import { Container, Card, Button, ProgressBar, Spinner, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
@@ -159,6 +160,7 @@ const VocabularyPractice = () => {
                     </p>
                 )}
 
+                <EarnedAchievements awards={sessionSummary?.newAchievements} />
                 <Button variant="success" size="lg" className="rounded-pill fw-bold shadow-sm" onClick={() => navigate('/hub')}>
                     Vissza a Szótárba
                 </Button>

@@ -48,7 +48,7 @@ const mapSummaryData = (data) => ({
 });
 
 export const NotificationProvider = ({ children }) => {
-    const { user } = useAuth();
+    const { user, syncXp } = useAuth();
     const userId = user?.userId;
 
     const [notificationState, setNotificationState] = useState({ userId: null, data: EMPTY_NOTIFICATIONS });
@@ -77,8 +77,10 @@ export const NotificationProvider = ({ children }) => {
             if (requestId !== requestCounterRef.current) return;
 
             const data = response.data;
+            syncXp?.(userId, data.currentXp);
             pruneViewedStore(userId, data);
             setNotificationState({ userId, data: mapSummaryData(data) });
+            window.dispatchEvent(new Event('achievement-refresh'));
             return true;
         } catch (error) {
             if (error.response?.status !== 403) {
@@ -86,7 +88,7 @@ export const NotificationProvider = ({ children }) => {
             }
             return false;
         }
-    }, [userId]);
+    }, [userId, syncXp]);
 
     useEffect(() => {
         if (!userId || !autoRefreshEnabled) return;
@@ -107,8 +109,10 @@ export const NotificationProvider = ({ children }) => {
 
                 if (isMounted && requestId === requestCounterRef.current) {
                     const data = response.data;
+                    syncXp?.(userId, data.currentXp);
                     pruneViewedStore(userId, data);
                     setNotificationState({ userId, data: mapSummaryData(data) });
+                    window.dispatchEvent(new Event('achievement-refresh'));
                 }
             } catch (error) {
                 if (error.response?.status !== 403) {
@@ -123,8 +127,9 @@ export const NotificationProvider = ({ children }) => {
         let eventSource = null;
 
         if (token && token !== 'null') {
-            eventSource = new EventSource(`http://localhost:8080/api/notifications/stream?token=${token}`);
+            eventSource = new EventSource(`${(api.defaults?.baseURL || '/api').replace(/\/$/, '')}/notifications/stream?token=${encodeURIComponent(token)}`);
 
+            eventSource.addEventListener("open", loadInitialData);
             eventSource.addEventListener("ping", () => {
                 loadInitialData();
             });
@@ -150,7 +155,7 @@ export const NotificationProvider = ({ children }) => {
             clearInterval(intervalId);
             window.removeEventListener('focus', handleFocus);
         };
-    }, [userId, autoRefreshEnabled, invalidateRequests]);
+    }, [userId, autoRefreshEnabled, invalidateRequests, syncXp]);
 
     const setAutomaticRefresh = enabled => {
         setAutoRefreshEnabled(enabled);

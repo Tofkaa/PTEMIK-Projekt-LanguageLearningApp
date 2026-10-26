@@ -1,14 +1,33 @@
+import api from '../services/api';
+import { useEffect, useRef } from 'react';
 import { Container, Row, Col, Card, Badge, Button } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import AchievementsSection from '../components/profile/AchievementSection.jsx';
 import RecentResultsSection from '../components/profile/RecentResultsSection.jsx';
 import AccessibleCode from '../components/AccessibleCode';
 
 const Profile = () => {
-    const { user } = useAuth();
+    const { user, syncXp } = useAuth();
     const navigate = useNavigate();
+    const { hash } = useLocation();
+    const achievementsHeading = useRef(null);
+    useEffect(() => {
+        if (hash === '#achievements' && achievementsHeading.current) {
+            achievementsHeading.current.focus();
+            achievementsHeading.current.scrollIntoView({ block: 'start' });
+        }
+    }, [hash]);
     
+    useEffect(() => {
+        if (!user?.userId || !syncXp) return;
+        let active = true;
+        api.get('/users/me').then(({ data }) => {
+            if (active && data.userId === user.userId) syncXp(user.userId, data.xp);
+        }).catch(() => {});
+        return () => { active = false; };
+    }, [user?.userId, syncXp]);
+
     const roleLabels = {
         ADMIN: 'Rendszergazda',
         TEACHER: 'Tanár',
@@ -96,7 +115,7 @@ const Profile = () => {
 
                     <Card className="bg-dark text-light border-0 shadow-lg rounded-4 p-2">
                         <Card.Body>
-                            <h2 className="h4 fw-bold text-warning mb-3 border-bottom border-secondary pb-2">
+                            <h2 id="achievements" ref={achievementsHeading} tabIndex={-1} className="h4 fw-bold text-warning mb-3 border-bottom border-secondary pb-2">
                                 <span aria-hidden="true" className="me-2">🎖️</span> Kitüntetéseim
                             </h2>
                             <AchievementsSection />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Row, Col, Spinner } from 'react-bootstrap';
 import api from '../../services/api'; 
 import { formatToLocalDisplay } from '../../utils/dateUtils';
@@ -14,6 +14,10 @@ const AchievementsSection = () => {
     const [achievements, setAchievements] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const section = useRef(null);
+    const inFlight = useRef(new Set());
+    const alive = useRef(false);
+    useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
     // --- DATA FETCHING ---
     useEffect(() => {
@@ -32,6 +36,60 @@ const AchievementsSection = () => {
 
         fetchAchievements();
     }, []);
+
+    useEffect(() => {
+        const root = section.current;
+        if (!root) return;
+        const visible = new Set();
+        let observing = true;
+        const acknowledge = async () => {
+            if (document.hidden) return;
+            const ids = [...visible].filter(id => !inFlight.current.has(id));
+            if (!ids.length) return;
+            ids.forEach(id => inFlight.current.add(id));
+            try {
+                await api.post('/achievements/acknowledge', { awardIds: ids, read: true });
+                if (alive.current) setAchievements(items => items.map(a => ids.includes(a.userAchievementId) ? { ...a, unread: false } : a));
+            } catch { /* Keep the new marker; a later visit can retry without interrupting the gallery. */ }
+            finally { ids.forEach(id => inFlight.current.delete(id)); }
+        };
+        const cards = [...root.querySelectorAll('[data-unread-award]')];
+        let observer;
+        const checkVisible = () => {
+            cards.forEach(card => {
+                const box = card.getBoundingClientRect();
+                if (box.bottom > 0 && box.top < window.innerHeight && box.right > 0 && box.left < window.innerWidth)
+                    visible.add(card.dataset.unreadAward);
+                else visible.delete(card.dataset.unreadAward);
+            });
+            acknowledge();
+        };
+        if (typeof IntersectionObserver !== 'undefined') {
+            observer = new IntersectionObserver(entries => {
+                if (!observing) return;
+                entries.forEach(entry => {
+                    if (!entry.target.dataset.unreadAward) return;
+                    if (entry.isIntersecting) visible.add(entry.target.dataset.unreadAward);
+                    else visible.delete(entry.target.dataset.unreadAward);
+                });
+                acknowledge();
+            });
+            cards.forEach(card => observer.observe(card));
+        } else {
+            checkVisible();
+            window.addEventListener('scroll', checkVisible, true);
+            window.addEventListener('resize', checkVisible);
+        }
+        const onVisibility = () => { if (!document.hidden) checkVisible(); };
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            observing = false;
+            observer?.disconnect();
+            document.removeEventListener('visibilitychange', onVisibility);
+            window.removeEventListener('scroll', checkVisible, true);
+            window.removeEventListener('resize', checkVisible);
+        };
+    }, [achievements]);
 
     // --- CONDITIONAL RENDERING ---
     if (isLoading) {
@@ -52,11 +110,13 @@ const AchievementsSection = () => {
     );
 
     return (
+        <section ref={section} aria-label="Kitüntetéseim">
         <Row className="g-3 mt-2">
             {sortedAchievements.map((ach) => (
                 <Col xs={12} md={6} key={ach.achievementId}>
                     {/* Dynamic styling based on the 'isUnlocked' boolean */}
                     <div 
+                        data-unread-award={ach.unread ? ach.userAchievementId : undefined}
                         className={`d-flex align-items-center p-3 rounded-4 border transition-all duration-300 h-100 ${
                             ach.isUnlocked 
                             ? 'border-info bg-dark shadow-sm' 
@@ -82,7 +142,7 @@ const AchievementsSection = () => {
                         {/* Trophy Details */}
                         <div>
                             <h3 className={`h6 fw-bold mb-1 ${ach.isUnlocked ? 'text-info' : 'text-light'}`}>
-                                {ach.name} {!ach.isUnlocked && <><span aria-hidden="true" className="ms-1 fs-6">🔒</span><span className="visually-hidden"> – még nem szerezted meg</span></>}
+                                {ach.name} {ach.unread && <span className="badge text-bg-info ms-1">Új</span>} {!ach.isUnlocked && <><span aria-hidden="true" className="ms-1 fs-6">🔒</span><span className="visually-hidden"> – még nem szerezted meg</span></>}
                             </h3>
                             <p className="text-body-secondary mb-0" style={{ fontSize: '0.8rem' }}>
                                 {ach.description}
@@ -99,6 +159,7 @@ const AchievementsSection = () => {
                 </Col>
             ))}
         </Row>
+        </section>
     );
 };
 

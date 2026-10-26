@@ -1,3 +1,4 @@
+import EarnedAchievements from '../components/EarnedAchievements';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Container, Card, Button, ProgressBar, Spinner, Form, Row, Col } from 'react-bootstrap';
@@ -281,6 +282,7 @@ const LessonPlayer = () => {
                         <span aria-hidden="true">{isPassed ? '🏆' : '💔'}</span>
                     </div>
                     <h1 ref={headingRef} tabIndex={-1} className="fw-bold display-5 mb-2">{isPassed ? 'Sikeres Lecke!' : 'Gyakorolj még egy kicsit!'}</h1>
+                    <EarnedAchievements awards={lessonResult.newAchievements} />
                     <p className="text-light opacity-75 fs-5 fst-italic">"{lessonResult.feedback}"</p>
                     {(lessonResult.lessonMastered || lessonResult.topicMastered) && <div className="border border-success rounded p-3 mt-3">
                         <h2 className="h4">{lessonResult.topicMastered ? 'Témakörmastery teljesítve!' : 'Leckemastery teljesítve!'}</h2>

@@ -36,3 +36,20 @@ it.each([false, true])('updates progress without rewriting or moving the current
     expect(otherStorage.getItem('token')).toBeNull();
     expect(vocabularyApi.getVocabularyMap).toHaveBeenCalledTimes(2);
 });
+
+function LiveXp() {
+    const { user, login, syncXp } = useAuth();
+    return <>
+        <button onClick={() => login('token', { userId: 'me', xp: 375 })}>Belépés XP</button>
+        <button onClick={() => syncXp('other', 1000)}>Másik fiók</button>
+        <button onClick={() => syncXp('me', 525)}>Jutalom</button>
+        <output aria-label="Aktuális XP">{user?.xp}</output>
+    </>;
+}
+it('synchronizes asynchronous XP rewards only into the matching account', async () => {
+    render(<AuthProvider><LiveXp /></AuthProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Belépés XP' }));
+    await waitFor(() => expect(screen.getByLabelText('Aktuális XP')).toHaveTextContent('375'));
+    fireEvent.click(screen.getByRole('button', { name: 'Másik fiók' })); expect(screen.getByLabelText('Aktuális XP')).toHaveTextContent('375');
+    fireEvent.click(screen.getByRole('button', { name: 'Jutalom' })); expect(screen.getByLabelText('Aktuális XP')).toHaveTextContent('525');
+});

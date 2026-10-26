@@ -5,7 +5,7 @@ import { NotificationProvider, useNotifications } from '../../context/Notificati
 import AccessibilityFooter from '../AccessibilityFooter';
 import api from '../../services/api';
 
-const auth = vi.hoisted(() => ({ user: { userId: 'teacher', role: 'TEACHER' } }));
+const auth = vi.hoisted(() => ({ user: { userId: 'teacher', role: 'TEACHER' }, syncXp: vi.fn() }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('../../services/api', () => ({ default: { get: vi.fn() } }));
 let streams;
@@ -120,4 +120,10 @@ describe('site index and controllable notification updates', () => {
         expect(screen.getByRole('status')).toHaveTextContent('A frissítés nem sikerült.');
         expect(refresh).toHaveAttribute('aria-disabled', 'false');
     });
+});
+
+it('synchronizes server XP from an accepted notification snapshot', async () => {
+    api.get.mockResolvedValue({ data: { pendingFriendRequests: 2, currentXp: 525 } });
+    render(<Example />); await screen.findByText('Kérelmek: 2');
+    expect(auth.syncXp).toHaveBeenCalledWith('teacher', 525);
 });
