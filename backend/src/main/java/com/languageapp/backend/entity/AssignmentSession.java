@@ -13,7 +13,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "assignment_sessions", indexes = {
         @Index(name = "idx_sessions_assignment_user", columnList = "assignment_id, user_id"),
-        @Index(name = "idx_sessions_assignment_started", columnList = "assignment_id, started_at DESC")
+        @Index(name = "idx_sessions_assignment_started", columnList = "assignment_id, started_at DESC"),
+        @Index(name = "idx_sessions_user_graded", columnList = "user_id, is_graded, started_at DESC")
 })
 public class AssignmentSession {
 

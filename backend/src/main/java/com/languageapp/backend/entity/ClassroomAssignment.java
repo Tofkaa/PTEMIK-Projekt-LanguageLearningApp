@@ -16,7 +16,9 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "classroom_assignments")
+@Table(name = "classroom_assignments", indexes = {
+        @Index(name = "idx_assignments_classroom_created", columnList = "classroom_id, created_at DESC")
+})
 
 @SQLDelete(sql = "UPDATE classroom_assignments SET is_active = false WHERE assignment_id=?")
 @SQLRestriction("is_active = true")

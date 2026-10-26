@@ -27,6 +27,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -50,6 +51,7 @@ class SecurityFoundationsPersistenceTest {
     @Autowired PasswordEncoder encoder;
     @Autowired Clock clock;
     @Autowired AssignmentService grading;
+    @Autowired com.languageapp.backend.controller.NotificationController notifications;
     @Autowired AssignmentSessionRepository examSessions;
     @Autowired ClassroomAssignmentRepository assignments;
     @Autowired AssignmentAccommodationRepository accommodations;
@@ -92,9 +94,91 @@ class SecurityFoundationsPersistenceTest {
     }
     String classroomPath(Fixture f) { return "/api/assignments/classroom/"+f.classroom; }
 
+    @ParameterizedTest @ValueSource(longs={-1,0,1})
+    void notificationAssignmentDeadlineAndIndividualOverrideRemainExclusive(long seconds) {
+        var f=fixture();Instant now=Instant.parse("2026-10-26T12:00:00Z");
+        tx.executeWithoutResult(status->assignments.findById(f.assignment).orElseThrow().setAvailableUntil(now.plusSeconds(seconds)));
+        assertEquals(seconds>0?1:0,assignments.findActiveNotificationReferences(f.student.getUserId(),now).size());
+        tx.executeWithoutResult(status->{
+            assignments.findById(f.assignment).orElseThrow().setAvailableUntil(now.minusSeconds(100));
+            var override=new AssignmentAccommodation();override.setAssignment(em.getReference(ClassroomAssignment.class,f.assignment));
+            override.setUser(em.getReference(User.class,f.student.getUserId()));override.setAvailableUntilOverride(now.plusSeconds(seconds));em.persist(override);
+        });
+        assertEquals(seconds>0?1:0,assignments.findActiveNotificationReferences(f.student.getUserId(),now).size());
+    }
+    @Test void notificationReferencesAreScopedToOwnerAndStudentAndKeepTheExistingWireFormat() throws Exception {
+        var f=fixture();UUID pending=gradingSession(f,true),graded=gradingSession(f,true);var foreign=fixture();gradingSession(foreign,true);
+        UUID scheduled=tx.execute(status->{
+            var request=new ClassroomMember();request.setClassroom(em.getReference(Classroom.class,f.classroom));
+            request.setUser(em.getReference(User.class,f.outsider.getUserId()));request.setStatus(MembershipStatus.PENDING);em.persist(request);
+            examSessions.findById(graded).orElseThrow().setGraded(true);
+            var work=new ClassroomAssignment();work.setClassroom(em.getReference(Classroom.class,f.classroom));work.setTitle("Scheduled");
+            work.setAvailableFrom(clock.instant().plusSeconds(86400));work.setAvailableUntil(clock.instant().plusSeconds(172800));
+            em.persist(work);em.flush();return work.getAssignmentId();
+        });
+        mvc.perform(get("/api/notifications/summary").header("Authorization",auth(f.teacher)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.teacherPendingJoinRequestIds.length()").value(1))
+                .andExpect(jsonPath("$.teacherPendingJoinRequestIds[0]").value(f.classroom+":"+f.outsider.getUserId()))
+                .andExpect(jsonPath("$.teacherUngradedSubmissionIds.length()").value(1))
+                .andExpect(jsonPath("$.teacherUngradedSubmissionIds[0]").value(f.classroom+":"+f.assignment+":"+pending))
+                .andExpect(jsonPath("$.studentGradedSessionIds").isEmpty());
+        mvc.perform(get("/api/notifications/summary").header("Authorization",auth(f.student)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.teacherPendingJoinRequestIds").isEmpty())
+                .andExpect(jsonPath("$.teacherUngradedSubmissionIds").isEmpty())
+                .andExpect(jsonPath("$.studentGradedSessionIds.length()").value(1))
+                .andExpect(jsonPath("$.studentGradedSessionIds[0]").value(f.classroom+":"+f.assignment+":"+graded))
+                .andExpect(jsonPath("$.studentActiveAssignmentIds.length()").value(1))
+                .andExpect(jsonPath("$.studentActiveAssignmentIds[0]").value(f.classroom+":"+scheduled));
+        mvc.perform(get("/api/notifications/summary").header("Authorization",auth(f.outsider)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.studentActiveAssignmentIds").isEmpty());
+    }
+    @Test void notificationQueryCountAndEntityLoadsDoNotGrowWithOtherUsersLargeSessions() {
+        var f=fixture();
+        var stats=em.getEntityManagerFactory().unwrap(org.hibernate.SessionFactory.class).getStatistics();
+        boolean wasEnabled=stats.isStatisticsEnabled();stats.setStatisticsEnabled(true);
+        try {
+            var auth=new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(f.student.getEmail(),"unused");
+            stats.clear();var before=notifications.getSummary(auth).getBody();
+            long queries=stats.getPrepareStatementCount(),loaded=stats.getEntityLoadCount();
+            assertTrue(queries<=11,"Summary must use a fixed query budget, got "+queries);
+            assertTrue(loaded<=1,"Only the current User may be materialized, got "+loaded);
+            var unrelated=fixture();
+            tx.executeWithoutResult(status->{
+                for(int i=0;i<50;i++) {
+                    var row=new AssignmentSession();row.setAssignment(em.getReference(ClassroomAssignment.class,unrelated.assignment));
+                    row.setUser(em.getReference(User.class,unrelated.student.getUserId()));row.setStartedAt(clock.instant());
+                    row.setFinishedAt(clock.instant());row.setRawAnswers("x".repeat(250000));em.persist(row);
+                }
+            });
+            stats.clear();var after=notifications.getSummary(auth).getBody();
+            assertEquals(queries,stats.getPrepareStatementCount());assertEquals(loaded,stats.getEntityLoadCount());
+            assertEquals(before.getStudentActiveAssignmentIds(),after.getStudentActiveAssignmentIds());
+            assertEquals(before.getStudentGradedSessionIds(),after.getStudentGradedSessionIds());
+            assertEquals(before.getTeacherUngradedSubmissionIds(),after.getTeacherUngradedSubmissionIds());
+            tx.executeWithoutResult(status->{
+                for(int i=0;i<25;i++) {
+                    var work=new ClassroomAssignment();work.setClassroom(em.getReference(Classroom.class,f.classroom));
+                    work.setTitle("Own notification "+i);em.persist(work);
+                    if(i%5==0) {
+                        var override=new AssignmentAccommodation();override.setAssignment(work);
+                        override.setUser(em.getReference(User.class,f.student.getUserId()));
+                        override.setAvailableUntilOverride(clock.instant().plusSeconds(3600));em.persist(override);
+                    }
+                }
+            });
+            stats.clear();var withOwnWork=notifications.getSummary(auth).getBody();
+            assertEquals(queries,stats.getPrepareStatementCount());assertEquals(loaded,stats.getEntityLoadCount());
+            assertEquals(before.getStudentActiveAssignmentIds().size()+25,withOwnWork.getStudentActiveAssignmentIds().size());
+            System.out.printf("Notification summary: %d prepared SQL queries and %d loaded entities; unchanged after unrelated 12.5 MB session payload and 25 own assignments.%n",queries,loaded);
+        } finally {stats.setStatisticsEnabled(wasEnabled);stats.clear();}
+    }
+
     static java.util.stream.Stream<Class<?>> indexedEntities() {
         return java.util.stream.Stream.of(StudentVocabulary.class,Result.class,AssignmentSession.class,Progress.class,
-                UserAchievement.class,Friendship.class,Challenge.class,RefreshToken.class);
+                UserAchievement.class,Friendship.class,Challenge.class,RefreshToken.class,
+                Classroom.class,ClassroomMember.class,ClassroomAssignment.class);
     }
     @ParameterizedTest @org.junit.jupiter.params.provider.MethodSource("indexedEntities")
     void hotPathIndexesAreCreatedWithTheDeclaredColumnOrderAndWithoutChangingUniqueness(Class<?> entity) {

@@ -14,6 +14,13 @@ import java.util.UUID;
 @Repository
 public interface ClassroomMemberRepository extends JpaRepository<ClassroomMember, UUID> {
 
+    @Query("SELECT new com.languageapp.backend.dto.projection.PendingJoinNotification(m.classroom.classroomId, m.user.userId) " +
+            "FROM ClassroomMember m WHERE m.classroom.teacher.userId = :teacherId " +
+            "AND m.status = com.languageapp.backend.enums.MembershipStatus.PENDING " +
+            "ORDER BY m.classroom.classroomId, m.user.userId")
+    List<com.languageapp.backend.dto.projection.PendingJoinNotification> findPendingNotificationReferences(
+            @org.springframework.data.repository.query.Param("teacherId") UUID teacherId);
+
     boolean existsByClassroom_ClassroomIdAndUser_UserId(UUID classroomId, UUID userId);
 
     List<ClassroomMember> findAllByClassroom_ClassroomIdOrderByJoinedAtDesc(UUID classroomId);
