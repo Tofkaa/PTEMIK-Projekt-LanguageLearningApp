@@ -1,5 +1,26 @@
 TESZTELÉSRE:
 
+A backendhez kötelező egy helyben generált JWT-aláírókulcs a gyökér `.env`
+`JWT_SECRET` változójában (közvetlen backendindításnál a környezetben).
+PowerShellben generálható:
+
+```powershell
+$jwtBytes = New-Object byte[] 64
+$jwtGenerator = [Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+    $jwtGenerator.GetBytes($jwtBytes)
+    [Convert]::ToBase64String($jwtBytes)
+} finally {
+    $jwtGenerator.Dispose()
+}
+```
+
+A kapott értéket csak a helyi `.env`-be másold. Példakulcs vagy tesztkulcs nem
+használható valódi környezetben. Kulcscsere után a korábbi access tokenek
+érvénytelenek; új hitelesítés/tokenfrissítés szükséges. Hiányzó, hibás Base64 vagy
+32 bájtnál rövidebb kulccsal a backend nem indul el. A `.env.example` nem tartalmaz
+használható aláírókulcsot.
+
 Helyi HTTPS és az oktatói gépeken szükséges tanúsítványgenerálás:
 [Helyi HTTPS beállítása](docs/local-https.md).
 
