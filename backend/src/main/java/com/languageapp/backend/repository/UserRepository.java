@@ -19,6 +19,16 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @Query("select u.userId from User u where u.email = :email and u.isActive = true")
+    Optional<UUID> findActiveProfileUserId(@Param("email") String email);
+
+    /** Never merge a stale User after a slow external upload; update only this field on an active account. */
+    @org.springframework.transaction.annotation.Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update User u set u.profilePictureUrl = :url where u.userId = :id and u.isActive = true")
+    int updateActiveProfilePicture(@Param("id") UUID id, @Param("url") String url);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.email = :email")
     Optional<User> findByEmailForAuthentication(@Param("email") String email);

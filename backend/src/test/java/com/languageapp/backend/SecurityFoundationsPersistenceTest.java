@@ -105,7 +105,14 @@ class SecurityFoundationsPersistenceTest {
     }
     @Test void profileUploadDecodesPixelsAndNeverSendsOriginalPayloadToStorage() throws Exception {
         var f=fixture();String url="https://res.cloudinary.com/test/image/upload/normalized.png";
-        org.mockito.Mockito.when(images.uploadProfileImage(org.mockito.ArgumentMatchers.any(byte[].class))).thenReturn(url);
+        org.mockito.Mockito.when(images.uploadProfileImage(org.mockito.ArgumentMatchers.any(byte[].class))).thenAnswer(invocation->{
+            assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive(),
+                    "External image upload must not hold a database transaction");
+            tx.executeWithoutResult(status->{
+                var latest=users.findById(f.student.getUserId()).orElseThrow();latest.setXp(1234);latest.setPreferredDifficulty(DifficultyLevel.HARD);
+            });
+            return url;
+        });
         mvc.perform(multipart("/api/users/me/profile-picture").file(
                 new org.springframework.mock.web.MockMultipartFile("file","fake.svg","application/octet-stream",profilePng()))
                 .header("Authorization",auth(f.student)))
@@ -115,6 +122,21 @@ class SecurityFoundationsPersistenceTest {
         var image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(payload.getValue()));
         assertEquals(250,image.getWidth());assertEquals(250,image.getHeight());
         assertEquals(url,users.findById(f.student.getUserId()).orElseThrow().getProfilePictureUrl());
+        var latest=users.findById(f.student.getUserId()).orElseThrow();
+        assertEquals(1234,latest.getXp());assertEquals(DifficultyLevel.HARD,latest.getPreferredDifficulty());
+    }
+    @Test void accountDeactivatedDuringUploadCannotReceiveAStaleProfileUpdate() throws Exception {
+        var f=fixture();String header=auth(f.student);
+        org.mockito.Mockito.when(images.uploadProfileImage(org.mockito.ArgumentMatchers.any(byte[].class))).thenAnswer(invocation->{
+            tx.executeWithoutResult(status->{
+                var user=users.findById(f.student.getUserId()).orElseThrow();user.setActive(false);user.setProfilePictureUrl(null);
+            });
+            return "https://example.test/new.png";
+        });
+        mvc.perform(multipart("/api/users/me/profile-picture").file(
+                new org.springframework.mock.web.MockMultipartFile("file","avatar.png","image/png",profilePng()))
+                .header("Authorization",header)).andExpect(status().isNotFound());
+        var user=users.findById(f.student.getUserId()).orElseThrow();assertFalse(user.isActive());assertNull(user.getProfilePictureUrl());
     }
     @Test void invalidProfileUploadReturnsStructured400AndLeavesExistingUrlIntact() throws Exception {
         var f=fixture();String old="https://example.test/old.png";
