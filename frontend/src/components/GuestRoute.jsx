@@ -11,9 +11,8 @@ import { useAuth } from '../context/AuthContext.jsx';
  */
 const GuestRoute = ({ children }) => {
     const { user } = useAuth();
-    const token = localStorage.getItem('token');
 
-    if (user || token) {
+    if (user) {
         return <Navigate to="/dashboard" replace />;
     }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Form, Button, Card, Container, Row, Col } from 'react-bootstrap';
-import api from '../services/api.jsx';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
@@ -23,7 +23,7 @@ const Login = () => {
     const [isLoading, setIsLoading] = useState(false);
 
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { authenticate } = useAuth();
 
     /**
      * Asynchronous handler for form submission.
@@ -35,45 +35,21 @@ const Login = () => {
         setError(''); 
         setIsLoading(true);
         
-        console.log(`Initiating login attempt for: ${email}`);
-
         try {
-            // 1. Send authentication request to the backend
-           const response = await api.post('/auth/login', { 
+           await authenticate({
                 email, 
                 password,
                 rememberMe
             });
             
-            const token = response.data.accessToken;
-            console.log("Token received!");
-
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
-
-            // 2. Immediately store the token in LocalStorage.
-            // This ensures the Axios interceptor can attach it to the subsequent (/users/me) request
-            // before the Context is fully updated.
-           if (rememberMe) {
-                localStorage.setItem('token', token);
-            } else {
-                sessionStorage.setItem('token', token);
-            }
-
-            // 3. Fetch the authenticated user's profile
-            const userResponse = await api.get('/users/me');
-            console.log("Profile data fetched:", userResponse.data);
-
-            // 4. Synchronize the global authentication state (Context)
-           login(token, userResponse.data, rememberMe);
-
-            // 5. Redirect to the protected Dashboard view
             navigate('/dashboard');
 
         } catch (err) {
-            console.error("Login error:", err);
+            if (axios.isCancel(err)) return;
             // Display a generic error message to the user for security reasons
-            setError('Hibás email cím vagy jelszó!');
+            setError([400, 401].includes(err.response?.status) ? 'Hibás email cím vagy jelszó!'
+                : err.response?.status === 403 ? 'Ez a fiók jelenleg nem használható bejelentkezésre.'
+                : 'A bejelentkezés most nem sikerült. Ellenőrizd a kapcsolatot, majd próbáld újra.');
         } finally {
             setIsLoading(false);
         }

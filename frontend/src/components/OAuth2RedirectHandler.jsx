@@ -1,49 +1,41 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import axios from 'axios';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
 import { Spinner } from 'react-bootstrap';
 
 const OAuth2RedirectHandler = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { completeOAuthLogin } = useAuth();
     const token = searchParams.get('token');
+    const attempt = useRef(null);
 
     useEffect(() => {
-        const authenticateUser = async () => {
-            if (token) {
-                try {
-                    localStorage.setItem('token', token);
-            
-                    const response = await api.get('/users/me');
-                 
-                    await login(token, response.data, true);
-                    
-                    navigate('/dashboard', { replace: true });
-                } catch (error) {
-                    console.error('Hiba az OAuth2 token feldolgozásakor:', error);
-                    localStorage.removeItem('token');
-                    navigate('/login', { state: { error: 'Sikertelen közösségi bejelentkezés.' } });
-                }
-            } else {
-                navigate('/login', { state: { error: 'Hiányzó azonosító token.' } });
-            }
-        };
+        let active = true;
+        if (!token) {
+            navigate('/login', { state: { error: 'Hiányzó azonosító token.' }, replace: true });
+            return;
+        }
+        // React StrictMode may replay this effect; keep one authentication attempt per callback.
+        if (attempt.current?.token !== token) attempt.current = { token, promise: completeOAuthLogin(token) };
+        attempt.current.promise.then(() => {
+            if (active) navigate('/dashboard', { replace: true });
+        }).catch(error => {
+            if (active && !axios.isCancel(error)) navigate('/login', {
+                state: { error: 'Sikertelen közösségi bejelentkezés.' }, replace: true,
+            });
+        });
+        return () => { active = false; };
+    }, [token, completeOAuthLogin, navigate]);
 
-        authenticateUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    return (
-        <div className="d-flex justify-content-center align-items-center vh-100 bg-dark text-light">
-            <div className="text-center">
-                <Spinner aria-hidden="true" animation="border" variant="info" className="mb-3" />
-                <h1 className="h4 fw-bold">Bejelentkezés folyamatban...</h1>
-                <p className="text-secondary">Hitelesítés ellenőrzése a szerverrel</p>
-            </div>
+    return <div className="d-flex justify-content-center align-items-center vh-100 bg-dark text-light">
+        <div className="text-center">
+            <Spinner aria-hidden="true" animation="border" variant="info" className="mb-3" />
+            <h1 className="h4 fw-bold">Bejelentkezés folyamatban...</h1>
+            <p className="text-secondary">Hitelesítés ellenőrzése a szerverrel</p>
         </div>
-    );
+    </div>;
 };
 
 export default OAuth2RedirectHandler;
