@@ -6,8 +6,8 @@ import api from './api';
 export const vocabularyApi = {
     
 
-    lookupWord: (word, source = 'DICTIONARY_TOOLTIP') => 
-        api.post('/vocabulary/lookup', { word, source }),
+    lookupWord: (word, source = 'DICTIONARY_TOOLTIP', config) =>
+        api.post('/vocabulary/lookup', { word, source }, config),
 
   
     recordPractice: (vocabularyId, isCorrect) => 

@@ -4,8 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api.jsx';
 import { useAuth } from '../context/AuthContext';
 import useStageFocus from '../hooks/useStageFocus';
+import { getAuthEpoch } from '../services/authSession';
 
 const FlashcardPractice = () => {
+    const { user } = useAuth();
+    return <FlashcardSession key={JSON.stringify([getAuthEpoch(), user?.userId, user?.activeCourseCode])} />;
+};
+
+const FlashcardSession = () => {
     const navigate = useNavigate();
     
     const [words, setWords] = useState([]);
@@ -36,21 +42,26 @@ const FlashcardPractice = () => {
     };
 
     useEffect(() => {
+        const controller = new AbortController();
+        let active = true;
         const fetchAllWords = async () => {
             try {
-                const response = await api.get('/vocabulary/hub');
+                const response = await api.get('/vocabulary/hub', { signal: controller.signal });
+                if (!active) return;
 
                 const shuffled = [...response.data].sort(() => Math.random() - 0.5);
                 setWords(shuffled);
             } catch (err) {
+                if (!active) return;
                 console.error("Hiba a szavak lekérésekor:", err);
                 setError("Nem sikerült betölteni a szótárat.");
             } finally {
-                setIsLoading(false);
+                if (active) setIsLoading(false);
             }
         };
 
         fetchAllWords();
+        return () => { active = false; controller.abort(); };
     }, []);
 
     const handleNextCard = () => {

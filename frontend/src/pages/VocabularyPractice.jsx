@@ -10,8 +10,15 @@ import LearningFeedback from '../components/LearningFeedback';
 import useStageFocus from '../hooks/useStageFocus';
 import LanguageText from '../components/LanguageText';
 import { exerciseTypeLabel } from '../utils/exerciseTypeLabel';
+import { useAuth } from '../context/AuthContext';
+import { getAuthEpoch } from '../services/authSession';
 
 const VocabularyPractice = () => {
+    const { user } = useAuth();
+    return <VocabularySession key={JSON.stringify([getAuthEpoch(), user?.userId, user?.activeCourseCode])} />;
+};
+
+const VocabularySession = () => {
     const navigate = useNavigate();
     const { refreshNotifications } = useNotifications();
     const [exercises, setExercises] = useState([]);
@@ -27,27 +34,35 @@ const VocabularyPractice = () => {
     const [sessionSummary, setSessionSummary] = useState(null);
     const [saveError, setSaveError] = useState(null);
     const actionRef = useRef(null);
+    const alive = useRef(false);
+    const submission = useRef(null);
     const headingRef = useStageFocus(isLoading ? 'loading' : error ? 'error'
         : isCompleted ? 'result' : exercises.length ? `question-${currentIndex}` : 'empty');
 
     useEffect(() => {
+        const controller = new AbortController();
+        let active = true;
+        alive.current = true;
         const fetchDynamicExercises = async () => {
             try {
-                const response = await api.get('/vocabulary/practice/generate');
+                const response = await api.get('/vocabulary/practice/generate', { signal: controller.signal });
+                if (!active) return;
                 if (response.data.length === 0) {
                     setExercises([]);
                 } else {
                     setExercises(response.data);
                 }
             } catch (err) {
+                if (!active) return;
                 console.error("Hiba a dinamikus gyakorlás lekérésekor:", err);
                 setError("Nem sikerült betölteni a gyakorló feladatokat.");
             } finally {
-                setIsLoading(false);
+                if (active) setIsLoading(false);
             }
         };
 
         fetchDynamicExercises();
+        return () => { active = false; alive.current = false; controller.abort(); submission.current?.abort(); };
     }, []);
 
     const handleCheckAnswer = () => {
@@ -78,20 +93,24 @@ const VocabularyPractice = () => {
         }
         setIsChecking(true);
         setSaveError(null);
+        const controller = new AbortController();
+        submission.current = controller;
         try {
             const timeTaken = Math.floor((Date.now() - startTime) / 1000);
             const response = await api.post('/vocabulary/practice/submit', {
                 results,
                 timeTakenSeconds: timeTaken
-            });
+            }, { signal: controller.signal });
+            if (!alive.current || controller.signal.aborted) return;
             setSessionSummary(response.data);
             setIsCompleted(true);
             refreshNotifications?.();
         } catch (err) {
+            if (!alive.current || controller.signal.aborted) return;
             console.error('Hiba az eredmények mentésekor:', err);
             setSaveError('Nem sikerült menteni az eredményeket. A válaszaid megmaradtak, próbáld újra a mentést.');
         } finally {
-            setIsChecking(false);
+            if (alive.current) setIsChecking(false);
         }
     };
 
