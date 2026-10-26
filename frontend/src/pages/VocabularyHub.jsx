@@ -13,6 +13,7 @@ const VocabularyHub = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterLevel, setFilterLevel] = useState('ALL');
+    const [dateOrder, setDateOrder] = useState('ASC');
     const { user } = useAuth();
     const { notifications } = useNotifications();
 
@@ -44,6 +45,11 @@ const VocabularyHub = () => {
         return 'success'; // 6 = mesteri
     };
 
+    const reviewTime = value => {
+        const time = Date.parse(value);
+        // Missing dates already mean immediately due in this view.
+        return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
+    };
     const filteredVocabulary = vocabulary.filter(item => {
         const matchesSearch = item.word.toLowerCase().includes(searchTerm.toLowerCase()) || 
                               item.translation.toLowerCase().includes(searchTerm.toLowerCase());
@@ -52,6 +58,11 @@ const VocabularyHub = () => {
         if (filterLevel === 'MASTERED') return matchesSearch && item.mastered;
         if (filterLevel === 'LEARNING') return matchesSearch && !item.mastered;
         return matchesSearch;
+    }).sort((a, b) => {
+        const left = reviewTime(a.nextPracticeAt);
+        const right = reviewTime(b.nextPracticeAt);
+        const comparison = (left > right) - (left < right);
+        return dateOrder === 'ASC' ? comparison : -comparison;
     });
 
     if (isLoading) {
@@ -93,8 +104,8 @@ const VocabularyHub = () => {
 
             {/* Filters and Search Bar */}
             <Card className="bg-dark border-secondary shadow-lg mb-4 rounded-4 p-3">
-                <Row className="g-3 align-items-center">
-                    <Col md={8}>
+                <Row className="g-3 align-items-end">
+                    <Col md={6}>
                         <Form.Label htmlFor="vocabulary-search">Keresés szó vagy jelentés alapján</Form.Label>
                         <Form.Control 
                             id="vocabulary-search"
@@ -105,7 +116,7 @@ const VocabularyHub = () => {
                             className="bg-black text-light border-secondary shadow-none"
                         />
                     </Col>
-                    <Col md={4}>
+                    <Col md={3}>
                         <Form.Label htmlFor="vocabulary-filter">Tanulási állapot</Form.Label>
                         <Form.Select 
                             id="vocabulary-filter"
@@ -116,6 +127,15 @@ const VocabularyHub = () => {
                             <option value="ALL">Összes szó ({vocabulary.length})</option>
                             <option value="LEARNING">Tanulás alatt</option>
                             <option value="MASTERED">Mesteri szintű</option>
+                        </Form.Select>
+                    </Col>
+                    <Col md={3}>
+                        <Form.Label htmlFor="vocabulary-date-order">Következő ismétlés sorrendje</Form.Label>
+                        <Form.Select id="vocabulary-date-order" value={dateOrder}
+                            onChange={event => setDateOrder(event.target.value)}
+                            className="bg-black text-light border-secondary shadow-none">
+                            <option value="ASC">Növekvő (korábbi elöl)</option>
+                            <option value="DESC">Csökkenő (későbbi elöl)</option>
                         </Form.Select>
                     </Col>
                 </Row>
@@ -131,13 +151,13 @@ const VocabularyHub = () => {
                             <th scope="col" className="py-3 text-start ps-4">Célszó (Idegen nyelv)</th>
                             <th scope="col" className="py-3 text-start">Jelentés (Magyar)</th>
                             <th scope="col" className="py-3">SRS Szint</th>
-                            <th scope="col" className="py-3 pe-4">Következő Ismétlés</th>
+                            <th scope="col" aria-sort={dateOrder === 'ASC' ? 'ascending' : 'descending'} className="py-3 pe-4">Következő Ismétlés</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredVocabulary.length > 0 ? (
-                            filteredVocabulary.map((item, idx) => (
-                                <tr key={idx} className="border-secondary">
+                            filteredVocabulary.map(item => (
+                                <tr key={item.word} className="border-secondary">
                                     <th scope="row" lang={user?.activeCourseCode || 'en'} className="text-start ps-4 fw-bold app-accent-text">{item.word}</th>
                                     <td lang="hu" className="text-start text-light opacity-90">{item.translation}</td>
                                     <td>
