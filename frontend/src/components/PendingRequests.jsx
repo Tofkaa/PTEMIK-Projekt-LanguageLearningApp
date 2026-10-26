@@ -10,6 +10,7 @@ import api from '../services/api';
 import { useNotifications } from '../context/NotificationContext';
 import { formatToLocalDisplay } from '../utils/dateUtils';
 import LearningFeedback from './LearningFeedback';
+import TimedSuccessFeedback from './TimedSuccessFeedback';
 
 
 /**
@@ -20,6 +21,7 @@ const PendingRequests = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const messageSequence = useRef(0);
     const isFirstLoad = useRef(true);
     const [busyId, setBusyId] = useState(null);
     const headingRef = useRef(null);
@@ -67,7 +69,7 @@ const PendingRequests = () => {
             const endpoint = `/friendships/requests/${friendshipId}/${action}`;
             const response = await api.post(endpoint);
             
-            setMessage({ type: 'success', text: response.data.message || 'A kérelem feldolgozva.' });
+            setMessage({ type: 'success', text: response.data.message || 'A kérelem feldolgozva.', id: ++messageSequence.current });
             // Only restore focus if it is still in the card that is about to disappear.
             restoreFocus.current = !!button.closest('.card')?.contains(document.activeElement);
             
@@ -90,8 +92,10 @@ const PendingRequests = () => {
 
     return (
         <div className="p-3">
-            <LearningFeedback error={message.type === 'danger' ? message.text : ''}
-                feedback={message.type === 'success' ? { type: 'success', msg: message.text } : null} />
+            <LearningFeedback error={message.type === 'danger' ? message.text : ''} />
+            <TimedSuccessFeedback message={message.type === 'success' ? message : null}
+                focusTarget={headingRef} onDismiss={() => setMessage(current =>
+                    current.type === 'success' && current.id === message.id ? { type: '', text: '' } : current)} />
             <h2 ref={headingRef} tabIndex={-1} className="h5 text-light mb-4">Beérkező kérelmek ({requests.length})</h2>
 
             {(!requests || requests.length === 0) ? (
