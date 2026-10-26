@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import axios from 'axios';
 import api from '../services/api';
 import { vocabularyApi } from '../services/vocabularyApi';
@@ -13,13 +13,17 @@ export const AuthProvider = ({ children }) => {
     const [vocabularyMap, setVocabularyMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [startupError, setStartupError] = useState(false);
+    const vocabularyRequest = useRef(0);
+    const courseRequest = useRef(0);
+    const courseQueue = useRef(Promise.resolve());
 
     const fetchVocabularyMap = useCallback(async snapshot => {
+        const request = ++vocabularyRequest.current;
         try {
             const response = await vocabularyApi.getVocabularyMap();
-            if (isCurrentAuth(snapshot)) setVocabularyMap(response.data);
+            if (isCurrentAuth(snapshot) && request === vocabularyRequest.current) setVocabularyMap(response.data);
         } catch (error) {
-            if (isCurrentAuth(snapshot) && !axios.isCancel(error)) console.error('Hiba a szótérkép betöltésekor:', error);
+            if (isCurrentAuth(snapshot) && request === vocabularyRequest.current && !axios.isCancel(error)) console.error('Hiba a szótérkép betöltésekor:', error);
         }
     }, []);
 
@@ -44,6 +48,8 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const unsubscribe = subscribeAuth(type => {
+            ++vocabularyRequest.current;
+            ++courseRequest.current;
             setUser(null);
             setVocabularyMap({});
             setStartupError(false);
@@ -57,7 +63,9 @@ export const AuthProvider = ({ children }) => {
 
     const updateProfile = async userData => {
         const snapshot = authSnapshot();
-        setUser(current => current && (!current.userId || !userData.userId || current.userId === userData.userId) ? userData : current);
+        // A lesson/profile response may predate a course change. Only changeLanguage changes this field.
+        setUser(current => current && (!current.userId || !userData.userId || current.userId === userData.userId)
+            ? { ...userData, activeCourseCode: current.activeCourseCode ?? userData.activeCourseCode } : current);
         await fetchVocabularyMap(snapshot);
     };
     const login = async (token, userData, rememberMe = false) => {
@@ -102,9 +110,26 @@ export const AuthProvider = ({ children }) => {
     };
     const changeLanguage = async courseCode => {
         const snapshot = authSnapshot();
-        const response = await userApi.changeActiveCourse(courseCode);
+        const request = ++courseRequest.current;
+        ++vocabularyRequest.current;
+        setVocabularyMap({});
+        // Aborting a PATCH does not undo its server-side write. Serialize mutations instead.
+        const pending = courseQueue.current.then(() => {
+            requireCurrentAuth(snapshot);
+            return userApi.changeActiveCourse(courseCode);
+        });
+        courseQueue.current = pending.catch(() => {});
+        let response;
+        try {
+            response = await pending;
+        } catch (error) {
+            if (isCurrentAuth(snapshot) && request === courseRequest.current) await fetchVocabularyMap(snapshot);
+            throw error;
+        }
         requireCurrentAuth(snapshot);
+        // Also retain an intermediate successful switch if the following switch fails.
         setUser(response.data);
+        if (request !== courseRequest.current) return false;
         await fetchVocabularyMap(snapshot);
         return true;
     };
