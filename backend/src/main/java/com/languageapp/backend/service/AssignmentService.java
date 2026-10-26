@@ -46,6 +46,24 @@ public class AssignmentService {
     private final SseService sseService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /** Capture scalar recipients before leaving the transaction; never notify for a rolled-back write. */
+    private void notifyAfterCommit(List<String> recipients) {
+        List<String> unique = recipients.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        if (unique.isEmpty()) return;
+        Runnable notify = () -> {
+            for (String recipient : unique) {
+                try { sseService.sendPing(recipient); }
+                catch (RuntimeException failure) { log.warn("Committed assignment notification could not be delivered."); }
+            }
+        };
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() { notify.run(); }
+                    });
+        } else notify.run();
+    }
+
     /**
      * Creates a new classroom assignment.
      * Supports standard fixed exercise lists and dynamic "RANDOM_SUBSET" generation for anti-cheat purposes.
@@ -117,8 +135,8 @@ public class AssignmentService {
         assignmentRepository.save(assignment);
         if (!initialAccommodations.isEmpty()) accommodationRepository.saveAll(initialAccommodations);
 
-        classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
-                .forEach(member -> sseService.sendPing(member.getUser().getEmail()));
+        notifyAfterCommit(classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
+                .stream().map(member -> member.getUser().getEmail()).toList());
     }
 
     /**
@@ -352,7 +370,7 @@ public class AssignmentService {
         }
 
         sessionRepository.save(session);
-        sseService.sendPing(session.getAssignment().getClassroom().getTeacher().getEmail());
+        notifyAfterCommit(List.of(session.getAssignment().getClassroom().getTeacher().getEmail()));
 
         streakService.updateActivity(session.getUser());
 
@@ -627,17 +645,7 @@ public class AssignmentService {
         session.setDraftRevision(session.getDraftRevision() + 1);
 
         sessionRepository.save(session);
-        String recipient = session.getUser().getEmail();
-        Runnable notify = () -> {
-            try { sseService.sendPing(recipient); }
-            catch (RuntimeException failure) { log.warn("Published grade notification could not be delivered for session {}", sessionId); }
-        };
-        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
-            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-                    new org.springframework.transaction.support.TransactionSynchronization() {
-                        @Override public void afterCommit() { notify.run(); }
-                    });
-        } else notify.run();
+        notifyAfterCommit(List.of(session.getUser().getEmail()));
 
         log.info("Teacher {} graded session {}. Published: true", teacherEmail, sessionId);
         return session.getDraftRevision();
@@ -742,7 +750,7 @@ public class AssignmentService {
         ac.setAvailableUntilOverride(request.getAvailableUntilOverride());
         accommodationRepository.save(ac);
         ongoing.forEach(s -> { s.setEffectiveTimeLimitMinutes(minutes); s.setEffectiveAvailableUntil(until); });
-        sseService.sendPing(member.getUser().getEmail());
+        notifyAfterCommit(List.of(member.getUser().getEmail()));
     }
 
     @Transactional(readOnly = true)

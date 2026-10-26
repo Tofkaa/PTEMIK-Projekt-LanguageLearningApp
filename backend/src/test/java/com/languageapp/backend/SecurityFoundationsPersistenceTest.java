@@ -51,6 +51,8 @@ class SecurityFoundationsPersistenceTest {
     @Autowired Clock clock;
     @Autowired AssignmentService grading;
     @Autowired AssignmentSessionRepository examSessions;
+    @Autowired ClassroomAssignmentRepository assignments;
+    @Autowired AssignmentAccommodationRepository accommodations;
     @Autowired LessonTopicRepository topics;
     @Autowired LessonRepository lessons;
     @Autowired ExerciseRepository exercises;
@@ -199,6 +201,58 @@ class SecurityFoundationsPersistenceTest {
     String gradeBody(int score,long revision) { return "{\"teacherScore\":"+score+",\"teacherComment\":\"Feedback\",\"revision\":"+revision+"}"; }
     com.languageapp.backend.dto.request.TeacherGradeRequest gradeRequest(int score,long revision) {
         var request=new com.languageapp.backend.dto.request.TeacherGradeRequest();request.setTeacherScore(score);request.setRevision(revision);return request;
+    }
+
+    UUID notificationExercise(Fixture f) {
+        return tx.execute(status->{
+            var topic=new LessonTopic();topic.setName("Notification exercise");topic.setCourse(users.findById(f.student.getUserId()).orElseThrow().getActiveCourse());em.persist(topic);
+            var lesson=new Lesson();lesson.setTitle("Notification");lesson.setTopic(topic);em.persist(lesson);
+            var exercise=new Exercise();exercise.setLesson(lesson);exercise.setType("TRANSLATION");exercise.setDifficulty("EASY");
+            exercise.setContent(Map.of("question","Alma"));exercise.setCorrectAnswer(Map.of("answer","Apple"));em.persist(exercise);em.flush();return exercise.getExerciseId();
+        });
+    }
+    com.languageapp.backend.dto.request.AssignmentCreateRequest notificationAssignment(UUID exerciseId) {
+        var request=new com.languageapp.backend.dto.request.AssignmentCreateRequest();
+        request.setTitle("Notification after commit");request.setExerciseIds(List.of(exerciseId));return request;
+    }
+    @ParameterizedTest @ValueSource(strings={"creation","submission","accommodation"})
+    void allAssignmentNotificationsWaitForCommitAndDisappearOnRollback(String operation) {
+        var f=fixture();UUID sessionId=gradingSession(f,false),exerciseId=notificationExercise(f);
+        long assignmentCount=assignments.count(),accommodationCount=accommodations.count();
+        Runnable write=switch(operation) {
+            case "creation" -> ()->grading.createAssignment(f.classroom,notificationAssignment(exerciseId),f.teacher.getEmail());
+            case "submission" -> ()->{
+                var request=new com.languageapp.backend.dto.request.AssignmentSubmitRequest();request.setAnswers(List.of());request.setRevision(0L);
+                grading.submitAssignment(sessionId,request,f.student.getEmail());
+            };
+            default -> ()->{
+                var request=new com.languageapp.backend.dto.request.AssignmentAccommodationRequest();request.setExtraMinutes(5);
+                grading.updateAccommodation(f.assignment,f.student.getUserId(),request,f.teacher.getEmail());
+            };
+        };
+        org.mockito.Mockito.clearInvocations(sse);
+        tx.executeWithoutResult(status->{write.run();org.mockito.Mockito.verifyNoInteractions(sse);status.setRollbackOnly();});
+        org.mockito.Mockito.verifyNoInteractions(sse);
+        assertEquals(assignmentCount,assignments.count());assertEquals(accommodationCount,accommodations.count());
+        assertNull(examSessions.findById(sessionId).orElseThrow().getFinishedAt());
+        tx.executeWithoutResult(status->{write.run();org.mockito.Mockito.verifyNoInteractions(sse);});
+        String recipient=operation.equals("submission")?f.teacher.getEmail():f.student.getEmail();
+        org.mockito.Mockito.verify(sse).sendPing(recipient);
+        if(operation.equals("creation")) assertEquals(assignmentCount+1,assignments.count());
+        if(operation.equals("accommodation")) assertEquals(accommodationCount+1,accommodations.count());
+        if(operation.equals("submission")) assertNotNull(examSessions.findById(sessionId).orElseThrow().getFinishedAt());
+    }
+    @Test void oneFailedAssignmentNotificationDoesNotUndoCommitOrSkipOtherRecipients() {
+        var f=fixture();UUID exerciseId=notificationExercise(f);long before=assignments.count();
+        tx.executeWithoutResult(status->{
+            var member=new ClassroomMember();member.setClassroom(em.getReference(Classroom.class,f.classroom));
+            member.setUser(em.getReference(User.class,f.outsider.getUserId()));member.setStatus(MembershipStatus.ACCEPTED);em.persist(member);
+        });
+        org.mockito.Mockito.doThrow(new IllegalStateException("synthetic send failure")).when(sse).sendPing(f.student.getEmail());
+        assertDoesNotThrow(()->grading.createAssignment(f.classroom,notificationAssignment(exerciseId),f.teacher.getEmail()));
+        assertEquals(before+1,assignments.count());
+        org.mockito.Mockito.verify(sse).sendPing(f.student.getEmail());
+        org.mockito.Mockito.verify(sse).sendPing(f.outsider.getEmail());
     }
     @Test void gradingInputBoundsAreEnforcedBeforeWriting() throws Exception {
         var f=fixture();UUID id=gradingSession(f,true);String header=auth(f.teacher);String path="/api/assignments/sessions/"+id+"/grade";
