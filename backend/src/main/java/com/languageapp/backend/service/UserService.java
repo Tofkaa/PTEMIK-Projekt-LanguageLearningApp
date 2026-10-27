@@ -46,6 +46,7 @@ public class UserService {
     private final UserAchievementRepository userAchievementRepository;
     private final InvitationLinkRepository invitationLinkRepository;
     private final OAuthIdentityRepository oAuthIdentityRepository;
+    private final OAuthLinkIntentRepository oauthLinkIntentRepository;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -437,6 +438,7 @@ public class UserService {
 
     /** Only called after local credentials or an email challenge have been verified. */
     void anonymizeAccount(User user) {
+        oauthLinkIntentRepository.deleteById(user.getUserId());
         oAuthIdentityRepository.deleteByUserUserId(user.getUserId());
         invitationLinkRepository.revokeAllForOwner(user.getUserId(), clock.instant());
         lessonAttemptRepository.deleteByUserUserId(user.getUserId());

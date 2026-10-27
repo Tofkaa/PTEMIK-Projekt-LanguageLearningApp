@@ -15,8 +15,16 @@ public class OAuth2AuthenticationFailureHandler implements AuthenticationFailure
     @Value("${app.frontend.url}") private String frontendUrl;
     private static final Set<String> CODES=Set.of("email_in_use","unverified_email","identity_unavailable","access_denied");
     @Override public void onAuthenticationFailure(HttpServletRequest request,HttpServletResponse response,AuthenticationException failure) throws IOException {
+        if (Boolean.TRUE.equals(request.getAttribute(OAuthLinkService.LINK_REQUEST_ATTRIBUTE))) {
+            redirectLink(response); return;
+        }
         String code=failure instanceof OAuth2AuthenticationException oauth?oauth.getError().getErrorCode():"identity_unavailable";
         redirect(response,code);
+    }
+    public void redirectLink(HttpServletResponse response) throws IOException {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        response.setHeader("Cache-Control","no-store");
+        response.sendRedirect(frontendUrl+"/settings?oauth_link_error=failed");
     }
     public void redirect(HttpServletResponse response,String code) throws IOException {
         org.springframework.security.core.context.SecurityContextHolder.clearContext();

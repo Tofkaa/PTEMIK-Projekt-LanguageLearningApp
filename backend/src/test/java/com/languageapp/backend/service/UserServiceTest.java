@@ -42,6 +42,7 @@ import static org.mockito.Mockito.*;
 class UserServiceTest {
     @Mock private com.languageapp.backend.repository.InvitationLinkRepository invitationLinkRepository;
     @Mock private com.languageapp.backend.repository.OAuthIdentityRepository oAuthIdentityRepository;
+    @Mock private com.languageapp.backend.repository.OAuthLinkIntentRepository oauthLinkIntentRepository;
     @Mock private com.languageapp.backend.repository.UserAchievementRepository userAchievementRepository;
     @Mock private com.languageapp.backend.repository.LessonAttemptRepository lessonAttemptRepository;
     @Mock private com.languageapp.backend.repository.ResultRepository resultRepository;

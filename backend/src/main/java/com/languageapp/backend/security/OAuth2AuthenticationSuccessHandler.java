@@ -27,6 +27,17 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
+        if (authentication instanceof org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken linked
+                && linked.getPrincipal() instanceof OAuthLinkVerifiedUser principal) {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+            response.setHeader("Cache-Control","no-store");
+            response.setHeader("Referrer-Policy","no-referrer");
+            if (!linked.getAuthorizedClientRegistrationId().equals(principal.proof().provider().name().toLowerCase(java.util.Locale.ROOT))) {
+                failureHandler.redirectLink(response); return;
+            }
+            response.sendRedirect(frontendUrl+"/oauth-link/confirm#proof="+principal.proof().token());
+            return;
+        }
         if (!(authentication instanceof org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken oauth)
                 || !(oauth.getPrincipal() instanceof FederatedOAuth2User principal)
                 || !oauth.getAuthorizedClientRegistrationId().equals(principal.provider().name().toLowerCase(java.util.Locale.ROOT))) {

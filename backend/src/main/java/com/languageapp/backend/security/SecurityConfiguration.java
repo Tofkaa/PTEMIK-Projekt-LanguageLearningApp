@@ -44,6 +44,8 @@ public class SecurityConfiguration {
     private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
     private final tools.jackson.databind.ObjectMapper objectMapper;
     private final java.time.Clock clock;
+    private final OAuthLinkService oauthLinks;
+    private final org.springframework.security.oauth2.client.registration.ClientRegistrationRepository registrations;
 
     /**
      * Configures the main security filter chain.
@@ -56,6 +58,7 @@ public class SecurityConfiguration {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         log.info("Initializing Security Filter Chain...");
 
+        OAuthLinkAuthorization linking = new OAuthLinkAuthorization(registrations, oauthLinks);
         http
                 // Enable CORS with custom configuration
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -70,6 +73,8 @@ public class SecurityConfiguration {
                 )
 
                 .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(linking).authorizationRequestRepository(linking))
+                        .tokenEndpoint(endpoint -> endpoint.accessTokenResponseClient(linking))
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(customOAuth2UserService)
                         )
@@ -98,6 +103,13 @@ public class SecurityConfiguration {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(new AnswerPayloadFilter(objectMapper, clock), org.springframework.security.web.access.intercept.AuthorizationFilter.class);
 
+        http.oauth2Login(oauth2 -> oauth2.addObjectPostProcessor(
+                new org.springframework.security.config.ObjectPostProcessor<org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter>() {
+                    @Override public <O extends org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter> O postProcess(O filter) {
+                        filter.setAuthenticationFailureHandler(oAuth2AuthenticationFailureHandler);
+                        return filter;
+                    }
+                }));
         return http.build();
     }
 

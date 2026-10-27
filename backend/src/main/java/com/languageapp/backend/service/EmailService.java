@@ -145,4 +145,17 @@ public class EmailService {
 
         sendHtmlEmail(toOldEmail, "Biztonsági értesítés: E-mail módosítási kérelem - LanguageApp", htmlBody);
     }
+    @Async
+    public void sendOAuthLinkCode(String recipient,String provider,String code) {
+        sendHtmlEmail(recipient,"Belépési mód összekapcsolása – LanguageApp",
+                "<h1>"+provider+"-belépés hozzáadása</h1><p>A meglévő LanguageApp-fiókod megerősítéséhez írd be ezt az egyszeri kódot a Beállítások oldalon:</p>"
+                +"<p style='font-size:24px;font-weight:bold;letter-spacing:4px'>"+code+"</p>"
+                +"<p>A kód 15 percig, legfeljebb öt hibás próbálkozásig érvényes. Maradj a kérést indító bejelentkezésben.</p>"
+                +"<p>Ez még nem kapcsol össze fiókokat: a szolgáltatói hitelesítés után külön jóváhagyás szükséges. Ha nem te kérted, ne add meg a kódot.</p>");
+    }
+    @Async
+    public void sendOAuthLinkSecurityAlert(String recipient,String provider) {
+        sendHtmlEmail(recipient,"Új belépési mód hozzáadva – LanguageApp","<h1>Új belépési mód</h1><p>A fiókodhoz sikeresen hozzákapcsoltál egy "+provider+"-fiókot.</p>"
+                +"<p>Az eredeti e-mail-címed, jelszavad és tanulási adataid változatlanok.</p><p>Ha nem te végezted a módosítást, ellenőrizd a fiókod biztonságát.</p>");
+    }
 }
