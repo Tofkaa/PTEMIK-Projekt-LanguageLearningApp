@@ -236,7 +236,7 @@ public class UserService {
      */
     @Transactional
     public void requestEmailChange(String currentEmail, String newEmail, String currentPassword) {
-        User user = getUserByEmail(currentEmail);
+        User user = getAccountForEmailChange(currentEmail);
 
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw new BadRequestException("A megadott jelenlegi jelszó hibás!");
@@ -246,7 +246,7 @@ public class UserService {
             throw new BadRequestException("Kérlek, adj meg egy érvényes e-mail címet!");
         }
 
-        String normalizedNewEmail = newEmail.trim().toLowerCase();
+        String normalizedNewEmail = newEmail.trim().toLowerCase(Locale.ROOT);
 
         if (normalizedNewEmail.equalsIgnoreCase(currentEmail)) {
             throw new BadRequestException("Az új e-mail cím nem lehet azonos a jelenlegivel!");
@@ -270,8 +270,10 @@ public class UserService {
 
         emailChangeTokenRepository.save(token);
 
-        emailService.sendEmailChangeOtp(normalizedNewEmail, otpCode);
-        emailService.sendEmailChangeSecurityAlert(currentEmail, normalizedNewEmail);
+        String recipient = user.getEmail();
+        // Independent callbacks: failure to schedule one email must not suppress the other.
+        CommittedEmail.send(() -> emailService.sendEmailChangeOtp(normalizedNewEmail, otpCode));
+        CommittedEmail.send(() -> emailService.sendEmailChangeSecurityAlert(recipient, normalizedNewEmail));
         log.info("Email change OTP generated for user {} -> new email: {}", currentEmail, normalizedNewEmail);
     }
 
@@ -280,13 +282,12 @@ public class UserService {
      */
     @Transactional
     public void verifyEmailChange(String currentEmail, String otpCode) {
-        User user = getUserByEmail(currentEmail);
+        User user = getAccountForEmailChange(currentEmail);
 
         EmailChangeToken token = emailChangeTokenRepository.findByUser_UserId(user.getUserId())
                 .orElseThrow(() -> new BadRequestException("Nincs folyamatban lévő e-mail módosítási kérés!"));
 
         if (!clock.instant().isBefore(token.getExpiryDate())) {
-            emailChangeTokenRepository.delete(token);
             throw new BadRequestException("Az ellenőrző kód lejárt! Kérlek, indítsd újra a folyamatot.");
         }
 
@@ -295,7 +296,6 @@ public class UserService {
         }
 
         if (userRepository.existsByEmail(token.getNewEmail())) {
-            emailChangeTokenRepository.delete(token);
             throw new BadRequestException("Ez az e-mail cím időközben foglalt lett!");
         }
 
@@ -305,6 +305,15 @@ public class UserService {
 
         emailChangeTokenRepository.delete(token);
         log.info("User successfully changed email from {} to {}", oldEmail, user.getEmail());
+    }
+
+    /** Serialize issue/reissue/consume and avoid loading a stale User before the shared account lock. */
+    private User getAccountForEmailChange(String email) {
+        User user = userRepository.findByEmailForAuthentication(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User nem található."));
+        if (!user.isActive() || user.getRole() == Role.DELETED)
+            throw new com.languageapp.backend.exception.ForbiddenException("Ez a fiók nem használható e-mail módosítására.");
+        return user;
     }
 
     @Transactional(readOnly = true)

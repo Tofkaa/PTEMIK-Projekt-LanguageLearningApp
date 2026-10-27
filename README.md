@@ -59,7 +59,7 @@ VITE_APP_SECURITY_EXERCISE_SALT=L4ngu4ge4ppS3cr3tS4lt2026!
 VITE_API_BASE_URL=http://localhost:8080/api
 
 
-Az email-megerősítés és a commit utáni levélindítás integrációs tesztje külön
+Az email-megerősítés, az emailcímcsere és a commit utáni levélindítás integrációs tesztjei külön
 `VERIFICATION_TEST_DATABASE_URL` változóval futtatható, kizárólag
 `jdbc:postgresql://host:port/languageapp_verification_check_...` nevű, előre
 létrehozott, eldobható adatbázison. A teszt újraépíti annak sémáját; az alkalmazás
@@ -67,5 +67,5 @@ adatbázisát ne add meg. Külső levelet nem küld, a képtároló és háttér
 A változó beállítása után a `backend` mappából:
 
 ```powershell
-.\mvnw.cmd '-Dtest=VerificationLifecyclePersistenceTest' test
+.\mvnw.cmd '-Dtest=VerificationLifecyclePersistenceTest,EmailChangeLifecyclePersistenceTest' test
 ```

@@ -13,6 +13,7 @@ import com.languageapp.backend.repository.PasswordResetTokenRepository;
 import com.languageapp.backend.repository.UserRepository;
 import com.languageapp.backend.repository.VerificationTokenRepository;
 import com.languageapp.backend.service.EmailService;
+import com.languageapp.backend.service.CommittedEmail;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -22,8 +23,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.util.UUID;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
@@ -121,7 +120,7 @@ public class AuthenticationService {
 
         String verificationRecipient = user.getEmail();
         String verificationName = user.getName();
-        sendMailAfterCommit(() -> emailService.sendVerificationEmail(verificationRecipient, verificationName, tokenStr));
+        CommittedEmail.send(() -> emailService.sendVerificationEmail(verificationRecipient, verificationName, tokenStr));
 
 
         UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
@@ -202,7 +201,7 @@ public class AuthenticationService {
 
             // Capture scalars; the async dispatcher must not see an uncommitted token or a managed entity.
             String recipient = user.getEmail();
-            sendMailAfterCommit(() -> emailService.sendPasswordResetEmail(recipient, tokenStr));
+            CommittedEmail.send(() -> emailService.sendPasswordResetEmail(recipient, tokenStr));
             log.info("Password reset token generated; email scheduled after commit for user ID: {}", user.getUserId());
         });
 
@@ -325,24 +324,6 @@ public class AuthenticationService {
                     log.warn("Refresh token validation failed: Token not found or invalid hash.");
                     return new BadRequestException("An error occurred, please login again.");
                 });
-    }
-
-    /** External email scheduling must never race a token commit or turn a committed signup into an HTTP error. */
-    private void sendMailAfterCommit(Runnable dispatch) {
-        Runnable safeDispatch = () -> {
-            try { dispatch.run(); }
-            catch (RuntimeException failure) {
-                // Do not log exception messages, addresses or the usable token.
-                log.warn("Authentication email could not be scheduled after commit.");
-            }
-        };
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override public void afterCommit() { safeDispatch.run(); }
-            });
-        } else {
-            safeDispatch.run();
-        }
     }
 
     private String generateFriendCode() {

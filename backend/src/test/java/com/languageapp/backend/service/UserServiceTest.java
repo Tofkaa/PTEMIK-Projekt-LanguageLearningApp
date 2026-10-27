@@ -15,6 +15,8 @@ import com.languageapp.backend.repository.UserRepository;
 import com.languageapp.backend.repository.FriendshipRepository;
 import com.languageapp.backend.repository.RefreshTokenRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -297,7 +299,7 @@ class UserServiceTest {
         User mockUser = createTestUserWithCourse(currentEmail);
         mockUser.setPasswordHash("hashed_password");
 
-        when(userRepository.findByEmail(currentEmail)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailForAuthentication(currentEmail)).thenReturn(Optional.of(mockUser));
         when(passwordEncoder.matches("helyesJelszo", "hashed_password")).thenReturn(true);
         when(userRepository.existsByEmail(newEmail)).thenReturn(false);
 
@@ -331,7 +333,7 @@ class UserServiceTest {
         validToken.setOtpCode("123456");
         validToken.setExpiryDate(clock.instant().plus(10, ChronoUnit.MINUTES));
 
-        when(userRepository.findByEmail(currentEmail)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailForAuthentication(currentEmail)).thenReturn(Optional.of(mockUser));
         when(emailChangeTokenRepository.findByUser_UserId(mockUser.getUserId())).thenReturn(Optional.of(validToken));
         when(userRepository.existsByEmail(newEmail)).thenReturn(false);
 
@@ -356,7 +358,7 @@ class UserServiceTest {
         validToken.setOtpCode("123456");
         validToken.setExpiryDate(clock.instant().plus(10, ChronoUnit.MINUTES));
 
-        when(userRepository.findByEmail(currentEmail)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailForAuthentication(currentEmail)).thenReturn(Optional.of(mockUser));
         when(emailChangeTokenRepository.findByUser_UserId(mockUser.getUserId())).thenReturn(Optional.of(validToken));
 
         // 2. & 3. Act & Assert
@@ -454,4 +456,46 @@ class UserServiceTest {
         assertEquals(clock.instant(), record.get("presentedAt")); assertNull(record.get("readAt"));
     }
 
+
+    @ParameterizedTest @ValueSource(longs = {-1, 0, 1})
+    void emailChangeExpiryIsExclusiveAndCannotConsumeExpiredCodes(long seconds) {
+        User user = createTestUserWithCourse("expiry@example.test");
+        when(userRepository.findByEmailForAuthentication(user.getEmail())).thenReturn(Optional.of(user));
+        EmailChangeToken token = new EmailChangeToken(); token.setUser(user); token.setOtpCode("123456");
+        token.setNewEmail("changed@example.test"); token.setExpiryDate(clock.instant().plusSeconds(seconds));
+        when(emailChangeTokenRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(token));
+        if (seconds > 0) {
+            userService.verifyEmailChange(user.getEmail(), "123456");
+            assertEquals("changed@example.test", user.getEmail());
+            verify(emailChangeTokenRepository).delete(token);
+        } else {
+            assertThrows(BadRequestException.class, () -> userService.verifyEmailChange(user.getEmail(), "123456"));
+            verify(userRepository, never()).save(any()); verify(emailChangeTokenRepository, never()).delete(any());
+        }
+    }
+    @Test void incorrectEmailChangePasswordCannotReplaceAPendingChallengeOrSendMail() {
+        User user = createTestUserWithCourse("wrong-password@example.test"); user.setPasswordHash("hash");
+        when(userRepository.findByEmailForAuthentication(user.getEmail())).thenReturn(Optional.of(user));
+        assertThrows(BadRequestException.class, () -> userService.requestEmailChange(user.getEmail(), "target@example.test", "incorrect"));
+        verifyNoInteractions(emailChangeTokenRepository, emailService);
+    }
+    @Test void emailChangeRejectsInactiveAccountsBeforeLoadingOrSendingCodes() {
+        User user = createTestUserWithCourse("inactive@example.test"); user.setActive(false);
+        when(userRepository.findByEmailForAuthentication(user.getEmail())).thenReturn(Optional.of(user));
+        assertThrows(com.languageapp.backend.exception.ForbiddenException.class,
+                () -> userService.requestEmailChange(user.getEmail(), "target@example.test", "password"));
+        assertThrows(com.languageapp.backend.exception.ForbiddenException.class,
+                () -> userService.verifyEmailChange(user.getEmail(), "123456"));
+        verifyNoInteractions(emailChangeTokenRepository, emailService, passwordEncoder);
+    }
+    @Test void failedOtpSchedulingStillAttemptsTheIndependentSecurityNotice() {
+        User user = createTestUserWithCourse("notice@example.test"); user.setPasswordHash("hash");
+        when(userRepository.findByEmailForAuthentication(user.getEmail())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "hash")).thenReturn(true);
+        doThrow(new org.springframework.core.task.TaskRejectedException("test-only queue rejection"))
+                .when(emailService).sendEmailChangeOtp(anyString(), anyString());
+        assertDoesNotThrow(() -> userService.requestEmailChange(user.getEmail(), "target@example.test", "password"));
+        verify(emailChangeTokenRepository).save(any());
+        verify(emailService).sendEmailChangeSecurityAlert(user.getEmail(), "target@example.test");
+    }
 }
