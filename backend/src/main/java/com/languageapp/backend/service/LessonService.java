@@ -61,23 +61,16 @@ public class LessonService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
 
-        UUID activeCourseId = user.getActiveCourse().getCourseId();
-
-        // 1. Határozzuk meg az aktuális adaptív szintet, amit a kártyákon mutatni fogunk
         String currentDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
-
-        // 2. Kérjük le a felhasználó ÖSSZES eddigi eredményét egyetlen query-ben
-        List<Progress> userProgress = progressRepository.findByUserUserId(user.getUserId());
+        MasteryService.CourseSnapshot mastery = masteryService.getCourseSnapshot(user);
 
         // 3. Magyar nyelvű ABC rendező (hogy az Ételek ne kerüljön a végére)
         Collator huCollator = Collator.getInstance(new Locale("hu", "HU"));
 
-        List<Lesson> courseLessons = lessonRepository.findByTopic_Course_CourseId(activeCourseId)
-                .stream()
-                .filter(lesson -> lesson.isActive() && lesson.getTopic().isActive())
+        List<LessonRepository.CourseLesson> courseLessons = mastery.lessons().stream()
                 .sorted((l1, l2) -> {
                     // Témakörök betűrendben (pl. Alapvető -> Családtagok -> Ételek -> Utazás)
-                    int topicCompare = huCollator.compare(l1.getTopic().getName(), l2.getTopic().getName());
+                    int topicCompare = huCollator.compare(l1.getTopicName(), l2.getTopicName());
                     if (topicCompare != 0) return topicCompare;
 
                     // Témakörön belül az új orderIndex alapján
@@ -89,34 +82,22 @@ public class LessonService {
 
         return courseLessons.stream()
                 .map(lesson -> {
-                    // SEAMLESS HALADÁS JAVÍTÁSA:
-                    // Ha a leckét BÁRMILYEN nehézségen befejezte már, akkor a fa haladjon tovább!
-                    boolean isCompleted = userProgress.stream()
-                            .filter(p -> p.getLesson().getLessonId().equals(lesson.getLessonId()))
-                            .anyMatch(Progress::getIsCompleted);
-
-                    // Keressük meg a legutolsó sikeres szintet, amivel már teljesítette
-                    String completedDiff = userProgress.stream()
-                            .filter(p -> p.getLesson().getLessonId().equals(lesson.getLessonId()) && p.getIsCompleted())
-                            .map(Progress::getCompletedDifficulty)
-                            .findFirst()
-                            .orElse(null);
-
+                    MasteryService.LessonMastery state = mastery.byLesson().get(lesson.getLessonId());
                     LessonResponse response = new LessonResponse(
                             lesson.getLessonId(),
-                            lesson.getTopic().getName(),
+                            lesson.getTopicName(),
                             lesson.getTitle(),
                             lesson.getOrderIndex(),
                             lesson.getLanguage(),
                             lesson.getDescription(),
-                            isCompleted,
-                            completedDiff,
+                            state.completed(),
+                            state.completedDifficulty(),
                             currentDifficulty // Ezt látja a Dashboard a kártyákon
                     );
-                    response.setAvailableDifficulties(masteryService.availableLevels(lesson));
-                    response.setCompletedDifficulties(masteryService.completedLevels(lesson, userProgress));
-                    response.setMastered(masteryService.isMastered(lesson, userProgress));
-                    response.setTopicMastered(masteryService.isTopicMastered(lesson.getTopic().getTopicId(), courseLessons, userProgress));
+                    response.setAvailableDifficulties(state.availableLevels());
+                    response.setCompletedDifficulties(state.completedLevels());
+                    response.setMastered(state.mastered());
+                    response.setTopicMastered(mastery.masteredTopics().contains(lesson.getTopicId()));
                     return response;
                 })
                 .toList();

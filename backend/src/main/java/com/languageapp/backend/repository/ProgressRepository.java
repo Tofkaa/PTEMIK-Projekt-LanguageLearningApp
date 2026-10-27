@@ -20,4 +20,13 @@ public interface ProgressRepository extends JpaRepository<Progress, UUID> {
     Optional<Progress> findByUserUserIdAndLessonLessonId(UUID userId, UUID lessonId);
 
     Optional<Progress> findByUserUserIdAndLessonLessonIdAndCompletedDifficulty(UUID userId, UUID lessonId, String difficulty);
+
+    interface PassedLevel {
+        UUID getLessonId();
+        String getDifficulty();
+    }
+
+    @Query("select p.lesson.lessonId as lessonId, p.completedDifficulty as difficulty from Progress p " +
+            "where p.user.userId = :userId and p.lesson.topic.course.courseId = :courseId and p.isCompleted = true")
+    List<PassedLevel> findPassedCourseLevels(@Param("userId") UUID userId, @Param("courseId") UUID courseId);
 }

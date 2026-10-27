@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 class LessonServiceTest {
 
     @Mock private LessonRepository lessonRepository;
+    @Mock private MasteryService masteryService;
     @Mock private UserRepository userRepository;
     @Mock private ChallengeRepository challengeRepository;
     @Mock private CourseRepository courseRepository;
@@ -126,5 +127,23 @@ class LessonServiceTest {
         assertThrows(ForbiddenException.class, () ->
                 lessonService.getExercisesByLessonId(lesson.getLessonId(), student.getEmail(), challengeId)
         );
+    }
+
+    @Test void dashboardUsesOneSnapshotAndKeepsHungarianTopicOrderingAndAllMasteryFields() {
+        var first=mock(LessonRepository.CourseLesson.class);var second=mock(LessonRepository.CourseLesson.class);
+        UUID firstId=UUID.randomUUID(),secondId=UUID.randomUUID(),firstTopic=UUID.randomUUID(),secondTopic=UUID.randomUUID();
+        when(first.getLessonId()).thenReturn(firstId);when(first.getTopicId()).thenReturn(firstTopic);when(first.getTopicName()).thenReturn("Alapok");
+        when(second.getLessonId()).thenReturn(secondId);when(second.getTopicId()).thenReturn(secondTopic);when(second.getTopicName()).thenReturn("Ételek");
+        var state=new MasteryService.LessonMastery(List.of("EASY","MEDIUM"),List.of("EASY"),true,"EASY",false);
+        var complete=new MasteryService.LessonMastery(List.of("EASY"),List.of("EASY"),true,"EASY",true);
+        when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
+        when(userDifficultyCalculator.determineTargetDifficulty(student)).thenReturn("HARD");
+        when(masteryService.getCourseSnapshot(student)).thenReturn(new MasteryService.CourseSnapshot(List.of(second,first),Map.of(firstId,state,secondId,complete),java.util.Set.of(secondTopic)));
+        var result=lessonService.getAllLessonsForUser(student.getEmail());
+        assertEquals(List.of(firstId,secondId),result.stream().map(com.languageapp.backend.dto.response.LessonResponse::getLessonId).toList());
+        assertEquals(List.of("EASY","MEDIUM"),result.getFirst().getAvailableDifficulties());
+        assertEquals(List.of("EASY"),result.getFirst().getCompletedDifficulties());assertFalse(result.getFirst().isMastered());
+        assertTrue(result.getLast().isMastered());assertTrue(result.getLast().isTopicMastered());assertEquals("HARD",result.getFirst().getDifficulty());
+        verify(masteryService).getCourseSnapshot(student);verifyNoMoreInteractions(masteryService);verifyNoInteractions(progressRepository,lessonRepository);
     }
 }
