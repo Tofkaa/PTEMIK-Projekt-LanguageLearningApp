@@ -31,8 +31,26 @@ public interface AssignmentSessionRepository extends JpaRepository<AssignmentSes
     List<com.languageapp.backend.dto.projection.SubmissionNotification> findGradedNotificationReferences(
             @Param("studentId") UUID studentId);
 
-    @Query("SELECT s.sessionId FROM AssignmentSession s WHERE s.finishedAt IS NULL AND s.allocatedExerciseIds IS NOT NULL")
-    List<UUID> findRecoverableOngoingIds();
+    /** Matches timingResponse: initialized attempts use their frozen settings, legacy attempts the common settings. */
+    @Query(value = """
+            select s.session_id
+            from assignment_sessions s
+            join classroom_assignments a on a.assignment_id = s.assignment_id and a.is_active = true
+            join classrooms c on c.classroom_id = a.classroom_id and c.is_active = true
+            cross join lateral (
+                select case when s.timing_initialized then s.effective_time_limit_minutes
+                            when a.time_limit_minutes > 0 then a.time_limit_minutes else null end as minutes,
+                       case when s.timing_initialized then s.effective_available_until else a.available_until end as until_at
+            ) timing
+            where s.finished_at is null and s.allocated_exercise_ids is not null and a.allow_latesubmission = false
+              and (cast(:afterId as uuid) is null or s.session_id > cast(:afterId as uuid))
+              and ((timing.until_at is not null and timing.until_at <= :cutoff)
+                   or (timing.minutes is not null and s.started_at + timing.minutes * interval '1 minute' <= :cutoff))
+            order by s.session_id
+            limit :batchSize
+            """, nativeQuery = true)
+    List<UUID> findExpiredCandidateIds(@Param("cutoff") java.time.Instant cutoff,
+                                       @Param("afterId") UUID afterId, @Param("batchSize") int batchSize);
 
     @Query("SELECT s.assignment.assignmentId FROM AssignmentSession s WHERE s.sessionId = :id")
     Optional<UUID> findAssignmentId(@Param("id") UUID id);
