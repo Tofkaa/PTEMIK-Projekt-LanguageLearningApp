@@ -22,6 +22,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.util.UUID;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
@@ -117,7 +119,9 @@ public class AuthenticationService {
         verificationToken.setExpiryDate(clock.instant().plus(24, ChronoUnit.HOURS));
         verificationTokenRepository.save(verificationToken);
 
-        emailService.sendVerificationEmail(user.getEmail(), user.getName(), tokenStr);
+        String verificationRecipient = user.getEmail();
+        String verificationName = user.getName();
+        sendMailAfterCommit(() -> emailService.sendVerificationEmail(verificationRecipient, verificationName, tokenStr));
 
 
         UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
@@ -155,15 +159,20 @@ public class AuthenticationService {
      */
     @Transactional
     public void verifyEmail(String token) {
+        // Resolve only the ID before the shared user lock; do not cache a stale User via the token relation.
+        UUID userId = verificationTokenRepository.findUserIdByToken(token)
+                .orElseThrow(() -> new BadRequestException("Érvénytelen vagy lejárt token!"));
+        User user = userRepository.findForSessionUpdate(userId)
+                .filter(account -> account.isActive() && account.getRole() != Role.DELETED)
+                .orElseThrow(() -> new BadRequestException("Érvénytelen vagy lejárt token!"));
+        // Another consumer/deletion may have committed while this request waited for the user lock.
         VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
                 .orElseThrow(() -> new BadRequestException("Érvénytelen vagy lejárt token!"));
 
         if (!clock.instant().isBefore(verificationToken.getExpiryDate())) {
-            verificationTokenRepository.delete(verificationToken);
             throw new BadRequestException("A megerősítő link lejárt. Kérlek, igényelj újat a profilodban.");
         }
 
-        User user = verificationToken.getUser();
         user.setVerified(true);
         userRepository.save(user);
 
@@ -191,9 +200,10 @@ public class AuthenticationService {
 
             passwordResetTokenRepository.save(resetToken);
 
-            // Send async email
-            emailService.sendPasswordResetEmail(user.getEmail(), tokenStr);
-            log.info("Password reset token generated and email dispatched for user ID: {}", user.getUserId());
+            // Capture scalars; the async dispatcher must not see an uncommitted token or a managed entity.
+            String recipient = user.getEmail();
+            sendMailAfterCommit(() -> emailService.sendPasswordResetEmail(recipient, tokenStr));
+            log.info("Password reset token generated; email scheduled after commit for user ID: {}", user.getUserId());
         });
 
         // No exception, if the email does not exist
@@ -315,6 +325,24 @@ public class AuthenticationService {
                     log.warn("Refresh token validation failed: Token not found or invalid hash.");
                     return new BadRequestException("An error occurred, please login again.");
                 });
+    }
+
+    /** External email scheduling must never race a token commit or turn a committed signup into an HTTP error. */
+    private void sendMailAfterCommit(Runnable dispatch) {
+        Runnable safeDispatch = () -> {
+            try { dispatch.run(); }
+            catch (RuntimeException failure) {
+                // Do not log exception messages, addresses or the usable token.
+                log.warn("Authentication email could not be scheduled after commit.");
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() { safeDispatch.run(); }
+            });
+        } else {
+            safeDispatch.run();
+        }
     }
 
     private String generateFriendCode() {

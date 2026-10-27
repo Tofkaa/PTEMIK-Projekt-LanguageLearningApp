@@ -57,3 +57,15 @@ VITE_APP_SECURITY_EXERCISE_SALT=L4ngu4ge4ppS3cr3tS4lt2026!
 
 -frontend mappa .env tartalma:
 VITE_API_BASE_URL=http://localhost:8080/api
+
+
+Az email-megerősítés és a commit utáni levélindítás integrációs tesztje külön
+`VERIFICATION_TEST_DATABASE_URL` változóval futtatható, kizárólag
+`jdbc:postgresql://host:port/languageapp_verification_check_...` nevű, előre
+létrehozott, eldobható adatbázison. A teszt újraépíti annak sémáját; az alkalmazás
+adatbázisát ne add meg. Külső levelet nem küld, a képtároló és háttérjobok is mockoltak.
+A változó beállítása után a `backend` mappából:
+
+```powershell
+.\mvnw.cmd '-Dtest=VerificationLifecyclePersistenceTest' test
+```
