@@ -19,6 +19,10 @@ import java.time.Instant;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -850,36 +854,17 @@ public class AssignmentService {
 
     /** Only called after the public entry point has authorized the classroom. */
     private ClassroomStatisticsResponse calculateClassroomStatistics(UUID classroomId) {
-        List<ClassroomAssignment> assignments = assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(classroomId);
-        List<User> students = classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
-                .stream().map(ClassroomMember::getUser).toList();
-
+        long assignmentCount = assignmentRepository.countByClassroom_ClassroomId(classroomId);
+        var students = classroomMemberRepository.findAcceptedStudents(classroomId);
+        Map<UUID, AssignmentSessionRepository.StudentStatistics> byStudent = new HashMap<>();
+        sessionRepository.aggregateClassroomStatistics(classroomId).forEach(row -> byStudent.put(row.getUserId(), row));
         List<ClassroomStatisticsResponse.StudentProgressDTO> progressList = new ArrayList<>();
-
-        for (User student : students) {
-            List<AssignmentSession> studentSessions = new ArrayList<>();
-            for (ClassroomAssignment assignment : assignments) {
-                List<AssignmentSession> sessionsForAssignment = sessionRepository
-                        .findAllByAssignment_AssignmentIdAndUser_UserId(assignment.getAssignmentId(), student.getUserId());
-                studentSessions.addAll(sessionsForAssignment.stream().filter(s -> s.getFinishedAt() != null).toList());
-            }
-
-            long uniqueCompletedCount = studentSessions.stream()
-                    .map(s -> s.getAssignment().getAssignmentId())
-                    .distinct()
-                    .count();
-
-            double avg = studentSessions.stream()
-                    .mapToInt(s -> s.getTeacherScore() != null ? s.getTeacherScore() : s.getFinalScore())
-                    .average().orElse(0.0);
-
-            String lastAct = studentSessions.stream()
-                    .map(s -> s.getFinishedAt().toString())
-                    .max(String::compareTo).orElse("Nincs adat");
-
+        for (var student : students) {
+            var row = byStudent.get(student.getUserId());
             progressList.add(new ClassroomStatisticsResponse.StudentProgressDTO(
-                    student.getName(), student.getEmail(), (int)uniqueCompletedCount, Math.round(avg * 10.0) / 10.0, lastAct
-            ));
+                    student.getName(), student.getEmail(), row == null ? 0 : Math.toIntExact(row.getCompletedCount()),
+                    row == null ? 0.0 : Math.round(row.getAverageScore() * 10.0) / 10.0,
+                    row == null ? "Nincs adat" : row.getLastActivity().toString()));
         }
 
         double totalAvg = progressList.stream()
@@ -889,7 +874,7 @@ public class AssignmentService {
 
         return new ClassroomStatisticsResponse(
                 Math.round(totalAvg * 10.0) / 10.0,
-                assignments.size(),
+                Math.toIntExact(assignmentCount),
                 progressList
         );
     }
@@ -955,99 +940,53 @@ public class AssignmentService {
             throw new BadRequestException("Unauthorized to view detailed analytics.");
         }
 
-        List<ClassroomAssignment> assignments = assignmentRepository
-                .findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(classroomId);
-
-        List<User> students = classroomMemberRepository
-                .findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
-                .stream().map(ClassroomMember::getUser).toList();
-
-        // 1. Prepare Assignment Headers (Columns for the Heatmap)
+        var assignments = assignmentRepository.findAnalyticsHeaders(classroomId);
+        var students = classroomMemberRepository.findAcceptedStudents(classroomId);
+        var bestSessions = sessionRepository.findBestClassroomAnalyticsSessions(classroomId);
+        Map<UUID, Map<UUID, AssignmentSessionRepository.BestAnalyticsSession>> byStudent = new HashMap<>();
+        Map<UUID, List<AssignmentSessionResponse.AnswerDetail>> parsed = new HashMap<>();
+        Set<UUID> fallbackIds = new HashSet<>();
+        for (var session : bestSessions) {
+            byStudent.computeIfAbsent(session.getUserId(), key -> new HashMap<>()).put(session.getAssignmentId(), session);
+            List<AssignmentSessionResponse.AnswerDetail> answers = parseAnalyticsAnswers(session);
+            parsed.put(session.getSessionId(), answers);
+            for (var answer : answers) {
+                if (answer != null && !answer.isCorrect() && answer.getExercise() != null
+                        && answer.getExercise().getExerciseId() != null && answer.getServerCorrectAnswer() == null)
+                    fallbackIds.add(answer.getExercise().getExerciseId());
+            }
+        }
+        Map<AssignmentExerciseKey, String> fallbackAnswers = loadAnalyticsFallbackAnswers(classroomId, fallbackIds);
         List<ClassroomAnalyticsResponse.AssignmentHeaderDTO> headers = assignments.stream()
                 .map(a -> ClassroomAnalyticsResponse.AssignmentHeaderDTO.builder()
-                        .assignmentId(a.getAssignmentId().toString())
-                        .title(a.getTitle())
-                        .build())
-                .toList();
-
-        // 2. Build the Heatmap Data (Rows for Students)
+                        .assignmentId(a.getAssignmentId().toString()).title(a.getTitle()).build()).toList();
         List<ClassroomAnalyticsResponse.StudentHeatmapRowDTO> heatmapData = new ArrayList<>();
-        java.util.Map<String, ClassroomAnalyticsResponse.FrequentMistakeDTO> globalMistakes = new java.util.HashMap<>();
-        for (User student : students) {
-            java.util.Map<String, Integer> scores = new java.util.HashMap<>();
-
-            for (ClassroomAssignment assignment : assignments) {
-                // Find the highest score if multiple attempts exist
-                Optional<AssignmentSession> bestSession = sessionRepository
-                        .findAllByAssignment_AssignmentIdAndUser_UserId(assignment.getAssignmentId(), student.getUserId())
-                        .stream()
-                        .filter(s -> s.getFinishedAt() != null)
-                        .max(java.util.Comparator.comparingInt(s -> s.getTeacherScore() != null ? s.getTeacherScore() : s.getFinalScore()));
-                if (bestSession.isPresent()) {
-                    AssignmentSession session = bestSession.get();
-                    int score = session.getTeacherScore() != null ? session.getTeacherScore() : session.getFinalScore();
-                    scores.put(assignment.getAssignmentId().toString(), score);
-
-                    // 3. Collect Mistake Data for Item Analysis
-                    try {
-                        if (session.getRawAnswers() != null) {
-                            List<AssignmentSessionResponse.AnswerDetail> answers = objectMapper.readValue(
-                                    session.getRawAnswers(),
-                                    new TypeReference<List<AssignmentSessionResponse.AnswerDetail>>() {}
-                            );
-
-                            for (AssignmentSessionResponse.AnswerDetail answer : answers) {
-                                if (!answer.isCorrect() && answer.getExercise() != null) {
-                                    UUID exId = answer.getExercise().getExerciseId();
-                                    String exIdStr = exId.toString();
-
-                                    Exercise realExercise = assignment.getExercises().stream()
-                                            .filter(e -> e.getExerciseId().equals(exId))
-                                            .findFirst()
-                                            .orElse(null);
-
-                                    String realCorrectAnswer = answer.getServerCorrectAnswer();
-
-                                    if (realCorrectAnswer == null && realExercise != null && realExercise.getCorrectAnswer() != null) {
-                                        java.util.Map<String, Object> ca = realExercise.getCorrectAnswer();
-                                        if (ca.containsKey("answer")) realCorrectAnswer = ca.get("answer").toString();
-                                        else if (ca.containsKey("translation")) realCorrectAnswer = ca.get("translation").toString();
-                                        else if (ca.containsKey("text")) realCorrectAnswer = ca.get("text").toString();
-                                        else realCorrectAnswer = ca.values().iterator().next().toString();
-                                    }
-
-                                    if (!globalMistakes.containsKey(exIdStr)) {
-                                        globalMistakes.put(exIdStr, ClassroomAnalyticsResponse.FrequentMistakeDTO.builder()
-                                                .question(answer.getQuestion())
-                                                .mistakeCount(1)
-                                                .assignmentTitle(assignment.getTitle())
-                                                .exercise(answer.getExercise())
-                                                .serverCorrectAnswer(realCorrectAnswer)
-                                                .build());
-                                    } else {
-                                        ClassroomAnalyticsResponse.FrequentMistakeDTO existing = globalMistakes.get(exIdStr);
-                                        existing.setMistakeCount(existing.getMistakeCount() + 1);
-
-                                        if (existing.getServerCorrectAnswer() == null && realCorrectAnswer != null) {
-                                            existing.setServerCorrectAnswer(realCorrectAnswer);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (Exception e) {
-                        log.error("Failed to parse raw answers for analytics", e);
+        Map<String, ClassroomAnalyticsResponse.FrequentMistakeDTO> globalMistakes = new HashMap<>();
+        for (var student : students) {
+            Map<String, Integer> scores = new HashMap<>();
+            var studentSessions = byStudent.getOrDefault(student.getUserId(), Map.of());
+            for (var assignment : assignments) {
+                var session = studentSessions.get(assignment.getAssignmentId());
+                scores.put(assignment.getAssignmentId().toString(), session == null ? null : session.getScore());
+                if (session == null) continue;
+                for (var answer : parsed.get(session.getSessionId())) {
+                    if (answer == null || answer.isCorrect() || answer.getExercise() == null || answer.getExercise().getExerciseId() == null) continue;
+                    UUID exerciseId = answer.getExercise().getExerciseId();
+                    String correctAnswer = answer.getServerCorrectAnswer() != null ? answer.getServerCorrectAnswer()
+                            : fallbackAnswers.get(new AssignmentExerciseKey(assignment.getAssignmentId(), exerciseId));
+                    var existing = globalMistakes.get(exerciseId.toString());
+                    if (existing == null) {
+                        globalMistakes.put(exerciseId.toString(), ClassroomAnalyticsResponse.FrequentMistakeDTO.builder()
+                                .question(answer.getQuestion()).mistakeCount(1).assignmentTitle(assignment.getTitle())
+                                .exercise(answer.getExercise()).serverCorrectAnswer(correctAnswer).build());
+                    } else {
+                        existing.setMistakeCount(existing.getMistakeCount() + 1);
+                        if (existing.getServerCorrectAnswer() == null && correctAnswer != null) existing.setServerCorrectAnswer(correctAnswer);
                     }
-                } else {
-                    scores.put(assignment.getAssignmentId().toString(), null);
                 }
             }
-
             heatmapData.add(ClassroomAnalyticsResponse.StudentHeatmapRowDTO.builder()
-                    .studentName(student.getName())
-                    .studentEmail(student.getEmail())
-                    .scores(scores)
-                    .build());
+                    .studentName(student.getName()).studentEmail(student.getEmail()).scores(scores).build());
         }
 
         // 4. Sort and Extract Top 5 Mistakes
@@ -1061,5 +1000,40 @@ public class AssignmentService {
                 .heatmapData(heatmapData)
                 .topMistakes(topMistakes)
                 .build();
+    }
+
+    private record AssignmentExerciseKey(UUID assignmentId, UUID exerciseId) { }
+
+    private List<AssignmentSessionResponse.AnswerDetail> parseAnalyticsAnswers(AssignmentSessionRepository.BestAnalyticsSession session) {
+        if (session.getRawAnswers() == null) return List.of();
+        try {
+            List<AssignmentSessionResponse.AnswerDetail> answers = objectMapper.readValue(session.getRawAnswers(), new TypeReference<>() { });
+            return answers == null ? List.of() : answers;
+        } catch (Exception failure) {
+            // Parser messages may contain student answers: keep them out of operational logs.
+            log.warn("Could not read stored answers for analytics session {}", session.getSessionId());
+            return List.of();
+        }
+    }
+
+    private Map<AssignmentExerciseKey, String> loadAnalyticsFallbackAnswers(UUID classroomId, Set<UUID> exerciseIds) {
+        Map<AssignmentExerciseKey, String> result = new HashMap<>();
+        List<UUID> ids = new ArrayList<>(exerciseIds);
+        // Bound the SQL parameter list; no per-student, per-assignment, or per-answer queries.
+        for (int offset = 0; offset < ids.size(); offset += 500) {
+            for (var row : assignmentRepository.findAnswerReferences(classroomId, ids.subList(offset, Math.min(offset + 500, ids.size())))) {
+                String answer = analyticsAnswerText(row.correctAnswer());
+                if (answer != null) result.put(new AssignmentExerciseKey(row.assignmentId(), row.exerciseId()), answer);
+            }
+        }
+        return result;
+    }
+
+    private String analyticsAnswerText(Map<String, Object> values) {
+        if (values == null || values.isEmpty()) return null;
+        Object answer = values.containsKey("answer") ? values.get("answer")
+                : values.containsKey("translation") ? values.get("translation")
+                : values.containsKey("text") ? values.get("text") : values.values().iterator().next();
+        return answer == null ? null : answer.toString();
     }
 }

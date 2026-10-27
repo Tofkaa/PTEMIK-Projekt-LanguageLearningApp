@@ -49,4 +49,41 @@ public interface AssignmentSessionRepository extends JpaRepository<AssignmentSes
     List<AssignmentSession> findAllByAssignment_AssignmentIdOrderByStartedAtDesc(UUID assignmentId);
 
     int countByAssignment_Classroom_Teacher_UserIdAndIsGradedFalseAndFinishedAtIsNotNull(UUID userId);
+
+    interface StudentStatistics {
+        UUID getUserId();
+        long getCompletedCount();
+        double getAverageScore();
+        java.time.Instant getLastActivity();
+    }
+
+    @Query("select s.user.userId as userId, count(distinct a.assignmentId) as completedCount, " +
+            "avg(coalesce(s.teacherScore, s.finalScore, 0)) as averageScore, max(s.finishedAt) as lastActivity " +
+            "from AssignmentSession s join s.assignment a where a.classroom.classroomId = :classroomId " +
+            "and s.finishedAt is not null and exists (select m.classroomMemberId from ClassroomMember m " +
+            "where m.classroom = a.classroom and m.user = s.user " +
+            "and m.status = com.languageapp.backend.enums.MembershipStatus.ACCEPTED) group by s.user.userId")
+    List<StudentStatistics> aggregateClassroomStatistics(@Param("classroomId") UUID classroomId);
+
+    interface BestAnalyticsSession {
+        UUID getSessionId();
+        UUID getUserId();
+        UUID getAssignmentId();
+        int getScore();
+        String getRawAnswers();
+    }
+
+    // PostgreSQL DISTINCT ON selects one best attempt BEFORE transferring any answer JSON.
+    // Equal scores are stable: earliest start, then session UUID. All joins retain classroom ownership.
+    @Query(value = """
+            select distinct on (s.user_id, s.assignment_id)
+                s.session_id as "sessionId", s.user_id as "userId", s.assignment_id as "assignmentId",
+                coalesce(s.teacher_score, s.final_score, 0) as score, s.raw_answers as "rawAnswers"
+            from assignment_sessions s
+            join classroom_assignments a on a.assignment_id = s.assignment_id and a.is_active = true
+            join classroom_members m on m.classroom_id = a.classroom_id and m.user_id = s.user_id and m.status = 'ACCEPTED'
+            where a.classroom_id = :classroomId and s.finished_at is not null
+            order by s.user_id, s.assignment_id, coalesce(s.teacher_score, s.final_score, 0) desc, s.started_at, s.session_id
+            """, nativeQuery = true)
+    List<BestAnalyticsSession> findBestClassroomAnalyticsSessions(@Param("classroomId") UUID classroomId);
 }

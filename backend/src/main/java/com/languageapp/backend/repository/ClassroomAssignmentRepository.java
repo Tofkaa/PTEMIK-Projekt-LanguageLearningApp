@@ -59,4 +59,21 @@ public interface ClassroomAssignmentRepository extends JpaRepository<ClassroomAs
             "OR (a.allowLateSubmission = true AND EXISTS (SELECT s.sessionId FROM AssignmentSession s WHERE s.assignment = a AND s.user.userId = :userId AND s.finishedAt IS NULL)))")
     List<ClassroomAssignment> findActiveAssignmentsForStudent(@Param("userId") UUID userId,
                                                            @Param("now") Instant now);
+
+    long countByClassroom_ClassroomId(UUID classroomId);
+
+    interface AnalyticsHeader {
+        UUID getAssignmentId();
+        String getTitle();
+    }
+
+    @Query("select a.assignmentId as assignmentId, a.title as title from ClassroomAssignment a " +
+            "where a.classroom.classroomId = :classroomId order by a.createdAt desc, a.assignmentId")
+    List<AnalyticsHeader> findAnalyticsHeaders(@Param("classroomId") UUID classroomId);
+
+    @Query("select new com.languageapp.backend.dto.projection.AssignmentAnswerReference(a.assignmentId, e.exerciseId, e.correctAnswer) " +
+            "from ClassroomAssignment a join a.exercises e " +
+            "where a.classroom.classroomId = :classroomId and e.exerciseId in :exerciseIds")
+    List<com.languageapp.backend.dto.projection.AssignmentAnswerReference> findAnswerReferences(
+            @Param("classroomId") UUID classroomId, @Param("exerciseIds") List<UUID> exerciseIds);
 }

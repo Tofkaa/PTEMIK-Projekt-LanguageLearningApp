@@ -41,4 +41,14 @@ public interface ClassroomMemberRepository extends JpaRepository<ClassroomMember
     List<com.languageapp.backend.dto.projection.ClassroomMemberStatDTO> getClassroomStats(@org.springframework.data.repository.query.Param("classroomId") UUID classroomId);
 
     int countByClassroom_Teacher_UserIdAndStatus(UUID userId, MembershipStatus membershipStatus);
+
+    interface AcceptedStudent {
+        UUID getUserId();
+        String getName();
+        String getEmail();
+    }
+
+    @Query("select m.user.userId as userId, m.user.name as name, m.user.email as email from ClassroomMember m " +
+            "where m.classroom.classroomId = :classroomId and m.status = com.languageapp.backend.enums.MembershipStatus.ACCEPTED")
+    List<AcceptedStudent> findAcceptedStudents(@org.springframework.data.repository.query.Param("classroomId") UUID classroomId);
 }
