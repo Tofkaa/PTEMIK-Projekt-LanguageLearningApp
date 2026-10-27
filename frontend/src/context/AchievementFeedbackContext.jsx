@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
@@ -8,13 +8,23 @@ import AchievementNotification from '../components/AchievementNotification';
 const noop = () => {};
 const Context = createContext({ presentInline: noop });
 
-// The key discards queues, timers and stale request callbacks on account changes.
+// Only notification state remounts on account changes; routes must keep their lifecycle.
 export function AchievementFeedbackProvider({ children }) {
     const { user } = useAuth();
-    return <AccountFeedback key={user?.userId || 'guest'} userId={user?.userId}>{children}</AccountFeedback>;
+    const userId = user?.userId;
+    const presenterRef = useRef(null);
+    const presentInline = useCallback(awards => {
+        const current = presenterRef.current;
+        if (current && current.userId === userId) current.presentInline(awards);
+    }, [userId]);
+    const value = useMemo(() => ({ presentInline }), [presentInline]);
+    return <Context.Provider value={value}>
+        <AccountFeedback key={userId || 'guest'} userId={userId} presenterRef={presenterRef} />
+        {children}
+    </Context.Provider>;
 }
 
-function AccountFeedback({ children, userId }) {
+function AccountFeedback({ userId, presenterRef }) {
     const location = useLocation();
     const { autoRefreshEnabled = true } = useNotifications() || {};
     const [queue, setQueue] = useState([]);
@@ -53,6 +63,12 @@ function AccountFeedback({ children, userId }) {
         acknowledge(awards);
     }, [acknowledge]);
 
+    useLayoutEffect(() => {
+        const current = { userId, presentInline };
+        presenterRef.current = current;
+        return () => { if (presenterRef.current === current) presenterRef.current = null; };
+    }, [userId, presentInline, presenterRef]);
+
     useEffect(() => {
         if (!userId) return;
         let mounted = true;
@@ -86,14 +102,13 @@ function AccountFeedback({ children, userId }) {
         return () => document.removeEventListener('visibilitychange', visible);
     }, []);
 
-    return <Context.Provider value={{ presentInline }}>
+    return <>
         <div className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
             {!blocked && active.length > 0 ? (active.length === 1 ? `Új kitüntetés: ${active[0].name}` : `${active.length} új kitüntetést szereztél!`) : ''}
         </div>
         {!blocked && active.length > 0 && <AchievementNotification key={active.map(a => a.userAchievementId).join(',')}
             awards={active} onPresented={() => acknowledge(active)} onClose={() => setActive([])} />}
-        {children}
-    </Context.Provider>;
+    </>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { AchievementFeedbackProvider } from './AchievementFeedbackContext';
+import { AchievementFeedbackProvider, useAchievementFeedback } from './AchievementFeedbackContext';
 import EarnedAchievements from '../components/EarnedAchievements';
 
 const state = vi.hoisted(() => ({ user: { userId: 'student' }, autoRefreshEnabled: true }));
@@ -65,4 +66,37 @@ it('does not acknowledge or spend a pending card in a hidden tab', async () => {
     expect(api.post).not.toHaveBeenCalled(); expect(screen.getByRole('status')).toBeEmptyDOMElement();
     Object.defineProperty(document, 'hidden', { configurable: true, value: false }); fireEvent(document, new Event('visibilitychange'));
     await screen.findByRole('region', { name: 'Új kitüntetések' });
+});
+
+
+it('keeps route children mounted when authentication changes but still resets notification state', async () => {
+    const mounts=vi.fn(), unmounts=vi.fn();
+    function Route() {
+        useEffect(() => { mounts(); return () => unmounts(); }, []);
+        return <input aria-label="Route state" defaultValue="" />;
+    }
+    state.user=null;api.get.mockResolvedValue({ data: [] });
+    const tree=() => <MemoryRouter><AchievementFeedbackProvider><Route /></AchievementFeedbackProvider></MemoryRouter>;
+    const view=render(tree());fireEvent.change(screen.getByLabelText('Route state'),{target:{value:'keep route'}});
+    state.user={userId:'student'};view.rerender(tree());
+    expect(screen.getByLabelText('Route state')).toHaveValue('keep route');
+    expect(mounts).toHaveBeenCalledTimes(1);expect(unmounts).not.toHaveBeenCalled();
+    await act(async () => {});
+});
+
+it('does not let a stale inline presenter acknowledge another account awards', async () => {
+    const captured={};
+    function Probe() {
+        const { presentInline }=useAchievementFeedback();
+        const id=state.user.userId;
+        useEffect(() => { captured[id]=presentInline; },[id,presentInline]);
+        return null;
+    }
+    api.get.mockResolvedValue({data:[]});
+    const tree=() => <MemoryRouter><AchievementFeedbackProvider><Probe /></AchievementFeedbackProvider></MemoryRouter>;
+    const view=render(tree());await act(async () => {});
+    state.user={userId:'other'};view.rerender(tree());await act(async () => {});
+    act(() => captured.student(awards));expect(api.post).not.toHaveBeenCalled();
+    act(() => captured.other(awards));
+    expect(api.post).toHaveBeenCalledExactlyOnceWith('/achievements/acknowledge',{awardIds:['a1'],read:false});
 });
