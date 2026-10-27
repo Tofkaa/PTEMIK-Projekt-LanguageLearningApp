@@ -262,7 +262,7 @@ class UserServiceTest {
         User mockUser = createTestUserWithCourse(testEmail);
         mockUser.setPasswordHash("hashed_old_password");
 
-        when(userRepository.findByEmail(testEmail)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailForAuthentication(testEmail)).thenReturn(Optional.of(mockUser));
         when(passwordEncoder.matches("jelenlegiJelszo", "hashed_old_password")).thenReturn(true);
         when(passwordEncoder.matches("ujJelszo123", "hashed_old_password")).thenReturn(false);
         when(passwordEncoder.encode("ujJelszo123")).thenReturn("hashed_new_password");
@@ -273,6 +273,7 @@ class UserServiceTest {
         // 3. Assert
         assertEquals("hashed_new_password", mockUser.getPasswordHash());
         verify(userRepository, times(1)).save(mockUser);
+        verify(refreshTokenRepository).deleteByUserUserId(mockUser.getUserId());
     }
 
     @Test
@@ -282,7 +283,7 @@ class UserServiceTest {
         User mockUser = createTestUserWithCourse(testEmail);
         mockUser.setPasswordHash("hashed_old_password");
 
-        when(userRepository.findByEmail(testEmail)).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmailForAuthentication(testEmail)).thenReturn(Optional.of(mockUser));
         when(passwordEncoder.matches("hibasJelszo", "hashed_old_password")).thenReturn(false);
 
         // 2. & 3. Act & Assert
@@ -290,6 +291,7 @@ class UserServiceTest {
                 userService.changePassword(testEmail, "hibasJelszo", "ujJelszo123")
         );
         verify(userRepository, never()).save(any());
+        verifyNoInteractions(refreshTokenRepository);
     }
 
     @Test

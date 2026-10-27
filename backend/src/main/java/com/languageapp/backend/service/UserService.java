@@ -215,9 +215,13 @@ public class UserService {
      */
     @Transactional
     public void changePassword(String email, String currentPassword, String newPassword) {
-        User user = getUserByEmail(email);
+        // Login, reset and password change serialize credential checks on the same account row.
+        User user = userRepository.findByEmailForAuthentication(email)
+                .filter(User::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+        if (currentPassword == null || user.getPasswordHash() == null
+                || !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw new BadRequestException("A megadott jelenlegi jelszó hibás!");
         }
 
@@ -231,7 +235,9 @@ public class UserService {
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-        log.info("User {} successfully changed their password", email);
+        // Atomic with the credential write: every prior access-token SID and refresh token is revoked.
+        refreshTokenRepository.deleteByUserUserId(user.getUserId());
+        log.info("Password changed and prior sessions revoked for account ID: {}", user.getUserId());
     }
 
     /**

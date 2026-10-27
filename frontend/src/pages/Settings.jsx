@@ -245,8 +245,11 @@ const Settings = () => {
                 newPassword: passwords.newPassword
             });
 
-            setPasswordMessage({ type: 'success', text: 'Jelszó sikeresen módosítva!' });
             setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+            // Clear local authentication immediately; logout serializes cookie cleanup with refresh/login.
+            void logout();
+            navigate('/login', { replace: true, state: { successMessage:
+                'Jelszavad sikeresen módosult. Minden eszközön kijelentkeztettünk. Jelentkezz be az új jelszavaddal.' } });
         } catch (err) {
             const errorMsg = err.response?.data?.message || err.response?.data || 'Hiba történt a jelszó módosításakor.';
             setPasswordMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hiba történt!' });
@@ -598,7 +601,10 @@ const Settings = () => {
                             <LearningFeedback label="Jelszó" error={passwordMessage.type === 'danger' ? passwordMessage.text : ''}
                                 feedback={passwordMessage.type === 'success' ? { type: 'success', msg: passwordMessage.text } : null} />
 
-                            <Form onSubmit={handleSavePassword} style={{ maxWidth: '500px' }}>
+                            <p id="settings-password-session-help" className="text-light opacity-75">
+                                A jelszó módosítása után minden eszközön kijelentkeztetünk, ezen az eszközön is újra be kell lépned.
+                            </p>
+                            <Form onSubmit={handleSavePassword} aria-describedby="settings-password-session-help" style={{ maxWidth: '500px' }}>
                                 <Form.Group className="mb-3" controlId="settings-current-password">
                                     <Form.Label className="text-light opacity-75">Jelenlegi jelszó</Form.Label>
                                     <Form.Control 

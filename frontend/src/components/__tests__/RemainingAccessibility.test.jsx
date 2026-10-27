@@ -328,6 +328,39 @@ describe('persistent settings feedback and grading', () => {
         await waitFor(() => expect(opener).toHaveFocus());
     });
 
+    it('signs out only after the password is saved and keeps an untimed accessible confirmation', async () => {
+        sessionStorage.setItem('settingsActiveTab', 'security');
+        let complete;
+        api.put.mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+        render(<MemoryRouter initialEntries={['/settings']}><Routes>
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/login" element={<Login />} />
+        </Routes></MemoryRouter>);
+        expect(screen.getByText(/minden eszközön kijelentkeztetünk, ezen az eszközön/)).toBeVisible();
+        fireEvent.change(screen.getByLabelText('Jelenlegi jelszó', { exact: true }), { target: { value: 'old-password' } });
+        fireEvent.change(screen.getByLabelText('Új jelszó', { exact: true }), { target: { value: 'new-password' } });
+        fireEvent.change(screen.getByLabelText('Új jelszó megerősítése', { exact: true }), { target: { value: 'new-password' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Jelszó frissítése' }));
+        expect(auth.logout).not.toHaveBeenCalled();
+        await act(async () => complete({ data: 'saved' }));
+        await screen.findByRole('heading', { name: 'Bejelentkezés' });
+        expect(auth.logout).toHaveBeenCalledExactlyOnceWith();
+        vi.useFakeTimers();act(() => vi.advanceTimersByTime(30_000));
+        expect(screen.getByRole('status')).toHaveTextContent('Minden eszközön kijelentkeztettünk.');
+    });
+
+    it('keeps the password form and session on a failed password change', async () => {
+        sessionStorage.setItem('settingsActiveTab', 'security');
+        api.put.mockRejectedValueOnce({ response: { data: { message: 'A jelenlegi jelszó hibás.' } } });
+        render(<MemoryRouter><Settings /></MemoryRouter>);
+        fireEvent.change(screen.getByLabelText('Jelenlegi jelszó', { exact: true }), { target: { value: 'wrong-password' } });
+        fireEvent.change(screen.getByLabelText('Új jelszó', { exact: true }), { target: { value: 'new-password' } });
+        fireEvent.change(screen.getByLabelText('Új jelszó megerősítése', { exact: true }), { target: { value: 'new-password' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Jelszó frissítése' }));
+        expect(await screen.findByRole('alert', { name: 'Jelszó: hiba' })).toHaveTextContent('A jelenlegi jelszó hibás.');
+        expect(auth.logout).not.toHaveBeenCalled();
+    });
+
     it('preserves the email-change confirmation on the login screen without a timed redirect', async () => {
         sessionStorage.setItem('settingsActiveTab', 'security');
         render(<MemoryRouter initialEntries={['/settings']}><Routes>
