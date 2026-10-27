@@ -30,4 +30,6 @@ public interface ChallengeRepository extends JpaRepository<Challenge, UUID> {
      */
     @Query("SELECT COUNT(c) FROM Challenge c WHERE (c.challenger.userId = :userId OR c.opponent.userId = :userId) AND c.status IN (com.languageapp.backend.enums.ChallengeStatus.COMPLETED, com.languageapp.backend.enums.ChallengeStatus.DECLINED, com.languageapp.backend.enums.ChallengeStatus.EXPIRED)")
     int countHistoryForUser(@Param("userId") UUID userId);
+    @Query("select count(c) from Challenge c where (c.challenger.userId = :userId or c.opponent.userId = :userId) and c.status = :status and c.winner.userId = :userId")
+    long countWins(@Param("userId") UUID userId, @Param("status") ChallengeStatus status);
 }

@@ -32,6 +32,9 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
     @Query("SELECT f FROM Friendship f WHERE (f.user.userId = :userId OR f.friend.userId = :userId) AND f.status = :status")
     List<Friendship> findAcceptedFriendships(@Param("userId") UUID userId, @Param("status") FriendshipStatus status);
 
+    @Query("select count(f) from Friendship f where (f.user.userId = :userId or f.friend.userId = :userId) and f.status = :status")
+    long countFriendships(@Param("userId") UUID userId, @Param("status") FriendshipStatus status);
+
     /**
      * Security check: Verifies if a relationship (either PENDING or ACCEPTED) already exists
      * between two users to prevent duplicate requests and spamming.

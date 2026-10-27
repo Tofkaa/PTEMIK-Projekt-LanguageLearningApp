@@ -14,6 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -57,19 +59,14 @@ public class AchievementService {
                 .orElseThrow(() -> new com.languageapp.backend.exception.ResourceNotFoundException("User not found"));
         List<Achievement> allAchievements = achievementRepository.findAll();
 
+        var owned = new HashSet<>(userAchievementRepository.findOwnedAchievementIds(user.getUserId()));
+        // Request-local metrics only: never cache one learner's state across calls or accounts.
+        Map<String, Long> metrics = new HashMap<>();
         for (Achievement achievement : allAchievements) {
-            if (!achievement.isActive()) continue;
-            // OPTIMIZATION: Check if the user already has this trophy to prevent redundant processing
-            if (userAchievementRepository
-                    .existsByUserUserIdAndAchievementAchievementId(
-                            user.getUserId(),
-                            achievement.getAchievementId())) {
-                continue;
-            }
-
-            // Evaluate the JSONB conditions dynamically
-            if (isEligible(user, achievement, currentLessonScore)) {
+            if (!achievement.isActive() || owned.contains(achievement.getAchievementId())) continue;
+            if (isEligible(user, achievement, currentLessonScore, metrics)) {
                 awarded.add(toFeedback(awardAchievement(user, achievement)));
+                owned.add(achievement.getAchievementId());
             }
         }
         return awarded;
@@ -84,7 +81,7 @@ public class AchievementService {
      * @param currentLessonScore The score achieved in the triggering lesson.
      * @return boolean True if the criteria are fully met.
      */
-    private boolean isEligible(User user, Achievement achievement, int currentLessonScore) {
+    private boolean isEligible(User user, Achievement achievement, int currentLessonScore, Map<String, Long> metrics) {
         Map<String, Object> criteria = achievement.getCriteria();
         if (criteria == null || !criteria.containsKey("type")) {
             return false;
@@ -93,23 +90,17 @@ public class AchievementService {
         String type = String.valueOf(criteria.get("type"));
 
         try {
-            // Helper metric: Total successfully completed lessons
-            long completedCount = progressRepository.findByUserUserId(user.getUserId()).stream()
-                    .filter(p -> Boolean.TRUE.equals(p.getIsCompleted()))
-                    .map(p -> p.getLesson().getLessonId()).distinct()
-                    .count();
-
             switch (type) {
                 case "LESSON_MASTERY":
-                    return masteryService.countMastered(user, false) >= Integer.parseInt(String.valueOf(criteria.get("target")));
+                    return metrics.computeIfAbsent("LESSON_MASTERY", key -> masteryService.countMastered(user, false)) >= Integer.parseInt(String.valueOf(criteria.get("target")));
                 case "TOPIC_MASTERY":
-                    return masteryService.countMastered(user, true) >= Integer.parseInt(String.valueOf(criteria.get("target")));
+                    return metrics.computeIfAbsent("TOPIC_MASTERY", key -> masteryService.countMastered(user, true)) >= Integer.parseInt(String.valueOf(criteria.get("target")));
                 case "FIRST_LESSON":
-                    return completedCount >= 1;
+                    return metrics.computeIfAbsent("COMPLETED_LESSONS", key -> progressRepository.countCompletedLessons(user.getUserId())) >= 1;
 
                 case "LESSON_COUNT":
                     int targetLessons = Integer.parseInt(String.valueOf(criteria.get("target")));
-                    return completedCount >= targetLessons;
+                    return metrics.computeIfAbsent("COMPLETED_LESSONS", key -> progressRepository.countCompletedLessons(user.getUserId())) >= targetLessons;
 
                 case "XP_MILESTONE":
                     int targetXp = Integer.parseInt(String.valueOf(criteria.get("target")));
@@ -120,17 +111,12 @@ public class AchievementService {
 
                 case "SOCIAL_FRIENDS":
                     int targetFriends = Integer.parseInt(String.valueOf(criteria.get("target")));
-                    int currentFriends = friendshipRepository.findAcceptedFriendships(user.getUserId(), com.languageapp.backend.enums.FriendshipStatus.ACCEPTED).size();
+                    long currentFriends = metrics.computeIfAbsent("SOCIAL_FRIENDS", key -> friendshipRepository.countFriendships(user.getUserId(), com.languageapp.backend.enums.FriendshipStatus.ACCEPTED));
                     return currentFriends >= targetFriends;
 
                 case "SOCIAL_DUELS":
                     int targetDuels = Integer.parseInt(String.valueOf(criteria.get("target")));
-                    long wonDuels = challengeRepository.findByChallengerUserIdOrOpponentUserId(user.getUserId(), user.getUserId())
-                            .stream()
-                            .filter(c -> c.getStatus() == ChallengeStatus.COMPLETED
-                                    && c.getWinner() != null
-                                    && c.getWinner().getUserId().equals(user.getUserId()))
-                            .count();
+                    long wonDuels = metrics.computeIfAbsent("SOCIAL_DUELS", key -> challengeRepository.countWins(user.getUserId(), ChallengeStatus.COMPLETED));
                     return wonDuels >= targetDuels;
 
                 case "STREAK_DAYS":
@@ -140,12 +126,12 @@ public class AchievementService {
 
                 case "VOCAB_COUNT":
                     int targetVocab = Integer.parseInt(String.valueOf(criteria.get("target")));
-                    long currentVocabCount = vocabularyRepository.countByUser_UserId(user.getUserId());
+                    long currentVocabCount = metrics.computeIfAbsent("VOCAB_COUNT", key -> vocabularyRepository.countByUser_UserId(user.getUserId()));
                     return currentVocabCount >= targetVocab;
 
                 case "MASTERED_VOCAB_COUNT":
                     int targetMastered = Integer.parseInt(String.valueOf(criteria.get("target")));
-                    long masteredCount = vocabularyRepository.countByUser_UserIdAndSrsLevelGreaterThanEqual(user.getUserId(), 6);
+                    long masteredCount = metrics.computeIfAbsent("MASTERED_VOCAB_COUNT", key -> vocabularyRepository.countByUser_UserIdAndSrsLevelGreaterThanEqual(user.getUserId(), 6));
                     return masteredCount >= targetMastered;
 
                 default:
@@ -171,19 +157,22 @@ public class AchievementService {
         User user = userRepository.findForLearningUpdate(userId)
                 .orElseThrow(() -> new com.languageapp.backend.exception.ResourceNotFoundException("User not found"));
         List<Achievement> allAchievements = achievementRepository.findAll();
+        Map<UUID, UserAchievement> owned = new HashMap<>();
+        for (UserAchievement award : userAchievementRepository.findByUserUserId(userId)) {
+            owned.putIfAbsent(award.getAchievement().getAchievementId(), award);
+        }
+        Map<String, Long> metrics = new HashMap<>();
         for (Achievement achievement : allAchievements) {
             Object type = achievement.getCriteria() == null ? null : achievement.getCriteria().get("type");
             if (achievement.isActive() && ("LESSON_MASTERY".equals(type) || "TOPIC_MASTERY".equals(type))
-                    && !userAchievementRepository.existsByUserUserIdAndAchievementAchievementId(userId, achievement.getAchievementId())
-                    && isEligible(user, achievement, 0)) awardAchievement(user, achievement);
+                    && !owned.containsKey(achievement.getAchievementId())
+                    && isEligible(user, achievement, 0, metrics)) {
+                owned.put(achievement.getAchievementId(), awardAchievement(user, achievement));
+            }
         }
-        List<UserAchievement> userAchievements = userAchievementRepository.findByUserUserId(userId);
 
         return allAchievements.stream().map(ach -> {
-            UserAchievement unlockedAch = userAchievements.stream()
-                    .filter(ua -> ua.getAchievement().getAchievementId().equals(ach.getAchievementId()))
-                    .findFirst()
-                    .orElse(null);
+            UserAchievement unlockedAch = owned.get(ach.getAchievementId());
 
             return AchievementResponse.builder()
                     .achievementId(ach.getAchievementId())
