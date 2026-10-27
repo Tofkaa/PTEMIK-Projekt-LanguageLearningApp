@@ -1,7 +1,5 @@
 package com.languageapp.backend.security;
 
-import com.languageapp.backend.entity.User;
-import com.languageapp.backend.repository.UserRepository;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,8 +9,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
@@ -23,32 +19,28 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    private final JwtService jwtService;
-    private final RefreshTokenService refreshTokenService;
-    private final UserRepository userRepository;
+    private final FederatedIdentityService identities;
+    private final OAuth2AuthenticationFailureHandler failureHandler;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
-        OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-        String email = oAuth2User.getAttribute("email");
-
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found after OAuth2 login"));
-
-        // build UserDetails for JwtService
-        // Empty String because password can be null (oauth2)
-        UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
-                .username(user.getEmail())
-                .password(user.getPasswordHash() != null ? user.getPasswordHash() : "")
-                .authorities("ROLE_" + user.getRole().name())
-                .build();
-
-        // Generate Tokens
-        var session = refreshTokenService.createSession(user.getUserId());
-        String jwtToken = jwtService.generateSessionToken(userDetails, session.id());
-        String refreshToken = session.rawToken();
+        if (!(authentication instanceof org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken oauth)
+                || !(oauth.getPrincipal() instanceof FederatedOAuth2User principal)
+                || !oauth.getAuthorizedClientRegistrationId().equals(principal.provider().name().toLowerCase(java.util.Locale.ROOT))) {
+            failureHandler.redirect(response,"identity_unavailable"); return;
+        }
+        FederatedIdentityService.Login login;
+        try { login=identities.issueSession(principal); }
+        catch (org.springframework.security.oauth2.core.OAuth2AuthenticationException rejected) {
+            failureHandler.redirect(response,rejected.getError().getErrorCode()); return;
+        } catch (RuntimeException unavailable) {
+            log.warn("OAuth2 session could not be issued.");
+            failureHandler.redirect(response,"identity_unavailable"); return;
+        }
+        String jwtToken=login.accessToken(), refreshToken=login.refreshToken();
 
         // Refresh token into HttpOnly cookie
         ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)
@@ -59,12 +51,13 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                 .sameSite("Lax")
                 .build();
 
+        response.setHeader("Cache-Control","no-store");
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
         // Redirect to the React Frontend's "landing" page with the Access Tokennel in URL params
         String redirectUrl = frontendUrl + "/oauth2/redirect?token=" + jwtToken;
 
-        log.info("Sikeres OAuth2 bejelentkezés ({}). Irányítás a frontend felé.", email);
+        log.info("OAuth2 sign-in completed for account ID: {}", principal.userId());
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
 }

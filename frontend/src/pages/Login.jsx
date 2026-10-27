@@ -8,6 +8,13 @@ import ThemeToggle from '../components/ThemeToggle.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 import LearningFeedback from '../components/LearningFeedback';
 
+const oauthErrors = new Map([
+    ['email_in_use', 'Ehhez az emailcímhez már tartozik fiók. Használd a fiókod korábbi belépési módját.'],
+    ['unverified_email', 'A belépéshez előbb erősítsd meg az emailcímedet a Google- vagy Discord-fiókodban.'],
+    ['identity_unavailable', 'Ezzel a szolgáltatói fiókkal most nem sikerült bejelentkezni. Próbáld újra, vagy használd a korábbi belépési módodat.'],
+    ['access_denied', 'A közösségi belépés megszakadt. Újra megpróbálhatod.'],
+]);
+
 /**
  * Login Component
  * Responsible for user authentication, JWT token management, 
@@ -20,7 +27,8 @@ const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
-    const [error, setError] = useState(() => typeof location.state?.error === 'string' ? location.state.error : '');
+    const [error, setError] = useState(() => typeof location.state?.error === 'string' ? location.state.error
+        : oauthErrors.get(new URLSearchParams(location.search).get('oauth_error')) || '');
     const [isLoading, setIsLoading] = useState(false);
 
     const navigate = useNavigate();

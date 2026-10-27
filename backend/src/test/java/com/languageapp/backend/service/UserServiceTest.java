@@ -41,6 +41,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
     @Mock private com.languageapp.backend.repository.InvitationLinkRepository invitationLinkRepository;
+    @Mock private com.languageapp.backend.repository.OAuthIdentityRepository oAuthIdentityRepository;
     @Mock private com.languageapp.backend.repository.UserAchievementRepository userAchievementRepository;
     @Mock private com.languageapp.backend.repository.LessonAttemptRepository lessonAttemptRepository;
     @Mock private com.languageapp.backend.repository.ResultRepository resultRepository;
@@ -79,7 +80,7 @@ class UserServiceTest {
         User user = createTestUserWithCourse("local@example.test");
         user.setAuthProvider(AuthProvider.LOCAL);
         user.setPasswordHash("stored-hash");
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForAccountDeletion(user.getEmail())).thenReturn(Optional.of(user));
         assertThrows(BadRequestException.class,
                 () -> userService.deleteAndAnonymizeMyAccount(user.getEmail(), "password", false));
         verify(userRepository, never()).save(any());
@@ -92,7 +93,7 @@ class UserServiceTest {
         User user = createTestUserWithCourse("local@example.test");
         user.setAuthProvider(AuthProvider.LOCAL);
         user.setPasswordHash("stored-hash");
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForAccountDeletion(user.getEmail())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "stored-hash")).thenReturn(false);
         assertThrows(BadRequestException.class,
                 () -> userService.deleteAndAnonymizeMyAccount(user.getEmail(), "wrong", true));
@@ -107,7 +108,7 @@ class UserServiceTest {
         user.setPasswordHash("stored-hash");
         user.setActive(true);
         user.setVerified(true);
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForAccountDeletion(user.getEmail())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("correct", "stored-hash")).thenReturn(true);
         userService.deleteAndAnonymizeMyAccount(user.getEmail(), "correct", true);
         verify(passwordEncoder).matches("correct", "stored-hash");
@@ -143,7 +144,7 @@ class UserServiceTest {
     void oauthCannotBypassEmailApprovalThroughLegacyDeletionEndpoint() {
         User user = createTestUserWithCourse("oauth@example.test");
         user.setAuthProvider(AuthProvider.DISCORD);
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForAccountDeletion(user.getEmail())).thenReturn(Optional.of(user));
         assertThrows(BadRequestException.class,
                 () -> userService.deleteAndAnonymizeMyAccount(user.getEmail(), "TÖRLÉS", true));
         verify(userRepository, never()).save(any());
@@ -420,6 +421,7 @@ class UserServiceTest {
         UUID ownerId = user.getUserId();
         userService.anonymizeAccount(user);
         verify(invitationLinkRepository).revokeAllForOwner(ownerId, clock.instant());
+        verify(oAuthIdentityRepository).deleteByUserUserId(ownerId);
         assertFalse(user.isActive());
         assertFalse(user.isVerified());
     }
@@ -497,5 +499,18 @@ class UserServiceTest {
         assertDoesNotThrow(() -> userService.requestEmailChange(user.getEmail(), "target@example.test", "password"));
         verify(emailChangeTokenRepository).save(any());
         verify(emailService).sendEmailChangeSecurityAlert(user.getEmail(), "target@example.test");
+    }
+
+    @Test void dataExportIncludesOnlyOwnedFederatedIdentifiers() {
+        User user=createTestUserWithCourse("identity-export@example.test");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        var identity=new com.languageapp.backend.entity.OAuthIdentity();identity.setProvider(AuthProvider.GOOGLE);
+        identity.setSubject("stable-subject");identity.setUser(user);identity.setLinkedAt(clock.instant());
+        when(oAuthIdentityRepository.findByUserUserId(user.getUserId())).thenReturn(java.util.List.of(identity));
+        var records=assertInstanceOf(java.util.List.class,userService.exportUserData(user.getEmail()).get("oauthIdentities"));
+        var record=assertInstanceOf(java.util.Map.class,records.getFirst());
+        assertEquals("GOOGLE",record.get("provider"));assertEquals("stable-subject",record.get("subject"));
+        assertEquals(clock.instant(),record.get("linkedAt"));assertFalse(record.containsKey("accessToken"));
+        verify(oAuthIdentityRepository).findByUserUserId(user.getUserId());
     }
 }

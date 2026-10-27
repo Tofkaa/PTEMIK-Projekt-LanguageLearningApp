@@ -69,3 +69,19 @@ A változó beállítása után a `backend` mappából:
 ```powershell
 .\mvnw.cmd '-Dtest=VerificationLifecyclePersistenceTest,EmailChangeLifecyclePersistenceTest' test
 ```
+
+
+Az OAuth-fiókok azonosítója a szolgáltató és annak stabil felhasználói azonosítója.
+Emailcím-egyezés alapján nincs automatikus fiókösszekötés. A korábbi OAuth-fiók
+csak a tárolt szolgáltató/azonosító pár igazolt egyezésekor kap új azonosítókapcsolatot;
+az alkalmazásbeli emailcímét ez nem módosítja. Új szolgáltató meglévő fiókhoz
+hozzáadására ez a verzió még nem ad külön összekötési felületet.
+
+A helyi, szimulált Google/Discord integrációs teszt a
+`OAUTH_IDENTITY_TEST_DATABASE_URL` változóval indítható. Kizárólag előre létrehozott,
+eldobható `jdbc:postgresql://host:port/languageapp_oauth_check_...` adatbázist fogad el,
+annak sémáját újraépíti. Külső szolgáltatói fiók vagy éles OAuth-titok nem szükséges:
+
+```powershell
+.\mvnw.cmd '-Dtest=FederatedIdentityPersistenceTest' test
+```

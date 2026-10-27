@@ -18,6 +18,12 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
+    boolean existsByEmailIgnoreCase(String email);
+
+    // A pre-existing provider+subject is evidence; email equality alone never is.
+    @Query("select u.userId from User u where u.authProvider=:provider and u.providerId=:subject")
+    List<UUID> findLegacyOAuthIds(@Param("provider") com.languageapp.backend.enums.AuthProvider provider,
+            @Param("subject") String subject,org.springframework.data.domain.Pageable limit);
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Query("select u.userId from User u where u.email = :email and u.isActive = true")

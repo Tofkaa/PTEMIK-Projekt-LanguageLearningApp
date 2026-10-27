@@ -48,6 +48,7 @@ class DeviceSessionsPersistenceTest {
     @Autowired RefreshTokenService sessions;
     @Autowired AuthenticationService authentication;
     @Autowired OAuth2AuthenticationSuccessHandler oauthSuccess;
+    @Autowired FederatedIdentityService federated;
     @Autowired JwtService jwt;
     @Autowired PasswordEncoder encoder;
     @Autowired Clock clock;
@@ -227,11 +228,17 @@ class DeviceSessionsPersistenceTest {
     }
     @Test void oauthSuccessIssuesASessionBoundTokenWithoutReplacingAnExistingDevice() throws Exception {
         var u=fixture();var previous=login(u);
-        var principal=new DefaultOAuth2User(List.of(new SimpleGrantedAuthority("ROLE_USER")),
-                Map.of("email",u.getEmail(),"sub","test-subject"),"sub");
+        tx.executeWithoutResult(status -> {
+            var account=users.findForSessionUpdate(u.getUserId()).orElseThrow();
+            account.setAuthProvider(com.languageapp.backend.enums.AuthProvider.GOOGLE); account.setProviderId("test-subject");
+        });
+        var providerUser=new DefaultOAuth2User(List.of(new SimpleGrantedAuthority("ROLE_USER")),
+                Map.of("email",u.getEmail(),"sub","test-subject","email_verified",true),"sub");
+        var binding=federated.bind(new OAuthClaims(com.languageapp.backend.enums.AuthProvider.GOOGLE,"test-subject",u.getEmail(),u.getName(),null));
+        var principal=new FederatedOAuth2User(binding,providerUser);
         var response=new MockHttpServletResponse();
         oauthSuccess.onAuthenticationSuccess(new MockHttpServletRequest(),response,
-                new UsernamePasswordAuthenticationToken(principal,"unused",principal.getAuthorities()));
+                new org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken(principal,principal.getAuthorities(),"google"));
         String redirected=response.getRedirectedUrl();assertNotNull(redirected);
         String access=redirected.substring(redirected.indexOf("?token=")+7);
         assertNotNull(jwt.extractSessionId(access));assertNotEquals(jwt.extractSessionId(previous.access),jwt.extractSessionId(access));

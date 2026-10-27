@@ -28,15 +28,21 @@ import static org.mockito.Mockito.*;
 /** Schema creation is allowed only in an explicitly named, disposable PostgreSQL database. */
 @EnabledIfEnvironmentVariable(named = "ACCOUNT_DELETION_TEST_DATABASE_URL", matches = "jdbc:postgresql://[^/]+/languageapp_deletion_check_[a-zA-Z0-9_]+")
 @SpringBootTest(properties = {"spring.datasource.url=${ACCOUNT_DELETION_TEST_DATABASE_URL}",
-        "spring.jpa.hibernate.ddl-auto=create", "spring.jpa.show-sql=false"})
+        "spring.jpa.hibernate.ddl-auto=create", "spring.jpa.show-sql=false",
+        "jwt.secret=U2VjdXJpdHkgZm91bmRhdGlvbnMgdGVzdCBvbmx5IHNpZ25pbmcga2V5IG5vdCBmb3IgZGVwbG95bWVudCE="})
 class AccountDeletionPersistenceTest {
     @Autowired AccountDeletionService service;
     @Autowired UserRepository users;
     @Autowired AccountDeletionTokenRepository tokens;
+    @Autowired com.languageapp.backend.repository.OAuthIdentityRepository identities;
     @Autowired RefreshTokenService sessions;
     @Autowired PlatformTransactionManager manager;
     @MockitoBean EmailService emailService;
     @MockitoBean DataSeeder dataSeeder;
+    @MockitoBean com.languageapp.backend.service.ImageStorageService images;
+    @MockitoBean com.languageapp.backend.service.SseService sse;
+    @MockitoBean com.languageapp.backend.scheduler.AssignmentExpiryScheduler expiry;
+    @MockitoBean com.languageapp.backend.scheduler.ChallengeScheduler challenges;
     @MockitoBean Clock clock;
     TransactionTemplate tx;
     record Fixture(UUID id, String email, String session, String secret) {}
@@ -50,7 +56,10 @@ class AccountDeletionPersistenceTest {
         User user = tx.execute(status -> {
             User u = new User(); u.setEmail(UUID.randomUUID() + "@example.test"); u.setName("Deletion persistence test");
             u.setAuthProvider(AuthProvider.DISCORD); u.setProviderId(UUID.randomUUID().toString());
-            return users.saveAndFlush(u);
+            users.saveAndFlush(u);
+            var identity=new com.languageapp.backend.entity.OAuthIdentity();identity.setUser(u);identity.setProvider(AuthProvider.DISCORD);identity.setSubject(u.getProviderId());
+            identities.saveAndFlush(identity);
+            return u;
         });
         String session = sessions.createRefreshToken(user.getUserId());
         service.request(user.getEmail(), session);
@@ -86,6 +95,7 @@ class AccountDeletionPersistenceTest {
         assertFalse(users.findById(f.id()).orElseThrow().isActive());
         assertTrue(tokens.findById(f.id()).isEmpty());
         assertTrue(sessions.findByRawToken(f.session()).isEmpty());
+        assertTrue(identities.findByUserUserId(f.id()).isEmpty());
     }
 
     @Test void failedOuterTransactionRollsBackDeletionConsumptionAndSessionRevocationTogether() {
@@ -97,5 +107,6 @@ class AccountDeletionPersistenceTest {
         assertTrue(users.findById(f.id()).orElseThrow().isActive());
         assertTrue(sessions.findByRawToken(f.session()).isPresent());
         assertEquals(f.email(), service.preview(f.email(), f.session(), f.secret()).email());
+        assertEquals(1,identities.findByUserUserId(f.id()).size());
     }
 }

@@ -41,6 +41,7 @@ public class SecurityConfiguration {
     private final CustomUserDetailsService userDetailsService;
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
+    private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
     private final tools.jackson.databind.ObjectMapper objectMapper;
     private final java.time.Clock clock;
 
@@ -73,6 +74,7 @@ public class SecurityConfiguration {
                                 .userService(customOAuth2UserService)
                         )
                         .successHandler(oAuth2AuthenticationSuccessHandler)
+                        .failureHandler(oAuth2AuthenticationFailureHandler)
                 )
 
                 // Enforce stateless session management (no server-side HTTP sessions)

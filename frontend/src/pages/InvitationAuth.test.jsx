@@ -88,3 +88,21 @@ it('retains the captured invitation during the StrictMode OAuth effect replay', 
     expect(auth.completeOAuthLogin).toHaveBeenCalledExactlyOnceWith('oauth-once');
     expect(api.post).not.toHaveBeenCalled();
 });
+
+it.each([
+    ['email_in_use', 'Ehhez az emailcímhez már tartozik fiók.'],
+    ['unverified_email', 'A belépéshez előbb erősítsd meg az emailcímedet'],
+    ['identity_unavailable', 'Ezzel a szolgáltatói fiókkal most nem sikerült bejelentkezni.'],
+    ['access_denied', 'A közösségi belépés megszakadt.'],
+])('announces the fixed %s OAuth failure and retains the invitation for retry', async (code, message) => {
+    render(<Tree path={`/login?oauth_error=${code}`} />);
+    expect(screen.getByRole('alert')).toHaveTextContent(message);
+    expect(sessionStorage.getItem('pendingInvitation')).toContain(token);
+    expect(auth.authenticate).not.toHaveBeenCalled();
+    expect(auth.completeOAuthLogin).not.toHaveBeenCalled();
+});
+it('does not render an arbitrary OAuth error or object prototype key from the URL', () => {
+    render(<Tree path="/login?oauth_error=toString" />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Belépés' })).toBeEnabled();
+});

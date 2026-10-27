@@ -43,6 +43,7 @@ public class UserService {
     private final LessonAttemptRepository lessonAttemptRepository;
     private final UserAchievementRepository userAchievementRepository;
     private final InvitationLinkRepository invitationLinkRepository;
+    private final OAuthIdentityRepository oAuthIdentityRepository;
 
     /**
      * Retrieves the profile information of the authenticated user.
@@ -387,12 +388,17 @@ public class UserService {
             entry.put("expiresAt", link.getExpiresAt()); entry.put("revokedAt", link.getRevokedAt());
             return entry;
         }).toList());
+        exportData.put("oauthIdentities", oAuthIdentityRepository.findByUserUserId(user.getUserId()).stream().map(identity -> {
+            Map<String,Object> entry = new LinkedHashMap<>();
+            entry.put("provider", identity.getProvider().name()); entry.put("subject", identity.getSubject());
+            entry.put("linkedAt", identity.getLinkedAt()); return entry;
+        }).toList());
         return exportData;
     }
 
     @Transactional
     public void deleteAndAnonymizeMyAccount(String email, String confirmationInput, boolean confirmed) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailForAccountDeletion(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User nem található."));
 
         boolean isLocalWithPassword = user.getAuthProvider() == com.languageapp.backend.enums.AuthProvider.LOCAL
@@ -414,6 +420,7 @@ public class UserService {
 
     /** Only called after local credentials or an email challenge have been verified. */
     void anonymizeAccount(User user) {
+        oAuthIdentityRepository.deleteByUserUserId(user.getUserId());
         invitationLinkRepository.revokeAllForOwner(user.getUserId(), clock.instant());
         lessonAttemptRepository.deleteByUserUserId(user.getUserId());
         friendshipRepository.deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
