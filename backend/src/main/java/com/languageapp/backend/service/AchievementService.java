@@ -92,9 +92,9 @@ public class AchievementService {
         try {
             switch (type) {
                 case "LESSON_MASTERY":
-                    return metrics.computeIfAbsent("LESSON_MASTERY", key -> masteryService.countMastered(user, false)) >= Integer.parseInt(String.valueOf(criteria.get("target")));
+                    return masteryCount(user, false, metrics) >= Integer.parseInt(String.valueOf(criteria.get("target")));
                 case "TOPIC_MASTERY":
-                    return metrics.computeIfAbsent("TOPIC_MASTERY", key -> masteryService.countMastered(user, true)) >= Integer.parseInt(String.valueOf(criteria.get("target")));
+                    return masteryCount(user, true, metrics) >= Integer.parseInt(String.valueOf(criteria.get("target")));
                 case "FIRST_LESSON":
                     return metrics.computeIfAbsent("COMPLETED_LESSONS", key -> progressRepository.countCompletedLessons(user.getUserId())) >= 1;
 
@@ -142,6 +142,15 @@ public class AchievementService {
             log.error("Error evaluating achievement criteria (ID: {}): {}", achievement.getAchievementId(), e.getMessage());
             return false;
         }
+    }
+
+    private long masteryCount(User user, boolean topics, Map<String, Long> metrics) {
+        if (!metrics.containsKey("LESSON_MASTERY")) {
+            MasteryService.MasteryCounts counts = masteryService.countMasteredBoth(user);
+            metrics.put("LESSON_MASTERY", counts.lessons());
+            metrics.put("TOPIC_MASTERY", counts.topics());
+        }
+        return metrics.get(topics ? "TOPIC_MASTERY" : "LESSON_MASTERY");
     }
 
     /**

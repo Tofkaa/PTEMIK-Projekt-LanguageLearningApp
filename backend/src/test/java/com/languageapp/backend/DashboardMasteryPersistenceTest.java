@@ -134,7 +134,10 @@ class DashboardMasteryPersistenceTest {
         statistics.clear();var snapshot=mastery.getCourseSnapshot(f.user());
         assertEquals(count,snapshot.lessons().size());assertTrue(snapshot.byLesson().values().stream().allMatch(MasteryService.LessonMastery::mastered));
         assertEquals(Set.of(f.topic().getTopicId()),snapshot.masteredTopics());assertNoContentEntitiesLoaded();
-        return statistics.getPrepareStatementCount();
+        long queries=statistics.getPrepareStatementCount();
+        statistics.clear();var counts=mastery.countMasteredBoth(f.user());
+        assertEquals(count,counts.lessons());assertEquals(1,counts.topics());assertEquals(3,statistics.getPrepareStatementCount());
+        return queries;
     }
     long measureDashboard(Fixture f,int count) throws Exception {
         statistics.clear();var response=lessons.getAllLessonsForUser(f.user().getEmail());assertEquals(count,response.size());

@@ -186,11 +186,11 @@ class AchievementMetricsPersistenceTest {
         tx.executeWithoutResult(status -> {
             award(f.user(),trophy("PERFECT_SCORE",1));trophy("LESSON_MASTERY",1);trophy("LESSON_MASTERY",2);
         });
-        when(mastery.countMastered(any(User.class),eq(false))).thenReturn(2L);
+        when(mastery.countMasteredBoth(any(User.class))).thenReturn(new MasteryService.MasteryCounts(2,0));
         var result=service.getUserAchievements(f.user().getUserId()).stream().filter(a -> a.isUnlocked()).toList();
         assertEquals(3,result.size());assertTrue(result.stream().allMatch(a -> a.isUnread()));
         assertTrue(result.stream().allMatch(a -> a.getUserAchievementId()!=null && a.getAchievedAt()!=null));
-        verify(mastery).countMastered(any(User.class),eq(false));
+        verify(mastery).countMasteredBoth(any(User.class));
     }
 
     @Test void rollbackDoesNotSaveOrNotifyTheAward() {

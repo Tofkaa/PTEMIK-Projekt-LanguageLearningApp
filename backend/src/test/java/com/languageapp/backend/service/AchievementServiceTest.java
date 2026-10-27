@@ -52,7 +52,7 @@ class AchievementServiceTest {
     @Test void masteryTrophyAcceptsAnImperfectSuccessfulCompletion() {
         perfectScoreAch.setCriteria(Map.of("type", "LESSON_MASTERY", "target", 1));
         when(achievementRepository.findAll()).thenReturn(List.of(perfectScoreAch));
-        when(masteryService.countMastered(testUser, false)).thenReturn(1L);
+        when(masteryService.countMasteredBoth(testUser)).thenReturn(new MasteryService.MasteryCounts(1,0));
         achievementService.checkAndAwardAchievements(testUser, 67);
         verify(userAchievementRepository).save(any());
     }
@@ -61,7 +61,7 @@ class AchievementServiceTest {
         perfectScoreAch.setCriteria(Map.of("type", "TOPIC_MASTERY", "target", 1));
         when(userRepository.findForLearningUpdate(testUser.getUserId())).thenReturn(java.util.Optional.of(testUser));
         when(achievementRepository.findAll()).thenReturn(List.of(perfectScoreAch));
-        when(masteryService.countMastered(testUser, true)).thenReturn(1L);
+        when(masteryService.countMasteredBoth(testUser)).thenReturn(new MasteryService.MasteryCounts(0,1));
         achievementService.getUserAchievements(testUser.getUserId());
         verify(userAchievementRepository).save(any());
     }
@@ -86,6 +86,7 @@ class AchievementServiceTest {
         testUser = new User();
         testUser.setUserId(UUID.randomUUID());
         testUser.setEmail("diak@test.com");
+        lenient().when(masteryService.countMasteredBoth(any())).thenReturn(new MasteryService.MasteryCounts(0,0));
         testUser.setStreak(5); // A streak teszteléséhez
         lenient().when(userRepository.findForLearningUpdate(testUser.getUserId())).thenReturn(java.util.Optional.of(testUser));
 
@@ -214,8 +215,7 @@ class AchievementServiceTest {
         verify(challengeRepository).countWins(testUser.getUserId(), com.languageapp.backend.enums.ChallengeStatus.COMPLETED);
         verify(vocabularyRepository).countByUser_UserId(testUser.getUserId());
         verify(vocabularyRepository).countByUser_UserIdAndSrsLevelGreaterThanEqual(testUser.getUserId(), 6);
-        verify(masteryService).countMastered(testUser, false);
-        verify(masteryService).countMastered(testUser, true);
+        verify(masteryService).countMasteredBoth(testUser);
         verifyNoMoreInteractions(progressRepository, friendshipRepository, challengeRepository, vocabularyRepository, masteryService);
     }
 
@@ -240,10 +240,10 @@ class AchievementServiceTest {
     @Test void profileReconciliationReusesMetricsAndIncludesNewAwardsImmediately() {
         var first = trophy("LESSON_MASTERY", 1); var second = trophy("LESSON_MASTERY", 2);
         when(achievementRepository.findAll()).thenReturn(List.of(first, second));
-        when(masteryService.countMastered(testUser, false)).thenReturn(2L);
+        when(masteryService.countMasteredBoth(testUser)).thenReturn(new MasteryService.MasteryCounts(2,0));
         var response = achievementService.getUserAchievements(testUser.getUserId());
         org.junit.jupiter.api.Assertions.assertTrue(response.stream().allMatch(com.languageapp.backend.dto.response.AchievementResponse::isUnlocked));
-        verify(masteryService).countMastered(testUser, false);
+        verify(masteryService).countMasteredBoth(testUser);
         verify(userAchievementRepository).findByUserUserId(testUser.getUserId());
         verify(userAchievementRepository, never()).existsByUserUserIdAndAchievementAchievementId(any(), any());
         verifyNoInteractions(progressRepository);

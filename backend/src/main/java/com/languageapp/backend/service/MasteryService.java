@@ -93,9 +93,18 @@ public class MasteryService {
         return new CourseSnapshot(lessons, states, masteredTopics);
     }
 
+    public record MasteryCounts(long lessons, long topics) { }
+
+    @Transactional(readOnly = true)
+    public MasteryCounts countMasteredBoth(User user) {
+        CourseSnapshot snapshot = getCourseSnapshot(user);
+        return new MasteryCounts(snapshot.byLesson().values().stream().filter(LessonMastery::mastered).count(),
+                snapshot.masteredTopics().size());
+    }
+
     @Transactional(readOnly = true)
     public long countMastered(User user, boolean topics) {
-        CourseSnapshot snapshot = getCourseSnapshot(user);
-        return topics ? snapshot.masteredTopics().size() : snapshot.byLesson().values().stream().filter(LessonMastery::mastered).count();
+        MasteryCounts counts = countMasteredBoth(user);
+        return topics ? counts.topics() : counts.lessons();
     }
 }
