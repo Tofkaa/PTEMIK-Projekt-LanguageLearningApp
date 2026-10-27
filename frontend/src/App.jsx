@@ -1,7 +1,8 @@
 import Invitation from './pages/Invitation';
+import EmailVerificationNotice from './components/EmailVerificationNotice';
 import { AchievementFeedbackProvider } from './context/AchievementFeedbackContext';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Alert, Container, Button } from 'react-bootstrap';
+import { Container } from 'react-bootstrap';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -54,19 +55,7 @@ const VerificationBanner = () => {
     const hiddenPaths = ['/assignment/session/', '/lesson/'];
     if (hiddenPaths.some(path => location.pathname.includes(path))) return null;
 
-   return (
-    <Container className="mb-3">
-        <Alert variant="warning" className="d-flex justify-content-between align-items-center shadow-sm py-2 px-3 border-warning rounded-3">
-            <div className="d-flex align-items-center gap-2">
-                <span className="fs-5">⚠️</span>
-                <div>
-                    <strong className="d-block">Kérjük, erősítsd meg az e-mail címedet!</strong>
-                    <span className="small opacity-75">Egyes funkciók (pl. feladatok beküldése) korlátozva lehetnek, amíg nem kattintasz az e-mailben kapott linkre.</span>
-                </div>
-            </div>
-        </Alert>
-    </Container>
-);
+   return <Container className="mb-3"><EmailVerificationNotice key={user.userId || user.email} /></Container>;
 };
 
 /**

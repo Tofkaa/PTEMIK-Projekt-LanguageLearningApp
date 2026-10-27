@@ -492,10 +492,11 @@ const Settings = () => {
 
                         {/* 3. TAB: Security */}
                         <Tab eventKey="security" title="Biztonság" className="p-4">
-                            {activeTab === 'security' && <OAuthConnections key={user.userId || user.email}
+                            {activeTab === 'security' && user.verified === true && <OAuthConnections key={user.userId || user.email}
                                 initialError={new URLSearchParams(location.search).has('oauth_link_error') ? 'A szolgáltatói hitelesítés nem fejeződött be. Indíts új összekapcsolást.' : ''}
                                 success={location.state?.oauthLinkMessage || ''} />}
                             
+                            {user.verified !== true && <p className="mb-4">Belépési mód hozzáadásához előbb erősítsd meg az e-mail-címedet. A lap tetején kérhetsz új megerősítő levelet, és ellenőrizheted az állapotot.</p>}
                             {/* --- E-MAIL ADDRESS CHANGE (OTP FLOW) --- */}
                             <h2 className="h5 fw-bold text-info mb-3"><span aria-hidden="true">📧 </span>E-mail cím módosítása</h2>
                             <p className="text-secondary small mb-3">

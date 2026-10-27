@@ -16,5 +16,14 @@ public interface VerificationTokenRepository extends JpaRepository<VerificationT
     @Query("select t.user.userId from VerificationToken t where t.token = :token")
     Optional<UUID> findUserIdByToken(@Param("token") String token);
 
+    @Query("select max(t.createdAt) from VerificationToken t where t.user.userId=:userId")
+    Optional<java.time.Instant> lastCreatedAt(UUID userId);
+    long countByUser_UserIdAndCreatedAtAfter(UUID userId, java.time.Instant since);
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("update VerificationToken t set t.expiryDate=:now where t.user.userId=:userId and t.expiryDate>:now")
+    void expirePrevious(UUID userId, java.time.Instant now);
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("delete from VerificationToken t where t.user.userId=:userId and t.createdAt<:before")
+    void pruneOld(UUID userId, java.time.Instant before);
     void deleteByUser_UserId(UUID userId);
 }

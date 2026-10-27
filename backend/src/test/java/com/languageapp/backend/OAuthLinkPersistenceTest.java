@@ -43,6 +43,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.jpa.show-sql=false","jwt.secret=U2VjdXJpdHkgZm91bmRhdGlvbnMgdGVzdCBvbmx5IHNpZ25pbmcga2V5IG5vdCBmb3IgZGVwbG95bWVudCE="})
 class OAuthLinkPersistenceTest {
     @Autowired OAuthLinkService links;
+    @Autowired VerificationEmailService verificationMail;
+    @Autowired VerificationTokenRepository verificationTokens;
+    @Autowired AuthenticationService authentication;
     @Autowired UserService profiles;
     @Autowired org.springframework.security.crypto.password.PasswordEncoder encoder;
     @Autowired FederatedIdentityService federated;
@@ -254,6 +257,42 @@ class OAuthLinkPersistenceTest {
         Callable<Boolean> redeem=()->{go.await();try{links.startAuthorization(nonce,"google","state");return true;}catch(RuntimeException duplicate){return false;}};
         try{var one=pool.submit(redeem);var two=pool.submit(redeem);go.countDown();assertNotEquals(one.get(10,TimeUnit.SECONDS),two.get(10,TimeUnit.SECONDS));}
         finally{pool.shutdownNow();}
+    }
+    Account unverified(){
+        Account a=account();tx.executeWithoutResult(s->users.findForSessionUpdate(a.user.getUserId()).orElseThrow().setVerified(false));return a;
+    }
+    @Test void authenticatedResendVerifiesOnlyTheCurrentAccountThroughTheNewMail()throws Exception {
+        Account a=unverified();
+        mvc.perform(post("/api/users/me/verification-email")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/users/me/verification-email").header("Authorization","Bearer "+a.access))
+                .andExpect(status().isNoContent()).andExpect(header().string("Cache-Control","no-store"));
+        var code=org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(mail).sendVerificationEmail(eq(a.user.getEmail()),eq(a.user.getName()),code.capture());
+        assertFalse(users.findById(a.user.getUserId()).orElseThrow().isVerified());
+        authentication.verifyEmail(code.getValue());assertTrue(users.findById(a.user.getUserId()).orElseThrow().isVerified());
+        assertThrows(RuntimeException.class,()->verificationMail.resend(a.user.getEmail()));
+    }
+    @Test void resendInvalidatesEarlierLinksButRollbackKeepsTheOriginalUsable() {
+        Account a=unverified();String old=UUID.randomUUID().toString();
+        tx.executeWithoutResult(s->{var token=new VerificationToken();token.setUser(users.findById(a.user.getUserId()).orElseThrow());token.setToken(old);token.setExpiryDate(java.time.Instant.now().plusSeconds(3600));em.persist(token);em.flush();
+            em.createNativeQuery("update verification_tokens set created_at=current_timestamp-interval '2 minutes' where token=:token").setParameter("token",old).executeUpdate();});
+        tx.executeWithoutResult(s->{verificationMail.resend(a.user.getEmail());s.setRollbackOnly();});
+        assertTrue(verificationTokens.findByToken(old).orElseThrow().getExpiryDate().isAfter(java.time.Instant.now()));
+        verify(mail,never()).sendVerificationEmail(eq(a.user.getEmail()),anyString(),anyString());
+        verificationMail.resend(a.user.getEmail());assertThrows(RuntimeException.class,()->authentication.verifyEmail(old));
+        assertThrows(RuntimeException.class,()->verificationMail.resend(a.user.getEmail()));
+    }
+    @Test void concurrentResendsHaveOneWinnerAndTheHourlyLimitPersists()throws Exception {
+        Account a=unverified();var pool=Executors.newFixedThreadPool(4);var go=new CountDownLatch(1);
+        Callable<Boolean> send=()->{go.await();try{verificationMail.resend(a.user.getEmail());return true;}catch(com.languageapp.backend.exception.BadRequestException limited){return false;}};
+        try{var futures=new ArrayList<Future<Boolean>>();for(int i=0;i<4;i++)futures.add(pool.submit(send));go.countDown();int wins=0;for(var future:futures)if(future.get(10,TimeUnit.SECONDS))wins++;assertEquals(1,wins);}
+        finally{pool.shutdownNow();}
+        for(int i=1;i<5;i++) {
+            tx.executeWithoutResult(s->em.createNativeQuery("update verification_tokens set created_at=current_timestamp-interval '2 minutes' where user_id=:id").setParameter("id",a.user.getUserId()).executeUpdate());
+            verificationMail.resend(a.user.getEmail());
+        }
+        tx.executeWithoutResult(s->em.createNativeQuery("update verification_tokens set created_at=current_timestamp-interval '2 minutes' where user_id=:id").setParameter("id",a.user.getUserId()).executeUpdate());
+        assertThrows(RuntimeException.class,()->verificationMail.resend(a.user.getEmail()));
     }
     @Test void rollbackDoesNotSendCodeOrPersistIntent() {
         Account a=account();tx.executeWithoutResult(status->{links.request(a.user.getEmail(),a.session.id(),a.session.rawToken(),"google");status.setRollbackOnly();});
