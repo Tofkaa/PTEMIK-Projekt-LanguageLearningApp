@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Spinner, Alert, ProgressBar, Badge } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
-import api from '../services/api.jsx';
+import useScopedData from '../hooks/useScopedData';
 import { useNavigate } from 'react-router-dom';
 import Leaderboard from '../components/Leaderboard.jsx';
 import TutorialTour from '../components/TutorialTour.jsx';
@@ -20,9 +19,9 @@ const Dashboard = () => {
     const navigate = useNavigate();
 
     // --- LOCAL STATE ---
-    const [lessons, setLessons] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState('');
+    const scope = JSON.stringify([user?.userId, user?.activeCourseCode, user?.preferredDifficulty]);
+    const { data: lessons, isLoading, error: loadError } = useScopedData('/lessons', scope, hasUser);
+    const error = loadError ? 'Nem sikerült betölteni a leckéket a szerverről.' : '';
 
     // --- DERIVED STATE: XP & LEVEL CALCULATIONS ---
     const currentXp = user?.xp || 0;
@@ -104,31 +103,6 @@ const Dashboard = () => {
             };
         }
     }
-
-/**
-     * Component Lifecycle: Initialization & Language Change Listener
-     */
-    useEffect(() => {
-        const fetchLessons = async () => {
-            setIsLoading(true);
-            setError('');
-            try {
-                const response = await api.get('/lessons');
-                setLessons(response.data);
-            } catch (err) {
-                console.error("Error fetching lessons:", err);
-                setError('Nem sikerült betölteni a leckéket a szerverről.');
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        if (hasUser) {
-            fetchLessons();
-        }
-        
-    
-    }, [hasUser, user?.activeCourseCode, user?.preferredDifficulty]);
 
     // --- DATA TRANSFORMATION ---
     const groupedLessons = lessons.reduce((acc, lesson) => {

@@ -40,6 +40,7 @@ class InvitationPersistenceTest {
     @Autowired FriendshipRepository connections;
     @Autowired InvitationLinkRepository links;
     @Autowired JwtService jwt;
+    @Autowired com.languageapp.backend.security.RefreshTokenService refresh;
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager manager;
     @Autowired WebApplicationContext context;
@@ -69,8 +70,9 @@ class InvitationPersistenceTest {
         });
     }
     String auth(User user) {
-        return "Bearer "+jwt.generateToken(org.springframework.security.core.userdetails.User.withUsername(user.getEmail())
-                .password("test-only").authorities("ROLE_"+user.getRole().name()).build());
+        var session = refresh.createSession(user.getUserId());
+        return "Bearer "+jwt.generateSessionToken(org.springframework.security.core.userdetails.User.withUsername(user.getEmail())
+                .password("test-only").authorities("ROLE_"+user.getRole().name()).build(), session.id());
     }
     String body(String kind,String token) { return "{\"kind\":\""+kind+"\",\"token\":\""+token+"\"}"; }
     <T> List<T> parallel(Callable<T> a, Callable<T> b) throws Exception {
@@ -147,6 +149,16 @@ class InvitationPersistenceTest {
         tx.executeWithoutResult(status -> users.findById(f.student.getUserId()).orElseThrow().setVerified(false));
         mvc.perform(post("/api/invitations/confirm").header("Authorization",auth(f.student)).contentType(MediaType.APPLICATION_JSON).content(body("friend",token))).andExpect(status().isForbidden());
         assertTrue(connections.findConnectionsBetween(f.student.getUserId(),f.other.getUserId()).isEmpty());
+    }
+    @Test void invitationPreviewRejectsLegacyTokensWithoutAPersistedSession() throws Exception {
+        Fixture f = fixture();
+        String token = invitations.manage(f.other.getEmail(), "friend", null, "current").token();
+        String legacy = jwt.generateToken(org.springframework.security.core.userdetails.User.withUsername(f.student.getEmail())
+                .password("test-only").authorities("ROLE_STUDENT").build());
+        mvc.perform(post("/api/invitations/preview").header("Authorization", "Bearer " + legacy)
+                .contentType(MediaType.APPLICATION_JSON).content(body("friend", token)))
+                .andExpect(status().isUnauthorized());
+        assertTrue(connections.findConnectionsBetween(f.student.getUserId(), f.other.getUserId()).isEmpty());
     }
     @Test void httpPreviewIsMinimalNonCacheableAndBadInputHasNoEffects() throws Exception {
         Fixture f=fixture(); String token=invitations.manage(f.other.getEmail(),"friend",null,"current").token();

@@ -39,10 +39,13 @@ public class VocabularyService {
 
     @Transactional
     public VocabularyResponse lookupAndSaveWord(String email, String word, String source) {
+        com.languageapp.backend.validation.AnswerLimits.requireWord(word);
+        String cleanWord = word.trim().toLowerCase(Locale.ROOT);
+        com.languageapp.backend.validation.AnswerLimits.requireWord(cleanWord);
+        if (source != null && source.length() > 50)
+            throw new com.languageapp.backend.exception.BadRequestException("A szótári forrás legfeljebb 50 karakter lehet.");
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        String cleanWord = word.trim().toLowerCase();
 
         // Fetch the user's currently active course for multi-language support
         Course activeCourse = user.getActiveCourse();
@@ -81,7 +84,7 @@ public class VocabularyService {
      */
     private String fetchTranslationFromExternalApi(String word, String courseCode) {
         try {
-            String cleanWord = word.trim().toLowerCase();
+            String cleanWord = word.trim().toLowerCase(Locale.ROOT);
 
             // Construct the dynamic URL using the courseCode variable
             String url = "https://api.mymemory.translated.net/get?q={word}&langpair=" + courseCode + "|hu";
@@ -213,6 +216,7 @@ public class VocabularyService {
     @Transactional
     public void addKnownWordsBatch(String email, List<String> words) {
         if (words == null || words.isEmpty()) return;
+        com.languageapp.backend.validation.AnswerLimits.requireWords(words);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -221,7 +225,7 @@ public class VocabularyService {
         Course activeCourse = user.getActiveCourse();
 
         for (String word : words) {
-            String cleanWord = word.trim().toLowerCase();
+            String cleanWord = word.trim().toLowerCase(Locale.ROOT);
 
             // Prevent duplicates within the same language course
             if (vocabularyRepository.findByUser_UserIdAndCourse_CourseIdAndWordIgnoreCase(user.getUserId(), activeCourse.getCourseId(), cleanWord).isPresent()) {
@@ -343,6 +347,13 @@ public class VocabularyService {
      */
     @Transactional
     public Map<String, Object> processDynamicPracticeSession(String email, DynamicPracticeSubmitRequest request) {
+        var results = request.getResults();
+        if (results == null || results.size() > com.languageapp.backend.validation.AnswerLimits.MAX_WORDS || request.getTimeTakenSeconds() < 0)
+            throw new com.languageapp.backend.exception.BadRequestException("Érvénytelen vagy túl nagy gyakorlási eredmény.");
+        for (var result : results) {
+            if (result == null) throw new com.languageapp.backend.exception.BadRequestException("Hiányzó gyakorlási eredmény.");
+            com.languageapp.backend.validation.AnswerLimits.requireWord(result.getTargetWord());
+        }
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 

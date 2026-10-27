@@ -417,7 +417,7 @@ const Settings = () => {
                                     </button>
                                 </Col>
                                 <Col>
-                                    <p className="text-secondary mb-0 small">Engedélyezett formátumok: JPG, PNG, WEBP. Maximum 5MB.</p>
+                                    <p className="text-secondary mb-0 small">Engedélyezett formátumok: JPG, PNG, WEBP. Maximum 5MB, 4096 × 4096 képpont és 16 megapixel.</p>
                                     <Button variant="outline-secondary" size="sm" disabled={isUploadingImage} className="mt-2" onClick={() => fileInputRef.current.click()}>Kép módosítása</Button>
                                 </Col>
                             </Row>

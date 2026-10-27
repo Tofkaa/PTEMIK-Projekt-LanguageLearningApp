@@ -13,7 +13,10 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "friendships")
+@Table(name = "friendships", indexes = {
+        @Index(name = "idx_friends_sender_status", columnList = "user_id, status, friend_id"),
+        @Index(name = "idx_friends_receiver_status", columnList = "friend_id, status, user_id")
+})
 
 public class Friendship {
 

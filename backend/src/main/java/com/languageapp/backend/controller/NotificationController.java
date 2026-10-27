@@ -4,7 +4,9 @@ import com.languageapp.backend.dto.response.NotificationSummaryDTO;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.enums.ChallengeStatus;
 import com.languageapp.backend.enums.FriendshipStatus;
-import com.languageapp.backend.enums.MembershipStatus;
+import com.languageapp.backend.dto.projection.AssignmentNotification;
+import com.languageapp.backend.dto.projection.PendingJoinNotification;
+import com.languageapp.backend.dto.projection.SubmissionNotification;
 import com.languageapp.backend.repository.*;
 import com.languageapp.backend.service.SseService;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +35,6 @@ public class NotificationController {
 
     private final ClassroomAssignmentRepository assignmentRepository;
     private final AssignmentSessionRepository sessionRepository;
-    private final AssignmentAccommodationRepository accommodationRepository;
     private final ClassroomMemberRepository classroomMemberRepository;
     private final StudentVocabularyRepository studentVocabularyRepository;
 
@@ -59,53 +60,16 @@ public class NotificationController {
         int totalFriends = friendshipRepository.countByFriendUserIdAndStatus(userId, FriendshipStatus.ACCEPTED)
                 + friendshipRepository.countByUserUserIdAndStatus(userId, FriendshipStatus.ACCEPTED);
         int totalHistory = challengeRepository.countHistoryForUser(userId);
-        int dueVocabCount = (int) studentVocabularyRepository.countByUser_UserIdAndNextPracticeAtLessThanEqual(userId, clock.instant());
+        int dueVocabCount = (int) studentVocabularyRepository.countByUser_UserIdAndNextPracticeAtLessThanEqual(userId, now);
 
-        java.util.List<String> tPendingIds = new java.util.ArrayList<>();
-        java.util.List<String> tUngradedIds = new java.util.ArrayList<>();
-        java.util.List<String> sActiveIds = new java.util.ArrayList<>();
-        java.util.List<String> sGradedIds = new java.util.ArrayList<>();
-
-        // 1. TANÁR: Várakozó diákok (classroomId:userId)
-        classroomMemberRepository.findAll().stream()
-                .filter(m -> m.getClassroom().getTeacher().getUserId().equals(userId) && m.getStatus() == MembershipStatus.PENDING)
-                .forEach(m -> tPendingIds.add(m.getClassroom().getClassroomId() + ":" + m.getUser().getUserId()));
-
-        // 2. TANÁR: Értékeletlen beadások SESSION szinten (classroomId:assignmentId:sessionId)
-        sessionRepository.findAll().stream()
-                .filter(s -> s.getAssignment().getClassroom().getTeacher().getUserId().equals(userId) && !s.isGraded() && s.getFinishedAt() != null)
-                .forEach(s -> tUngradedIds.add(
-                        s.getAssignment().getClassroom().getClassroomId() + ":" +
-                                s.getAssignment().getAssignmentId() + ":" +
-                                s.getSessionId()
-                ));
-
-        // 3. DIÁK: Új értékelések SESSION szinten (classroomId:assignmentId:sessionId)
-        sessionRepository.findAll().stream()
-                .filter(s -> s.getUser().getUserId().equals(userId) && s.isGraded())
-                .forEach(s -> sGradedIds.add(
-                        s.getAssignment().getClassroom().getClassroomId() + ":" +
-                                s.getAssignment().getAssignmentId() + ":" +
-                                s.getSessionId()
-                ));
-
-        // 4. DIÁK: Aktív feladatok (classroomId:assignmentId)
-        classroomMemberRepository.findAllByUser_UserIdAndStatus(userId, MembershipStatus.ACCEPTED)
-                .forEach(m -> {
-                    assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(m.getClassroom().getClassroomId())
-                            .forEach(a -> {
-                                boolean hasFinished = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userId)
-                                        .stream().anyMatch(session -> session.getFinishedAt() != null);
-
-                                var until = accommodationRepository.findByAssignment_AssignmentIdAndUser_UserId(a.getAssignmentId(), userId)
-                                        .map(com.languageapp.backend.entity.AssignmentAccommodation::getAvailableUntilOverride).orElse(a.getAvailableUntil());
-                                boolean isExpired = until != null && !now.isBefore(until);
-
-                                if (!hasFinished && !isExpired) {
-                                    sActiveIds.add(a.getClassroom().getClassroomId() + ":" + a.getAssignmentId());
-                                }
-                            });
-                });
+        var tPendingIds = classroomMemberRepository.findPendingNotificationReferences(userId).stream()
+                .map(PendingJoinNotification::key).toList();
+        var tUngradedIds = sessionRepository.findUngradedNotificationReferences(userId).stream()
+                .map(SubmissionNotification::key).toList();
+        var sGradedIds = sessionRepository.findGradedNotificationReferences(userId).stream()
+                .map(SubmissionNotification::key).toList();
+        var sActiveIds = assignmentRepository.findActiveNotificationReferences(userId, now).stream()
+                .map(AssignmentNotification::key).toList();
 
         return ResponseEntity.ok(new NotificationSummaryDTO(
                 pendingFriends, pendingChallenges, totalFriends, totalHistory,

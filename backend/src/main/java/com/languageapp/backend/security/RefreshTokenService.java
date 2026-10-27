@@ -24,7 +24,7 @@ import java.util.UUID;
  * Service responsible for managing the lifecycle of refresh tokens.
  * <p>
  * Handles secure token generation, cryptographic hashing (SHA-256),
- * validation, and automatic invalidation of expired sessions.
+     * validation, and revocation of sessions.
  */
 @Slf4j
 @Service
@@ -40,7 +40,7 @@ public class RefreshTokenService {
 
     /**
      * Creates a cryptographically secure refresh token for the specified user.
-     * Deletes any existing tokens for the user to maintain a single active session.
+     * Each login creates an independent session; other devices remain signed in.
      *
      * @param userId the UUID of the user
      * @return the raw, unhashed refresh token (to be sent via HTTP-only cookie)
@@ -48,15 +48,23 @@ public class RefreshTokenService {
      */
     @Transactional
     public String createRefreshToken(UUID userId) {
+        return createSession(userId).rawToken();
+    }
+
+    public record Session(UUID id, String rawToken) { }
+
+    /** The persisted token ID is stable across refreshes and safe to include in signed JWTs. */
+    @Transactional
+    public Session createSession(UUID userId) {
         log.debug("Creating new refresh token for user ID: {}", userId);
 
-        refreshTokenRepository.deleteByUserUserId(userId);
-
-        User user = userRepository.findById(userId)
+        User user = userRepository.findForSessionUpdate(userId)
                 .orElseThrow(() -> {
                     log.error("Failed to create refresh token: User not found with ID {}", userId);
                     return new ResourceNotFoundException("No user found for token generation.");
                 });
+
+        if (!user.isActive()) throw new BadRequestException("Session unavailable, please log in again.");
 
         String rawToken = UUID.randomUUID().toString() + "-" + UUID.randomUUID().toString();
 
@@ -70,22 +78,21 @@ public class RefreshTokenService {
         refreshTokenRepository.save(refreshToken);
 
         log.info("Successfully created and stored refresh token hash for user ID: {}", userId);
-        return rawToken;
+        return new Session(refreshToken.getRefreshTokenId(), rawToken);
     }
 
     /**
      * Verifies if the provided refresh token is still valid (not expired).
-     * If expired, it automatically deletes the token from the database.
+     * Expired records are rejected without writing from a read-only refresh transaction.
      *
      * @param token the {@link RefreshToken} entity to check
      * @return the valid {@link RefreshToken}
      * @throws BadRequestException if the token has expired
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public RefreshToken verifyExpiration(RefreshToken token) {
         if (!clock.instant().isBefore(token.getExpiryDate())) {
-            log.warn("Refresh token expired for user ID: {}. Deleting from database.", token.getUser().getUserId());
-            refreshTokenRepository.delete(token);
+            log.warn("Refresh token expired for user ID: {}.", token.getUser().getUserId());
 
             throw new BadRequestException("Session expired, please log in again.");
         }
@@ -100,8 +107,15 @@ public class RefreshTokenService {
      * @return an {@link Optional} containing the token entity if found
      */
     public Optional<RefreshToken> findByRawToken(String rawToken) {
+        if (rawToken == null || rawToken.isBlank() || rawToken.length() > 256) return Optional.empty();
         log.debug("Searching for refresh token by hash in database.");
         return refreshTokenRepository.findByTokenHash(hashToken(rawToken));
+    }
+
+    /** Indexed primary-key lookup; never trust a JWT subject without its live session. */
+    @Transactional(readOnly = true)
+    public boolean isSessionActive(UUID sessionId, String email) {
+        return sessionId != null && refreshTokenRepository.isSessionActive(sessionId, email, clock.instant());
     }
 
     /**
@@ -112,10 +126,16 @@ public class RefreshTokenService {
     public String deleteByRawToken(String rawToken) {
         return findByRawToken(rawToken).map(token -> {
             String email = token.getUser().getEmail();
-            refreshTokenRepository.delete(token);
+            refreshTokenRepository.revokeByTokenHash(token.getTokenHash());
             log.debug("Refresh token successfully deleted for user: {}", email);
             return email;
         }).orElse("Unknown user (deleted/expired token)");
+    }
+
+    /** Revoke every refresh session atomically with a password-reset transaction. */
+    @Transactional
+    public void revokeAllForUser(UUID userId) {
+        refreshTokenRepository.deleteByUserUserId(userId);
     }
 
     /**

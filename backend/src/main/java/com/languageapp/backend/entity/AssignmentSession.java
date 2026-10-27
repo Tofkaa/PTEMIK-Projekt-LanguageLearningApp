@@ -11,7 +11,11 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "assignment_sessions")
+@Table(name = "assignment_sessions", indexes = {
+        @Index(name = "idx_sessions_assignment_user", columnList = "assignment_id, user_id"),
+        @Index(name = "idx_sessions_assignment_started", columnList = "assignment_id, started_at DESC"),
+        @Index(name = "idx_sessions_user_graded", columnList = "user_id, is_graded, started_at DESC")
+})
 public class AssignmentSession {
 
     @Id
@@ -51,6 +55,7 @@ public class AssignmentSession {
     private String allocatedExerciseIds;
     @Column(columnDefinition = "TEXT")
     private String draftState;
+    /** Input revision while open; publication revision after the attempt is finished. */
     @Column(nullable = false, columnDefinition = "bigint default 0")
     private long draftRevision;
     private Instant draftSavedAt;

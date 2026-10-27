@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -8,7 +9,7 @@ import GuestRoute from '../components/GuestRoute';
 import api from '../services/api';
 import { clearInvitation, rememberInvitation } from '../utils/invitationIntent';
 
-const auth = vi.hoisted(() => ({ user: null, login: vi.fn() }));
+const auth = vi.hoisted(() => ({ user: null, authenticate: vi.fn(), completeOAuthLogin: vi.fn() }));
 vi.mock('../context/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('../context/ThemeContext.jsx', () => ({ useTheme: () => ({ theme: 'dark' }) }));
 vi.mock('../components/ThemeToggle.jsx', () => ({ default: () => null }));
@@ -28,7 +29,8 @@ beforeEach(() => {
     rememberInvitation({ kind: 'friend', token });
     api.post.mockResolvedValue({ data: { accessToken: 'access-token' } });
     api.get.mockResolvedValue({ data: { userId: 'student', verified: true } });
-    auth.login.mockImplementation(async () => { clearInvitation(); });
+    auth.authenticate.mockImplementation(async () => { clearInvitation(); });
+    auth.completeOAuthLogin.mockImplementation(async () => { clearInvitation(); });
 });
 afterEach(cleanup);
 it('returns from a password login to the captured invitation without submitting a connection', async () => {
@@ -37,17 +39,17 @@ it('returns from a password login to the captured invitation without submitting 
     fireEvent.change(screen.getByLabelText('Jelszó'), { target: { value: 'test-password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Belépés' }));
     await screen.findByRole('heading', { name: destination });
-    expect(auth.login).toHaveBeenCalledWith('access-token', { userId: 'student', verified: true }, false);
-    expect(api.post.mock.calls.map(([url]) => url)).toEqual(['/auth/login']);
+    expect(auth.authenticate).toHaveBeenCalledExactlyOnceWith({ email: 'student@example.test', password: 'test-password', rememberMe: false });
+    expect(api.post).not.toHaveBeenCalled();
 });
 it('returns from an OAuth callback to the captured invitation without submitting a connection', async () => {
     render(<Tree path="/oauth2/redirect?token=oauth-access" />);
     await screen.findByRole('heading', { name: destination });
-    expect(auth.login).toHaveBeenCalledWith('oauth-access', { userId: 'student', verified: true }, true);
+    expect(auth.completeOAuthLogin).toHaveBeenCalledExactlyOnceWith('oauth-access');
     expect(api.post).not.toHaveBeenCalled();
 });
 it('retains the invitation after a failed OAuth callback so login can be retried', async () => {
-    api.get.mockRejectedValue(new Error('Network unavailable'));
+    auth.completeOAuthLogin.mockRejectedValue(new Error('Network unavailable'));
     render(<Tree path="/oauth2/redirect?token=oauth-access" />);
     await screen.findByRole('heading', { name: 'Bejelentkezés' });
     expect(sessionStorage.getItem('pendingInvitation')).toContain(token);
@@ -76,5 +78,13 @@ it('explains returning to the original tab and preserves its invitation through 
     fireEvent.change(screen.getByLabelText('Jelszó'), { target: { value: 'test-password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Belépés' }));
     await screen.findByRole('heading', { name: destination });
-    expect(api.post.mock.calls.map(([url]) => url)).toEqual(['/auth/register', '/auth/login']);
+    expect(api.post.mock.calls.map(([url]) => url)).toEqual(['/auth/register']);
+    expect(auth.authenticate).toHaveBeenCalledExactlyOnceWith({ email: 'new@example.test', password: 'test-password', rememberMe: false });
+});
+
+it('retains the captured invitation during the StrictMode OAuth effect replay', async () => {
+    render(<StrictMode><Tree path="/oauth2/redirect?token=oauth-once" /></StrictMode>);
+    await screen.findByRole('heading', { name: destination });
+    expect(auth.completeOAuthLogin).toHaveBeenCalledExactlyOnceWith('oauth-once');
+    expect(api.post).not.toHaveBeenCalled();
 });

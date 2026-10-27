@@ -102,7 +102,7 @@ public class LessonController {
     @PostMapping("/{id}/attempts/{attemptId}/exercises/{exerciseId}/check")
     public ResponseEntity<ExerciseCheckResponse> checkAttemptExercise(@PathVariable UUID id,
             @PathVariable UUID attemptId, @PathVariable UUID exerciseId,
-            @RequestBody ExerciseCheckRequest request, Authentication authentication) {
+            @Valid @RequestBody ExerciseCheckRequest request, Authentication authentication) {
         return ResponseEntity.ok(evaluationService.checkAttemptExercise(id, attemptId, exerciseId,
                 authentication.getName(), request.getAnswer()));
     }

@@ -16,6 +16,7 @@ public class ExerciseSubmission {
     private UUID exerciseId;
 
     @NotNull(message = "The answer can not be empty!")
+    @com.languageapp.backend.validation.BoundedAnswer
     private Object answer;
 
     @JsonProperty("isRetry")

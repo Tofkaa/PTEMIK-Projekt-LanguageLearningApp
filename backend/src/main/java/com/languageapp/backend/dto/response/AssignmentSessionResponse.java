@@ -26,6 +26,7 @@ public class AssignmentSessionResponse {
     private List<AnswerDetail> answers;
     private Integer timeLimitMinutes;
     private Instant submissionDeadline;
+    private long gradingRevision;
 
     @Data
     @AllArgsConstructor

@@ -32,6 +32,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final ProgressRepository progressRepository;
     private final ImageStorageService imageStorageService;
+    private final ProfileImageSanitizer profileImageSanitizer;
     private final PasswordEncoder passwordEncoder;
     private final EmailChangeTokenRepository emailChangeTokenRepository;
     private final EmailService emailService;
@@ -149,16 +150,18 @@ public class UserService {
         return getUserProfile(email);
     }
 
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public String updateProfilePicture(String email, MultipartFile file) {
-        User user = getUserByEmail(email);
+        UUID userId = userRepository.findActiveProfileUserId(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Aktív felhasználó nem található."));
 
         try {
 
-            String imageUrl = imageStorageService.uploadProfileImage(file);
+            byte[] image = profileImageSanitizer.sanitize(file);
+            String imageUrl = imageStorageService.uploadProfileImage(image);
 
-            user.setProfilePictureUrl(imageUrl);
-            userRepository.save(user);
+            if (userRepository.updateActiveProfilePicture(userId, imageUrl) != 1)
+                throw new ResourceNotFoundException("A fiók a feltöltés közben megszűnt vagy inaktívvá vált.");
 
             log.info("User {} updated profile picture", email);
             return imageUrl;

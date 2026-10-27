@@ -5,7 +5,6 @@ import com.cloudinary.utils.ObjectUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Map;
@@ -21,16 +20,14 @@ public class CloudinaryStorageServiceImpl implements ImageStorageService {
     }
 
     @Override
-    public String uploadProfileImage(MultipartFile file) throws IOException {
-        log.info("Képfeltöltés indítása a külső szolgáltató felé: {}", file.getOriginalFilename());
-
-        Map uploadResult = cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap(
+    public String uploadProfileImage(byte[] png) throws IOException {
+        Map<?, ?> uploadResult = cloudinary.uploader().upload(png, ObjectUtils.asMap(
                 "folder", "languageapp/profiles",
-                "transformation", "c_fill,w_250,h_250"
+                "resource_type", "image",
+                "format", "png"
         ));
 
         String secureUrl = uploadResult.get("secure_url").toString();
-        log.info("Sikeres képfeltöltés. URL: {}", secureUrl);
 
         return secureUrl;
     }

@@ -4,6 +4,7 @@ import com.languageapp.backend.dto.request.*;
 import com.languageapp.backend.dto.response.*;
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.exception.BadRequestException;
+import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,24 @@ public class AssignmentService {
 
     private final SseService sseService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /** Capture scalar recipients before leaving the transaction; never notify for a rolled-back write. */
+    private void notifyAfterCommit(List<String> recipients) {
+        List<String> unique = recipients.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        if (unique.isEmpty()) return;
+        Runnable notify = () -> {
+            for (String recipient : unique) {
+                try { sseService.sendPing(recipient); }
+                catch (RuntimeException failure) { log.warn("Committed assignment notification could not be delivered."); }
+            }
+        };
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() { notify.run(); }
+                    });
+        } else notify.run();
+    }
 
     /**
      * Creates a new classroom assignment.
@@ -116,8 +135,8 @@ public class AssignmentService {
         assignmentRepository.save(assignment);
         if (!initialAccommodations.isEmpty()) accommodationRepository.saveAll(initialAccommodations);
 
-        classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
-                .forEach(member -> sseService.sendPing(member.getUser().getEmail()));
+        notifyAfterCommit(classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
+                .stream().map(member -> member.getUser().getEmail()).toList());
     }
 
     /**
@@ -129,6 +148,7 @@ public class AssignmentService {
      */
     @Transactional(readOnly = true)
     public List<AssignmentResponse> getAssignmentsByClassroom(UUID classroomId, String email) {
+        requireClassroomAccess(classroomId, email);
         return assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(classroomId)
                 .stream()
                 .map(a -> mapToResponse(a, email))
@@ -350,7 +370,7 @@ public class AssignmentService {
         }
 
         sessionRepository.save(session);
-        sseService.sendPing(session.getAssignment().getClassroom().getTeacher().getEmail());
+        notifyAfterCommit(List.of(session.getAssignment().getClassroom().getTeacher().getEmail()));
 
         streakService.updateActivity(session.getUser());
 
@@ -407,6 +427,8 @@ public class AssignmentService {
     }
 
     private void validateAnswers(List<Exercise> exercises, List<ExerciseSubmission> answers) {
+        com.languageapp.backend.validation.AnswerLimits.requireSubmissions(answers,
+                com.languageapp.backend.validation.AnswerLimits.MAX_ASSIGNMENT_SUBMISSIONS);
         var allowed = exercises.stream().map(Exercise::getExerciseId).collect(java.util.stream.Collectors.toSet());
         var seen = new java.util.HashSet<UUID>();
         for (ExerciseSubmission a : answers) {
@@ -544,7 +566,8 @@ public class AssignmentService {
                             s.isGraded(),
                             answersList,
                             timingResponse(s).timeLimitMinutes(),
-                            timingResponse(s).deadline()
+                            timingResponse(s).deadline(),
+                            s.getDraftRevision()
                     );
                 }).toList();
     }
@@ -586,7 +609,8 @@ public class AssignmentService {
                             s.isGraded(),
                             answersList,
                             timingResponse(s).timeLimitMinutes(),
-                            timingResponse(s).deadline()
+                            timingResponse(s).deadline(),
+                            s.getDraftRevision()
                     );
                 }).toList();
     }
@@ -599,22 +623,32 @@ public class AssignmentService {
      * @param teacherEmail The email of the teacher performing the grading.
      */
     @Transactional
-    public void gradeSession(UUID sessionId, TeacherGradeRequest request, String teacherEmail) {
-        AssignmentSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+    public long gradeSession(UUID sessionId, TeacherGradeRequest request, String teacherEmail) {
+        if (request.getTeacherScore() == null || request.getTeacherScore() < 0 || request.getTeacherScore() > 100
+                || request.getRevision() == null || request.getRevision() < 0
+                || request.getTeacherComment() != null && request.getTeacherComment().length() > 4000)
+            throw new BadRequestException("A pontszám 0 és 100 közötti egész szám, a megjegyzés legfeljebb 4000 karakter, és érvényes mentési verzió szükséges.");
+        // Keep the existing assignment-before-session lock order; read the current revision only after the lock.
+        AssignmentSession session = lockedSession(sessionId);
 
         if (!session.getAssignment().getClassroom().getTeacher().getEmail().equals(teacherEmail)) {
-            throw new BadRequestException("Unauthorized to grade this session.");
+            throw new com.languageapp.backend.exception.ForbiddenException("Nincs jogosultságod ezt a beadást értékelni.");
         }
+
+        if (session.getFinishedAt() == null) throw new com.languageapp.backend.exception.ConflictException("Folyamatban lévő próbálkozás még nem értékelhető.");
+        if (session.getDraftRevision() != request.getRevision()) throw new com.languageapp.backend.exception.ConflictException(
+                "Az értékelés közben megváltozott. Töltsd be a legfrissebb értékelést, és vesd össze a saját módosításaiddal.");
 
         session.setTeacherScore(request.getTeacherScore());
         session.setTeacherComment(request.getTeacherComment());
         session.setGraded(true);
+        session.setDraftRevision(session.getDraftRevision() + 1);
 
         sessionRepository.save(session);
-        sseService.sendPing(session.getUser().getEmail());
+        notifyAfterCommit(List.of(session.getUser().getEmail()));
 
         log.info("Teacher {} graded session {}. Published: true", teacherEmail, sessionId);
+        return session.getDraftRevision();
     }
 
     /**
@@ -716,7 +750,7 @@ public class AssignmentService {
         ac.setAvailableUntilOverride(request.getAvailableUntilOverride());
         accommodationRepository.save(ac);
         ongoing.forEach(s -> { s.setEffectiveTimeLimitMinutes(minutes); s.setEffectiveAvailableUntil(until); });
-        sseService.sendPing(member.getUser().getEmail());
+        notifyAfterCommit(List.of(member.getUser().getEmail()));
     }
 
     @Transactional(readOnly = true)
@@ -806,7 +840,16 @@ public class AssignmentService {
      * @return {@link ClassroomStatisticsResponse} containing class averages and individual student progress.
      */
     @Transactional(readOnly = true)
-    public ClassroomStatisticsResponse getClassroomStatistics(UUID classroomId) {
+    public ClassroomStatisticsResponse getClassroomStatistics(UUID classroomId, String email) {
+        Classroom classroom = findClassroom(classroomId);
+        if (!classroom.getTeacher().getEmail().equals(email)) {
+            throw new ForbiddenException("Csak az osztályterem tanára láthatja a teljes statisztikát.");
+        }
+        return calculateClassroomStatistics(classroomId);
+    }
+
+    /** Only called after the public entry point has authorized the classroom. */
+    private ClassroomStatisticsResponse calculateClassroomStatistics(UUID classroomId) {
         List<ClassroomAssignment> assignments = assignmentRepository.findAllByClassroom_ClassroomIdOrderByCreatedAtDesc(classroomId);
         List<User> students = classroomMemberRepository.findAllByClassroom_ClassroomIdAndStatus(classroomId, MembershipStatus.ACCEPTED)
                 .stream().map(ClassroomMember::getUser).toList();
@@ -860,7 +903,8 @@ public class AssignmentService {
      */
     @Transactional(readOnly = true)
     public java.util.Map<String, Object> getStudentClassroomStats(UUID classroomId, String email) {
-        ClassroomStatisticsResponse allStats = getClassroomStatistics(classroomId);
+        requireClassroomAccess(classroomId, email);
+        ClassroomStatisticsResponse allStats = calculateClassroomStatistics(classroomId);
 
         ClassroomStatisticsResponse.StudentProgressDTO myProgress = allStats.getStudentProgress().stream()
                 .filter(p -> p.getStudentEmail().equals(email))
@@ -876,6 +920,22 @@ public class AssignmentService {
                 "myAverage", myAvg,
                 "classAverage", allStats.getClassAverage()
         );
+    }
+
+    private Classroom findClassroom(UUID classroomId) {
+        return classroomRepository.findById(classroomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Classroom not found."));
+    }
+
+    /** Authentication alone is insufficient: the caller must own or belong to this classroom. */
+    private void requireClassroomAccess(UUID classroomId, String email) {
+        Classroom classroom = findClassroom(classroomId);
+        if (classroom.getTeacher().getEmail().equals(email)) return;
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        boolean accepted = classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(classroomId, user.getUserId())
+                .filter(member -> member.getStatus() == MembershipStatus.ACCEPTED).isPresent();
+        if (!accepted) throw new ForbiddenException("Nincs jogosultságod az osztályterem adatainak megtekintéséhez.");
     }
 
     /**

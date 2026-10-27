@@ -1,152 +1,159 @@
 import { clearInvitation } from '../utils/invitationIntent';
-import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
+import axios from 'axios';
 import api from '../services/api';
 import { vocabularyApi } from '../services/vocabularyApi';
 import { userApi } from '../services/userApi';
-/**
- * Global Authentication Context
- * Provides a centralized state for user data and authentication methods.
- */
+import { authSnapshot, beginAuthentication, endSession, getAccessToken, getAuthEpoch, isCurrentAuth,
+    queueAuthCookieOperation, requireCurrentAuth, storeAccessToken, subscribeAuth } from '../services/authSession';
+
 const AuthContext = createContext();
 
-/**
- * AuthProvider Component
- * Wraps the application to provide authentication state and functions to all child components.
- * * @param {Object} props - Component properties
- * @param {React.ReactNode} props.children - Child components to be wrapped by the provider
- */
 export const AuthProvider = ({ children }) => {
-    // Global state for the authenticated user object
     const [user, setUser] = useState(null);
-    // Global state for user vocabulary wordmap
     const [vocabularyMap, setVocabularyMap] = useState({});
-    // Global loading state used during initial token verification
     const [loading, setLoading] = useState(true);
+    const [startupError, setStartupError] = useState(false);
+    const vocabularyRequest = useRef(0);
+    const courseRequest = useRef(0);
+    const courseQueue = useRef(Promise.resolve());
 
-    // Retrieve the wordmap
-    const fetchVocabularyMap = async () => {
+    const fetchVocabularyMap = useCallback(async snapshot => {
+        const request = ++vocabularyRequest.current;
         try {
             const response = await vocabularyApi.getVocabularyMap();
-            setVocabularyMap(response.data);
+            if (isCurrentAuth(snapshot) && request === vocabularyRequest.current) setVocabularyMap(response.data);
         } catch (error) {
-            console.error("Hiba a szótérkép betöltésekor:", error);
+            if (isCurrentAuth(snapshot) && request === vocabularyRequest.current && !axios.isCancel(error)) console.error('Hiba a szótérkép betöltésekor:', error);
         }
-    };
-
-    /**
-     * Runs once when the application mounts (e.g., on hard refresh).
-     * Checks if a token exists in LocalStorage and attempts to fetch the latest user profile.
-     */
-    useEffect(() => {
-        const checkLoggedInUser = async () => {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            
-            if (token) {
-                try {
-                    // If token exists, fetch the latest user profile from the backend
-                    const response = await api.get('/users/me');
-                    setUser(response.data);
-                    await fetchVocabularyMap();
-                } catch (error) {
-                    console.error("Error fetching user profile (expired token?):", error);
-                    // Clear invalid/expired token and reset user state
-                    localStorage.removeItem('token');
-                    sessionStorage.removeItem('token');
-                    setUser(null);
-                }
-            }
-            
-            // Verification complete, remove loading screen
-            setLoading(false);
-        };
-
-        checkLoggedInUser();
     }, []);
 
-    /** Update progress/profile and vocabulary without changing authentication storage. */
-    const updateProfile = async (userData) => {
-        setUser(userData);
-        await fetchVocabularyMap();
-    };
-
-    /** Store a newly authenticated session, then synchronize its profile. */
-    const login = async (token, userData, rememberMe = false) => {
-        if (rememberMe) {
-            localStorage.setItem('token', token);
-        } else {
-            sessionStorage.setItem('token', token);
-        }
-        await updateProfile(userData);
-    };
-
-    /**
-     * Terminates the user session.
-     * Calls the backend to invalidate the HttpOnly refresh token cookie,
-     * then clears the local access token and user state.
-     */
-    const logout = async (skipServerCall = false) => {
+    const checkLoggedInUser = useCallback(async () => {
+        const snapshot = authSnapshot();
+        setStartupError(false);
+        if (!snapshot.token) { setLoading(false); return; }
+        setLoading(true);
         try {
-            if (!skipServerCall) {
-                // 1. Request the backend to invalidate the HttpOnly Refresh Token cookie
-                await api.post('/auth/logout');
-                console.log("Successful server-side logout.");
-            }
+            const response = await api.get('/users/me');
+            requireCurrentAuth(snapshot);
+            setUser(response.data);
+            await fetchVocabularyMap(snapshot);
         } catch (error) {
-            console.error("Error during server-side logout:", error);
+            if (!isCurrentAuth(snapshot) || axios.isCancel(error)) return;
+            if ([401, 403].includes(error.response?.status)) endSession(snapshot.epoch);
+            else setStartupError(true);
         } finally {
-            // 2. Regardless of server response, immediately discard the client-side Access Token
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
-            // 3. Reset the React state, which triggers a redirect to the Login page via PrivateRoute
+            if (isCurrentAuth(snapshot)) setLoading(false);
+        }
+    }, [fetchVocabularyMap]);
+
+    useEffect(() => {
+        const unsubscribe = subscribeAuth(type => {
+            ++vocabularyRequest.current;
+            ++courseRequest.current;
             setUser(null);
             setVocabularyMap({});
-            clearInvitation();
+            setStartupError(false);
+            setLoading(false);
+            if (type === 'external' && getAccessToken()) void checkLoggedInUser();
+        });
+        if (window.location.pathname === '/oauth2/redirect') setLoading(false);
+        else void checkLoggedInUser();
+        return unsubscribe;
+    }, [checkLoggedInUser]);
+
+    const updateProfile = async userData => {
+        const snapshot = authSnapshot();
+        // A lesson/profile response may predate a course change. Only changeLanguage changes this field.
+        setUser(current => current && (!current.userId || !userData.userId || current.userId === userData.userId)
+            ? { ...userData, activeCourseCode: current.activeCourseCode ?? userData.activeCourseCode } : current);
+        await fetchVocabularyMap(snapshot);
+    };
+    const login = async (token, userData, rememberMe = false) => {
+        const epoch = beginAuthentication(rememberMe);
+        storeAccessToken(token, epoch);
+        setUser(userData);
+        await fetchVocabularyMap({ epoch });
+        requireCurrentAuth({ epoch });
+    };
+    const authenticate = async credentials => {
+        const epoch = beginAuthentication(credentials.rememberMe);
+        const response = await queueAuthCookieOperation(epoch, () => api.post('/auth/login', credentials, {
+            _authEpoch: epoch, timeout: 15000, skipGlobalError: true,
+        }));
+        storeAccessToken(response.data.accessToken, epoch);
+        const profile = await api.get('/users/me');
+        requireCurrentAuth({ epoch });
+        setUser(profile.data);
+        await fetchVocabularyMap({ epoch });
+        requireCurrentAuth({ epoch });
+    };
+    const completeOAuthLogin = useCallback(async token => {
+        const epoch = beginAuthentication(true);
+        storeAccessToken(token, epoch);
+        const profile = await api.get('/users/me');
+        requireCurrentAuth({ epoch });
+        setUser(profile.data);
+        await fetchVocabularyMap({ epoch });
+        requireCurrentAuth({ epoch });
+    }, [fetchVocabularyMap]);
+    const logout = async (skipServerCall = false) => {
+        clearInvitation();
+        endSession();
+        const epoch = getAuthEpoch();
+        if (skipServerCall) return;
+        try {
+            await queueAuthCookieOperation(epoch, () => api.post('/auth/logout', null, {
+                _authEpoch: epoch, _allowStaleAuthOperation: true, timeout: 15000, skipGlobalError: true,
+            }), true);
+        } catch (error) {
+            if (!axios.isCancel(error)) console.error('Error during server-side logout:', error);
         }
     };
-
-    const changeLanguage = async (courseCode) => {
+    const changeLanguage = async courseCode => {
+        const snapshot = authSnapshot();
+        const request = ++courseRequest.current;
+        ++vocabularyRequest.current;
+        setVocabularyMap({});
+        // Aborting a PATCH does not undo its server-side write. Serialize mutations instead.
+        const pending = courseQueue.current.then(() => {
+            requireCurrentAuth(snapshot);
+            return userApi.changeActiveCourse(courseCode);
+        });
+        courseQueue.current = pending.catch(() => {});
+        let response;
         try {
-            const response = await userApi.changeActiveCourse(courseCode);
-            setUser(response.data);
-            await fetchVocabularyMap();
-            console.log(`Sikeres nyelvváltás: ${courseCode}`);
-            return true;
+            response = await pending;
         } catch (error) {
-            console.error("Hiba a nyelvváltás során:", error);
+            if (isCurrentAuth(snapshot) && request === courseRequest.current) await fetchVocabularyMap(snapshot);
             throw error;
         }
+        requireCurrentAuth(snapshot);
+        // Also retain an intermediate successful switch if the following switch fails.
+        setUser(response.data);
+        if (request !== courseRequest.current) return false;
+        await fetchVocabularyMap(snapshot);
+        return true;
     };
-
-    // Notification snapshots may contain XP earned while the user was elsewhere (e.g. a duel).
     const syncXp = useCallback((userId, xp) => {
         if (!Number.isFinite(xp) || xp < 0) return;
         setUser(current => current?.userId === userId && current.xp !== xp ? { ...current, xp } : current);
     }, []);
+    const updateCurrentUser = update => setUser(current => current ? (typeof update === 'function' ? update(current) : update) : null);
 
-    // Display a loading spinner while verifying the token on initial mount
-    if (loading) {
-        return (
-            <div className="d-flex justify-content-center align-items-center vh-100">
-                <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Betöltés…</span>
-                </div>
-            </div>
-        );
-    }
+    if (loading) return <div className="d-flex justify-content-center align-items-center vh-100">
+        <div className="spinner-border text-primary" role="status"><span className="visually-hidden">Betöltés…</span></div>
+    </div>;
+    if (startupError) return <main className="container py-5">
+        <h1 className="h3">A bejelentkezés ellenőrzése nem sikerült</h1>
+        <p role="alert">Ellenőrizd a kapcsolatot, majd próbáld újra. A munkamenetedet megőriztük.</p>
+        <button type="button" className="btn btn-primary me-2" onClick={checkLoggedInUser}>Újrapróbálás</button>
+        <button type="button" className="btn btn-outline-secondary" onClick={() => logout()}>Kijelentkezés</button>
+    </main>;
 
-    // Provide the authentication state and methods to the rest of the application
-    return (
-        <AuthContext.Provider value={{ user,setUser, login, logout, vocabularyMap, changeLanguage, updateProfile, syncXp }}>
-            {children}
-        </AuthContext.Provider>
-    );
+    return <AuthContext.Provider value={{ user, setUser: updateCurrentUser, login, authenticate, completeOAuthLogin,
+        logout, vocabularyMap, changeLanguage, updateProfile, syncXp }}>{children}</AuthContext.Provider>;
 };
 
-/**
- * Custom hook for easy consumption of the AuthContext.
- * * @returns {Object} The authentication context (user, login, logout)
- */
 // eslint-disable-next-line react-refresh/only-export-components
-export const useAuth = () => {
-    return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);

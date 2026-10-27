@@ -74,9 +74,9 @@ public class VocabularyController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> addKnownWordsBatch(
             Authentication authentication,
-            @RequestBody Map<String, List<String>> request) {
+            @Valid @RequestBody com.languageapp.backend.dto.request.KnownWordsRequest request) {
 
-        vocabularyService.addKnownWordsBatch(authentication.getName(), request.get("words"));
+        vocabularyService.addKnownWordsBatch(authentication.getName(), request.getWords());
         return ResponseEntity.ok().build();
     }
 
@@ -94,7 +94,7 @@ public class VocabularyController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> submitDynamicPractice(
             Principal principal,
-            @RequestBody DynamicPracticeSubmitRequest request) {
+            @Valid @RequestBody DynamicPracticeSubmitRequest request) {
 
         Map<String, Object> result = vocabularyService.processDynamicPracticeSession(principal.getName(), request);
         return ResponseEntity.ok(result);

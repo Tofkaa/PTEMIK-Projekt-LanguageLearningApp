@@ -1,10 +1,19 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { OverlayTrigger, Popover, Spinner, Badge } from 'react-bootstrap';
 import { vocabularyApi } from '../services/vocabularyApi';
 import { formatToLocalDisplay } from '../utils/dateUtils';
+import { useAuth } from '../context/AuthContext';
+import { getAuthEpoch } from '../services/authSession';
 
 /** Opens a translation and preserves the existing lookup/SRS side effects. */
-const SmartWord = ({ word, queryWord, disabled = false, source = 'LESSON', preloadedTranslation = null, onWordClick, lang }) => {
+const SmartWord = props => {
+    const { user } = useAuth() || {};
+    const scope = JSON.stringify([getAuthEpoch(), user?.userId, user?.activeCourseCode, props.word,
+        props.queryWord, props.lang, props.source, props.preloadedTranslation, props.disabled]);
+    return <WordTranslation key={scope} {...props} />;
+};
+
+const WordTranslation = ({ word, queryWord, disabled = false, source = 'LESSON', preloadedTranslation = null, onWordClick, lang }) => {
     const id = useId();
     const triggerRef = useRef(null);
     const closeRef = useRef(null);
@@ -14,6 +23,12 @@ const SmartWord = ({ word, queryWord, disabled = false, source = 'LESSON', prelo
         : null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const alive = useRef(false);
+    const lookup = useRef(null);
+    useEffect(() => {
+        alive.current = true;
+        return () => { alive.current = false; lookup.current?.abort(); };
+    }, []);
 
     const handleToggle = async nextShow => {
         setShow(nextShow);
@@ -22,13 +37,17 @@ const SmartWord = ({ word, queryWord, disabled = false, source = 'LESSON', prelo
         if (translationData || isLoading) return;
         setIsLoading(true);
         setError(null);
+        const controller = new AbortController();
+        lookup.current = controller;
         try {
-            const response = await vocabularyApi.lookupWord(queryWord || word.toLowerCase(), source);
+            const response = await vocabularyApi.lookupWord(queryWord || word.toLowerCase(), source, { signal: controller.signal });
+            if (!alive.current || controller.signal.aborted) return;
             setTranslationData(response.data);
         } catch {
+            if (!alive.current || controller.signal.aborted) return;
             setError('Fordítás nem elérhető. Zárd be, majd próbáld újra.');
         } finally {
-            setIsLoading(false);
+            if (alive.current) setIsLoading(false);
         }
     };
 

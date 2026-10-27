@@ -17,6 +17,20 @@ import java.util.UUID;
 @Repository
 public interface AssignmentSessionRepository extends JpaRepository<AssignmentSession, UUID> {
 
+    @Query("SELECT new com.languageapp.backend.dto.projection.SubmissionNotification(" +
+            "s.assignment.classroom.classroomId, s.assignment.assignmentId, s.sessionId) " +
+            "FROM AssignmentSession s WHERE s.assignment.classroom.teacher.userId = :teacherId " +
+            "AND s.isGraded = false AND s.finishedAt IS NOT NULL ORDER BY s.startedAt DESC, s.sessionId")
+    List<com.languageapp.backend.dto.projection.SubmissionNotification> findUngradedNotificationReferences(
+            @Param("teacherId") UUID teacherId);
+
+    @Query("SELECT new com.languageapp.backend.dto.projection.SubmissionNotification(" +
+            "s.assignment.classroom.classroomId, s.assignment.assignmentId, s.sessionId) " +
+            "FROM AssignmentSession s WHERE s.user.userId = :studentId AND s.isGraded = true " +
+            "ORDER BY s.startedAt DESC, s.sessionId")
+    List<com.languageapp.backend.dto.projection.SubmissionNotification> findGradedNotificationReferences(
+            @Param("studentId") UUID studentId);
+
     @Query("SELECT s.sessionId FROM AssignmentSession s WHERE s.finishedAt IS NULL AND s.allocatedExerciseIds IS NOT NULL")
     List<UUID> findRecoverableOngoingIds();
 

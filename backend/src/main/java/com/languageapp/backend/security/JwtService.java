@@ -4,7 +4,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
@@ -12,9 +11,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
+import jakarta.annotation.PostConstruct;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.time.Clock;
 import java.time.Instant;
@@ -34,8 +35,28 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secretKey;
 
+    private SecretKey signingKey;
+
     @Value("${jwt.expiration}")
     private long jwtExpiration;
+
+    /** Validate once at startup; never include the supplied secret in an exception. */
+    @PostConstruct
+    void initializeSigningKey() {
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException("JWT_SECRET is required: provide a Base64-encoded random key of at least 32 bytes.");
+        }
+        byte[] bytes;
+        try {
+            bytes = java.util.Base64.getDecoder().decode(secretKey.strip());
+        } catch (IllegalArgumentException invalidEncoding) {
+            throw new IllegalStateException("JWT_SECRET must be valid Base64 encoding of at least 32 random bytes.");
+        }
+        if (bytes.length < 32) {
+            throw new IllegalStateException("JWT_SECRET must decode to at least 32 random bytes.");
+        }
+        signingKey = Keys.hmacShaKeyFor(bytes);
+    }
 
     /**
      * Generates a JWT access token for the given user.
@@ -45,6 +66,23 @@ public class JwtService {
      */
     public String generateToken(UserDetails userDetails) {
         return generateToken(new HashMap<>(), userDetails);
+    }
+
+    public String generateSessionToken(UserDetails userDetails, UUID sessionId) {
+        if (sessionId == null) throw new IllegalArgumentException("A persisted session ID is required.");
+        return generateToken(new HashMap<>(Map.of("sid", sessionId.toString())), userDetails);
+    }
+
+    /** Legacy sid-less tokens deliberately cannot authenticate protected APIs. */
+    public UUID extractSessionId(String token) {
+        String sid = extractClaim(token, claims -> claims.get("sid", String.class));
+        try {
+            if (sid == null) return null;
+            UUID id = UUID.fromString(sid);
+            return id.toString().equals(sid) ? id : null;
+        } catch (IllegalArgumentException invalid) {
+            return null;
+        }
     }
 
     /**
@@ -165,12 +203,13 @@ public class JwtService {
     }
 
     /**
-     * Decodes the Base64 encoded secret key and returns a cryptographic {@link SecretKey}.
+     * Returns the signing key validated during startup.
      *
      * @return the HMAC SHA signing key
      */
     private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
-        return Keys.hmacShaKeyFor(keyBytes);
+        // Standalone unit tests may construct this service without Spring lifecycle callbacks.
+        if (signingKey == null) initializeSigningKey();
+        return signingKey;
     }
 }

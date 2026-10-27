@@ -18,6 +18,19 @@ import java.util.Optional;
 @Repository
 public interface ClassroomAssignmentRepository extends JpaRepository<ClassroomAssignment, UUID> {
 
+    /** Notification means an uncompleted assignment before its effective deadline, including scheduled work. */
+    @Query("SELECT new com.languageapp.backend.dto.projection.AssignmentNotification(a.classroom.classroomId, a.assignmentId) " +
+            "FROM ClassroomAssignment a JOIN ClassroomMember m ON m.classroom = a.classroom " +
+            "LEFT JOIN AssignmentAccommodation ac ON ac.assignment = a AND ac.user.userId = :studentId " +
+            "WHERE m.user.userId = :studentId AND m.status = com.languageapp.backend.enums.MembershipStatus.ACCEPTED " +
+            "AND (COALESCE(ac.availableUntilOverride, a.availableUntil) IS NULL " +
+            "OR COALESCE(ac.availableUntilOverride, a.availableUntil) > :now) " +
+            "AND NOT EXISTS (SELECT s.sessionId FROM AssignmentSession s " +
+            "WHERE s.assignment = a AND s.user.userId = :studentId AND s.finishedAt IS NOT NULL) " +
+            "ORDER BY a.createdAt DESC, a.assignmentId")
+    List<com.languageapp.backend.dto.projection.AssignmentNotification> findActiveNotificationReferences(
+            @Param("studentId") UUID studentId, @Param("now") Instant now);
+
     /** Serializes timing edits, start and submission for an assignment. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM ClassroomAssignment a WHERE a.assignmentId = :id")

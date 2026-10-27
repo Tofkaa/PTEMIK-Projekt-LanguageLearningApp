@@ -12,7 +12,9 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "user_achievements")
+@Table(name = "user_achievements", indexes = {
+        @Index(name = "idx_awards_user_achievement", columnList = "user_id, achievement_id")
+})
 
 public class UserAchievement {
 

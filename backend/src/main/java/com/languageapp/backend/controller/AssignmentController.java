@@ -137,12 +137,11 @@ public class AssignmentController {
      */
     @PostMapping("/sessions/{sessionId}/grade")
     @PreAuthorize("hasRole('TEACHER')")
-    public ResponseEntity<Void> gradeAssignmentSession(
+    public ResponseEntity<TeacherGradeResponse> gradeAssignmentSession(
             @PathVariable UUID sessionId,
-            @RequestBody TeacherGradeRequest request,
+            @Valid @RequestBody TeacherGradeRequest request,
             Authentication auth) {
-        assignmentService.gradeSession(sessionId, request, auth.getName());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(new TeacherGradeResponse(assignmentService.gradeSession(sessionId, request, auth.getName())));
     }
 
     @GetMapping("/{id}/my-sessions")
@@ -153,8 +152,8 @@ public class AssignmentController {
     }
 
     @GetMapping("/classroom/{classroomId}/statistics")
-    public ResponseEntity<ClassroomStatisticsResponse> getClassroomStatistics(@PathVariable UUID classroomId) {
-        return ResponseEntity.ok(assignmentService.getClassroomStatistics(classroomId));
+    public ResponseEntity<ClassroomStatisticsResponse> getClassroomStatistics(@PathVariable UUID classroomId, Authentication auth) {
+        return ResponseEntity.ok(assignmentService.getClassroomStatistics(classroomId, auth.getName()));
     }
 
 

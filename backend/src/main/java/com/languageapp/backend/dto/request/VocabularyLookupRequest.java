@@ -6,7 +6,9 @@ import lombok.Data;
 @Data
 public class VocabularyLookupRequest {
     @NotBlank(message = "A szó nem lehet üres")
+    @jakarta.validation.constraints.Size(max = com.languageapp.backend.validation.AnswerLimits.MAX_WORD_CHARACTERS)
     private String word;
 
+    @jakarta.validation.constraints.Size(max = 50)
     private String source = "DICTIONARY_TOOLTIP";
 }

@@ -52,6 +52,7 @@ class UserServiceTest {
 
     @Mock
     private ImageStorageService imageStorageService;
+    @Spy private ProfileImageSanitizer profileImageSanitizer = new ProfileImageSanitizer();
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -173,23 +174,56 @@ class UserServiceTest {
                 "file",
                 "avatar.jpg",
                 "image/jpeg",
-                "fiktiv_kep_tartalom".getBytes()
+                validProfilePng()
         );
 
         // Szabályok megadása a mockok számára
-        when(userRepository.findByEmail(testEmail)).thenReturn(Optional.of(mockUser));
-        when(imageStorageService.uploadProfileImage(mockFile)).thenReturn(expectedUrl);
+        when(userRepository.findActiveProfileUserId(testEmail)).thenReturn(Optional.of(mockUser.getUserId()));
+        when(userRepository.updateActiveProfilePicture(mockUser.getUserId(),expectedUrl)).thenReturn(1);
+        when(imageStorageService.uploadProfileImage(any(byte[].class))).thenReturn(expectedUrl);
 
         // 2. Act: A tesztelendő metódus meghívása
         String actualUrl = userService.updateProfilePicture(testEmail, mockFile);
 
         // 3. Assert: Eredmények ellenőrzése
         assertEquals(expectedUrl, actualUrl, "A visszaadott URL-nek egyeznie kell a mockolt URL-lel");
-        assertEquals(expectedUrl, mockUser.getProfilePictureUrl(), "A User entitásban is frissülnie kellett az URL-nek");
 
         // Ellenőrizzük, hogy a mentés és a feltöltés pontosan egyszer futott-e le
-        verify(userRepository, times(1)).save(mockUser);
-        verify(imageStorageService, times(1)).uploadProfileImage(mockFile);
+        verify(userRepository).updateActiveProfilePicture(mockUser.getUserId(),expectedUrl);
+        verify(userRepository,never()).save(any());
+        ArgumentCaptor<byte[]> upload = ArgumentCaptor.forClass(byte[].class);
+        verify(imageStorageService, times(1)).uploadProfileImage(upload.capture());
+        var normalized = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(upload.getValue()));
+        assertEquals(250, normalized.getWidth());
+        assertEquals(250, normalized.getHeight());
+    }
+
+    private byte[] validProfilePng() throws Exception {
+        var output = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", output);
+        return output.toByteArray();
+    }
+
+    @Test void invalidProfileCannotReachStorageOrChangeTheExistingUrl() {
+        User user = createTestUserWithCourse("image@example.test");
+        user.setProfilePictureUrl("https://example.test/original.png");
+        when(userRepository.findActiveProfileUserId(user.getEmail())).thenReturn(Optional.of(user.getUserId()));
+        var file = new MockMultipartFile("file", "avatar.png", "image/png", "<svg onload='alert(1)'/>".getBytes());
+        assertThrows(BadRequestException.class, () -> userService.updateProfilePicture(user.getEmail(), file));
+        assertEquals("https://example.test/original.png", user.getProfilePictureUrl());
+        verifyNoInteractions(imageStorageService);
+        verify(userRepository, never()).save(any());
+        verify(userRepository,never()).updateActiveProfilePicture(any(),any());
+    }
+
+    @Test void accountDisappearingDuringUploadCannotBeRecreatedByAStaleSave() throws Exception {
+        UUID id=UUID.randomUUID();
+        when(userRepository.findActiveProfileUserId("image@example.test")).thenReturn(Optional.of(id));
+        when(imageStorageService.uploadProfileImage(any(byte[].class))).thenReturn("https://example.test/new.png");
+        when(userRepository.updateActiveProfilePicture(id,"https://example.test/new.png")).thenReturn(0);
+        assertThrows(com.languageapp.backend.exception.ResourceNotFoundException.class,()->userService.updateProfilePicture(
+                "image@example.test",new MockMultipartFile("file","avatar.png","image/png",validProfilePng())));
+        verify(userRepository,never()).save(any());
     }
 
     @Test

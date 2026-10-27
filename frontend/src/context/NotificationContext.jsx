@@ -6,6 +6,7 @@
 
 import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import api from '../services/api';
+import { getAccessToken } from '../services/authSession';
 import { useAuth } from './AuthContext';
 import { pruneViewedStore } from '../utils/viewedStore';
 
@@ -64,7 +65,7 @@ export const NotificationProvider = ({ children }) => {
      */
     const fetchSummary = useCallback(async () => {
         if (!userId) return;
-        const currentToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const currentToken = getAccessToken();
         if (!currentToken || currentToken === 'null') return;
 
         const requestId = ++requestCounterRef.current;
@@ -97,7 +98,7 @@ export const NotificationProvider = ({ children }) => {
 
         const loadInitialData = async () => {
             if (!isMounted) return;
-            const currentToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const currentToken = getAccessToken();
             if (!currentToken || currentToken === 'null') return;
 
             const requestId = ++requestCounterRef.current;
@@ -123,7 +124,7 @@ export const NotificationProvider = ({ children }) => {
 
         loadInitialData();
 
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const token = getAccessToken();
         let eventSource = null;
 
         if (token && token !== 'null') {

@@ -18,6 +18,7 @@ public class LessonSubmitRequest {
     private Integer timeTakenSeconds = 0;
 
     @NotEmpty(message = "The List of answers can not be empty")
+    @jakarta.validation.constraints.Size(max = com.languageapp.backend.validation.AnswerLimits.MAX_LESSON_SUBMISSIONS)
     @Valid // Tells Spring to validate items in the List as well.
-    private List<ExerciseSubmission> answers;
+    private List<@jakarta.validation.constraints.NotNull ExerciseSubmission> answers;
 }

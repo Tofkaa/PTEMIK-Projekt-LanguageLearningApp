@@ -129,8 +129,9 @@ public class AuthenticationService {
         user.setLastLogin(clock.instant());
         userRepository.save(user);
 
-        String jwtToken = jwtService.generateToken(userDetails);
-        String refreshToken = refreshTokenService.createRefreshToken(user.getUserId());
+        var session = refreshTokenService.createSession(user.getUserId());
+        String jwtToken = jwtService.generateSessionToken(userDetails, session.id());
+        String refreshToken = session.rawToken();
 
         AuthResponse response = new AuthResponse(
                 jwtToken,
@@ -177,7 +178,7 @@ public class AuthenticationService {
     public void requestPasswordReset(String email) {
         log.info("Password reset requested for email: {}", email);
 
-        userRepository.findByEmail(email).ifPresent(user -> {
+        userRepository.findByEmailForAuthentication(email).ifPresent(user -> {
             // Delete previous tokens
             passwordResetTokenRepository.deleteByUser_UserId(user.getUserId());
 
@@ -203,6 +204,12 @@ public class AuthenticationService {
      */
     @Transactional
     public void resetPassword(String token, String newPassword) {
+        // Lock the user before loading mutable state; login uses the same lock before credential checks.
+        // The second token lookup occurs after the lock, so concurrent consumption cannot reuse stale state.
+        UUID userId = passwordResetTokenRepository.findUserIdByToken(token)
+                .orElseThrow(() -> new BadRequestException("Érvénytelen vagy már felhasznált token!"));
+        User user = userRepository.findForSessionUpdate(userId)
+                .orElseThrow(() -> new BadRequestException("Érvénytelen vagy már felhasznált token!"));
         com.languageapp.backend.entity.PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
                 .orElseThrow(() -> new BadRequestException("Érvénytelen vagy már felhasznált token!"));
 
@@ -210,8 +217,6 @@ public class AuthenticationService {
             passwordResetTokenRepository.delete(resetToken);
             throw new BadRequestException("A jelszóvisszaállító link lejárt. Kérlek, igényelj újat.");
         }
-
-        User user = resetToken.getUser();
 
         if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
             throw new BadRequestException("Az új jelszó nem lehet azonos a jelenlegi jelszavaddal!");
@@ -224,13 +229,15 @@ public class AuthenticationService {
         passwordResetTokenRepository.delete(resetToken);
 
         // Security step: log out all sessions
-        refreshTokenService.deleteByRawToken(user.getUserId().toString());
+        refreshTokenService.revokeAllForUser(user.getUserId());
         log.info("Password successfully reset for user: {}", user.getEmail());
     }
 
     @Transactional
     public AuthResult authenticate(LoginRequest request) {
         log.info("Authentication attempt for email: {}", request.getEmail());
+
+        User user = userRepository.findByEmailForAuthentication(request.getEmail()).orElse(null);
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -239,19 +246,17 @@ public class AuthenticationService {
                 )
         );
 
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> {
-                    log.error("Authenticated user not found in database: {}", request.getEmail());
-                    return new BadRequestException("Invalid login credentials.");
-                });
+        // Unknown accounts still go through the DAO provider's password-timing protection.
+        if (user == null) throw new org.springframework.security.authentication.BadCredentialsException("Invalid login credentials.");
 
         user.setLastLogin(clock.instant());
         userRepository.save(user);
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 
-        String jwtToken = jwtService.generateToken(userDetails);
-        String refreshToken = refreshTokenService.createRefreshToken(user.getUserId());
+        var session = refreshTokenService.createSession(user.getUserId());
+        String jwtToken = jwtService.generateSessionToken(userDetails, session.id());
+        String refreshToken = session.rawToken();
 
         AuthResponse response = new AuthResponse(
                 jwtToken,
@@ -281,15 +286,16 @@ public class AuthenticationService {
 
         return refreshTokenService.findByRawToken(rawRefreshToken)
                 .map(refreshTokenService::verifyExpiration)
-                .map(com.languageapp.backend.entity.RefreshToken::getUser)
-                .map(user -> {
+                .map(session -> {
+                    User user = session.getUser();
+                    if (!user.isActive()) throw new BadRequestException("Session unavailable, please log in again.");
                     UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
                             .username(user.getEmail())
                             .password(user.getPasswordHash())
                             .authorities("ROLE_" + user.getRole().name())
                             .build();
 
-                    String newAccessToken = jwtService.generateToken(userDetails);
+                    String newAccessToken = jwtService.generateSessionToken(userDetails, session.getRefreshTokenId());
                     log.info("Access token successfully refreshed for user: {}", user.getEmail());
 
                     return new AuthResponse(

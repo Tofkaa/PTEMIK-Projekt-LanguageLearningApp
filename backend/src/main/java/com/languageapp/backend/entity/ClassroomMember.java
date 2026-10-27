@@ -15,6 +15,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "classroom_members", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"classroom_id", "user_id"})
+}, indexes = {
+        @Index(name = "idx_members_user_status_room", columnList = "user_id, status, classroom_id")
 })
 
 public class ClassroomMember {

@@ -9,6 +9,7 @@ import com.languageapp.backend.entity.*;
 import com.languageapp.backend.exception.ForbiddenException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.*;
+import com.languageapp.backend.validation.AnswerLimits;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -59,6 +60,7 @@ public class EvaluationService {
      */
     @Transactional
     public LessonSubmitResponse evaluateLesson(UUID userId, UUID lessonId, UUID challengeId, LessonSubmitRequest request) {
+        AnswerLimits.requireSubmissions(request.getAnswers(), AnswerLimits.MAX_LESSON_SUBMISSIONS);
         log.debug("Starting evaluation for user: {} and lesson: {}", userId, lessonId);
 
         User user = userRepository.findForLearningUpdate(userId)
@@ -232,6 +234,7 @@ public class EvaluationService {
      * @return EvaluationDetails containing the correct answer count and the dynamically calculated XP.
      */
     public EvaluationDetails calculateEvaluationDetails(List<Exercise> exercises, LessonSubmitRequest request, List<MistakeDTO> mistakes) {
+        AnswerLimits.requireSubmissions(request.getAnswers(), AnswerLimits.MAX_LESSON_SUBMISSIONS);
         int correctCount = 0;
         int potentialXp = 0;
 
@@ -240,41 +243,22 @@ public class EvaluationService {
                 .collect(Collectors.groupingBy(ExerciseSubmission::getExerciseId));
 
         for (Exercise exercise : exercises) {
-            if (exercise.getCorrectAnswer() != null && exercise.getCorrectAnswer().containsKey("answer")) {
-                String rawExpected = String.valueOf(exercise.getCorrectAnswer().get("answer"));
-                String cleanExpected = normalizeText(rawExpected);
-
-                List<ExerciseSubmission> subs = subsByExercise.getOrDefault(exercise.getExerciseId(), new ArrayList<>());
-
-                ExerciseSubmission firstAttempt = subs.stream().filter(s -> !s.isRetry()).findFirst().orElse(null);
-                ExerciseSubmission retryAttempt = subs.stream().filter(ExerciseSubmission::isRetry).findFirst().orElse(null);
-
-                String firstAnswer = (firstAttempt != null && firstAttempt.getAnswer() != null) ? firstAttempt.getAnswer().toString() : "";
-                boolean firstCorrect = cleanExpected.equals(normalizeText(firstAnswer));
-
-                if (firstCorrect) {
-                    // CASE 1: Flawless execution. Award a point and full XP.
+            String rawExpected = expectedAnswer(exercise);
+            String cleanExpected = normalizeText(rawExpected);
+            List<ExerciseSubmission> subs = subsByExercise.getOrDefault(exercise.getExerciseId(), List.of());
+            ExerciseSubmission first = subs.stream().filter(s -> !s.isRetry()).findFirst().orElse(null);
+            ExerciseSubmission retry = subs.stream().filter(ExerciseSubmission::isRetry).findFirst().orElse(null);
+            String firstAnswer = first == null ? "" : (String) first.getAnswer();
+            if (cleanExpected.equals(normalizeText(firstAnswer))) {
+                correctCount++;
+                potentialXp += XP_PER_CORRECT_ANSWER;
+            } else {
+                String question = exercise.getContent() != null && exercise.getContent().containsKey("question")
+                        ? String.valueOf(exercise.getContent().get("question")) : "Unknown question";
+                mistakes.add(new MistakeDTO(exercise.getExerciseId(),question,firstAnswer,rawExpected));
+                if (retry != null && cleanExpected.equals(normalizeText((String)retry.getAnswer()))) {
                     correctCount++;
-                    potentialXp += XP_PER_CORRECT_ANSWER;
-                } else {
-                    // Log the mistake for the frontend Summary Screen using the initial wrong answer
-                    String questionText = exercise.getContent() != null && exercise.getContent().containsKey("question")
-                            ? String.valueOf(exercise.getContent().get("question"))
-                            : "Unknown question";
-                    mistakes.add(new MistakeDTO(exercise.getExerciseId(), questionText, firstAnswer, rawExpected));
-
-                    // CASE 2: The user failed initially, but we check if they fixed it via the retry queue
-                    if (retryAttempt != null) {
-                        String retryAnswer = retryAttempt.getAnswer() != null ? retryAttempt.getAnswer().toString() : "";
-                        boolean retryCorrect = cleanExpected.equals(normalizeText(retryAnswer));
-
-                        if (retryCorrect) {
-                            // The user learned from the mistake. Count it towards passing the lesson.
-                            correctCount++;
-                            // Apply penalty: award only half XP for requiring a second attempt.
-                            potentialXp += (XP_PER_CORRECT_ANSWER / 2);
-                        }
-                    }
+                    potentialXp += XP_PER_CORRECT_ANSWER / 2;
                 }
             }
         }
@@ -344,18 +328,12 @@ public class EvaluationService {
     }
 
     private String normalizeText(String input) {
-        if (input == null || input.isBlank() || "null".equals(input)) {
-            return "";
-        }
-        return input
-                .replaceAll("\\p{Punct}", "")
-                .toLowerCase()
-                .replaceAll("\\s+", " ")
-                .trim();
+        return com.languageapp.backend.validation.AnswerText.normalize(input);
     }
 
     @Transactional(readOnly = true)
     public ExerciseCheckResponse checkSingleExercise(UUID exerciseId, String userAnswer) {
+        AnswerLimits.requireText(userAnswer);
         Exercise exercise = exerciseRepository.findById(exerciseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Exercise not found"));
         return checkExerciseAnswer(exercise, userAnswer);
@@ -363,6 +341,7 @@ public class EvaluationService {
 
     @Transactional(readOnly = true)
     public ExerciseCheckResponse checkAttemptExercise(UUID lessonId, UUID attemptId, UUID exerciseId, String email, String answer) {
+        AnswerLimits.requireText(answer);
         LessonAttempt attempt = attemptRepository.findById(attemptId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lesson attempt not found"));
         if (!attempt.getUser().getEmail().equals(email) || !attempt.getLesson().getLessonId().equals(lessonId))
@@ -374,11 +353,7 @@ public class EvaluationService {
 
     private ExerciseCheckResponse checkExerciseAnswer(Exercise exercise, String userAnswer) {
 
-        if (exercise.getCorrectAnswer() == null || !exercise.getCorrectAnswer().containsKey("answer")) {
-            return ExerciseCheckResponse.builder().isCorrect(true).build();
-        }
-
-        String rawExpected = String.valueOf(exercise.getCorrectAnswer().get("answer"));
+        String rawExpected = expectedAnswer(exercise);
         String normExpected = normalizeText(rawExpected);
         String normUser = normalizeText(userAnswer);
 
@@ -406,8 +381,7 @@ public class EvaluationService {
                 }
             }
         } else {
-            int distance = calculateLevenshteinDistance(normExpected, normUser);
-            if (distance <= 2 && normExpected.length() > 4) {
+            if (normExpected.length() > 4 && TypoTolerance.withinTwoEdits(normExpected, normUser)) {
                 isAlmostCorrect = true;
                 feedbackMsg = "Majdnem jó! Ellenőrizd az elgépelést!";
             }
@@ -420,22 +394,17 @@ public class EvaluationService {
                 .build();
     }
 
-    private int calculateLevenshteinDistance(String a, String b) {
-        int[][] dp = new int[a.length() + 1][b.length() + 1];
-        for (int i = 0; i <= a.length(); i++) {
-            for (int j = 0; j <= b.length(); j++) {
-                if (i == 0) dp[i][j] = j;
-                else if (j == 0) dp[i][j] = i;
-                else dp[i][j] = min(dp[i - 1][j - 1] +
-                                    costOfSubstitution(a.charAt(i - 1), b.charAt(j - 1)),
-                            dp[i - 1][j] + 1, dp[i][j - 1] + 1);
-            }
-        }
-        return dp[a.length()][b.length()];
+    private void requireExpectedAnswer(String answer) {
+        if (answer.length() > AnswerLimits.MAX_CHARACTERS)
+            throw new com.languageapp.backend.exception.ConflictException("A feladat megoldása túl hosszú az értékeléshez. Jelezd az oktatónak.");
     }
-
-    private int costOfSubstitution(char a, char b) { return a == b ? 0 : 1; }
-    private int min(int a, int b, int c) {
-        return Math.min(Math.min(a, b), c);
+    private String expectedAnswer(Exercise exercise) {
+        Object value = exercise.getCorrectAnswer() == null ? null : exercise.getCorrectAnswer().get("answer");
+        if (!(value instanceof String text))
+            throw new com.languageapp.backend.exception.ConflictException("A feladat mintamegoldása hiányzik vagy érvénytelen. Jelezd az oktatónak.");
+        requireExpectedAnswer(text);
+        if (normalizeText(text).isEmpty())
+            throw new com.languageapp.backend.exception.ConflictException("A feladat mintamegoldása hiányzik vagy érvénytelen. Jelezd az oktatónak.");
+        return text;
     }
 }

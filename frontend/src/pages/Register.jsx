@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Form, Button, Card, Container, Row, Col, ButtonGroup, ToggleButton } from 'react-bootstrap';
 import api from '../services/api.jsx';
+import axios from 'axios';
+import { beginAuthentication, queueAuthCookieOperation } from '../services/authSession';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 import LearningFeedback from '../components/LearningFeedback';
@@ -53,10 +55,10 @@ const Register = () => {
         }
         
         setIsSubmitting(true);
-        console.log(`Initiating registration attempt for: ${name} (${email}) as ${role} for course ${courseCode}`);
+        const epoch = beginAuthentication(false);
 
         try {
-            await api.post('/auth/register', { 
+            await queueAuthCookieOperation(epoch, () => api.post('/auth/register', {
                 name, 
                 email, 
                 password,
@@ -64,7 +66,7 @@ const Register = () => {
                 role,
                 courseCode ,
                 acceptTerms
-            });
+            }, { _authEpoch: epoch, timeout: 15000, skipGlobalError: true }));
 
             setIsRegistered(true);
 
@@ -78,7 +80,7 @@ const Register = () => {
             sessionStorage.removeItem('reg_acceptTerms');
 
         } catch (err) {
-            console.error("Registration error:", err);
+            if (axios.isCancel(err)) return;
             
             if (err.response && err.response.data) {
                 setError(err.response.data.message || 'Hiba történt a regisztráció során. (Foglalt email?)');

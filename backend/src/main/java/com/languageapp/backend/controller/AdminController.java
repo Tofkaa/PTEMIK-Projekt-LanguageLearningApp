@@ -25,9 +25,7 @@ public class AdminController {
     // --- CURRICULUM MANAGEMENT ---
     @PostMapping("/curriculum/import")
     public ResponseEntity<String> importCurriculum(@RequestBody java.util.List<TopicImportRequest> requests, Authentication auth) {
-        for (TopicImportRequest request : requests) {
-            curriculumService.importTopicAndLessons(request);
-        }
+        curriculumService.importCurriculum(requests);
         adminService.logImportAction(auth.getName(), "CURRICULUM_IMPORTED", requests.size() + " teljes témakör importálva.");
         return ResponseEntity.ok("Curriculum imported successfully!");
     }

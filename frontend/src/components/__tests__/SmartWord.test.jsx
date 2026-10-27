@@ -44,7 +44,7 @@ describe('accessible word translation', () => {
         render(<SmartWord word="Apple" queryWord="apple" source="LESSON" onWordClick={onWordClick} />);
         const trigger = screen.getByRole('button', { name: 'Apple' });
         fireEvent.click(trigger);
-        expect(vocabularyApi.lookupWord).toHaveBeenCalledWith('apple', 'LESSON');
+        expect(vocabularyApi.lookupWord).toHaveBeenCalledWith('apple', 'LESSON', { signal: expect.any(AbortSignal) });
         expect(screen.getByRole('status')).toHaveTextContent('Keresés...');
         await act(async () => resolveLookup({ data: { translation: 'alma', srsLevel: 1, newAddition: true } }));
         expect(screen.getByRole('status')).toHaveTextContent('alma');

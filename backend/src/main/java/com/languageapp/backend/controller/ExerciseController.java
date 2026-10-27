@@ -27,7 +27,7 @@ public class ExerciseController {
     @PostMapping("/{exerciseId}/check")
     public ResponseEntity<ExerciseCheckResponse> checkExercise(
             @PathVariable UUID exerciseId,
-            @RequestBody ExerciseCheckRequest request) {
+            @jakarta.validation.Valid @RequestBody ExerciseCheckRequest request) {
 
         return ResponseEntity.ok(evaluationService.checkSingleExercise(exerciseId, request.getAnswer()));
     }
