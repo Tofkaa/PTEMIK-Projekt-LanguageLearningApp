@@ -240,10 +240,10 @@ describe('persistent settings feedback and grading', () => {
         expect(api.put).not.toHaveBeenCalled();
     });
 
-    it('retains the requested email and credentials when an expired code is replaced', async () => {
+    it.each(['Az ellenőrző kód lejárt!', 'Túl sok hibás próbálkozás történt. Kérj új ellenőrző kódot.'])('retains the requested email and credentials when a code is replaced after %s', async message => {
         sessionStorage.setItem('settingsActiveTab', 'security');
         api.post.mockImplementation(url => url.endsWith('/verify')
-            ? Promise.reject({ response: { data: { message: 'Az ellenőrző kód lejárt!' } } })
+            ? Promise.reject({ response: { data: { message } } })
             : Promise.resolve({ data: {} }));
         render(<MemoryRouter><Settings /></MemoryRouter>);
         fireEvent.change(screen.getByLabelText('Új e-mail cím'), { target: { value: 'new@example.test' } });
@@ -251,7 +251,7 @@ describe('persistent settings feedback and grading', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Ellenőrző kód küldése' }));
         fireEvent.change(await screen.findByRole('textbox', { name: '6-jegyű ellenőrző kód (OTP)' }), { target: { value: '123456' } });
         fireEvent.click(screen.getByRole('button', { name: 'Kód megerősítése' }));
-        expect(await screen.findByRole('alert', { name: 'E-mail cím: hiba' })).toHaveTextContent('lejárt');
+        expect(await screen.findByRole('alert', { name: 'E-mail cím: hiba' })).toHaveTextContent(message);
         fireEvent.click(screen.getByRole('button', { name: 'Mégse', exact: true }));
         expect(screen.getByLabelText('Új e-mail cím')).toHaveValue('new@example.test');
         expect(screen.getByLabelText('Jelenlegi jelszó (megerősítéshez)')).toHaveValue('test-only-password');

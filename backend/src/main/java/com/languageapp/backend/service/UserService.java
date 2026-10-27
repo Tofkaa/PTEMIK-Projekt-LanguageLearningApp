@@ -6,6 +6,7 @@ import com.languageapp.backend.entity.*;
 import com.languageapp.backend.enums.DifficultyLevel;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.BadRequestException;
+import com.languageapp.backend.exception.IncorrectOtpException;
 import com.languageapp.backend.exception.ResourceNotFoundException;
 import com.languageapp.backend.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import java.time.temporal.ChronoUnit;
 @RequiredArgsConstructor
 public class UserService {
     private final Clock clock;
+    private static final int EMAIL_CHANGE_MAX_FAILURES = 5;
 
     private final UserRepository userRepository;
     private final ProgressRepository progressRepository;
@@ -281,7 +283,7 @@ public class UserService {
     /**
      * Step 2: Verifies the 6-digit OTP and updates the user's primary email.
      */
-    @Transactional
+    @Transactional(noRollbackFor = IncorrectOtpException.class)
     public void verifyEmailChange(String currentEmail, String otpCode) {
         User user = getAccountForEmailChange(currentEmail);
 
@@ -292,8 +294,17 @@ public class UserService {
             throw new BadRequestException("Az ellenőrző kód lejárt! Kérlek, indítsd újra a folyamatot.");
         }
 
+        if (token.getFailedAttempts() >= EMAIL_CHANGE_MAX_FAILURES) {
+            throw new IncorrectOtpException("Túl sok hibás próbálkozás történt. Kérj új ellenőrző kódot.");
+        }
         if (otpCode == null || !token.getOtpCode().equals(otpCode.trim())) {
-            throw new BadRequestException("Hibás ellenőrző kód!");
+            int failures = token.getFailedAttempts() + 1;
+            token.setFailedAttempts(failures);
+            emailChangeTokenRepository.save(token);
+            // This exception alone commits: no account/email mutation has happened in this branch.
+            throw new IncorrectOtpException(failures >= EMAIL_CHANGE_MAX_FAILURES
+                    ? "Túl sok hibás próbálkozás történt. Kérj új ellenőrző kódot."
+                    : "Hibás ellenőrző kód. Még " + (EMAIL_CHANGE_MAX_FAILURES - failures) + " próbálkozásod maradt.");
         }
 
         if (userRepository.existsByEmail(token.getNewEmail())) {

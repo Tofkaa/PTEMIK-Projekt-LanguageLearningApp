@@ -562,7 +562,7 @@ const Settings = () => {
                                         />
                                         <Form.Text id="settings-code-help" className="text-secondary">
                                             Add meg az új e-mail címre küldött 6 számjegyű kódot. A kódot be is másolhatod.
-                                            {' '}Ha lejárt, a Mégse gombbal visszatérhetsz az új kód kéréséhez; a megadott adataid megmaradnak.
+                                            {' '}Öt hibás próbálkozás után új kódot kell kérned. Ha lejárt vagy elfogytak a próbálkozások, a Mégse gombbal visszatérhetsz az új kód kéréséhez; a megadott adataid megmaradnak.
                                         </Form.Text>
                                     </Form.Group>
 

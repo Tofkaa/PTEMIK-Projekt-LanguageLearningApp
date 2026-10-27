@@ -25,6 +25,10 @@ public class EmailChangeToken {
     @Column(nullable = false)
     private Instant expiryDate;
 
+    // The default also initializes already-existing challenges when Hibernate adds this column.
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    private int failedAttempts = 0;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;

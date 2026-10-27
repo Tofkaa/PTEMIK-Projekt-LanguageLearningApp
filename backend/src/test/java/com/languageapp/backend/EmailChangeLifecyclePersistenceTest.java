@@ -37,6 +37,9 @@ class EmailChangeLifecyclePersistenceTest {
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager manager;
     @Autowired Clock clock;
+    @Autowired org.springframework.web.context.WebApplicationContext context;
+    @Autowired com.languageapp.backend.security.JwtService jwt;
+    @Autowired com.languageapp.backend.security.RefreshTokenService sessions;
     @MockitoBean DataSeeder seeder;
     @MockitoBean EmailService mail;
     @MockitoBean SseService sse;
@@ -69,11 +72,12 @@ class EmailChangeLifecyclePersistenceTest {
         return tx.execute(status -> em.createQuery("select count(t) from EmailChangeToken t where t.user.userId=:id",Long.class)
                 .setParameter("id",f.id()).getSingleResult());
     }
-    void awaitTwoBlockedConsumers() {
+    void awaitTwoBlockedConsumers() { awaitBlockedOperations(2); }
+    void awaitBlockedOperations(int expected) {
         long deadline = System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime()<deadline) {
             Number blocked = (Number) em.createNativeQuery("select count(*) from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid() and cardinality(pg_blocking_pids(pid))>0").getSingleResult();
-            if (blocked.intValue()>=2) return;
+            if (blocked.intValue()>=expected) return;
             try { Thread.sleep(10); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
         }
         fail("Both operations must wait for the shared account lock before the competing update commits");
@@ -155,5 +159,70 @@ class EmailChangeLifecyclePersistenceTest {
         EmailChangeToken replacement = tokens.findByUser_UserId(f.id()).orElseThrow();
         assertNotEquals(original.getId(),replacement.getId()); assertEquals(destination,replacement.getNewEmail());
         assertTrue(tokens.findById(original.getId()).isEmpty()); assertEquals(1,count(f));
+    }
+
+    @Test void failedHttpResponsesCommitTheCounterAndEvenTheCorrectCodeIsRefusedAfterExhaustion() throws Exception {
+        Fixture f=fixture();seed(f,target());
+        var session=sessions.createSession(f.id());
+        var details=org.springframework.security.core.userdetails.User.withUsername(f.email()).password("unused").roles("STUDENT").build();
+        String authorization="Bearer "+jwt.generateSessionToken(details,session.id());
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup(context)
+                .apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity()).build();
+        for(int failed=1;failed<=5;failed++) {
+            var result=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/users/me/email-change/verify")
+                    .header("Authorization",authorization).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content("{\"otpCode\":\"000000\"}"))
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest()).andReturn();
+            assertEquals(failed,tokens.findByUser_UserId(f.id()).orElseThrow().getFailedAttempts());
+            if(failed==5)assertTrue(result.getResponse().getContentAsString().contains("új ellenőrző kódot"));
+        }
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/users/me/email-change/verify")
+                .header("Authorization",authorization).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"otpCode\":\"123456\"}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+        assertEquals(f.email(),users.findById(f.id()).orElseThrow().getEmail());
+        assertEquals(5,tokens.findByUser_UserId(f.id()).orElseThrow().getFailedAttempts());
+    }
+    @Test void parallelIncorrectCodesCannotExceedOrRollBackThePersistentBudget() throws Exception {
+        Fixture f=fixture();seed(f,target());
+        ExecutorService workers=Executors.newFixedThreadPool(8);List<Future<?>> attempts=new ArrayList<>();
+        try {
+            tx.executeWithoutResult(status->{
+                users.findForSessionUpdate(f.id()).orElseThrow();
+                for(int i=0;i<8;i++)attempts.add(workers.submit(()->{
+                    assertThrows(com.languageapp.backend.exception.IncorrectOtpException.class,
+                            ()->service.verifyEmailChange(f.email(),"000000"));
+                }));
+                awaitBlockedOperations(8);
+            });
+            for(Future<?> attempt:attempts)attempt.get(15,TimeUnit.SECONDS);
+            assertEquals(5,tokens.findByUser_UserId(f.id()).orElseThrow().getFailedAttempts());
+            assertEquals(f.email(),users.findById(f.id()).orElseThrow().getEmail());
+            assertThrows(com.languageapp.backend.exception.IncorrectOtpException.class,()->service.verifyEmailChange(f.email(),"123456"));
+        } finally {workers.shutdownNow();assertTrue(workers.awaitTermination(10,TimeUnit.SECONDS));}
+    }
+    @Test void reissueAfterExhaustionCreatesAUsableNewChallenge() {
+        Fixture f=fixture();seed(f,target());
+        for(int i=0;i<5;i++)assertThrows(com.languageapp.backend.exception.IncorrectOtpException.class,()->service.verifyEmailChange(f.email(),"000000"));
+        String destination=target();service.requestEmailChange(f.email(),destination,PASSWORD);
+        EmailChangeToken current=tokens.findByUser_UserId(f.id()).orElseThrow();assertEquals(0,current.getFailedAttempts());
+        service.verifyEmailChange(f.email(),current.getOtpCode());
+        assertEquals(destination,users.findById(f.id()).orElseThrow().getEmail());assertEquals(0,count(f));
+    }
+    @Test void correctCodeWithinTheBudgetStillChangesTheEmail() {
+        Fixture f=fixture();String destination=target();seed(f,destination);
+        for(int i=0;i<4;i++)assertThrows(com.languageapp.backend.exception.IncorrectOtpException.class,()->service.verifyEmailChange(f.email(),"000000"));
+        service.verifyEmailChange(f.email(),"123456");
+        assertEquals(destination,users.findById(f.id()).orElseThrow().getEmail());assertEquals(0,count(f));
+    }
+    @Test void unrelatedBusinessErrorsStillMarkTheTransactionForRollback() {
+        Fixture f=fixture(),other=fixture();seed(f,other.email());
+        assertThrows(org.springframework.transaction.UnexpectedRollbackException.class,()->tx.executeWithoutResult(status->{
+            users.findForSessionUpdate(f.id()).orElseThrow().setXp(99);
+            assertThrows(BadRequestException.class,()->service.verifyEmailChange(f.email(),"123456"));
+        }));
+        assertEquals(0,users.findById(f.id()).orElseThrow().getXp());
+        assertEquals(f.email(),users.findById(f.id()).orElseThrow().getEmail());
+        assertEquals(0,tokens.findByUser_UserId(f.id()).orElseThrow().getFailedAttempts());
     }
 }

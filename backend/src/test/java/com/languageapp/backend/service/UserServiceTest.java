@@ -513,4 +513,38 @@ class UserServiceTest {
         assertEquals(clock.instant(),record.get("linkedAt"));assertFalse(record.containsKey("accessToken"));
         verify(oAuthIdentityRepository).findByUserUserId(user.getUserId());
     }
+
+    @Test void fiveIncorrectOtpValuesExhaustTheChallengeWithoutModifyingTheAccount() {
+        User user=createTestUserWithCourse("attempts@example.test");
+        when(userRepository.findByEmailForAuthentication(user.getEmail())).thenReturn(Optional.of(user));
+        EmailChangeToken token=new EmailChangeToken();token.setUser(user);token.setOtpCode("123456");
+        token.setNewEmail("target@example.test");token.setExpiryDate(clock.instant().plusSeconds(900));
+        when(emailChangeTokenRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(token));
+        for(int i=1;i<=5;i++) {
+            assertThrows(com.languageapp.backend.exception.IncorrectOtpException.class,
+                    ()->userService.verifyEmailChange(user.getEmail(),"000000"));
+            assertEquals(i,token.getFailedAttempts());
+        }
+        assertThrows(com.languageapp.backend.exception.IncorrectOtpException.class,
+                ()->userService.verifyEmailChange(user.getEmail(),"123456"));
+        assertEquals(5,token.getFailedAttempts());verify(emailChangeTokenRepository,times(5)).save(token);
+        verify(userRepository,never()).save(any());verify(emailChangeTokenRepository,never()).delete(any());
+    }
+    @Test void correctOtpStillWorksAfterFourIncorrectValues() {
+        User user=createTestUserWithCourse("last-attempt@example.test");
+        when(userRepository.findByEmailForAuthentication(user.getEmail())).thenReturn(Optional.of(user));
+        EmailChangeToken token=new EmailChangeToken();token.setUser(user);token.setOtpCode("123456");token.setFailedAttempts(4);
+        token.setNewEmail("target@example.test");token.setExpiryDate(clock.instant().plusSeconds(900));
+        when(emailChangeTokenRepository.findByUser_UserId(user.getUserId())).thenReturn(Optional.of(token));
+        userService.verifyEmailChange(user.getEmail(),"123456");
+        assertEquals("target@example.test",user.getEmail());verify(emailChangeTokenRepository).delete(token);
+    }
+    @Test void newOtpChallengeStartsWithAFreshAttemptBudget() {
+        User user=createTestUserWithCourse("new-budget@example.test");user.setPasswordHash("hash");
+        when(userRepository.findByEmailForAuthentication(user.getEmail())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password","hash")).thenReturn(true);
+        userService.requestEmailChange(user.getEmail(),"target@example.test","password");
+        ArgumentCaptor<EmailChangeToken> created=ArgumentCaptor.forClass(EmailChangeToken.class);
+        verify(emailChangeTokenRepository).save(created.capture());assertEquals(0,created.getValue().getFailedAttempts());
+    }
 }
