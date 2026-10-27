@@ -32,6 +32,7 @@ import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import AccountDeletion from './pages/AccountDeletion.jsx';
 import Settings from './pages/Settings.jsx';
+import OAuthLinkConfirmation from './pages/OAuthLinkConfirmation.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import OAuth2RedirectHandler from './components/OAuth2RedirectHandler.jsx';
 import Terms from './pages/Terms.jsx';
@@ -102,6 +103,7 @@ function App() {
                         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
                         
                     
+                        <Route path="/oauth-link/confirm" element={<PrivateRoute><OAuthLinkConfirmation /></PrivateRoute>} />
                         <Route path="/settings" element={<PrivateRoute><Settings/></PrivateRoute>} />
                         
                         {/* Classrooms pages  */}

@@ -12,6 +12,7 @@ const pageTitles = [
     ['/terms', 'Felhasználási feltételek'],
     ['/privacy', 'Adatkezelési tájékoztató'],
     ['/dashboard', 'Áttekintés'],
+    ['/oauth-link/confirm', 'Belépési mód összekapcsolása'],
     ['/settings', 'Beállítások'],
     ['/classrooms', 'Osztálytermeim'],
     ['/classrooms/:id', 'Osztályterem'],

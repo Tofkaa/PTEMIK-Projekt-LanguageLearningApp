@@ -8,6 +8,7 @@ import getCroppedImg from '../utils/cropImage.js';
 import ImageCropControls from '../components/ImageCropControls';
 import LearningFeedback from '../components/LearningFeedback';
 import AccessibleCode from '../components/AccessibleCode';
+import OAuthConnections from '../components/OAuthConnections';
 
 const Settings = () => {
     const { user, setUser, logout } = useAuth();
@@ -66,7 +67,7 @@ const Settings = () => {
 
 
     // --- TABS LOGIC ---
-    const [activeTab, setActiveTab] = useState(location.state?.settingsTab === 'account' ? 'account' : sessionStorage.getItem('settingsActiveTab') || 'account');
+    const [activeTab, setActiveTab] = useState(new URLSearchParams(location.search).has('oauth_link_error') ? 'security' : ['account', 'security'].includes(location.state?.settingsTab) ? location.state.settingsTab : sessionStorage.getItem('settingsActiveTab') || 'account');
 
     const handleTabChange = (tabKey) => {
         setActiveTab(tabKey);
@@ -491,6 +492,9 @@ const Settings = () => {
 
                         {/* 3. TAB: Security */}
                         <Tab eventKey="security" title="Biztonság" className="p-4">
+                            {activeTab === 'security' && <OAuthConnections key={user.userId || user.email}
+                                initialError={new URLSearchParams(location.search).has('oauth_link_error') ? 'A szolgáltatói hitelesítés nem fejeződött be. Indíts új összekapcsolást.' : ''}
+                                success={location.state?.oauthLinkMessage || ''} />}
                             
                             {/* --- E-MAIL ADDRESS CHANGE (OTP FLOW) --- */}
                             <h2 className="h5 fw-bold text-info mb-3"><span aria-hidden="true">📧 </span>E-mail cím módosítása</h2>
