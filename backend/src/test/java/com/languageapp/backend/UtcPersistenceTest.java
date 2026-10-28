@@ -1,5 +1,12 @@
 package com.languageapp.backend;
 
+import com.languageapp.backend.scheduler.ChallengeScheduler;
+import com.languageapp.backend.scheduler.AssignmentExpiryScheduler;
+import com.languageapp.backend.service.SseService;
+import com.languageapp.backend.service.ImageStorageService;
+import com.languageapp.backend.service.EmailService;
+import com.languageapp.backend.config.DataSeeder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.enums.MembershipStatus;
 import com.languageapp.backend.repository.ClassroomAssignmentRepository;
@@ -12,11 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Runs only against an explicitly named, separate verification database. */
@@ -29,6 +34,14 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 @Transactional
 class UtcPersistenceTest {
+    // Legacy-schema validation still uses an isolated DB; never start external effects.
+    @MockitoBean DataSeeder seeder;
+    @MockitoBean EmailService mail;
+    @MockitoBean ImageStorageService images;
+    @MockitoBean SseService sse;
+    @MockitoBean AssignmentExpiryScheduler expiry;
+    @MockitoBean ChallengeScheduler challenges;
+
     @Autowired private EntityManager entityManager;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ClassroomAssignmentRepository assignments;

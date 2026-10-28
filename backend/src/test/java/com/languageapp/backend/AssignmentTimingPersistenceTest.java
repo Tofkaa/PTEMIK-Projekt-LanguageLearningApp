@@ -1,5 +1,12 @@
 package com.languageapp.backend;
 
+import com.languageapp.backend.scheduler.ChallengeScheduler;
+import com.languageapp.backend.scheduler.AssignmentExpiryScheduler;
+import com.languageapp.backend.service.SseService;
+import com.languageapp.backend.service.ImageStorageService;
+import com.languageapp.backend.service.EmailService;
+import com.languageapp.backend.config.DataSeeder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.languageapp.backend.dto.request.AssignmentAccommodationRequest;
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.enums.MembershipStatus;
@@ -19,13 +26,23 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(properties = {"spring.datasource.url=${UTC_TEST_DATABASE_URL}", "spring.jpa.hibernate.ddl-auto=validate", "spring.jpa.show-sql=false"})
 @Transactional
 class AssignmentTimingPersistenceTest {
+    // Legacy-schema validation still uses an isolated DB; never start external effects.
+    @MockitoBean DataSeeder seeder;
+    @MockitoBean EmailService mail;
+    @MockitoBean ImageStorageService images;
+    @MockitoBean SseService sse;
+    @MockitoBean AssignmentExpiryScheduler expiry;
+    @MockitoBean ChallengeScheduler challenges;
+
     @Autowired EntityManager em;
     @Autowired AssignmentService service;
     @Autowired ClassroomAssignmentRepository assignments;
 
     @Test void overrideQueryAndSessionSnapshotsPersistIndependently() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        Instant now = Instant.now();
+        // PostgreSQL timestamp precision is microseconds; do not compare a rounded DB value
+        // with the original nanosecond request when reusing the same deadline.
+        Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         User teacher = new User(); teacher.setName("Timing teacher"); teacher.setEmail("t" + suffix + "@test.invalid"); em.persist(teacher);
         User student = new User(); student.setName("Timing student"); student.setEmail("s" + suffix + "@test.invalid"); em.persist(student);
         Course course = new Course(); course.setLanguageCode("tm" + suffix); course.setLanguageName("Timing"); em.persist(course);

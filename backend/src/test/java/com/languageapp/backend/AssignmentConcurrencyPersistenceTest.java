@@ -35,6 +35,7 @@ class AssignmentConcurrencyPersistenceTest {
     @Autowired EntityManager em;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager manager;
+    @Autowired javax.sql.DataSource dataSource;
     @MockitoBean Clock clock;
     @MockitoBean DataSeeder seeder;
     @MockitoBean EmailService mail;
@@ -83,7 +84,13 @@ class AssignmentConcurrencyPersistenceTest {
     }fail("Expected a real PostgreSQL lock waiter");}
 
     @Test void eightIndependentDraftTransactionsReachTheCheckpointBeforeAnyOfThemCommits() throws Exception {
-        Fixture f=fixture(8,true);var ready=new CountDownLatch(8);var release=new CountDownLatch(1);var pool=Executors.newFixedThreadPool(8);var jobs=new ArrayList<Future<Long>>();
+        Fixture f=fixture(8,true);
+        // Test lock independence, not cold Docker/TCP connection creation latency.
+        // Hold all eight connections at once so each worker has a ready pool slot.
+        var warmConnections=new ArrayList<java.sql.Connection>();
+        try { for(int i=0;i<8;i++)warmConnections.add(dataSource.getConnection()); }
+        finally { for(var connection:warmConnections)connection.close(); }
+        var ready=new CountDownLatch(8);var release=new CountDownLatch(1);var pool=Executors.newFixedThreadPool(8);var jobs=new ArrayList<Future<Long>>();
         try{
             for(Student u:f.students)jobs.add(pool.submit(()->tx.execute(s->{long rev=service.saveDraft(u.session,draft(f,0),u.email).revision();ready.countDown();await(release);return rev;})));
             assertTrue(ready.await(10,TimeUnit.SECONDS),"Every independent student must progress while the other transactions stay open");
