@@ -331,7 +331,7 @@ describe('self-paced vocabulary practice', () => {
         expect(await screen.findByRole('status')).toHaveTextContent('Tökéletes!');
         activate('Mentés újrapróbálása');
         const result = await screen.findByRole('heading', { name: 'Dinamikus gyakorlás teljesítve!' });
-        expect(result).toHaveFocus();
+        await waitFor(() => expect(result).toHaveFocus());
         expect(screen.getByText('1 feladatból 1 helyes válasz')).toBeInTheDocument();
         const submissions = api.post.mock.calls.filter(([url]) => url === '/vocabulary/practice/submit');
         expect(submissions).toHaveLength(2);
