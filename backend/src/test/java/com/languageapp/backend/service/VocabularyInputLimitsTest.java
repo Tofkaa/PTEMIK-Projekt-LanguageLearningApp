@@ -19,33 +19,33 @@ class VocabularyInputLimitsTest {
     @Mock UserRepository users;
     @Mock StreakService streak;
     @Mock AchievementService achievements;
+    @Mock VocabularyLookupStore lookupStore;
+    @Mock TranslationClient translations;
     @InjectMocks VocabularyService service;
 
     @Test void validatesAndLooksUpBatchWordsWithTheSameLocaleIndependentNormalization() {
-        var course=new com.languageapp.backend.entity.Course();course.setCourseId(UUID.randomUUID());
-        var user=new com.languageapp.backend.entity.User();user.setUserId(UUID.randomUUID());user.setActiveCourse(course);
-        when(users.findByEmail("test@example.test")).thenReturn(Optional.of(user));
-        when(vocabulary.findByUser_UserIdAndCourse_CourseIdAndWordIgnoreCase(any(),any(),anyString()))
-                .thenReturn(Optional.of(new com.languageapp.backend.entity.StudentVocabulary()));
+        when(lookupStore.snapshot(eq("test@example.test"),anyList())).thenReturn(new VocabularyLookupStore.Snapshot(
+                UUID.randomUUID(),UUID.randomUUID(),"en",Map.of("i",com.languageapp.backend.dto.response.VocabularyResponse.builder().word("i").build())));
         Locale previous=Locale.getDefault();
         try { Locale.setDefault(Locale.forLanguageTag("tr-TR"));service.addKnownWordsBatch("test@example.test",List.of("I")); }
         finally { Locale.setDefault(previous); }
-        verify(vocabulary).findByUser_UserIdAndCourse_CourseIdAndWordIgnoreCase(user.getUserId(),course.getCourseId(),"i");
-        verify(vocabulary,never()).save(any());
+        verify(lookupStore).snapshot("test@example.test",List.of("i"));
+        verifyNoInteractions(translations);
+
     }
 
     @Test void rejectsAnOversizedBatchBeforeAnyLookupOrTranslation() {
         assertThrows(BadRequestException.class,()->service.addKnownWordsBatch("test@example.test",Collections.nCopies(1001,"apple")));
-        verifyNoInteractions(vocabulary,users,streak,achievements);
+        verifyNoInteractions(vocabulary,users,streak,achievements,lookupStore,translations);
     }
     @Test void validatesEveryWordIncludingCaseExpansionBeforeStartingTheBatch() {
         assertThrows(BadRequestException.class,()->service.addKnownWordsBatch("test@example.test",List.of("apple","İ".repeat(100))));
-        verifyNoInteractions(vocabulary,users,streak,achievements);
+        verifyNoInteractions(vocabulary,users,streak,achievements,lookupStore,translations);
     }
     @Test void boundsLookupAndSourceBeforeAnyExternalCall() {
         assertThrows(BadRequestException.class,()->service.lookupAndSaveWord("test@example.test","x".repeat(101),"source"));
         assertThrows(BadRequestException.class,()->service.lookupAndSaveWord("test@example.test","apple","x".repeat(51)));
-        verifyNoInteractions(vocabulary,users,streak,achievements);
+        verifyNoInteractions(vocabulary,users,streak,achievements,lookupStore,translations);
     }
     @Test void boundsDynamicResultListsAndNestedWordsBeforeRewardOrDatabaseWork() {
         var answer=new DynamicPracticeSubmitRequest.AnswerResult();answer.setTargetWord("apple");
@@ -53,6 +53,6 @@ class VocabularyInputLimitsTest {
         assertThrows(BadRequestException.class,()->service.processDynamicPracticeSession("test@example.test",request));
         request.setResults(List.of(answer));answer.setTargetWord("x".repeat(101));
         assertThrows(BadRequestException.class,()->service.processDynamicPracticeSession("test@example.test",request));
-        verifyNoInteractions(vocabulary,users,streak,achievements);
+        verifyNoInteractions(vocabulary,users,streak,achievements,lookupStore,translations);
     }
 }

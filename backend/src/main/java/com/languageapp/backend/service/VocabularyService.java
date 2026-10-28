@@ -1,12 +1,9 @@
 package com.languageapp.backend.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.languageapp.backend.dto.request.DynamicPracticeSubmitRequest;
 import com.languageapp.backend.dto.response.DynamicExerciseDTO;
 import com.languageapp.backend.dto.response.VocabularyDetailDTO;
 import com.languageapp.backend.dto.response.VocabularyResponse;
-import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.StudentVocabulary;
 import com.languageapp.backend.entity.User;
 import com.languageapp.backend.exception.ForbiddenException;
@@ -17,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 import java.time.Instant;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
@@ -32,78 +28,21 @@ public class VocabularyService {
 
     private final StudentVocabularyRepository vocabularyRepository;
     private final UserRepository userRepository;
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final VocabularyLookupStore lookupStore;
+    private final TranslationClient translations;
     private final StreakService streakService;
     private final AchievementService achievementService;
 
-    @Transactional
-    public VocabularyResponse lookupAndSaveWord(String email, String word, String source) {
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NEVER)
+    public VocabularyResponse lookupAndSaveWord(String email,String word,String source) {
         com.languageapp.backend.validation.AnswerLimits.requireWord(word);
-        String cleanWord = word.trim().toLowerCase(Locale.ROOT);
-        com.languageapp.backend.validation.AnswerLimits.requireWord(cleanWord);
-        if (source != null && source.length() > 50)
-            throw new com.languageapp.backend.exception.BadRequestException("A szótári forrás legfeljebb 50 karakter lehet.");
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        // Fetch the user's currently active course for multi-language support
-        Course activeCourse = user.getActiveCourse();
-
-        // Check if the word already exists in the vocabulary specific to the user's active course
-        Optional<StudentVocabulary> existing = vocabularyRepository.findByUser_UserIdAndCourse_CourseIdAndWordIgnoreCase(user.getUserId(), activeCourse.getCourseId(), cleanWord);
-
-        if (existing.isPresent()) {
-            StudentVocabulary voc = existing.get();
-            return buildVocabularyResponse(voc, false);
-        }
-
-        // Fetch translation dynamically using the active course's language code (e.g., 'es', 'de')
-        String translation = fetchTranslationFromExternalApi(cleanWord, activeCourse.getLanguageCode());
-
-        StudentVocabulary newVoc = new StudentVocabulary();
-        newVoc.setUser(user);
-
-        // Associate the newly saved word with the user's active course
-        newVoc.setCourse(activeCourse);
-        newVoc.setWord(cleanWord);
-        newVoc.setTranslation(translation);
-        newVoc.setSource(source != null ? source : "DICTIONARY");
-
-        newVoc = vocabularyRepository.save(newVoc);
-
-        log.info("New word '{}' added to user {}'s {} vocabulary", cleanWord, email, activeCourse.getLanguageCode());
-
-        achievementService.checkAndAwardAchievements(user, -1);
-        return buildVocabularyResponse(newVoc, true);
-    }
-
-    /**
-     * External API Call for fetching translation from MyMemory API.
-     * Dynamically injects the target course's language code for correct translation pairing.
-     */
-    private String fetchTranslationFromExternalApi(String word, String courseCode) {
-        try {
-            String cleanWord = word.trim().toLowerCase(Locale.ROOT);
-
-            // Construct the dynamic URL using the courseCode variable
-            String url = "https://api.mymemory.translated.net/get?q={word}&langpair=" + courseCode + "|hu";
-
-            String response = restTemplate.getForObject(url, String.class, cleanWord);
-
-            JsonNode root = objectMapper.readTree(response);
-            String translatedText = root.path("responseData").path("translatedText").asText();
-
-            if (translatedText != null && !translatedText.isEmpty() && !translatedText.contains("MYMEMORY WARNING")) {
-                return translatedText;
-            } else {
-                return "Ismeretlen jelentés";
-            }
-
-        } catch (Exception e) {
-            log.error("Hiba a külső szótár API hívásakor a '{}' szóra: {}", word, e.getMessage());
-            return "Fordítás nem érhető el";
-        }
+        String normalized=word.trim().toLowerCase(Locale.ROOT);
+        com.languageapp.backend.validation.AnswerLimits.requireWord(normalized);
+        if(source!=null && source.length()>50)throw new com.languageapp.backend.exception.BadRequestException("A szótári forrás legfeljebb 50 karakter lehet.");
+        var snapshot=lookupStore.snapshot(email,List.of(normalized));
+        var existing=snapshot.existing().get(normalized);if(existing!=null)return existing;
+        String translation=translations.translateAll(snapshot.language(),List.of(normalized)).get(normalized);
+        return lookupStore.saveLookup(email,snapshot,normalized,translation,source);
     }
 
     /**
@@ -213,40 +152,16 @@ public class VocabularyService {
      * This means the user presumably already knew the meaning well enough to grant them a srs level of 2.
      * The batch process now respects the multi-language boundary.
      */
-    @Transactional
-    public void addKnownWordsBatch(String email, List<String> words) {
-        if (words == null || words.isEmpty()) return;
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NEVER)
+    public void addKnownWordsBatch(String email,List<String> words) {
+        if(words==null || words.isEmpty())return;
         com.languageapp.backend.validation.AnswerLimits.requireWords(words);
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        // Establish context of the current active language course
-        Course activeCourse = user.getActiveCourse();
-
-        for (String word : words) {
-            String cleanWord = word.trim().toLowerCase(Locale.ROOT);
-
-            // Prevent duplicates within the same language course
-            if (vocabularyRepository.findByUser_UserIdAndCourse_CourseIdAndWordIgnoreCase(user.getUserId(), activeCourse.getCourseId(), cleanWord).isPresent()) {
-                continue;
-            }
-
-            String translation = fetchTranslationFromExternalApi(cleanWord, activeCourse.getLanguageCode());
-
-            StudentVocabulary newVoc = new StudentVocabulary();
-            newVoc.setUser(user);
-            newVoc.setCourse(activeCourse); // Link to course
-            newVoc.setWord(cleanWord);
-            newVoc.setTranslation(translation);
-            newVoc.setSource("AUTO_LEARNED");
-            newVoc.setSrsLevel(2);
-            newVoc.setNextPracticeAt(clock.instant().plus(3, ChronoUnit.DAYS));
-            newVoc.setLastPracticedAt(clock.instant());
-
-            vocabularyRepository.save(newVoc);
-        }
-        achievementService.checkAndAwardAchievements(user, -1);
+        List<String> normalized=words.stream().map(word->word.trim().toLowerCase(Locale.ROOT)).distinct().toList();
+        var snapshot=lookupStore.snapshot(email,normalized);
+        List<String> missing=normalized.stream().filter(word->!snapshot.existing().containsKey(word)).toList();
+        if(missing.isEmpty())return;
+        var translated=translations.translateAll(snapshot.language(),missing);
+        lookupStore.saveKnown(email,snapshot,translated);
     }
 
     /**

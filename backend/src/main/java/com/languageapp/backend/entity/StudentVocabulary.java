@@ -16,7 +16,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "student_vocabulary", indexes = {
+@Table(name = "student_vocabulary", uniqueConstraints = @UniqueConstraint(name="uk_vocab_user_course_word",columnNames={"user_id","course_id","word"}), indexes = {
         @Index(name = "idx_vocab_user_course_due", columnList = "user_id, course_id, next_practice_at")
 })
 public class StudentVocabulary {

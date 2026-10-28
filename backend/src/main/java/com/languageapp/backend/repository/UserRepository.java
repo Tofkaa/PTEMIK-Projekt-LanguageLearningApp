@@ -17,6 +17,11 @@ import java.util.UUID;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
 
+    record VocabularyContext(UUID userId, UUID courseId, String language) { }
+    @Query("select new com.languageapp.backend.repository.UserRepository$VocabularyContext(u.userId,c.courseId,c.languageCode) "
+            + "from User u left join u.activeCourse c where u.email=:email and u.isActive=true and u.role<>com.languageapp.backend.enums.Role.DELETED")
+    Optional<VocabularyContext> findVocabularyContext(@Param("email") String email);
+
     Optional<User> findByEmail(String email);
     boolean existsByEmailIgnoreCase(String email);
 

@@ -17,6 +17,13 @@ import java.util.UUID;
  */
 @Repository
 public interface StudentVocabularyRepository extends JpaRepository<StudentVocabulary, UUID> {
+    record LookupWord(java.util.UUID id,String word,String translation,int level,java.time.Instant nextPractice) { }
+    @org.springframework.data.jpa.repository.Query("select new com.languageapp.backend.repository.StudentVocabularyRepository$LookupWord(v.vocabularyId,v.word,v.translation,v.srsLevel,v.nextPracticeAt) "
+            + "from StudentVocabulary v where v.user.userId=:userId and v.course.courseId=:courseId and lower(v.word) in :words")
+    java.util.List<LookupWord> findLookupWordSnapshots(java.util.UUID userId,java.util.UUID courseId,java.util.Collection<String> words);
+    @org.springframework.data.jpa.repository.Query("select v from StudentVocabulary v where v.user.userId=:userId and v.course.courseId=:courseId and lower(v.word) in :words")
+    java.util.List<StudentVocabulary> findLookupWords(java.util.UUID userId,java.util.UUID courseId,java.util.Collection<String> words);
+
 
     // --- GLOBÁLIS METÓDUSOK (AchievementService és Tesztek használják) ---
 
