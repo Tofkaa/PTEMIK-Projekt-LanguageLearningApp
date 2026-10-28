@@ -562,28 +562,28 @@ class SecurityFoundationsPersistenceTest {
     String resetBody(String token,String password) {return "{\"token\":\""+token+"\",\"newPassword\":\""+password+"\"}";}
     @Test void resettingThePasswordRevokesEveryRefreshSessionAndPermitsANewLogin() throws Exception {
         var f=fixture();String first=seedSession(f.student),second=seedSession(f.student),reset=seedReset(f.student,60);
-        for(String raw:List.of(first,second)) mvc.perform(post("/api/auth/refresh").cookie(new MockCookie("refreshToken",raw))).andExpect(status().isOk());
-        mvc.perform(post("/api/auth/reset-password").contentType(MediaType.APPLICATION_JSON).content(resetBody(reset,"Foundation-new-password"))).andExpect(status().isOk());
+        for(String raw:List.of(first,second)) mvc.perform(post("/api/auth/refresh").header("Origin","http://localhost:5173").cookie(new MockCookie("refreshToken",raw))).andExpect(status().isOk());
+        mvc.perform(post("/api/auth/reset-password").header("Origin","http://localhost:5173").contentType(MediaType.APPLICATION_JSON).content(resetBody(reset,"Foundation-new-password"))).andExpect(status().isOk());
         assertTrue(encoder.matches("Foundation-new-password",users.findById(f.student.getUserId()).orElseThrow().getPasswordHash()));
         for(String raw:List.of(first,second)) {
             assertTrue(refresh.findByRawToken(raw).isEmpty());
-            mvc.perform(post("/api/auth/refresh").cookie(new MockCookie("refreshToken",raw))).andExpect(status().isBadRequest());
+            mvc.perform(post("/api/auth/refresh").header("Origin","http://localhost:5173").cookie(new MockCookie("refreshToken",raw))).andExpect(status().isBadRequest());
         }
-        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/auth/login").header("Origin","http://localhost:5173").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\""+f.student.getEmail()+"\",\"password\":\"Foundation-new-password\"}"))
                 .andExpect(status().isOk()).andExpect(cookie().httpOnly("refreshToken",true)).andExpect(cookie().secure("refreshToken",true));
     }
     @Test void anExpiredResetLeavesTheExistingPasswordAndSessionIntact() throws Exception {
         var f=fixture();String raw=seedSession(f.student),reset=seedReset(f.student,-1);
-        mvc.perform(post("/api/auth/reset-password").contentType(MediaType.APPLICATION_JSON).content(resetBody(reset,"Foundation-new-password"))).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/auth/reset-password").header("Origin","http://localhost:5173").contentType(MediaType.APPLICATION_JSON).content(resetBody(reset,"Foundation-new-password"))).andExpect(status().isBadRequest());
         assertTrue(encoder.matches("Foundation-old-password",users.findById(f.student.getUserId()).orElseThrow().getPasswordHash()));
         assertTrue(refresh.findByRawToken(raw).isPresent());
     }
     @Test void aConsumedResetCannotRevokeANewerLoginSession() throws Exception {
         var f=fixture();String reset=seedReset(f.student,60);
-        mvc.perform(post("/api/auth/reset-password").contentType(MediaType.APPLICATION_JSON).content(resetBody(reset,"Foundation-new-password"))).andExpect(status().isOk());
+        mvc.perform(post("/api/auth/reset-password").header("Origin","http://localhost:5173").contentType(MediaType.APPLICATION_JSON).content(resetBody(reset,"Foundation-new-password"))).andExpect(status().isOk());
         String newSession=refresh.createRefreshToken(f.student.getUserId());
-        mvc.perform(post("/api/auth/reset-password").contentType(MediaType.APPLICATION_JSON).content(resetBody(reset,"Foundation-other-password"))).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/auth/reset-password").header("Origin","http://localhost:5173").contentType(MediaType.APPLICATION_JSON).content(resetBody(reset,"Foundation-other-password"))).andExpect(status().isBadRequest());
         assertTrue(refresh.findByRawToken(newSession).isPresent());
         assertTrue(encoder.matches("Foundation-new-password",users.findById(f.student.getUserId()).orElseThrow().getPasswordHash()));
     }

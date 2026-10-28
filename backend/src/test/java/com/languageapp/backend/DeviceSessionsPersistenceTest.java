@@ -76,14 +76,14 @@ class DeviceSessionsPersistenceTest {
         });
     }
     Login login(User u) throws Exception {
-        var response=mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+        var response=mvc.perform(post("/api/auth/login").header("Origin","http://localhost:5173").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\""+u.getEmail()+"\",\"password\":\"Session-old-password\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse();
         String access=com.jayway.jsonpath.JsonPath.read(response.getContentAsString(),"$.accessToken");
         return new Login(access,response.getCookie("refreshToken").getValue());
     }
     String refresh(Login login) throws Exception {
-        var response=mvc.perform(post("/api/auth/refresh").cookie(new MockCookie("refreshToken",login.refresh)))
+        var response=mvc.perform(post("/api/auth/refresh").header("Origin","http://localhost:5173").cookie(new MockCookie("refreshToken",login.refresh)))
                 .andExpect(status().isOk()).andReturn().getResponse();
         return com.jayway.jsonpath.JsonPath.read(response.getContentAsString(),"$.accessToken");
     }
@@ -91,7 +91,7 @@ class DeviceSessionsPersistenceTest {
         mvc.perform(get("/api/users/me").header("Authorization","Bearer "+token)).andExpect(status().is(code));
     }
     void logout(Login login) throws Exception {
-        mvc.perform(post("/api/auth/logout").cookie(new MockCookie("refreshToken",login.refresh)))
+        mvc.perform(post("/api/auth/logout").header("Origin","http://localhost:5173").cookie(new MockCookie("refreshToken",login.refresh)))
                 .andExpect(status().isOk()).andExpect(cookie().maxAge("refreshToken",0));
     }
     String signed(User user, Map<String,Object> claims) {
@@ -107,7 +107,7 @@ class DeviceSessionsPersistenceTest {
         profile(first.access,200);profile(second.access,200);
         String renewedFirst=refresh(first);assertEquals(jwt.extractSessionId(first.access),jwt.extractSessionId(renewedFirst));
         logout(first);profile(first.access,401);profile(renewedFirst,401);
-        mvc.perform(post("/api/auth/refresh").cookie(new MockCookie("refreshToken",first.refresh))).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/auth/refresh").header("Origin","http://localhost:5173").cookie(new MockCookie("refreshToken",first.refresh))).andExpect(status().isBadRequest());
         profile(second.access,200);profile(refresh(second),200);
         logout(first); // idempotent even when the original session is already gone
         profile(second.access,200);
@@ -118,11 +118,11 @@ class DeviceSessionsPersistenceTest {
             var token=new PasswordResetToken();token.setUser(em.getReference(User.class,u.getUserId()));
             token.setToken(reset);token.setExpiryDate(clock.instant().plusSeconds(60));em.persist(token);
         });
-        mvc.perform(post("/api/auth/reset-password").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/auth/reset-password").header("Origin","http://localhost:5173").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"token\":\""+reset+"\",\"newPassword\":\"Session-new-password\"}")).andExpect(status().isOk());
         for(var old:List.of(first,second)) {
             profile(old.access,401);
-            mvc.perform(post("/api/auth/refresh").cookie(new MockCookie("refreshToken",old.refresh))).andExpect(status().isBadRequest());
+            mvc.perform(post("/api/auth/refresh").header("Origin","http://localhost:5173").cookie(new MockCookie("refreshToken",old.refresh))).andExpect(status().isBadRequest());
         }
     }
     @Test void sidlessMalformedUnknownAndOtherUsersSessionIdsCannotAuthenticate() throws Exception {
@@ -135,13 +135,13 @@ class DeviceSessionsPersistenceTest {
         var u=fixture();var login=login(u);
         tx.executeWithoutResult(status -> records.findById(jwt.extractSessionId(login.access)).orElseThrow().setExpiryDate(clock.instant()));
         profile(login.access,401);
-        mvc.perform(post("/api/auth/refresh").cookie(new MockCookie("refreshToken",login.refresh))).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/auth/refresh").header("Origin","http://localhost:5173").cookie(new MockCookie("refreshToken",login.refresh))).andExpect(status().isBadRequest());
     }
     @Test void disabledAccountCannotRefreshOrUsePreviouslyIssuedAccess() throws Exception {
         var u=fixture();var login=login(u);
         tx.executeWithoutResult(status -> users.findById(u.getUserId()).orElseThrow().setActive(false));
         profile(login.access,401);
-        mvc.perform(post("/api/auth/refresh").cookie(new MockCookie("refreshToken",login.refresh))).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/auth/refresh").header("Origin","http://localhost:5173").cookie(new MockCookie("refreshToken",login.refresh))).andExpect(status().isBadRequest());
         assertThrows(com.languageapp.backend.exception.BadRequestException.class,()->sessions.createSession(u.getUserId()));
     }
     @Test void authoritiesAreReloadedAndAnOldAdminClaimCannotBypassDemotion() throws Exception {

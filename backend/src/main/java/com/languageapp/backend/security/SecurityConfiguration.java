@@ -38,6 +38,7 @@ import java.util.List;
 public class SecurityConfiguration {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final BrowserOriginPolicy browserOriginPolicy;
     private final CustomUserDetailsService userDetailsService;
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
@@ -63,7 +64,8 @@ public class SecurityConfiguration {
                 // Enable CORS with custom configuration
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
-                // Disable CSRF since we use stateless JWT authentication
+                // Bearer APIs do not authenticate with cookies. Cookie-issuing/consuming APIs
+                // instead require the configured Origin via BrowserOriginFilter; OAuth GET callbacks use state.
                 .csrf(AbstractHttpConfigurer::disable)
 
                 // Define authorization rules for HTTP requests
@@ -82,7 +84,7 @@ public class SecurityConfiguration {
                         .failureHandler(oAuth2AuthenticationFailureHandler)
                 )
 
-                // Enforce stateless session management (no server-side HTTP sessions)
+                // API authentication is stateless; OAuth state/handoff intentionally uses a temporary HTTP session.
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
@@ -101,6 +103,7 @@ public class SecurityConfiguration {
 
                 // Insert the JWT filter before the standard Spring UsernamePassword filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new BrowserOriginFilter(browserOriginPolicy), JwtAuthenticationFilter.class)
                 .addFilterAfter(new AnswerPayloadFilter(objectMapper, clock), org.springframework.security.web.access.intercept.AuthorizationFilter.class);
 
         http.oauth2Login(oauth2 -> oauth2.addObjectPostProcessor(
@@ -124,13 +127,8 @@ public class SecurityConfiguration {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allowed origin patterns
-        configuration.setAllowedOriginPatterns(List.of(
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost",
-                "https://localhost"
-        ));
+        // One explicit frontend origin, shared with the cookie API CSRF policy.
+        configuration.setAllowedOrigins(List.of(browserOriginPolicy.origin()));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
 

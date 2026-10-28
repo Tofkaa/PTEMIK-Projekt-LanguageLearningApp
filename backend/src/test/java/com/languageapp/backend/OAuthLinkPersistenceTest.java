@@ -138,7 +138,7 @@ class OAuthLinkPersistenceTest {
         Account a=account();String subject=subject();long count=users.count();String proof=proof(a,provider,subject);
         assertEquals(count,users.count());assertTrue(identities.findUserId(AuthProvider.valueOf(provider.toUpperCase()),subject).isEmpty());
         assertEquals(1,sessionRows.findAll().stream().filter(row -> row.getUser().getUserId().equals(a.user.getUserId())).count());
-        mvc.perform(post("/api/oauth-links/preview").header("Authorization","Bearer "+a.access)
+        mvc.perform(post("/api/oauth-links/preview").header("Origin","http://localhost:5173").header("Authorization","Bearer "+a.access)
                 .cookie(new MockCookie("refreshToken",a.session.rawToken())).contentType("application/json").content(json.writeValueAsString(Map.of("proof",proof))))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"));
         assertFalse(links.preview(a.user.getEmail(),a.session.id(),a.session.rawToken(),proof).linked());
@@ -213,7 +213,7 @@ class OAuthLinkPersistenceTest {
         Account a=account();links.request(a.user.getEmail(),a.session.id(),a.session.rawToken(),"google");
         String wrong="000000".equals(codes.get(a.user.getEmail()))?"111111":"000000";
         for(int n=1;n<=5;n++) {
-            mvc.perform(post("/api/oauth-links/verify").header("Authorization","Bearer "+a.access).cookie(new MockCookie("refreshToken",a.session.rawToken()))
+            mvc.perform(post("/api/oauth-links/verify").header("Origin","http://localhost:5173").header("Authorization","Bearer "+a.access).cookie(new MockCookie("refreshToken",a.session.rawToken()))
                     .contentType("application/json").content(json.writeValueAsString(Map.of("code",wrong)))).andExpect(status().isBadRequest());
             assertEquals(n,intents.findById(a.user.getUserId()).orElseThrow().getFailedAttempts());
         }

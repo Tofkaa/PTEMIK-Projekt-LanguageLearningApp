@@ -76,11 +76,11 @@ class PasswordChangeSessionsPersistenceTest {
                 .content("{\"currentPassword\":\""+OLD+"\",\"newPassword\":\""+NEW+"\"}")).andExpect(status().isOk());
         assertEquals(0,count(f));assertEquals(1,count(other));
         for(String access:List.of(currentJwt,secondJwt))mvc.perform(get("/api/users/me").header("Authorization",access)).andExpect(status().isUnauthorized());
-        for(String raw:List.of(current.rawToken(),second.rawToken()))mvc.perform(post("/api/auth/refresh").cookie(new MockCookie("refreshToken",raw))).andExpect(status().isBadRequest());
+        for(String raw:List.of(current.rawToken(),second.rawToken()))mvc.perform(post("/api/auth/refresh").header("Origin","http://localhost:5173").cookie(new MockCookie("refreshToken",raw))).andExpect(status().isBadRequest());
         mvc.perform(get("/api/users/me").header("Authorization",otherJwt)).andExpect(status().isOk());
         assertThrows(BadCredentialsException.class,()->authentication.authenticate(login(f,OLD)));
         assertNotNull(authentication.authenticate(login(f,NEW)).responseDto().getAccessToken());assertEquals(1,count(f));
-        mvc.perform(post("/api/auth/logout").cookie(new MockCookie("refreshToken",current.rawToken())))
+        mvc.perform(post("/api/auth/logout").header("Origin","http://localhost:5173").cookie(new MockCookie("refreshToken",current.rawToken())))
                 .andExpect(status().isOk()).andExpect(header().string("Set-Cookie",org.hamcrest.Matchers.containsString("Max-Age=0")));
     }
     @Test void rejectedCurrentOrNewPasswordLeavesCredentialsAndSessionsIntact(){
