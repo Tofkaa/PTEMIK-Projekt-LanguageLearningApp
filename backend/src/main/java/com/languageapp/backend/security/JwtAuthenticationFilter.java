@@ -68,7 +68,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             userDetails, null, userDetails.getAuthorities()
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    var context=SecurityContextHolder.createEmptyContext();
+                    context.setAuthentication(authToken);
+                    SecurityContextHolder.setContext(context);
+                    // Retain authentication for this request's async SSE completion only, never in an HTTP session.
+                    new org.springframework.security.web.context.RequestAttributeSecurityContextRepository()
+                            .saveContext(context,request,response);
                 }
             }
         } catch (JwtException e) {

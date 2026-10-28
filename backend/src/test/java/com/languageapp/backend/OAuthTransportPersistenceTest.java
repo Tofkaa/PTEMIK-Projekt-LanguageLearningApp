@@ -121,8 +121,12 @@ class OAuthTransportPersistenceTest {
         var value=handoff("google");var login=exchange.exchange(new OAuthLoginController.Exchange(value.code),"https://localhost",value.request);
         String token=login.getBody().accessToken();
         mvc.perform(get("/api/notifications/stream").param("token",token)).andExpect(status().isUnauthorized());verifyNoInteractions(sse);
-        when(sse.subscribe(eq(value.user.getEmail()),anyLong())).thenAnswer(call->{long ttl=call.getArgument(1);assertTrue(ttl>0 && ttl<=300000);return new SseEmitter(ttl);});
-        mvc.perform(get("/api/notifications/stream").header("Authorization","Bearer "+token)).andExpect(status().isOk()).andExpect(request().asyncStarted());
+        var opened=new java.util.concurrent.atomic.AtomicReference<SseEmitter>();
+        when(sse.subscribe(eq(value.user.getEmail()),anyLong())).thenAnswer(call->{long ttl=call.getArgument(1);assertTrue(ttl>0 && ttl<=300000);var emitter=new SseEmitter(ttl);opened.set(emitter);return emitter;});
+        var stream=mvc.perform(get("/api/notifications/stream").header("Authorization","Bearer "+token))
+                .andExpect(status().isOk()).andExpect(request().asyncStarted()).andReturn();
+        opened.get().complete();
+        mvc.perform(asyncDispatch(stream)).andExpect(status().isOk());
         verify(sse).subscribe(eq(value.user.getEmail()),anyLong());
     }
 }
