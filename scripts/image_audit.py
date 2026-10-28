@@ -2,6 +2,7 @@
 import argparse
 from collections import Counter
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -37,6 +38,19 @@ def run(command, **kwargs):
     return subprocess.run(command, check=True, timeout=1200, **kwargs)
 
 
+def scanner_identity():
+    # Bind-mounted files must remain removable by the non-root Linux CI runner.
+    # Windows Docker Desktop maps host filesystem permissions separately.
+    return ["--user", f"{os.getuid()}:{os.getgid()}"] if os.name == "posix" else []
+
+
+def scanner_command(mounts, *arguments, offline=False):
+    command = ["docker", "run", "--rm", *scanner_identity(), "--env", "HOME=/tmp"]
+    if offline:
+        command += ["--network", "none"]
+    return [*command, *mounts, TRIVY, "--cache-dir", "/cache", *arguments]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("images", nargs="+", help="Explicit local images; never running containers")
@@ -51,7 +65,7 @@ def main():
         work = Path(folder)
         cache = args.cache_dir.resolve() if args.cache_dir else work / "cache"
         cache.mkdir(parents=True, exist_ok=True)
-        mounts = ["-v", f"{work}:/scan", "-v", f"{cache}:/root/.cache/trivy"]
+        mounts = ["-v", f"{work}:/scan", "-v", f"{cache}:/cache"]
         for index, image in enumerate(args.images):
             identifier = run(["docker", "image", "inspect", image, "--format", "{{.Id}}"],
                              capture_output=True, text=True).stdout.strip()
@@ -59,14 +73,14 @@ def main():
                 raise ValueError("Docker did not identify a local image")
             # Use the immutable local ID after inspect so a tag race cannot change the scan target.
             run(["docker", "image", "save", "--output", str(work / "image.tar"), identifier])
-            run(["docker", "run", "--rm", *mounts, TRIVY, "image", "--input", "/scan/image.tar",
-                 "--scanners", "vuln", "--list-all-pkgs", "--format", "json",
-                 "--output", "/scan/report.json", "--no-progress"])
+            run(scanner_command(mounts, "image", "--input", "/scan/image.tar",
+                                "--scanners", "vuln", "--list-all-pkgs", "--format", "json",
+                                "--output", "/scan/report.json", "--no-progress"))
             report = json.loads((work / "report.json").read_text(encoding="utf-8"))
             vulnerabilities = findings(report)
             # Converting the same complete scan provides an image inventory, not a second scan.
-            run(["docker", "run", "--rm", "--network", "none", *mounts, TRIVY,
-                 "convert", "--format", "cyclonedx", "--output", "/scan/sbom.json", "/scan/report.json"])
+            run(scanner_command(mounts, "convert", "--format", "cyclonedx",
+                                "--output", "/scan/sbom.json", "/scan/report.json", offline=True))
             (destination / f"image-{index}.json").write_text(
                 json.dumps(report, indent=2) + "\n", encoding="utf-8")
             sbom = json.loads((work / "sbom.json").read_text(encoding="utf-8"))
