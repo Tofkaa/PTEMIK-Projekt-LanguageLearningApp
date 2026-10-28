@@ -5,3 +5,8 @@ target/
 .mvn/
 mvnw
 mvnw.cmd
+.env
+.env.*
+database/manual/
+*.dump
+*.log

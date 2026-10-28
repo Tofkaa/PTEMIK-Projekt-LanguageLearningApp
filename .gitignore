@@ -14,3 +14,4 @@ rootCA-key.pem
 
 # Local quality-gate Python bytecode
 /scripts/__pycache__/
+/.quality-reports/

@@ -2,7 +2,8 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15-alpine
+    build: ./database
+    image: languageapp-postgres
     container_name: language_app_db
     restart: always
     environment:

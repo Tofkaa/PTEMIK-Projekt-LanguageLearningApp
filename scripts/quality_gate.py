@@ -17,8 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCES = ROOT / "backend/src/test/java"
 REPORTS = ROOT / "backend/target/surefire-reports"
 MANIFEST = Path(__file__).with_name("database-tests.json")
-# PostgreSQL 15 Alpine, pinned to the same image locally and in CI.
-POSTGRES_IMAGE = "postgres:15-alpine@sha256:5fe8ca7fc662071188c30271cb870d1ce9a6ec4578c934b064697ae77a9241e1"
+POSTGRES_BUILD = ROOT / "database"
 GUARD = re.compile(
     r'@EnabledIfEnvironmentVariable\(named\s*=\s*"(\w+)"\s*,\s*matches\s*=\s*'
     r'"jdbc:postgresql://\[\^/\]\+/([a-z_]+)\[a-zA-Z0-9_\]\+"\)'
@@ -103,9 +102,13 @@ class DisposablePostgres:
 
     def __enter__(self):
         env = dict(os.environ, POSTGRES_PASSWORD=self.password)
+        built = run(["docker", "build", "--quiet", str(POSTGRES_BUILD)],
+                    capture_output=True, text=True).stdout.strip()
+        if not re.fullmatch(r"sha256:[a-f0-9]{64}", built):
+            raise RuntimeError("Docker did not return the isolated PostgreSQL image ID")
         result = run(["docker", "create", "--label", "languageapp.quality=disposable",
                       "-e", "POSTGRES_PASSWORD", "-e", "POSTGRES_USER=app_user",
-                      "-p", "127.0.0.1::5432", POSTGRES_IMAGE],
+                      "-p", "127.0.0.1::5432", built],
                      env=env, capture_output=True, text=True)
         identifier = result.stdout.strip()
         if not re.fullmatch(r"[a-f0-9]{64}", identifier):

@@ -78,6 +78,8 @@ class GateSafetyTest(unittest.TestCase):
     def test_failed_work_removes_only_its_own_container_and_volume(self):
         identifier = "a" * 64
         def docker(command, **kwargs):
+            if "build" in command:
+                return SimpleNamespace(stdout="sha256:" + "c" * 64)
             return SimpleNamespace(stdout="127.0.0.1:45678\n" if "port" in command else identifier)
         with patch("quality_gate.run", side_effect=docker) as commands, \
                 patch("quality_gate.subprocess.run", return_value=SimpleNamespace(returncode=0)):
@@ -86,7 +88,7 @@ class GateSafetyTest(unittest.TestCase):
                     raise RuntimeError("simulated failure")
         self.assertEqual(commands.call_args.args[0],
                          ["docker", "rm", "--force", "--volumes", identifier])
-        creation = commands.call_args_list[0].args[0]
+        creation = next(call.args[0] for call in commands.call_args_list if "create" in call.args[0])
         self.assertIn("127.0.0.1::5432", creation)
         self.assertNotIn("--mount", creation)
         self.assertNotIn("--volume", creation)
@@ -94,6 +96,8 @@ class GateSafetyTest(unittest.TestCase):
     def test_failed_start_still_cleans_created_container(self):
         identifier = "b" * 64
         def docker(command, **kwargs):
+            if "build" in command:
+                return SimpleNamespace(stdout="sha256:" + "c" * 64)
             if "start" in command:
                 raise RuntimeError("start failed")
             return SimpleNamespace(stdout=identifier)
