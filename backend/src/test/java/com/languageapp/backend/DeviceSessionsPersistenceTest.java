@@ -48,6 +48,7 @@ class DeviceSessionsPersistenceTest {
     @Autowired RefreshTokenService sessions;
     @Autowired AuthenticationService authentication;
     @Autowired OAuth2AuthenticationSuccessHandler oauthSuccess;
+    @Autowired com.languageapp.backend.controller.OAuthLoginController exchange;
     @Autowired FederatedIdentityService federated;
     @Autowired JwtService jwt;
     @Autowired PasswordEncoder encoder;
@@ -237,12 +238,15 @@ class DeviceSessionsPersistenceTest {
         var binding=federated.bind(new OAuthClaims(com.languageapp.backend.enums.AuthProvider.GOOGLE,"test-subject",u.getEmail(),u.getName(),null));
         var principal=new FederatedOAuth2User(binding,providerUser);
         var response=new MockHttpServletResponse();
-        oauthSuccess.onAuthenticationSuccess(new MockHttpServletRequest(),response,
+        var browser=new MockHttpServletRequest();
+        oauthSuccess.onAuthenticationSuccess(browser,response,
                 new org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken(principal,principal.getAuthorities(),"google"));
         String redirected=response.getRedirectedUrl();assertNotNull(redirected);
-        String access=redirected.substring(redirected.indexOf("?token=")+7);
+        assertFalse(redirected.contains("?token="));String code=redirected.substring(redirected.indexOf("#code=")+6);
+        var redeemed=exchange.exchange(new com.languageapp.backend.controller.OAuthLoginController.Exchange(code),"http://localhost:5173",browser);
+        String access=redeemed.getBody().accessToken();
         assertNotNull(jwt.extractSessionId(access));assertNotEquals(jwt.extractSessionId(previous.access),jwt.extractSessionId(access));
         profile(previous.access,200);profile(access,200);
-        assertTrue(response.getHeader("Set-Cookie").contains("HttpOnly"));
+        assertTrue(redeemed.getHeaders().getFirst("Set-Cookie").contains("HttpOnly"));
     }
 }

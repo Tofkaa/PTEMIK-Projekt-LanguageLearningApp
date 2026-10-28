@@ -210,7 +210,7 @@ describe('persistent settings feedback and grading', () => {
             <Route path="/login" element={<Login />} />
         </Routes></MemoryRouter>);
         expect(await screen.findByRole('heading', { name: 'Bejelentkezés' })).toBeInTheDocument();
-        expect(screen.getByRole('alert')).toHaveTextContent('Hiányzó azonosító token.');
+        expect(screen.getByRole('alert')).toHaveTextContent('Hiányzó belépési jóváhagyás. Indíts új közösségi belépést.');
         expect(api.get).not.toHaveBeenCalled();
         expect(api.post).not.toHaveBeenCalled();
     });

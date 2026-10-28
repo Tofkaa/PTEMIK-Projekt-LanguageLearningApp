@@ -57,6 +57,12 @@ public class GlobalExceptionHandler {
                 HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI()));
     }
 
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedContentType(org.springframework.web.HttpMediaTypeNotSupportedException ex,HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).headers(ex.getHeaders()).body(buildErrorResponse(
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE,"Nem támogatott tartalomtípus.",request.getRequestURI()));
+    }
+
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleUnsupportedMethod(
             HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {

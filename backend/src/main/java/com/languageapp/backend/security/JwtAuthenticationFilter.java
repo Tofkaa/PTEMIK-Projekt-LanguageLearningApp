@@ -42,13 +42,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String authHeader = request.getHeader("Authorization");
 
-        if (authHeader == null && request.getRequestURI().endsWith("/stream")) {
-            String tokenParam = request.getParameter("token");
-            if (tokenParam != null) {
-                authHeader = "Bearer " + tokenParam;
-            }
-        }
-
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -79,7 +72,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (JwtException e) {
-            log.warn("JWT Authentication failed for request {}: {}", request.getRequestURI(), e.getMessage());
+            log.warn("JWT authentication rejected.");
             SecurityContextHolder.clearContext();
 
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -88,7 +81,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
 
         } catch (Exception e) {
-            log.error("An unexpected error occurred during JWT authentication filtering", e);
+            log.error("JWT authentication could not complete.");
             SecurityContextHolder.clearContext();
 
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

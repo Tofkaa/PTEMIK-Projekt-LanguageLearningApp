@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class OAuthHandlerTrustTest {
-    final FederatedIdentityService service=mock(FederatedIdentityService.class);
+    final OAuthLoginHandoff service=mock(OAuthLoginHandoff.class);
     OAuth2AuthenticationFailureHandler failure() {
         var failure=new OAuth2AuthenticationFailureHandler();ReflectionTestUtils.setField(failure,"frontendUrl","https://localhost");return failure;
     }
@@ -38,7 +38,7 @@ class OAuthHandlerTrustTest {
     }
     @Test void revocationBetweenUserinfoAndSuccessCannotIssueCredentials() throws Exception {
         var principal=new FederatedOAuth2User(new FederatedIdentityService.Binding(UUID.randomUUID(),AuthProvider.GOOGLE,"subject"),raw());
-        when(service.issueSession(principal)).thenThrow(OAuthClaims.failure("identity_unavailable"));
+        when(service.prepare(any(),eq(principal))).thenThrow(OAuthClaims.failure("identity_unavailable"));
         var response=new MockHttpServletResponse();
         success().onAuthenticationSuccess(new MockHttpServletRequest(),response,new OAuth2AuthenticationToken(principal,principal.getAuthorities(),"google"));
         assertNull(response.getHeader("Set-Cookie"));assertFalse(response.getRedirectedUrl().contains("token="));
@@ -53,7 +53,7 @@ class OAuthHandlerTrustTest {
 
     @Test void sessionStorageFailureReturnsAFixedRetryableFailureWithoutACookie() throws Exception {
         var principal=new FederatedOAuth2User(new FederatedIdentityService.Binding(UUID.randomUUID(),AuthProvider.GOOGLE,"subject"),raw());
-        when(service.issueSession(principal)).thenThrow(new org.springframework.dao.DataAccessResourceFailureException("test-only database unavailable"));
+        when(service.prepare(any(),eq(principal))).thenThrow(new org.springframework.dao.DataAccessResourceFailureException("test-only database unavailable"));
         var response=new MockHttpServletResponse();
         success().onAuthenticationSuccess(new MockHttpServletRequest(),response,new OAuth2AuthenticationToken(principal,principal.getAuthorities(),"google"));
         assertEquals("https://localhost/login?oauth_error=identity_unavailable",response.getRedirectedUrl());

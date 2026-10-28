@@ -91,7 +91,7 @@ it.each(['password', 'oauth'])('preserves the invitation through %s authenticati
     rememberInvitation(invitation);
     await mount();
     api.defaults.adapter = config => Promise.resolve(response(config,
-        config.url === '/auth/login' ? { accessToken: 'new-token' } : { userId: 'new-account' }));
+        ['/auth/login', '/auth/oauth/exchange'].includes(config.url) ? { accessToken: 'new-token' } : { userId: 'new-account' }));
     await act(async () => {
         if (method === 'password') await auth.authenticate({ email: 'student@example.test', password: 'test-password', rememberMe: false });
         else await auth.completeOAuthLogin('oauth-token');
@@ -101,4 +101,21 @@ it.each(['password', 'oauth'])('preserves the invitation through %s authenticati
     await act(() => auth.logout(true));
     expect(readInvitation()).toBeNull();
     expect(getAccessToken()).toBeNull();
+});
+
+it('serializes a late OAuth exchange, logout and a newer password login without restoring the OAuth account', async () => {
+    await mount(); const calls = []; let finish;
+    api.defaults.adapter = config => {
+        calls.push(config.url);
+        if (config.url === '/auth/oauth/exchange') return new Promise(resolve => { finish = () => resolve(response(config, { accessToken: 'stale-oauth-token' })); });
+        if (config.url === '/auth/login') return Promise.resolve(response(config, { accessToken: 'current-token' }));
+        return Promise.resolve(response(config, { userId: 'current-account' }));
+    };
+    let oauth, logout, login;
+    act(() => { oauth = auth.completeOAuthLogin('one-use-code').catch(error => error.code); });
+    await waitFor(() => expect(finish).toBeTypeOf('function'));
+    act(() => { logout = auth.logout(); login = auth.authenticate({ email: 'current', password: 'test-only' }); });
+    await act(async () => { finish(); expect(await oauth).toBe('ERR_CANCELED'); await logout; await login; });
+    expect(calls).toEqual(['/auth/oauth/exchange', '/auth/logout', '/auth/login', '/users/me']);
+    expect(getAccessToken()).toBe('current-token'); expect(screen.getByLabelText('Fiók')).toHaveTextContent('current-account');
 });

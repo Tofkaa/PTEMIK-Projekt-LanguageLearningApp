@@ -150,8 +150,12 @@ class OAuthLinkPersistenceTest {
         var normal=mvc.perform(get("/oauth2/authorization/"+provider)).andExpect(status().is3xxRedirection()).andReturn();
         String normalState=URLDecoder.decode(UriComponentsBuilder.fromUriString(normal.getResponse().getRedirectedUrl()).build().getQueryParams().getFirst("state"),java.nio.charset.StandardCharsets.UTF_8);
         var login=callback(new Started((MockHttpSession)normal.getRequest().getSession(false),normalState,provider),subject,true);
-        assertTrue(login.getRedirectedUrl().contains("/oauth2/redirect?token="));assertNotNull(login.getHeader("Set-Cookie"));
-        String access=login.getRedirectedUrl().split("\\?token=")[1];assertEquals(a.user.getEmail(),jwt.extractUsername(access));
+        assertTrue(login.getRedirectedUrl().contains("/oauth2/redirect#code="));assertNull(login.getHeader("Set-Cookie"));
+        String handoff=login.getRedirectedUrl().split("#code=")[1];
+        var redeemed=mvc.perform(post("/api/auth/oauth/exchange").session((MockHttpSession)normal.getRequest().getSession(false))
+                .header("Origin","http://localhost:5173").contentType("application/json").content(json.writeValueAsString(Map.of("code",handoff))))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        String access=com.jayway.jsonpath.JsonPath.read(redeemed.getContentAsString(),"$.accessToken");assertEquals(a.user.getEmail(),jwt.extractUsername(access));
     }
     @Test void originalAndProviderEmailsNeedNotMatchButAnExistingProviderOwnerCannotBeMerged()throws Exception {
         Account owner=account(),other=account();String subject=subject();confirm(owner,proof(owner,"google",subject));

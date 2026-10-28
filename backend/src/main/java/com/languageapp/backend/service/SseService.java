@@ -28,11 +28,13 @@ public class SseService {
         heartbeatScheduler.scheduleAtFixedRate(this::sendHeartbeatToAll, 25, 25, TimeUnit.SECONDS);
     }
 
-    public SseEmitter subscribe(String email) {
-        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
+    public SseEmitter subscribe(String email) { return subscribe(email,300000); }
+    public SseEmitter subscribe(String email,long lifetimeMillis) {
+        SseEmitter emitter = new SseEmitter(Math.max(1,Math.min(300000,lifetimeMillis)));
 
-        List<SseEmitter> userEmitters = emitters.computeIfAbsent(email, k -> new CopyOnWriteArrayList<>());
-        userEmitters.add(emitter);
+        emitters.compute(email,(key,current)->{
+            var list=current==null?new CopyOnWriteArrayList<SseEmitter>():current;list.add(emitter);return list;
+        });
 
         Runnable removeCallback = () -> removeEmitter(email, emitter);
         emitter.onCompletion(removeCallback);
@@ -90,13 +92,7 @@ public class SseService {
     }
 
     private void removeEmitter(String email, SseEmitter emitter) {
-        List<SseEmitter> userEmitters = emitters.get(email);
-        if (userEmitters != null) {
-            userEmitters.remove(emitter);
-            if (userEmitters.isEmpty()) {
-                emitters.remove(email, userEmitters);
-            }
-        }
+        emitters.computeIfPresent(email,(key,current)->{current.remove(emitter);return current.isEmpty()?null:current;});
     }
 
     @PreDestroy

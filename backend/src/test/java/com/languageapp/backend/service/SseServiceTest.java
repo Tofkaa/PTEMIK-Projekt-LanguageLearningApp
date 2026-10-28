@@ -15,6 +15,8 @@ class SseServiceTest {
         sseService = new SseService();
     }
 
+    @org.junit.jupiter.api.AfterEach void stop(){sseService.shutdown();}
+
     @Test
     void subscribe_ShouldReturnValidSseEmitter() {
         // Act
@@ -22,7 +24,7 @@ class SseServiceTest {
 
         // Assert
         assertNotNull(emitter, "A feliratkozásnak egy élő SseEmitter objektumot kell visszaadnia");
-        assertEquals(Long.MAX_VALUE, emitter.getTimeout(), "A timeoutnak végtelennek kell lennie");
+        assertEquals(300000L, emitter.getTimeout(), "A kapcsolat élettartama legyen korlátos");
     }
 
     @Test

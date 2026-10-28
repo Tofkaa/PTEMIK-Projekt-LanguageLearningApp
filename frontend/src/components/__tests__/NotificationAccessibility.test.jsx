@@ -9,18 +9,15 @@ const auth = vi.hoisted(() => ({ user: { userId: 'teacher', role: 'TEACHER' }, s
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('../../services/api', () => ({ default: { get: vi.fn() } }));
 let streams;
+vi.mock('../../services/notificationStream', () => ({ openNotificationStream: ({ onConnected, onPing }) => {
+    const stream = { handlers: { open: onConnected, ping: onPing }, close: vi.fn() }; streams.push(stream); return stream.close;
+} }));
 beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear(); sessionStorage.clear();
     sessionStorage.setItem('token', 'test-token');
     auth.user = { userId: 'teacher', role: 'TEACHER' };
     streams = [];
-    vi.stubGlobal('EventSource', class {
-        handlers = {};
-        close = vi.fn();
-        constructor() { streams.push(this); }
-        addEventListener(name, callback) { this.handlers[name] = callback; }
-    });
     api.get.mockResolvedValue({ data: { pendingFriendRequests: 2 } });
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });

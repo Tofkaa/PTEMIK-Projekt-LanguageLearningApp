@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 import { clearInvitation } from '../utils/invitationIntent';
 import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import axios from 'axios';
@@ -24,7 +25,7 @@ export const AuthProvider = ({ children }) => {
             const response = await vocabularyApi.getVocabularyMap();
             if (isCurrentAuth(snapshot) && request === vocabularyRequest.current) setVocabularyMap(response.data);
         } catch (error) {
-            if (isCurrentAuth(snapshot) && request === vocabularyRequest.current && !axios.isCancel(error)) console.error('Hiba a szótérkép betöltésekor:', error);
+            if (isCurrentAuth(snapshot) && request === vocabularyRequest.current && !axios.isCancel(error)) console.error('Hiba a szótérkép betöltésekor:', safeError(error));
         }
     }, []);
 
@@ -88,9 +89,12 @@ export const AuthProvider = ({ children }) => {
         await fetchVocabularyMap({ epoch });
         requireCurrentAuth({ epoch });
     };
-    const completeOAuthLogin = useCallback(async token => {
+    const completeOAuthLogin = useCallback(async code => {
         const epoch = beginAuthentication(true);
-        storeAccessToken(token, epoch);
+        const exchange = await queueAuthCookieOperation(epoch, () => api.post('/auth/oauth/exchange', { code }, {
+            _authEpoch: epoch, timeout: 15000, skipGlobalError: true,
+        }));
+        storeAccessToken(exchange.data.accessToken, epoch);
         const profile = await api.get('/users/me');
         requireCurrentAuth({ epoch });
         setUser(profile.data);
@@ -107,7 +111,7 @@ export const AuthProvider = ({ children }) => {
                 _authEpoch: epoch, _allowStaleAuthOperation: true, timeout: 15000, skipGlobalError: true,
             }), true);
         } catch (error) {
-            if (!axios.isCancel(error)) console.error('Error during server-side logout:', error);
+            if (!axios.isCancel(error)) console.error('Error during server-side logout:', safeError(error));
         }
     };
     const changeLanguage = async courseCode => {

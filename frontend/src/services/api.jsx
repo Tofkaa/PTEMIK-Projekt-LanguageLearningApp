@@ -21,7 +21,7 @@ api.interceptors.request.use(config => {
 });
 
 const report = message => window.dispatchEvent(new CustomEvent('api-error', { detail: message }));
-const refreshAccessToken = (snapshot, skipGlobalError) => {
+export const refreshAccessToken = (snapshot, skipGlobalError) => {
     if (refreshFlight?.epoch === snapshot.epoch) {
         if (!skipGlobalError) refreshFlight.notifyErrors = true;
         return refreshFlight.promise;

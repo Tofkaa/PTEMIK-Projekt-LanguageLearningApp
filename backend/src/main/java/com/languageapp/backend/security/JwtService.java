@@ -160,6 +160,8 @@ public class JwtService {
      * @param token the JWT string
      * @return the expiration {@link Date}
      */
+    public java.time.Instant expiresAt(String token) { return extractExpiration(token).toInstant(); }
+
     private Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }

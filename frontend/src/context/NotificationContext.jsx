@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 /**
  * @file NotificationContext.jsx
  * @description Provides global state management for application-wide notifications,
@@ -6,6 +7,7 @@
 
 import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import api from '../services/api';
+import { openNotificationStream } from '../services/notificationStream';
 import { getAccessToken } from '../services/authSession';
 import { useAuth } from './AuthContext';
 import { pruneViewedStore } from '../utils/viewedStore';
@@ -85,7 +87,7 @@ export const NotificationProvider = ({ children }) => {
             return true;
         } catch (error) {
             if (error.response?.status !== 403) {
-                console.error("Értesítések lekérése sikertelen", error);
+                console.error("Értesítések lekérése sikertelen", safeError(error));
             }
             return false;
         }
@@ -117,28 +119,14 @@ export const NotificationProvider = ({ children }) => {
                 }
             } catch (error) {
                 if (error.response?.status !== 403) {
-                    console.error("Értesítések lekérése sikertelen", error);
+                    console.error("Értesítések lekérése sikertelen", safeError(error));
                 }
             }
         };
 
         loadInitialData();
 
-        const token = getAccessToken();
-        let eventSource = null;
-
-        if (token && token !== 'null') {
-            eventSource = new EventSource(`${(api.defaults?.baseURL || '/api').replace(/\/$/, '')}/notifications/stream?token=${encodeURIComponent(token)}`);
-
-            eventSource.addEventListener("open", loadInitialData);
-            eventSource.addEventListener("ping", () => {
-                loadInitialData();
-            });
-
-            eventSource.onerror = () => {
-                console.warn("SSE kapcsolat megszakadt, újracsatlakozás várható...");
-            };
-        }
+        const closeStream = openNotificationStream({ onConnected: loadInitialData, onPing: loadInitialData });
 
         const intervalId = setInterval(() => {
             loadInitialData();
@@ -152,7 +140,7 @@ export const NotificationProvider = ({ children }) => {
         return () => {
             isMounted = false;
             invalidateRequests();
-            if (eventSource) eventSource.close();
+            closeStream();
             clearInterval(intervalId);
             window.removeEventListener('focus', handleFocus);
         };

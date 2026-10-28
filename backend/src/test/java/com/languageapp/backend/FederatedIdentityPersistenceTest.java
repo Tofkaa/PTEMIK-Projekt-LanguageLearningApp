@@ -46,6 +46,7 @@ class FederatedIdentityPersistenceTest {
     @Autowired FederatedIdentityService federated;
     @Autowired CustomOAuth2UserService oauth;
     @Autowired OAuth2AuthenticationSuccessHandler success;
+    @Autowired com.languageapp.backend.controller.OAuthLoginController exchange;
     @Autowired UserRepository users;
     @Autowired OAuthIdentityRepository identities;
     @Autowired CourseRepository courses;
@@ -116,10 +117,13 @@ class FederatedIdentityPersistenceTest {
         User user=users.findById(principal.userId()).orElseThrow();assertEquals(Role.STUDENT,user.getRole());assertTrue(user.isVerified());
         assertEquals(user.getUserId(),identities.findUserId(AuthProvider.valueOf(provider.toUpperCase(Locale.ROOT)),subject).orElseThrow());
         var result=new MockHttpServletResponse();
-        success.onAuthenticationSuccess(new MockHttpServletRequest(),result,new OAuth2AuthenticationToken(principal,principal.getAuthorities(),provider));
-        String url=result.getRedirectedUrl();assertNotNull(url);String token=url.substring(url.indexOf("?token=")+7);
+        var browser=new MockHttpServletRequest();
+        success.onAuthenticationSuccess(browser,result,new OAuth2AuthenticationToken(principal,principal.getAuthorities(),provider));
+        String url=result.getRedirectedUrl();assertNotNull(url);assertFalse(url.contains("?token="));String code=url.substring(url.indexOf("#code=")+6);
+        var redeemed=exchange.exchange(new com.languageapp.backend.controller.OAuthLoginController.Exchange(code),"http://localhost:5173",browser);
+        String token=redeemed.getBody().accessToken();
         assertEquals(user.getEmail(),jwt.extractUsername(token));assertNotNull(jwt.extractSessionId(token));
-        assertTrue(result.getHeader("Set-Cookie").contains("HttpOnly"));
+        assertTrue(redeemed.getHeaders().getFirst("Set-Cookie").contains("HttpOnly"));
     }
     @ParameterizedTest @ValueSource(strings={"google","discord"})
     void verifiedProviderCannotTakeOverALocalAccountWithTheSameEmail(String provider) {

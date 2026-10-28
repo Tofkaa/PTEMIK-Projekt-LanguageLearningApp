@@ -40,6 +40,7 @@ public class NotificationController {
 
     private final SseService sseService;
     private final Clock clock;
+    private final com.languageapp.backend.security.JwtService jwt;
 
     /**
      * Aggregates and returns the user's notification state (Derived State).
@@ -85,7 +86,11 @@ public class NotificationController {
      * @return SseEmitter object that holds the HTTP connection open.
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(Authentication authentication) {
-        return sseService.subscribe(authentication.getName());
+    public SseEmitter stream(Authentication authentication,@org.springframework.web.bind.annotation.RequestHeader("Authorization")String authorization) {
+        java.time.Instant expiration;
+        try { expiration=jwt.expiresAt(authorization.substring(7)); }
+        catch(io.jsonwebtoken.JwtException expired){throw new org.springframework.security.authentication.BadCredentialsException("A munkamenet lejárt.");}
+        long lifetime=Math.max(1,Math.min(300000,java.time.Duration.between(clock.instant(),expiration).toMillis()));
+        return sseService.subscribe(authentication.getName(),lifetime);
     }
 }

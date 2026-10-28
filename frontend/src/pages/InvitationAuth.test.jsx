@@ -43,14 +43,14 @@ it('returns from a password login to the captured invitation without submitting 
     expect(api.post).not.toHaveBeenCalled();
 });
 it('returns from an OAuth callback to the captured invitation without submitting a connection', async () => {
-    render(<Tree path="/oauth2/redirect?token=oauth-access" />);
+    render(<Tree path="/oauth2/redirect#code=oauth-code" />);
     await screen.findByRole('heading', { name: destination });
-    expect(auth.completeOAuthLogin).toHaveBeenCalledExactlyOnceWith('oauth-access');
+    expect(auth.completeOAuthLogin).toHaveBeenCalledExactlyOnceWith('oauth-code');
     expect(api.post).not.toHaveBeenCalled();
 });
 it('retains the invitation after a failed OAuth callback so login can be retried', async () => {
     auth.completeOAuthLogin.mockRejectedValue(new Error('Network unavailable'));
-    render(<Tree path="/oauth2/redirect?token=oauth-access" />);
+    render(<Tree path="/oauth2/redirect#code=oauth-code" />);
     await screen.findByRole('heading', { name: 'Bejelentkezés' });
     expect(sessionStorage.getItem('pendingInvitation')).toContain(token);
     expect(localStorage.getItem('token')).toBeNull();
@@ -83,7 +83,7 @@ it('explains returning to the original tab and preserves its invitation through 
 });
 
 it('retains the captured invitation during the StrictMode OAuth effect replay', async () => {
-    render(<StrictMode><Tree path="/oauth2/redirect?token=oauth-once" /></StrictMode>);
+    render(<StrictMode><Tree path="/oauth2/redirect#code=oauth-once" /></StrictMode>);
     await screen.findByRole('heading', { name: destination });
     expect(auth.completeOAuthLogin).toHaveBeenCalledExactlyOnceWith('oauth-once');
     expect(api.post).not.toHaveBeenCalled();

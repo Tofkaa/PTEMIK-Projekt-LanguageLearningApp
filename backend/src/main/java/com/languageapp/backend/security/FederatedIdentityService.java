@@ -20,7 +20,7 @@ public class FederatedIdentityService {
     private final JwtService jwt;
     private final Clock clock;
     private static final SecureRandom RANDOM=new SecureRandom();
-    public record Binding(UUID userId,AuthProvider provider,String subject) { }
+    public record Binding(UUID userId,AuthProvider provider,String subject) implements java.io.Serializable { }
     public record Login(String accessToken,String refreshToken) { }
 
     /** Provider IO finishes before entering this short transaction. No email-based account linking. */
@@ -64,6 +64,10 @@ public class FederatedIdentityService {
     /** Resolve the binding again under the account lock immediately before issuing credentials. */
     @Transactional
     public Login issueSession(FederatedOAuth2User principal) {
+        return issueSession(new Binding(principal.userId(),principal.provider(),principal.subject()));
+    }
+    @Transactional
+    public Login issueSession(Binding principal) {
         User user=active(principal.userId());
         UUID linked=identities.findUserId(principal.provider(),principal.subject())
                 .orElseThrow(() -> OAuthClaims.failure("identity_unavailable"));

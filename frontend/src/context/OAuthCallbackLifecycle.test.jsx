@@ -18,7 +18,7 @@ function Destination({ name }) {
     return <><h1>{name}</h1><output aria-label="Account">{user?.userId}</output></>;
 }
 function Tree() {
-    return <StrictMode><AuthProvider><MemoryRouter initialEntries={['/oauth2/redirect?token=synthetic-callback-token']}>
+    return <StrictMode><AuthProvider><MemoryRouter initialEntries={['/oauth2/redirect#code=synthetic-callback-code']}>
         <AchievementFeedbackProvider><Routes>
             <Route path="/oauth2/redirect" element={<OAuth2RedirectHandler />} />
             <Route path="/dashboard" element={<Destination name="Dashboard" />} />
@@ -40,18 +40,19 @@ it.each([false, true])('finishes OAuth once through real auth and keyed feedback
     const calls = [];
     api.defaults.adapter = config => {
         calls.push(config.url);
-        if (calls.length > 1) return new Promise(() => {});
+        if (config.url === '/auth/oauth/exchange') return Promise.resolve(response(config, { accessToken: 'synthetic-access-token' }));
+        if (calls.filter(url => url === '/users/me').length > 1) return new Promise(() => {});
         return new Promise(resolve => { finishProfile = () => resolve(response(config, { userId: 'oauth-account', verified: true })); });
     };
     vocabularyApi.getVocabularyMap.mockImplementationOnce(() => new Promise(resolve => { finishVocabulary = () => resolve({ data: {} }); }));
     render(<Tree />);
     await waitFor(() => expect(finishProfile).toBeTypeOf('function'));
     await act(async () => finishProfile());
-    expect(calls).toEqual(['/users/me']);
+    expect(calls).toEqual(['/auth/oauth/exchange', '/users/me']);
     await act(async () => finishVocabulary());
     await screen.findByRole('heading', { name: invitation ? 'Invitation' : 'Dashboard' });
     expect(screen.getByLabelText('Account')).toHaveTextContent('oauth-account');
-    expect(calls).toEqual(['/users/me']);
+    expect(calls).toEqual(['/auth/oauth/exchange', '/users/me']);
     expect(vocabularyApi.getVocabularyMap).toHaveBeenCalledTimes(1);
-    expect(getAccessToken()).toBe('synthetic-callback-token');
+    expect(getAccessToken()).toBe('synthetic-access-token');
 });
