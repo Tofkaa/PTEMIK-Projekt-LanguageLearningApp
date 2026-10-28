@@ -45,6 +45,7 @@ class AssignmentAccommodationTest {
         assignment.setTimeLimitMinutes(10); assignment.setAvailableUntil(NOW.plusSeconds(7200));
         member = new ClassroomMember(); member.setClassroom(classroom); member.setUser(student); member.setStatus(MembershipStatus.ACCEPTED);
         lenient().when(assignmentRepository.findLockedById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+        lenient().when(assignmentRepository.findForStudentWork(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
         lenient().when(assignmentRepository.findById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
         lenient().when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
         lenient().when(classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(classroom.getClassroomId(), student.getUserId())).thenReturn(Optional.of(member));

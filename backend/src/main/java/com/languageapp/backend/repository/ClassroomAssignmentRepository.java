@@ -31,10 +31,20 @@ public interface ClassroomAssignmentRepository extends JpaRepository<ClassroomAs
     List<com.languageapp.backend.dto.projection.AssignmentNotification> findActiveNotificationReferences(
             @Param("studentId") UUID studentId, @Param("now") Instant now);
 
-    /** Serializes timing edits, start and submission for an assignment. */
+    /** Exclusive metadata guard for teacher timing edits and deletion. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM ClassroomAssignment a WHERE a.assignmentId = :id")
     Optional<ClassroomAssignment> findLockedById(@Param("id") UUID id);
+
+    /** Student work shares metadata access; only teacher metadata changes exclude it. */
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("SELECT a FROM ClassroomAssignment a WHERE a.assignmentId = :id")
+    Optional<ClassroomAssignment> findForStudentWork(@Param("id") UUID id);
+
+    /** Serialize the initially absent attempt for this assignment/student, never the entire class. */
+    @Query(value = "select 1 from pg_advisory_xact_lock(hashtextextended(:key, 0))", nativeQuery = true)
+    int lockStudentStart(@Param("key") String key);
+
 
     /**
      * Retrieves all assignments for a classroom, sorted by creation date.

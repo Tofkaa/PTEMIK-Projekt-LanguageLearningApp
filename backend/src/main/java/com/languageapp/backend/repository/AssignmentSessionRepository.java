@@ -55,6 +55,16 @@ public interface AssignmentSessionRepository extends JpaRepository<AssignmentSes
     @Query("SELECT s.assignment.assignmentId FROM AssignmentSession s WHERE s.sessionId = :id")
     Optional<UUID> findAssignmentId(@Param("id") UUID id);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM AssignmentSession s WHERE s.sessionId = :id")
+    Optional<AssignmentSession> findLockedById(@Param("id") UUID id);
+
+    /** Read current attempt counts/status only after the per-student start guard; cooperate with submissions. */
+    @Query(value = "SELECT s.* FROM assignment_sessions s WHERE s.assignment_id = :assignmentId "
+            + "AND s.user_id = :userId ORDER BY s.started_at, s.session_id FOR UPDATE OF s", nativeQuery = true)
+    List<AssignmentSession> findLockedStudentAttempts(@Param("assignmentId") UUID assignmentId, @Param("userId") UUID userId);
+
+
     /**
      * Finds a session for a specific user and assignment.
      * Used to prevent multiple start attempts and to resume existing timers.

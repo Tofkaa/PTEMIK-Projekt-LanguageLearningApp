@@ -30,8 +30,8 @@ class TeacherGradingTest {
         session=new AssignmentSession();session.setSessionId(UUID.randomUUID());session.setAssignment(task);session.setUser(student);
         session.setFinishedAt(Instant.parse("2026-10-26T12:00:00Z"));session.setDraftRevision(3);
         lenient().when(sessions.findAssignmentId(session.getSessionId())).thenReturn(Optional.of(task.getAssignmentId()));
-        lenient().when(assignments.findLockedById(task.getAssignmentId())).thenReturn(Optional.of(task));
-        lenient().when(sessions.findById(session.getSessionId())).thenReturn(Optional.of(session));
+        lenient().when(assignments.findForStudentWork(task.getAssignmentId())).thenReturn(Optional.of(task));
+        lenient().when(sessions.findLockedById(session.getSessionId())).thenReturn(Optional.of(session));
     }
     TeacherGradeRequest request(int score,long revision) {
         var request=new TeacherGradeRequest();request.setTeacherScore(score);request.setRevision(revision);request.setTeacherComment("Feedback");return request;

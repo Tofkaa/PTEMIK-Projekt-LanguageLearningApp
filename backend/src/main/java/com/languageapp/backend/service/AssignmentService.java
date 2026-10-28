@@ -188,7 +188,7 @@ public class AssignmentService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
-        ClassroomAssignment assignment = assignmentRepository.findLockedById(assignmentId)
+        ClassroomAssignment assignment = assignmentRepository.findForStudentWork(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
 
         boolean isMember = classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(
@@ -203,7 +203,8 @@ public class AssignmentService {
             throw new BadRequestException("Ez a feladat még nem elérhető!");
         }
 
-        List<AssignmentSession> userSessions = sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(assignmentId, user.getUserId());
+        assignmentRepository.lockStudentStart("assignment-start:" + assignmentId + ":" + user.getUserId());
+        List<AssignmentSession> userSessions = sessionRepository.findLockedStudentAttempts(assignmentId, user.getUserId());
 
         Optional<AssignmentSession> ongoingSession = userSessions.stream()
                 .filter(s -> s.getFinishedAt() == null)
@@ -260,12 +261,7 @@ public class AssignmentService {
      */
     @Transactional
     public void submitAssignment(UUID sessionId, AssignmentSubmitRequest request, String email) {
-        UUID assignmentId = sessionRepository.findAssignmentId(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
-        assignmentRepository.findLockedById(assignmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
-        AssignmentSession session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+        AssignmentSession session = lockedSession(sessionId);
 
         if (!session.getUser().getEmail().equals(email)) {
             throw new BadRequestException("Unauthorized access to session.");
@@ -382,12 +378,13 @@ public class AssignmentService {
                 session.getUser().getEmail(), session.getAssignment().getTitle(), finalScore);
     }
 
+    /** Lock order: shared assignment metadata, then this session exclusively; no other student is excluded. */
     private AssignmentSession lockedSession(UUID id) {
         UUID assignmentId = sessionRepository.findAssignmentId(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found."));
-        assignmentRepository.findLockedById(assignmentId)
+        assignmentRepository.findForStudentWork(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
-        return sessionRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Session not found."));
+        return sessionRepository.findLockedById(id).orElseThrow(() -> new ResourceNotFoundException("Session not found."));
     }
 
     private void requireStudentSession(AssignmentSession s, String email) {
@@ -519,7 +516,7 @@ public class AssignmentService {
      */
     @Transactional
     public void deleteAssignment(UUID assignmentId, String teacherEmail) {
-        ClassroomAssignment assignment = assignmentRepository.findById(assignmentId)
+        ClassroomAssignment assignment = assignmentRepository.findLockedById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
 
         if (!assignment.getClassroom().getTeacher().getEmail().equals(teacherEmail)) {
@@ -632,7 +629,7 @@ public class AssignmentService {
                 || request.getRevision() == null || request.getRevision() < 0
                 || request.getTeacherComment() != null && request.getTeacherComment().length() > 4000)
             throw new BadRequestException("A pontszám 0 és 100 közötti egész szám, a megjegyzés legfeljebb 4000 karakter, és érvényes mentési verzió szükséges.");
-        // Keep the existing assignment-before-session lock order; read the current revision only after the lock.
+        // Shared assignment-before-exclusive-session order; read the current revision only after the lock.
         AssignmentSession session = lockedSession(sessionId);
 
         if (!session.getAssignment().getClassroom().getTeacher().getEmail().equals(teacherEmail)) {

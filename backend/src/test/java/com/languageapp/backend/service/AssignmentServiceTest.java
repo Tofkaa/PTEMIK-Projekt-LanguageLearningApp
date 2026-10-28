@@ -112,9 +112,9 @@ class AssignmentServiceTest {
         assignment.setAvailableFrom(NOW.minus(1, ChronoUnit.DAYS)); // Már elérhető
 
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
-        when(assignmentRepository.findLockedById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.findForStudentWork(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
         when(classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(classroom.getClassroomId(), student.getUserId())).thenReturn(Optional.of(member));
-        when(sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(assignment.getAssignmentId(), student.getUserId())).thenReturn(new ArrayList<>());
+        when(sessionRepository.findLockedStudentAttempts(assignment.getAssignmentId(), student.getUserId())).thenReturn(new ArrayList<>());
         when(sessionRepository.save(any(AssignmentSession.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // Act
@@ -130,7 +130,7 @@ class AssignmentServiceTest {
     void startAssignment_NotAMember_ShouldThrowBadRequestException() {
         // Arrange
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
-        when(assignmentRepository.findLockedById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.findForStudentWork(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
         // A diák NINCS benne az osztályban!
         when(classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(classroom.getClassroomId(), student.getUserId())).thenReturn(Optional.empty());
 
@@ -147,7 +147,7 @@ class AssignmentServiceTest {
     void startAssignment_BeforeStart_ShouldRejectWithoutCreatingSession() {
         assignment.setAvailableFrom(NOW.plusSeconds(1));
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
-        when(assignmentRepository.findLockedById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.findForStudentWork(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
         when(classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(
                 classroom.getClassroomId(), student.getUserId())).thenReturn(Optional.of(member));
 
@@ -161,7 +161,7 @@ class AssignmentServiceTest {
         assignment.setAvailableFrom(NOW);
         assignment.setExercises(new ArrayList<>());
         when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
-        when(assignmentRepository.findLockedById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.findForStudentWork(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
         when(classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(
                 classroom.getClassroomId(), student.getUserId())).thenReturn(Optional.of(member));
         when(sessionRepository.save(any(AssignmentSession.class))).thenAnswer(i -> i.getArguments()[0]);

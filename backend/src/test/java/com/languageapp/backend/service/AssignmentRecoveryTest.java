@@ -45,9 +45,10 @@ class AssignmentRecoveryTest {
         session.setStartedAt(now.minusSeconds(60));
         member = new ClassroomMember(); member.setUser(student); member.setClassroom(room); member.setStatus(MembershipStatus.ACCEPTED);
         lenient().when(sessionRepository.findAssignmentId(session.getSessionId())).thenReturn(Optional.of(assignment.getAssignmentId()));
-        lenient().when(sessionRepository.findById(session.getSessionId())).thenReturn(Optional.of(session));
+        lenient().when(sessionRepository.findLockedById(session.getSessionId())).thenReturn(Optional.of(session));
+        lenient().when(sessionRepository.findLockedStudentAttempts(assignment.getAssignmentId(),student.getUserId())).thenReturn(List.of(session));
         lenient().when(sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(assignment.getAssignmentId(),student.getUserId())).thenReturn(List.of(session));
-        lenient().when(assignmentRepository.findLockedById(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
+        lenient().when(assignmentRepository.findForStudentWork(assignment.getAssignmentId())).thenReturn(Optional.of(assignment));
         lenient().when(userRepository.findByEmail(student.getEmail())).thenReturn(Optional.of(student));
         lenient().when(classroomMemberRepository.findByClassroom_ClassroomIdAndUser_UserId(room.getClassroomId(),student.getUserId())).thenReturn(Optional.of(member));
         lenient().when(evaluationService.calculateEvaluationDetails(any(),any(),any())).thenReturn(new EvaluationService.EvaluationDetails(1,0));
