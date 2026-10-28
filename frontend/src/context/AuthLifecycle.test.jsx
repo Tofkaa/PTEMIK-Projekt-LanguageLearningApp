@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { rememberInvitation, readInvitation } from '../utils/invitationIntent';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -11,9 +12,10 @@ let auth;
 const response = (config, data, status = 200) => ({ config, data, status, statusText: '', headers: {} });
 const fail = (config, status) => Promise.reject(Object.assign(new Error('test failure'), { config, response: response(config, {}, status) }));
 function Probe() {
-    auth = useAuth();
-    return <><output aria-label="Fiók">{auth.user?.userId || 'nincs'}</output>
-        <output aria-label="Szókincs">{Object.keys(auth.vocabularyMap).join(',')}</output></>;
+    const currentAuth = useAuth();
+    useEffect(() => { auth = currentAuth; }, [currentAuth]);
+    return <><output aria-label="Fiók">{currentAuth.user?.userId || 'nincs'}</output>
+        <output aria-label="Szókincs">{Object.keys(currentAuth.vocabularyMap).join(',')}</output></>;
 }
 beforeEach(() => {
     endSession(); localStorage.clear(); sessionStorage.clear(); vi.clearAllMocks();

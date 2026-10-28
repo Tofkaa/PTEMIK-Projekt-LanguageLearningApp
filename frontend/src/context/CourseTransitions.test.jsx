@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -10,9 +11,10 @@ vi.mock('../services/userApi', () => ({ userApi: { changeActiveCourse: vi.fn() }
 let auth, requests;
 const profile = course => ({ userId: 'student', activeCourseCode: course, xp: 0 });
 function Probe() {
-    auth = useAuth();
-    return <><output aria-label="course">{auth.user?.activeCourseCode ?? 'none'}</output>
-        <output aria-label="words">{Object.keys(auth.vocabularyMap).join(',')}</output></>;
+    const currentAuth = useAuth();
+    useEffect(() => { auth = currentAuth; }, [currentAuth]);
+    return <><output aria-label="course">{currentAuth.user?.activeCourseCode ?? 'none'}</output>
+        <output aria-label="words">{Object.keys(currentAuth.vocabularyMap).join(',')}</output></>;
 }
 beforeEach(() => {
     endSession(); localStorage.clear(); sessionStorage.clear(); vi.clearAllMocks(); requests = [];
