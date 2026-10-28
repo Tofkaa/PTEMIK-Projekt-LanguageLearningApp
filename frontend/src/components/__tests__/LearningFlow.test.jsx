@@ -298,6 +298,32 @@ describe('assignment flow', () => {
 });
 
 describe('self-paced vocabulary practice', () => {
+    it.each(['en', 'de', 'es'])('separates Hungarian instructions from a directly focusable %s question word', async lang => {
+        api.post.mockResolvedValueOnce({ data: { attemptId: 'practice-attempt', exercises: [{
+            exerciseId: 'mixed', type: 'TRANSLATION', question: 'Fordítsd le magyarra: say',
+            questionLang: 'hu', answerLang: 'hu', questionParts: [
+                { text: 'Fordítsd le magyarra: ', lang: 'hu' }, { text: 'say', lang },
+            ],
+        }] } });
+        await openPractice();
+        const instruction = screen.getByRole('heading', { level: 1 });
+        expect(instruction).toHaveFocus();
+        expect(instruction).toHaveAttribute('lang', 'hu');
+        expect(instruction).toHaveAccessibleName(/^Fordítsd le magyarra\./);
+        expect(instruction).not.toHaveTextContent('say');
+        const question = screen.getByRole('heading', { level: 2, name: /^Fordítsd le magyarra:\s*say$/ });
+        const word = screen.getByText('say');
+        expect(question).toContainElement(word);
+        expect(word).toHaveAttribute('lang', lang);
+        expect(word).toHaveAttribute('tabindex', '0');
+        word.focus();
+        expect(word).toHaveFocus();
+        const answer = screen.getByRole('textbox', { name: 'Válaszod' });
+        expect(word.compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(answer).toHaveAttribute('lang', 'hu');
+        expect(api.post).toHaveBeenCalledTimes(1);
+    });
+
     it('retains feedback until Next is chosen, then focuses the new question', async () => {
         await openPractice();
         expect(screen.getByRole('progressbar', { name: 'Szókincsgyakorlás előrehaladása' })).toBeInTheDocument();

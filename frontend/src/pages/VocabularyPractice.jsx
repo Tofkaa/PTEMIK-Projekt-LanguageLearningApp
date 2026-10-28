@@ -206,6 +206,13 @@ const VocabularySession = ({ courseId }) => {
 
     const currentEx = exercises[currentIndex];
     const progressPercentage = (currentIndex / exercises.length) * 100;
+    const questionLang = currentEx.questionLang || 'hu';
+    // Focus announcements may flatten mixed-language descendants into one voice.
+    // Keep instructions separate and make the explicitly authored foreign text reachable by Tab.
+    const mixedQuestion = Array.isArray(currentEx.questionParts)
+        && currentEx.questionParts.every(part => typeof part?.text === 'string' && typeof part?.lang === 'string')
+        && currentEx.questionParts.map(part => part.text).join('') === currentEx.question
+        && currentEx.questionParts.some(part => part.lang !== questionLang && part.text.trim());
 
     return (
         <div className="min-vh-100 pb-5 text-light d-flex align-items-center">
@@ -233,10 +240,18 @@ const VocabularySession = ({ courseId }) => {
                 {/* Card container */}
                 <Card className="shadow-lg border-0 bg-dark text-light rounded-4 w-100 mb-4 p-4 text-center" style={{ maxWidth: '600px' }}>
                     <Card.Body>
-                        <h1 ref={headingRef} tabIndex={-1} className="h4 fw-bold text-body mb-4">
-                            <span lang="hu" className="visually-hidden">{currentEx.type === 'MULTIPLE_CHOICE' ? 'Válaszd ki a helyes opciót' : currentEx.type === 'WORD_BANK' ? 'Rakd sorba a szavakat' : 'Fordítás'}. {currentIndex + 1}. feladat, összesen {exercises.length}. </span>
-                            <LanguageText text={currentEx.question} lang={currentEx.questionLang || 'hu'} parts={currentEx.questionParts} />
+                        <h1 ref={headingRef} tabIndex={-1} lang="hu" className={mixedQuestion ? 'h6 fw-bold text-body mb-3' : 'h4 fw-bold text-body mb-4'}>
+                            {mixedQuestion ? <>
+                                <span>{currentEx.type === 'MULTIPLE_CHOICE' ? 'Válaszd ki a helyes opciót' : currentEx.answerLang === 'hu' ? 'Fordítsd le magyarra' : 'Fordítás'}.</span>
+                                <span lang="hu" className="visually-hidden"> {currentIndex + 1}. feladat, összesen {exercises.length}. Az idegen nyelvű szöveg Tab billentyűvel is elérhető.</span>
+                            </> : <>
+                                <span lang="hu" className="visually-hidden">{currentEx.type === 'MULTIPLE_CHOICE' ? 'Válaszd ki a helyes opciót' : currentEx.type === 'WORD_BANK' ? 'Rakd sorba a szavakat' : 'Fordítás'}. {currentIndex + 1}. feladat, összesen {exercises.length}. </span>
+                                <LanguageText text={currentEx.question} lang={questionLang} parts={currentEx.questionParts} />
+                            </>}
                         </h1>
+                        {mixedQuestion && <h2 lang={questionLang} className="h4 fw-bold text-body mb-4">
+                            <LanguageText text={currentEx.question} lang={questionLang} parts={currentEx.questionParts} focusForeignParts />
+                        </h2>}
 
                         {/* RENDER BASED ON EXERCISE TYPE */}
                         {currentEx.type === 'MULTIPLE_CHOICE' && (

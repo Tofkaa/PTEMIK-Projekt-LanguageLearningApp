@@ -67,3 +67,16 @@ it('preserves legacy or inconsistent hint text without inventing language segmen
     expect(container).toHaveTextContent('alma = apple');
     expect(screen.queryByText('different')).not.toBeInTheDocument();
 });
+
+
+it('only adds foreign text focus stops when explicitly requested and metadata matches the question', () => {
+    const mixed = [{ text: 'Fordítsd: ', lang: 'hu' }, { text: 'say', lang: 'en' }];
+    const view = render(<LanguageText text="Fordítsd: say" lang="hu" parts={mixed} />);
+    expect(screen.getByText('say')).not.toHaveAttribute('tabindex');
+    view.rerender(<LanguageText text="Fordítsd: say" lang="hu" parts={mixed} focusForeignParts />);
+    expect(screen.getByText('say')).toHaveAttribute('tabindex', '0');
+    expect(screen.getByText('Fordítsd:')).not.toHaveAttribute('tabindex');
+    view.rerender(<LanguageText text="Original" lang="hu" parts={mixed} focusForeignParts />);
+    expect(screen.queryByText('say')).not.toBeInTheDocument();
+    expect(screen.getByText('Original')).not.toHaveAttribute('tabindex');
+});
