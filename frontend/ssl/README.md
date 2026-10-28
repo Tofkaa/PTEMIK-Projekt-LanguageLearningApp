@@ -9,3 +9,6 @@ excluded from the Docker build context.
 
 Each reviewer or developer generates a separate certificate on their machine.
 Never copy an mkcert root CA private key into this repository or send it to others.
+
+An old local leaf key was committed in early history and has been replaced.
+Treat historical certificate keys as public; generate your own instead of reusing them.

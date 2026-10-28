@@ -27,7 +27,7 @@ valamint a frontend `npm ci`, függőségaudit, lint, unit teszt és build lép�
 pull request esetén; titkos konfigurációt nem igényel. A kapuk nem helyettesítik
 a kézi akadálymentességi próbákat, az advisoryk alkalmazási feltételeinek értékelését vagy a
 terheléses kapacitásmérést. A GitHub branch protection beállításában külön kell
-kötelezővé tenni a `frontend`, `backend` és `container-images` ellenőrzést.
+kötelezővé tenni a `frontend`, `backend`, `container-images` és `secrets` ellenőrzést.
 
 A frontend fejlesztéséhez Node 22.23.4 vagy a `frontend/package.json` engines
 mezőjének megfelelő újabb verzió szükséges. A Docker build és a CI Node 22.23.4-t
@@ -61,6 +61,23 @@ külső bind mount használatakor az adatkönyvtárnak e felhasználó számára
 kell lennie. A rootként végzett automatikus tulajdonosváltás nincs a javított image-ben.
 Az újraépítés a rögzített hivatalos bázisokat aktuális Alpine-javításokkal egészíti ki;
 új advisory esetén az érintett buildréteget frissíteni és ismét auditálni kell.
+
+A titokszkennelés a teljes aktuális HEAD-történetet és a publikálható fájlokat
+vizsgálja egy rögzített, hálózat nélküli Gitleaks-konténerben. A Gitből kizárt
+helyi `.env`, docs, mentések és tanúsítványok nem kerülnek a forrássnapshotba.
+Shallow checkout esetén hibát jelez; CI-ben ezért `fetch-depth: 0` szükséges.
+
+```powershell
+python scripts/secret_audit.py --report-dir .quality-reports/secrets
+```
+
+A kimenet csak helyadatokat tartalmaz, találati értéket vagy forrássort nem.
+A szabályokhoz futásonként pozitív/negatív canary-próbák tartoznak, a történetből
+már törölt próbakulcsokra is. A `.gitleaks.toml` kizárólag egy pontos dummy kulcsot
+enged meg a meghatározott tesztfájlokban; a `.gitleaksignore` egy igazoltan leváltott,
+régi fejlesztői kulcs egyetlen történeti fingerprintjét kezeli. Ezek nem általános
+tesztmappa-, privátkulcs- vagy teljes commit-kivételek. A scanner első letöltése
+hálózatot igényel, a vizsgálat sem forrást, sem Git-történetet nem küld külső szolgáltatásnak.
 
 Automatizált backendtesztek Java 21-gyel, a `backend` mappából:
 

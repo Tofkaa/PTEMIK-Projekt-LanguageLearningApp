@@ -1,0 +1,4 @@
+# Retired local development leaf key, already public in old history.
+# Current ignored key and live localhost TLS public key differ (verified 2026-10-28).
+# Only this exact historical commit/path/rule/line is ignored; new keys still fail.
+372fbbe299600969b5fbc1fc6ba8a473be5eeb13:frontend/ssl/cert.key:private-key:1

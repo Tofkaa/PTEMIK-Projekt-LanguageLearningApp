@@ -1,0 +1,15 @@
+title = "LanguageApp secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Exact public dummy signing material, only inside isolated backend persistence fixtures"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = [
+  '''(^|/)backend/src/test/java/com/languageapp/backend/[A-Za-z]+PersistenceTest\.java$''',
+  '''(^|/)backend/src/test/java/com/languageapp/backend/BackendApplicationTests\.java$'''
+]
+regexes = ['''^U2VjdXJpdHkgZm91bmRhdGlvbnMgdGVzdCBvbmx5IHNpZ25pbmcga2V5IG5vdCBmb3IgZGVwbG95bWVudCE=$''']
