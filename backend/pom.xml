@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.0.2</version>
+		<version>4.0.9</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.languageapp</groupId>
@@ -29,6 +29,16 @@
 	<properties>
 		<java.version>21</java.version>
 	</properties>
+    <dependencyManagement>
+        <dependencies>
+            <!-- Cloudinary HTTP44 predates Boot's HTTP5 stack. Keep its HTTP4 transport patched. -->
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>4.5.14</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -110,7 +120,7 @@
 		<dependency>
 			<groupId>com.cloudinary</groupId>
 			<artifactId>cloudinary-http44</artifactId>
-			<version>1.36.0</version>
+			<version>1.39.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -131,6 +141,18 @@
 
 	<build>
 		<plugins>
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>2.9.3</version>
+                <!-- Boot generates META-INF/sbom/application.cdx.json before the JAR is packaged. -->
+                <configuration>
+                    <schemaVersion>1.6</schemaVersion>
+                    <outputFormat>json</outputFormat>
+                    <includeTestScope>false</includeTestScope>
+                    <includeProvidedScope>false</includeProvidedScope>
+                </configuration>
+            </plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
