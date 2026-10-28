@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 import { Navbar, Container, Nav, Badge, NavDropdown } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
@@ -59,7 +60,7 @@ const NavigationBar = () => {
             await changeLanguage(courseCode);
             
         } catch (error) {
-            console.error("Sikertelen nyelvváltás", error);
+            console.error("Sikertelen nyelvváltás", safeError(error));
         }
     };
                            

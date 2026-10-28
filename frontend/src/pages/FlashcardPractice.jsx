@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 import { useState, useEffect, useId, useRef } from 'react';
 import { Container, Card, Button, ProgressBar, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
@@ -53,7 +54,7 @@ const FlashcardSession = () => {
                 setWords(shuffled);
             } catch (err) {
                 if (!active) return;
-                console.error("Hiba a szavak lekérésekor:", err);
+                console.error("Hiba a szavak lekérésekor:", safeError(err));
                 setError("Nem sikerült betölteni a szótárat.");
             } finally {
                 if (active) setIsLoading(false);

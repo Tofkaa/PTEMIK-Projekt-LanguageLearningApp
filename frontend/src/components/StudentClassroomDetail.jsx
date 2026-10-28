@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Tab, Tabs, Card, Button, Badge, Row, Col, ListGroup, Modal, ProgressBar } from 'react-bootstrap';
@@ -56,7 +57,7 @@ const StudentClassroomDetail = ({ classroom }) => {
             setClassmates(membersRes.data);
             setStats(statsRes.data);
         } catch (error) {
-            console.error("Hiba az adatok lekérésekor:", error);
+            console.error("Hiba az adatok lekérésekor:", safeError(error));
         } finally {
             if (!silent) setIsLoading(false);
         }
@@ -120,7 +121,7 @@ const StudentClassroomDetail = ({ classroom }) => {
             setSelectedAssignmentTitle(assignment.title);
             setIsResultModalOpen(true);
         } catch (error) {
-            console.error("Hiba az eredmények lekérésekor:", error);
+            console.error("Hiba az eredmények lekérésekor:", safeError(error));
         }
     };
 

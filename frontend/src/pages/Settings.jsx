@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Container, Card, Form, Button, Spinner, Alert, Tabs, Tab, Row, Col, Modal } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -143,7 +144,7 @@ const Settings = () => {
             setImageSrc(null);
             setImageMessage({ type: 'success', text: 'Profilkép sikeresen frissítve! ✅' });
         } catch (error) {
-            console.error('Hiba a profilkép feltöltésekor:', error);
+            console.error('Hiba a profilkép feltöltésekor:', safeError(error));
             const backendError = error.response?.data;
             setImageMessage({
                 type: 'danger',
@@ -327,7 +328,7 @@ const Settings = () => {
             window.URL.revokeObjectURL(url);
             
         } catch (error) {
-            console.error("Adat letöltés hiba:", error);
+            console.error("Adat letöltés hiba:", safeError(error));
             alert("Nem sikerült letölteni az adatokat. Kérlek, próbáld újra később.");
         } finally {
             setIsExporting(false);
@@ -364,7 +365,7 @@ const Settings = () => {
             setShowDeleteModal(false);
             await logout(true); 
         } catch (error) {
-            console.error("Fiók törlése hiba:", error);
+            console.error("Fiók törlése hiba:", safeError(error));
             const errorMsg = error.response?.data?.message || error.response?.data || 'Hiba történt a fióktörlés során.';
             setDeleteMessage({ type: 'danger', text: typeof errorMsg === 'string' ? errorMsg : 'Hibás megerősítés vagy hálózati hiba.' });
         } finally {

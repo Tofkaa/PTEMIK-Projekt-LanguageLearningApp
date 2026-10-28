@@ -1,3 +1,4 @@
+import { safeError } from '../../utils/safeError';
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Button, Spinner, Accordion, Badge, ListGroup, Modal, Row, Col } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi';
@@ -47,7 +48,7 @@ const CurriculumManager = () => {
 
             setTopics(data);
         } catch (error) {
-            console.error("Hiba a tananyagok betöltésekor:", error);
+            console.error("Hiba a tananyagok betöltésekor:", safeError(error));
             setTopics([]);
             setMessage({ text: 'Nem sikerült betölteni a tananyagokat. Próbáld újra az oldal frissítésével.', type: 'danger' });
         } finally {

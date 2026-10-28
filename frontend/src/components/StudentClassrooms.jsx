@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 import { useState, useEffect, useCallback } from 'react';
 import { classroomApi } from '../services/classroomApi';
 import { Card, Button, Form, Row, Col, Badge, Alert } from 'react-bootstrap';
@@ -31,7 +32,7 @@ const StudentClassrooms = () => {
             const response = await classroomApi.getStudentClassrooms();
             setClassrooms(response.data);
         } catch (error) {
-            console.error("Failed to fetch classrooms:", error);
+            console.error("Failed to fetch classrooms:", safeError(error));
         } finally {
             if (!silent) setIsLoading(false);
         }

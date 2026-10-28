@@ -1,3 +1,4 @@
+import { safeError } from '../../utils/safeError';
 import { useState, useEffect } from 'react';
 import { Badge, Spinner } from 'react-bootstrap';
 import api from '../../services/api';
@@ -14,7 +15,7 @@ const RecentResultsSection = () => {
                 const response = await api.get('/results/recent');
                 setResults(response.data);
             } catch (err) {
-                console.error("Hiba az eredmények lekérésekor:", err);
+                console.error("Hiba az eredmények lekérésekor:", safeError(err));
                 setError("Nem sikerült betölteni a statisztikákat.");
             } finally {
                 setIsLoading(false);

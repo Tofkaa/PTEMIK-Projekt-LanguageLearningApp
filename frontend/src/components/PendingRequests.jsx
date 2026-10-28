@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 /**
  * @file PendingRequests.jsx
  * @description Displays inbound friend requests. Allows the user to accept or reject them.
@@ -50,7 +51,7 @@ const PendingRequests = () => {
             });
             setRequests(response.data || []);
         } catch (err) {
-            console.error("Hiba a kérelmek betöltésekor:", err);
+            console.error("Hiba a kérelmek betöltésekor:", safeError(err));
             if (isInitialLoad) setMessage({ type: 'danger', text: 'Nem sikerült betölteni a kérelmeket.' });
         } finally {
             if (isInitialLoad) setLoading(false);

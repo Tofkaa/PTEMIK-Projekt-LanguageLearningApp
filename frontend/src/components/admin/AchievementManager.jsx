@@ -1,3 +1,4 @@
+import { safeError } from '../../utils/safeError';
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Button, Spinner, Table, Badge } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi';
@@ -24,7 +25,7 @@ const AchievementManager = () => {
             data.sort((a, b) => a.name.localeCompare(b.name));
             setAchievements(data);
         } catch (error) {
-            console.error("Hiba a kitüntetések lekérésekor:", error);
+            console.error("Hiba a kitüntetések lekérésekor:", safeError(error));
             setAchievements([]);
             setMessage({ text: 'Nem sikerült betölteni a kitüntetéseket. Próbáld újra az oldal frissítésével!', type: 'danger' });
         } finally {

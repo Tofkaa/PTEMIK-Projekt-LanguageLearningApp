@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 /**
  * @file FriendList.jsx
  * @description Displays the user's accepted friends and acts as the entry point for initiating new Challenges.
@@ -78,7 +79,7 @@ const FriendList = () => {
             });
             setFriends(response.data || []);
         } catch (err) {
-            console.error("Hiba a barátlista betöltésekor:", err);
+            console.error("Hiba a barátlista betöltésekor:", safeError(err));
             if (isInitialLoad) setError('Nem sikerült betölteni a barátlistát.');
         } finally {
             if (isInitialLoad) setLoading(false);
@@ -112,7 +113,7 @@ const FriendList = () => {
             }
         } catch (err) {
             if (requestId !== lessonRequestId.current) return;
-            console.error("Nem sikerült lekérni a leckéket a kihíváshoz", err);
+            console.error("Nem sikerült lekérni a leckéket a kihíváshoz", safeError(err));
             setLessons([]);
             setSelectedLesson('');
             setChallengeError('Nem sikerült betölteni a leckéket. Zárd be az ablakot, és próbáld újra!');
@@ -189,7 +190,7 @@ const FriendList = () => {
                 setFriends(previous => previous.filter(friend => friend.friendshipId !== friendshipId));
                 refreshNotifications?.();
             } catch (err) {
-                console.error("Hiba a barát törlésekor:", err);
+                console.error("Hiba a barát törlésekor:", safeError(err));
                 setRemoveError('Nem sikerült törölni a barátot. Próbáld újra!');
             } finally {
                 setRemovingId(null);

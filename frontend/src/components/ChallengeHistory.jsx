@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 /**
  * @file ChallengeHistory.jsx
  * @description Renders a read-only log of all closed (Completed, Expired, Declined) challenges.
@@ -50,7 +51,7 @@ const ChallengeHistory = () => {
             setHistory(response.data || []);
             setError('');
        } catch (err) {
-            console.error("Előzmények betöltési hiba:", err);
+            console.error("Előzmények betöltési hiba:", safeError(err));
             if (currentRequest === requestId.current && isInitialLoad) setError('Nem sikerült betölteni az előzményeket.');
         } finally {
            if (currentRequest === requestId.current) setLoading(false);

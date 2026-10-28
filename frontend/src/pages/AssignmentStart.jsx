@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 /**
  * @file AssignmentStart.jsx
  * @description Interstitial screen displayed before a student begins an assignment.
@@ -52,7 +53,7 @@ const AssignmentStart = () => {
                 state: { sessionData: res.data, assignmentDetails: details } 
             });
         } catch (error) {
-            console.error("Failed to start assignment", error);
+            console.error("Failed to start assignment", safeError(error));
             setError(error.response?.data?.message || 'Nem sikerült elindítani a feladatot. Frissítsd az oldalt és próbáld újra.');
             setIsStarting(false);
         }

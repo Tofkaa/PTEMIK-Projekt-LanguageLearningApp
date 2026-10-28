@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 /**
  * @file ActiveChallenges.jsx
  * @description Displays the list of ongoing duels for the authenticated user.
@@ -47,7 +48,7 @@ const ActiveChallenges = () => {
             });
             setChallenges(response.data || []);
         } catch (err) {
-            console.error("Hiba az aktív kihívások betöltésekor:", err);
+            console.error("Hiba az aktív kihívások betöltésekor:", safeError(err));
             if (isInitialLoad) setError('Nem sikerült betölteni az aktív kihívásokat.');
         } finally {
             if (isInitialLoad) setLoading(false);

@@ -1,3 +1,4 @@
+import { safeError } from '../../utils/safeError';
 import { useId, useRef, useState, useEffect } from 'react';
 import { Table, Badge, Button, Form, Spinner, InputGroup } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi'; 
@@ -30,7 +31,7 @@ const UserManagement = () => {
             setUsers(response.data);
             setMessage({ text: '', type: '' }); 
         } catch (error) {
-            console.error("Hiba a felhasználók lekérésekor:", error);
+            console.error("Hiba a felhasználók lekérésekor:", safeError(error));
             setMessage({ text: 'Nem sikerült betölteni a felhasználókat. Ellenőrizd a kapcsolatot.', type: 'danger' });
         } finally {
             fetchPending.current = false;

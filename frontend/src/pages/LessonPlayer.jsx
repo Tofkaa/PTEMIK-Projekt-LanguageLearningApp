@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 import EarnedAchievements from '../components/EarnedAchievements';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -91,7 +92,7 @@ const LessonPlayer = () => {
                 }
             } catch (err) {
                 if (cancelled) return;
-                console.error("Error fetching exercises:", err);
+                console.error("Error fetching exercises:", safeError(err));
                 setError('Nem sikerült betölteni a feladatokat.');
             } finally {
                 if (!cancelled) setIsLoading(false);
@@ -123,7 +124,7 @@ const LessonPlayer = () => {
         
         if (unclicked.length > 0) {
             api.post('/vocabulary/known-batch', { words: unclicked })
-                .catch(err => console.error("Auto-add sikertelen:", err));
+                .catch(err => console.error("Auto-add sikertelen:", safeError(err)));
         }
     };
 
@@ -157,7 +158,7 @@ const LessonPlayer = () => {
                         }
                     }
                 } catch (err) {
-                    console.error("Hiba a backend ellenőrzés során:", err);
+                    console.error("Hiba a backend ellenőrzés során:", safeError(err));
                     setCheckError('Nem sikerült ellenőrizni a választ. A válaszod megmaradt, próbáld újra.');
                 } finally {
                     setIsChecking(false);
@@ -179,7 +180,7 @@ const LessonPlayer = () => {
                         }
                     }
                 } catch (err) {
-                    console.error("Hiba a lokális hash ellenőrzés során:", err);
+                    console.error("Hiba a lokális hash ellenőrzés során:", safeError(err));
                     setCheckError('Nem sikerült ellenőrizni a választ. A válaszod megmaradt, próbáld újra.');
                 } finally {
                     setIsChecking(false);
@@ -240,7 +241,7 @@ const LessonPlayer = () => {
                 const userResponse = await api.get('/users/me'); 
                 await updateProfile(userResponse.data);
             } catch (fetchErr) {
-                console.warn("Failed to fetch fresh profile, initiating fallback update:", fetchErr);
+                console.warn("Failed to fetch fresh profile, initiating fallback update:", safeError(fetchErr));
                 const updatedUser = { 
                     ...user, 
                     xp: user.xp + (response.data.xpEarned || 0),
@@ -249,7 +250,7 @@ const LessonPlayer = () => {
                 await updateProfile(updatedUser);
             }
         } catch (err) {
-            console.error("Submission error:", err);
+            console.error("Submission error:", safeError(err));
             setSubmissionError('Nem sikerült beküldeni a válaszokat.');
         } finally {
             setIsSubmitting(false);

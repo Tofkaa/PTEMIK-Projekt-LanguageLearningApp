@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 /**
  * @file AssignmentSubmissions.jsx
  * @description Teacher dashboard view for evaluating and grading student submissions.
@@ -88,7 +89,7 @@ const AssignmentSubmissions = () => {
             const res = await assignmentApi.getAssignmentSessions(assignmentId);
             setSessions(res.data);
         } catch (error) {
-            console.error("Hiba a beadott munkák lekérésekor:", error);
+            console.error("Hiba a beadott munkák lekérésekor:", safeError(error));
             setLoadError('Nem sikerült lekérni a listát. Ellenőrizd a kapcsolatot és a jogosultságodat, majd próbáld újra!');
         } finally {
             setIsLoading(false);

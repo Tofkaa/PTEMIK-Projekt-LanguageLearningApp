@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 /**
  * @file Leaderboard.jsx
  * @description Displays the Global or Friends leaderboard with toggleable sorting (XP / Streak).
@@ -37,7 +38,7 @@ const Leaderboard = ({defaultScope = 'global'}) => {
             });
             if (active) setPlayers(response.data || []);
         } catch (err) {
-            console.error(err);
+            console.error('Request failed', safeError(err));
             if (active) setError('Nem sikerült betölteni a ranglistát.');
         } finally {
             if (active) setLoading(false);

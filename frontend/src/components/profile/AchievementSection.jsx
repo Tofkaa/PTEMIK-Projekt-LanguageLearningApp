@@ -1,3 +1,4 @@
+import { safeError } from '../../utils/safeError';
 import { useState, useEffect, useRef } from 'react';
 import { Row, Col, Spinner } from 'react-bootstrap';
 import api from '../../services/api'; 
@@ -27,7 +28,7 @@ const AchievementsSection = () => {
                 const response = await api.get('/achievements/me');
                 setAchievements(response.data);
             } catch (err) {
-                console.error("Error fetching achievements:", err);
+                console.error("Error fetching achievements:", safeError(err));
                 setError("Nem sikerült betölteni a kitüntetéseket.");
             } finally {
                 setIsLoading(false);

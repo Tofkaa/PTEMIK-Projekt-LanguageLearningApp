@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 /**
  * @file AssignmentPlayer.jsx
  * @description Manages the interactive quiz engine for classroom assignments.
@@ -234,7 +235,7 @@ const AssignmentPlayerSession = ({ attempt, onReload }) => {
             }
 
         } catch (err) {
-            console.error("Hiba az ellenőrzés során:", err);
+            console.error("Hiba az ellenőrzés során:", safeError(err));
             setCheckError('Nem sikerült ellenőrizni a választ. A válaszod megmaradt, próbáld újra.');
         } finally {
             setIsChecking(false);
@@ -321,7 +322,7 @@ const AssignmentPlayerSession = ({ attempt, onReload }) => {
             setShowSummary(true);
             
            } catch (error) {
-            console.error('Nem sikerült beküldeni a tesztet.', error);
+            console.error('Nem sikerült beküldeni a tesztet.', safeError(error));
             if (error.response?.status === 409) saving.markConflict();
             setSubmissionError(error.response?.data?.message || 'Nem sikerült beküldeni a tesztet. Ellenőrizd a kapcsolatod, majd próbáld újra.');
         } finally {

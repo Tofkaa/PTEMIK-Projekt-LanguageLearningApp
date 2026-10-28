@@ -1,3 +1,4 @@
+import { safeError } from '../../utils/safeError';
 import React, { useState, useEffect } from 'react';
 import { Table, Badge, Spinner, Alert, Card } from 'react-bootstrap';
 import { adminApi } from '../../services/adminApi';
@@ -32,7 +33,7 @@ const SystemLogs = () => {
             setLogs(response.data);
             setError('');
         } catch (err) {
-            console.error("Hiba a naplók lekérésekor:", err);
+            console.error("Hiba a naplók lekérésekor:", safeError(err));
             setError('Nem sikerült betölteni a rendszernaplókat.');
         } finally {
             if (!isQuiet) setIsLoading(false);

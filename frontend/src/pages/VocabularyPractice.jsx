@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 import EarnedAchievements from '../components/EarnedAchievements';
 import { useState, useEffect, useRef } from 'react';
 import { Container, Card, Button, ProgressBar, Spinner, Form } from 'react-bootstrap';
@@ -54,7 +55,7 @@ const VocabularySession = () => {
                 }
             } catch (err) {
                 if (!active) return;
-                console.error("Hiba a dinamikus gyakorlás lekérésekor:", err);
+                console.error("Hiba a dinamikus gyakorlás lekérésekor:", safeError(err));
                 setError("Nem sikerült betölteni a gyakorló feladatokat.");
             } finally {
                 if (active) setIsLoading(false);
@@ -107,7 +108,7 @@ const VocabularySession = () => {
             refreshNotifications?.();
         } catch (err) {
             if (!alive.current || controller.signal.aborted) return;
-            console.error('Hiba az eredmények mentésekor:', err);
+            console.error('Hiba az eredmények mentésekor:', safeError(err));
             setSaveError('Nem sikerült menteni az eredményeket. A válaszaid megmaradtak, próbáld újra a mentést.');
         } finally {
             if (alive.current) setIsChecking(false);

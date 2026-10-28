@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 import InvitationShare from './InvitationShare';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -123,7 +124,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
             const advStatsRes = await assignmentApi.getAdvancedClassroomStatistics(classroomId);
             setAdvancedStats(advStatsRes.data);
         } catch (error) {
-            console.error("Hiba az adatok lekérésekor:", error);
+            console.error("Hiba az adatok lekérésekor:", safeError(error));
         } finally {
             if (!silent) setIsLoading(false);
         }
@@ -205,7 +206,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
             setLessons(res.data);
             setIsAssignmentModalOpen(true);
         } catch (error) {
-            console.error("Hiba a leckék betöltésekor:", error);
+            console.error("Hiba a leckék betöltésekor:", safeError(error));
         }
     };
 
@@ -216,7 +217,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
             try {
                 const res = await lessonApi.getLessonExercises(lessonId);
                 setAvailableExercises(res.data);
-            } catch (error) { console.error("Hiba a feladatok betöltésekor:", error); }
+            } catch (error) { console.error("Hiba a feladatok betöltésekor:", safeError(error)); }
         } else {
             setAvailableExercises([]);
         }
@@ -228,7 +229,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
                 await assignmentApi.deleteAssignment(assignmentId);
                 fetchDashboardData(true);
             } catch (error) {
-                console.error("Hiba a feladat törlésekor:", error);
+                console.error("Hiba a feladat törlésekor:", safeError(error));
                 alert("Nem sikerült törölni a feladatot.");
             }
         }
@@ -333,7 +334,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
             setAvailableExercises([]);
             fetchDashboardData(); 
         } catch (error) {
-            console.error("Hiba a feladat kiosztásakor:", error);
+            console.error("Hiba a feladat kiosztásakor:", safeError(error));
             setAssignmentError(error.response?.data?.message || (error instanceof RangeError ? error.message : "Hiba történt a mentés során. A beállításaid megmaradtak; próbáld újra."));
         } finally {
             setIsSubmitting(false); 

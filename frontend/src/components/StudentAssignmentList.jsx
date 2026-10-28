@@ -1,3 +1,4 @@
+import { safeError } from '../utils/safeError';
 /**
  * @file StudentAssignmentList.jsx
  * @description Component for students to view their pending and active assignments across all enrolled classrooms.
@@ -34,7 +35,7 @@ const StudentAssignmentList = () => {
             const res = await assignmentApi.getStudentActiveAssignments();
             setActiveAssignments(res.data);
         } catch (error) {
-            console.error("Failed to fetch active assignments:", error);
+            console.error("Failed to fetch active assignments:", safeError(error));
         } finally {
             setIsLoading(false);
         }
