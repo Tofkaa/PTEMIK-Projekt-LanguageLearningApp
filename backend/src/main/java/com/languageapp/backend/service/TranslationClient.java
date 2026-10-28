@@ -2,6 +2,8 @@ package com.languageapp.backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.languageapp.backend.exception.TranslationUnavailableException;
+import com.languageapp.backend.exception.TooManyRequestsException;
+import com.languageapp.backend.security.RequestBudgetStore;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -20,6 +22,7 @@ import java.util.concurrent.Flow;
 public class TranslationClient {
     private static final int PARALLELISM=4, CACHE_LIMIT=512, MAX_BODY=64*1024;
     private final Clock clock;
+    private final RequestBudgetStore budgets;
     private final URI endpoint;
     private final int timeoutMillis;
     private final HttpClient http;
@@ -36,8 +39,8 @@ public class TranslationClient {
     private record Cached(String translation,Instant expiresAt) { }
 
     public TranslationClient(Clock clock,@Value("${app.translation.url:https://api.mymemory.translated.net/get}") String endpoint,
-            @Value("${app.translation.timeout-ms:4000}") int timeoutMillis) {
-        this.clock=clock;this.endpoint=URI.create(endpoint);
+            @Value("${app.translation.timeout-ms:4000}") int timeoutMillis, RequestBudgetStore budgets) {
+        this.clock=clock;this.endpoint=URI.create(endpoint);this.budgets=budgets;
         if(timeoutMillis<100 || timeoutMillis>10000)throw new IllegalArgumentException("Invalid dictionary timeout");
         this.timeoutMillis=timeoutMillis;
         this.http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).followRedirects(HttpClient.Redirect.NEVER).build();
@@ -55,7 +58,10 @@ public class TranslationClient {
                 long remaining=deadline-System.nanoTime();if(remaining<=0)throw new TimeoutException();
                 result.put(first.getKey(),first.getValue().get(remaining,TimeUnit.NANOSECONDS));pending.remove(first.getKey());
             } catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new TranslationUnavailableException();}
-            catch(ExecutionException | TimeoutException rejected){throw new TranslationUnavailableException();}
+            catch(ExecutionException rejected){
+                if(rejected.getCause() instanceof TooManyRequestsException limited)throw limited;
+                throw new TranslationUnavailableException();
+            } catch(TimeoutException rejected){throw new TranslationUnavailableException();}
         }
         return Map.copyOf(result);
     }
@@ -66,18 +72,21 @@ public class TranslationClient {
             cache.remove(key);
             var existing=flights.get(key);if(existing!=null)return existing;
             if(quotaStart==null || !now.isBefore(quotaStart.plusSeconds(60))){quotaStart=now;requests=0;}
-            if(requests>=120)throw new TranslationUnavailableException();
+            if(requests>=120)throw new TooManyRequestsException(Math.max(1,Duration.between(now,quotaStart.plusSeconds(60)).toSeconds()+1));
             var promise=new CompletableFuture<String>();flights.put(key,promise);
             try {
                 workers.execute(()->{
                     try {
+                        // Each actual outbound word, not each batch, consumes the shared provider quota.
+                        // This short transaction completes before HTTP; cache hits and joined flights never charge it.
+                        budgets.check(List.of(RequestBudgetStore.budget("translation-provider","global",endpoint.getHost(),120,60)));
                         String translation=fetch(key);
                         synchronized(gate) {
                             cache.put(key,new Cached(translation,clock.instant().plusSeconds(600)));
                             while(cache.size()>CACHE_LIMIT)cache.remove(cache.keySet().iterator().next());
                         }
                         promise.complete(translation);
-                    }catch(RuntimeException rejected){promise.completeExceptionally(new TranslationUnavailableException());}
+                    }catch(RuntimeException rejected){promise.completeExceptionally(rejected instanceof TooManyRequestsException?rejected:new TranslationUnavailableException());}
                     finally{synchronized(gate){flights.remove(key,promise);}}
                 });requests++;
             }catch(RejectedExecutionException busy){flights.remove(key,promise);throw new TranslationUnavailableException();}

@@ -1,5 +1,7 @@
 package com.languageapp.backend.service;
 
+import com.languageapp.backend.exception.TooManyRequestsException;
+
 import com.languageapp.backend.entity.VerificationToken;
 import com.languageapp.backend.enums.Role;
 import com.languageapp.backend.exception.BadRequestException;
@@ -27,9 +29,9 @@ public class VerificationEmailService {
         if(user.isVerified()) throw new BadRequestException("Az e-mail-címed már meg van erősítve. Frissítsd a fiók állapotát.");
         var now=clock.instant();
         if(tokens.lastCreatedAt(user.getUserId()).filter(last -> now.isBefore(last.plusSeconds(60))).isPresent())
-            throw new BadRequestException("Új megerősítő levelet egy perc elteltével kérhetsz.");
+            throw new TooManyRequestsException(60);
         if(tokens.countByUser_UserIdAndCreatedAtAfter(user.getUserId(),now.minusSeconds(3600))>=5)
-            throw new BadRequestException("Egy órán belül legfeljebb öt megerősítő levelet kérhetsz.");
+            throw new TooManyRequestsException(3600);
         // Old links expire atomically; retain recent issuance timestamps for the durable request budget.
         tokens.expirePrevious(user.getUserId(),now);
         tokens.pruneOld(user.getUserId(),now.minusSeconds(86400));

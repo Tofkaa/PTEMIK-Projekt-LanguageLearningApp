@@ -38,6 +38,8 @@ import java.util.List;
 public class SecurityConfiguration {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final ApiRequestLimiter requestLimiter;
+    private final ClientAddressResolver clientAddresses;
     private final BrowserOriginPolicy browserOriginPolicy;
     private final CustomUserDetailsService userDetailsService;
     private final CustomOAuth2UserService customOAuth2UserService;
@@ -104,6 +106,7 @@ public class SecurityConfiguration {
                 // Insert the JWT filter before the standard Spring UsernamePassword filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(new BrowserOriginFilter(browserOriginPolicy), JwtAuthenticationFilter.class)
+                .addFilterAfter(new ApiRateLimitFilter(requestLimiter, clientAddresses, objectMapper, clock), org.springframework.security.web.access.intercept.AuthorizationFilter.class)
                 .addFilterAfter(new AnswerPayloadFilter(objectMapper, clock), org.springframework.security.web.access.intercept.AuthorizationFilter.class);
 
         http.oauth2Login(oauth2 -> oauth2.addObjectPostProcessor(
@@ -134,6 +137,7 @@ public class SecurityConfiguration {
 
         // Must be true for the frontend to receive/send HttpOnly cookies
         configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(List.of("Retry-After"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

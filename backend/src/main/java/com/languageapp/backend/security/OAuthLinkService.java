@@ -1,5 +1,7 @@
 package com.languageapp.backend.security;
 
+import com.languageapp.backend.exception.TooManyRequestsException;
+
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.enums.*;
 import com.languageapp.backend.exception.*;
@@ -56,9 +58,9 @@ public class OAuthLinkService {
         if(alreadyLinked(user,provider))throw new BadRequestException("Ez a belépési mód már hozzá van kapcsolva a fiókodhoz.");
         OAuthLinkIntent intent=intents.findById(user.getUserId()).orElseGet(OAuthLinkIntent::new);Instant now=clock.instant();
         if(intent.getLastRequestedAt()!=null && now.isBefore(intent.getLastRequestedAt().plusSeconds(60)))
-            throw new BadRequestException("Új összekapcsolási kódot egy perc elteltével kérhetsz.");
+            throw new TooManyRequestsException(60);
         if(intent.getRateWindowStart()==null || !now.isBefore(intent.getRateWindowStart().plusSeconds(3600))){intent.setRateWindowStart(now);intent.setRequestsInWindow(0);}
-        if(intent.getRequestsInWindow()>=5)throw new BadRequestException("Egy órán belül legfeljebb öt összekapcsolási kódot kérhetsz.");
+        if(intent.getRequestsInWindow()>=5)throw new TooManyRequestsException(3600);
         String code=String.format(Locale.ROOT,"%06d",RANDOM.nextInt(1_000_000));
         intent.setUserId(user.getUserId());intent.setRequestId(UUID.randomUUID());intent.setProvider(provider);
         intent.setSessionId(session.getRefreshTokenId());intent.setSessionHash(session.getTokenHash());intent.setFingerprint(fingerprint(user));

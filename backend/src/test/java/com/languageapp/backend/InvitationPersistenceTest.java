@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties={"spring.datasource.url=${INVITATION_TEST_DATABASE_URL}", "spring.jpa.hibernate.ddl-auto=create", "spring.jpa.show-sql=false"})
 class InvitationPersistenceTest {
     @Autowired InvitationService invitations;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate quotaJdbc;
     @Autowired FriendshipService friendships;
     @Autowired ClassroomService classroomService;
     @Autowired UserRepository users;
@@ -172,7 +173,12 @@ class InvitationPersistenceTest {
     @Test void httpLinkManagementChecksOwnershipAndHasBoundedRequestRates() throws Exception {
         Fixture f=fixture();
         mvc.perform(post("/api/invitations/classrooms/"+f.classroomId).header("Authorization",auth(f.other))).andExpect(status().isForbidden());
-        for(int i=0;i<10;i++) mvc.perform(post("/api/invitations/friend").header("Authorization",auth(f.student))).andExpect(status().isOk());
-        mvc.perform(post("/api/invitations/friend").header("Authorization",auth(f.student))).andExpect(status().isTooManyRequests()).andExpect(header().string("Retry-After","60"));
+        String authorization=auth(f.student);
+        mvc.perform(post("/api/invitations/friend").header("Authorization",authorization)).andExpect(status().isOk());
+        // Saturate the actual shared bucket against DB time. Ten HTTP requests are not
+        // an instantaneous burst on a slow host: GCRA may legitimately refill while they run.
+        var bucket=com.languageapp.backend.security.RequestBudgetStore.budget("INVITATION_MANAGE","account",f.student.getEmail().toLowerCase(Locale.ROOT),10,60);
+        assertEquals(1,quotaJdbc.update("UPDATE request_budgets SET next_at=floor(extract(epoch FROM clock_timestamp())*1000000)::bigint+60000000 WHERE bucket_key=?",bucket.key()));
+        mvc.perform(post("/api/invitations/friend").header("Authorization",authorization)).andExpect(status().isTooManyRequests()).andExpect(result -> { long retry=Long.parseLong(result.getResponse().getHeader("Retry-After")); assertTrue(retry>=1 && retry<=60); });
     }
 }

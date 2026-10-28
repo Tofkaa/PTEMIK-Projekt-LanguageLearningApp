@@ -1,3 +1,4 @@
+import { rateLimitMessage } from '../utils/rateLimitMessage';
 import axios from 'axios';
 import { authSnapshot, endSession, getAccessToken, getAuthEpoch, isCurrentAuth, queueAuthCookieOperation,
     requireCurrentAuth, staleAuthError, storeAccessToken, tokenSessionId } from './authSession';
@@ -42,7 +43,7 @@ export const refreshAccessToken = (snapshot, skipGlobalError) => {
     }).catch(error => {
         if (!isCurrentAuth(snapshot) || axios.isCancel(error)) throw staleAuthError();
         if ([400, 401, 403].includes(error.response?.status)) endSession(snapshot.epoch);
-        else if (flight.notifyErrors) report('A munkamenet frissítése most nem sikerült. Ellenőrizd a kapcsolatot, majd próbáld újra.');
+        else if (flight.notifyErrors) report(error.response?.status === 429 ? rateLimitMessage(error) : 'A munkamenet frissítése most nem sikerült. Ellenőrizd a kapcsolatot, majd próbáld újra.');
         throw error;
     }).finally(() => { if (refreshFlight === flight) refreshFlight = null; });
     refreshFlight = flight;
@@ -77,6 +78,7 @@ api.interceptors.response.use(response => {
         else if (error.response.status === 404) message = 'A keresett adat vagy végpont nem található (404).';
         else if (error.response.status === 403) message = 'Nincs megfelelő jogosultságod ehhez a művelethez! (403)';
         else if (error.response.status === 401) message = 'A művelethez be kell jelentkezned.';
+        else if (error.response.status === 429) message = rateLimitMessage(error);
         else if (error.response.status === 413) message = 'A beküldött válaszok összmérete túl nagy. Rövidítsd a választ, majd próbáld újra.';
         else if ([400, 409].includes(error.response.status)) {
             const backend = error.response.data?.message || error.response.data;

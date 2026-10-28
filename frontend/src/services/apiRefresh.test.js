@@ -41,7 +41,7 @@ it.each([false, true])('refreshes a short access token without leaving the page 
     expect(retry.headers.Authorization).toBe('Bearer fresh-test-token');
 });
 
-it.each([undefined, 500, 503])('keeps authentication and permits retry after temporary refresh failure %s', async status => {
+it.each([undefined, 429, 500, 503])('keeps authentication and permits retry after temporary refresh failure %s', async status => {
     sessionStorage.setItem('token', 'old-test-token');
     let failing = true;
     api.defaults.adapter = vi.fn(config => {
@@ -204,4 +204,19 @@ it('shares one refresh across concurrent requests and rejects both without redir
     expect(sessionStorage.getItem('token')).toBe('old-test-token');
     expect(browser.location.href).toBe('https://localhost/settings');
     expect(browser.dispatchEvent).toHaveBeenCalledTimes(1);
+});
+
+
+it('preserves the session and does not refresh or replay a rate-limited mutation', async () => {
+    sessionStorage.setItem('token', 'current-token');
+    const calls = [];
+    api.defaults.adapter = config => {
+        calls.push(config.url);
+        return Promise.reject(Object.assign(new Error('limited'), { config,
+            response: { ...response(config, {}, 429), headers: { 'retry-after': '23' } } }));
+    };
+    await expect(api.post('/friendships/request', {})).rejects.toThrow('limited');
+    expect(calls).toEqual(['/friendships/request']);
+    expect(session.getAccessToken()).toBe('current-token');
+    expect(browser.dispatchEvent.mock.calls.at(-1)[0].detail).toContain('23 másodperc múlva');
 });

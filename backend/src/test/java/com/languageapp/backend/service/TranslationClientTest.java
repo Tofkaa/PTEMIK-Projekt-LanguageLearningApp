@@ -1,6 +1,9 @@
 package com.languageapp.backend.service;
 
 import com.languageapp.backend.exception.TranslationUnavailableException;
+import com.languageapp.backend.exception.TooManyRequestsException;
+import com.languageapp.backend.security.RequestBudgetStore;
+import static org.mockito.Mockito.*;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.*;
 import java.net.*;
@@ -15,6 +18,7 @@ class TranslationClientTest {
     HttpServer server;
     ExecutorService providerThreads;
     TranslationClient client;
+    RequestBudgetStore budgets=mock(RequestBudgetStore.class);
     AtomicInteger calls=new AtomicInteger(),active=new AtomicInteger(),maximum=new AtomicInteger();
     AtomicReference<String> body=new AtomicReference<>("{\"responseStatus\":200,\"responseData\":{\"translatedText\":\"alma\"}}");
     AtomicInteger status=new AtomicInteger(200);
@@ -30,13 +34,19 @@ class TranslationClientTest {
                 byte[] bytes=body.get().getBytes(StandardCharsets.UTF_8);exchange.sendResponseHeaders(status.get(),bytes.length);exchange.getResponseBody().write(bytes);
             }catch(java.io.IOException cancelled){/* Expected cancellation by bounded clients. */}
             finally{active.decrementAndGet();exchange.close();}
-        });server.start();client=new TranslationClient(Clock.systemUTC(),"http://127.0.0.1:"+server.getAddress().getPort()+"/get",500);
+        });server.start();client=new TranslationClient(Clock.systemUTC(),"http://127.0.0.1:"+server.getAddress().getPort()+"/get",500,budgets);
     }
     @AfterEach void stop(){client.close();server.stop(0);providerThreads.shutdownNow();}
     @Test void successfulPublicTranslationsAreCachedAndDeduplicated() {
         assertEquals("alma",client.translateAll("en",List.of("apple","apple")).get("apple"));
         assertEquals("alma",client.translateAll("en",List.of("apple")).get("apple"));assertEquals(1,calls.get());
+        verify(budgets,times(1)).check(anyList());
         client.translateAll("de",List.of("apple"));assertEquals(2,calls.get());
+    }
+    @Test void sharedProviderQuotaRejectsBeforeHttpAndPropagatesRetryAfter() {
+        doThrow(new TooManyRequestsException(7)).when(budgets).check(anyList());
+        var rejected=assertThrows(TooManyRequestsException.class,()->client.translateAll("en",List.of("apple")));
+        assertEquals(7,rejected.retryAfterSeconds());assertEquals(0,calls.get());
     }
     @Test void parallelIdenticalLookupsShareOneProviderRequest()throws Exception {
         delay=150;var pool=Executors.newFixedThreadPool(8);var go=new CountDownLatch(1);
@@ -84,9 +94,9 @@ class TranslationClientTest {
     @Test void cacheExpiryAndProviderQuotaAreBounded() {
         client.close();var instant=new AtomicReference<>(Instant.parse("2026-10-28T10:00:00Z"));
         Clock mutable=new Clock(){public ZoneId getZone(){return ZoneOffset.UTC;}public Clock withZone(ZoneId zone){return this;}public Instant instant(){return instant.get();}};
-        client=new TranslationClient(mutable,"http://127.0.0.1:"+server.getAddress().getPort()+"/get",2000);
+        client=new TranslationClient(mutable,"http://127.0.0.1:"+server.getAddress().getPort()+"/get",2000,budgets);
         for(int n=0;n<120;n++)client.translateAll("en",List.of("word"+n));
-        assertThrows(TranslationUnavailableException.class,()->client.translateAll("en",List.of("over-quota")));
+        assertThrows(TooManyRequestsException.class,()->client.translateAll("en",List.of("over-quota")));
         client.translateAll("en",List.of("word0"));assertEquals(120,calls.get());
         instant.set(instant.get().plusSeconds(601));client.translateAll("en",List.of("word0"));assertEquals(121,calls.get());
     }

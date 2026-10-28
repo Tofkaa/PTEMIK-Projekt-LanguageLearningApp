@@ -1,5 +1,7 @@
 package com.languageapp.backend.service;
 
+import com.languageapp.backend.exception.TooManyRequestsException;
+
 import com.languageapp.backend.entity.*;
 import com.languageapp.backend.enums.AuthProvider;
 import com.languageapp.backend.exception.BadRequestException;
@@ -44,14 +46,14 @@ public class AccountDeletionService {
         Instant now = clock.instant();
         AccountDeletionToken token = tokens.findById(user.getUserId()).orElseGet(AccountDeletionToken::new);
         if (token.getLastRequestedAt() != null && now.isBefore(token.getLastRequestedAt().plusSeconds(60))) {
-            throw new BadRequestException("Új törlési linket egy perc elteltével kérhetsz.");
+            throw new TooManyRequestsException(60);
         }
         if (token.getRateWindowStart() == null || !now.isBefore(token.getRateWindowStart().plus(1, ChronoUnit.HOURS))) {
             token.setRateWindowStart(now);
             token.setRequestsInWindow(0);
         }
         if (token.getRequestsInWindow() >= 5) {
-            throw new BadRequestException("Egy órán belül legfeljebb öt törlési linket kérhetsz. Próbáld újra később.");
+            throw new TooManyRequestsException(3600);
         }
         byte[] secret = new byte[32];
         RANDOM.nextBytes(secret);

@@ -1,0 +1,33 @@
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import Login from '../../pages/Login';
+import ForgotPassword from '../../pages/ForgotPassword';
+import { authApi } from '../../services/authApi';
+const state = vi.hoisted(() => ({ authenticate: vi.fn() }));
+vi.mock('../../context/AuthContext.jsx', () => ({ useAuth: () => state }));
+vi.mock('../../context/ThemeContext.jsx', () => ({ useTheme: () => ({ theme: 'light', themePreference: 'light', setThemePreference: vi.fn() }) }));
+vi.mock('../../services/authApi', () => ({ authApi: { forgotPassword: vi.fn() } }));
+beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); sessionStorage.clear(); });
+afterEach(cleanup);
+const limited = { response: { status: 429, headers: { 'retry-after': '17' } } };
+it('announces a login cooldown, keeps the entered values and never automatically retries', async () => {
+    state.authenticate.mockRejectedValue(limited);
+    render(<MemoryRouter><Login /></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText('Email cím'), { target: { value: 'test@example.test' } });
+    fireEvent.change(screen.getByLabelText('Jelszó'), { target: { value: 'Password-for-test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Belépés', exact: true }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('17 másodperc múlva');
+    expect(screen.getByLabelText('Email cím')).toHaveValue('test@example.test');
+    expect(screen.getByLabelText('Jelszó')).toHaveValue('Password-for-test');
+    expect(state.authenticate).toHaveBeenCalledTimes(1);
+});
+it('explains recovery throttling instead of reporting a network failure', async () => {
+    authApi.forgotPassword.mockRejectedValue(limited);
+    render(<MemoryRouter><ForgotPassword /></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText('Email cím'), { target: { value: 'test@example.test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Visszaállító link küldése' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('17 másodperc múlva');
+    expect(screen.getByLabelText('Email cím')).toHaveValue('test@example.test');
+    expect(authApi.forgotPassword).toHaveBeenCalledTimes(1);
+});

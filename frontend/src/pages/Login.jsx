@@ -1,3 +1,4 @@
+import { rateLimitMessage } from '../utils/rateLimitMessage';
 import { postLoginDestination } from '../utils/invitationIntent';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -57,7 +58,7 @@ const Login = () => {
         } catch (err) {
             if (axios.isCancel(err)) return;
             // Display a generic error message to the user for security reasons
-            setError([400, 401].includes(err.response?.status) ? 'Hibás email cím vagy jelszó!'
+            setError(err.response?.status === 429 ? rateLimitMessage(err) : [400, 401].includes(err.response?.status) ? 'Hibás email cím vagy jelszó!'
                 : err.response?.status === 403 ? 'Ez a fiók jelenleg nem használható bejelentkezésre.'
                 : 'A bejelentkezés most nem sikerült. Ellenőrizd a kapcsolatot, majd próbáld újra.');
         } finally {

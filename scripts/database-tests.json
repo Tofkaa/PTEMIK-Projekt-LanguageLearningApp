@@ -79,6 +79,10 @@
     "environment": "PASSWORD_CHANGE_TEST_DATABASE_URL",
     "prefix": "languageapp_password_change_check_"
   },
+  "RateLimitPersistenceTest": {
+    "environment": "RATE_LIMIT_TEST_DATABASE_URL",
+    "prefix": "languageapp_rate_limit_check_"
+  },
   "SecurityFoundationsPersistenceTest": {
     "environment": "SECURITY_FOUNDATIONS_TEST_DATABASE_URL",
     "prefix": "languageapp_security_fix_check_"

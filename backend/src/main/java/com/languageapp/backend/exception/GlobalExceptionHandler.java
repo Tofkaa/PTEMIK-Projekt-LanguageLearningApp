@@ -45,6 +45,12 @@ public class GlobalExceptionHandler {
                 HttpStatus.FORBIDDEN, "Nincs jogosultságod ehhez a művelethez.", request.getRequestURI()));
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ErrorResponse> handleThrottled(TooManyRequestsException ex,HttpServletRequest request) {
+        return ResponseEntity.status(429).header("Retry-After",Long.toString(ex.retryAfterSeconds()))
+                .header("Cache-Control","no-store").body(buildErrorResponse(HttpStatus.TOO_MANY_REQUESTS,ex.getMessage(),request.getRequestURI()));
+    }
+
     @ExceptionHandler(TranslationUnavailableException.class)
     public ResponseEntity<ErrorResponse> handleTranslationUnavailable(TranslationUnavailableException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header("Retry-After", "30")

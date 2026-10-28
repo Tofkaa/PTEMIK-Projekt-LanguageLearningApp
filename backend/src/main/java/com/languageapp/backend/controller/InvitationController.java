@@ -36,10 +36,5 @@ public class InvitationController {
         limiter.check(auth.getName(), "manage");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(invitations.manage(auth.getName(),kind,id,operation));
     }
-    @ExceptionHandler(com.languageapp.backend.service.InvitationRequestLimiter.LimitExceeded.class)
-    public ResponseEntity<java.util.Map<String,String>> limited() {
-        return ResponseEntity.status(429).header("Retry-After", "60").cacheControl(CacheControl.noStore())
-                .body(java.util.Map.of("message", "Túl sok meghívóművelet. Várj egy percet, majd próbáld újra!"));
-    }
 
 }

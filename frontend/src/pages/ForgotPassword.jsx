@@ -1,3 +1,4 @@
+import { rateLimitMessage } from '../utils/rateLimitMessage';
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Form, Button, Card, Container, Row, Col } from 'react-bootstrap';
@@ -21,9 +22,9 @@ const ForgotPassword = () => {
             const response = await authApi.forgotPassword(email);
             setStatus('success');
             setMessage(response.data || 'Ha létezik fiók ezzel az e-mail címmel, elküldtük a visszaállító linket.');
-        } catch {
+        } catch (error) {
             setStatus('error');
-            setMessage('Hálózati hiba történt. Kérlek, próbáld újra később.');
+            setMessage(error.response?.status === 429 ? rateLimitMessage(error) : 'Hálózati hiba történt. Kérlek, próbáld újra később.');
         }
     };
 

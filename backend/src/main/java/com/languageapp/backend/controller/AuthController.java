@@ -24,9 +24,11 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthenticationService authenticationService;
+    private final com.languageapp.backend.security.ApiRequestLimiter requestLimits;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+        requestLimits.anonymousAccount(com.languageapp.backend.security.RequestOperation.REGISTER, request.getEmail());
         AuthenticationService.AuthResult result = authenticationService.register(request);
 
         ResponseCookie cookie = createCookie(result.refreshToken(), false);
@@ -48,6 +50,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        requestLimits.anonymousAccount(com.languageapp.backend.security.RequestOperation.LOGIN, request.getEmail());
         AuthenticationService.AuthResult result = authenticationService.authenticate(request);
 
         ResponseCookie cookie = createCookie(result.refreshToken(), request.isRememberMe());
@@ -98,6 +101,7 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<String> forgotPassword(@RequestParam String email) {
         log.info("Received forgot password request");
+        requestLimits.anonymousAccount(com.languageapp.backend.security.RequestOperation.RESET_REQUEST, email);
         authenticationService.requestPasswordReset(email);
         // Always return this response, to not leak if the user with said email exists or not
         return ResponseEntity.ok("Ha létezik fiók ezzel az e-mail címmel, elküldtük a visszaállító linket.");
@@ -106,6 +110,7 @@ public class AuthController {
     @PostMapping("/reset-password")
     public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         log.info("Received password reset confirmation request");
+        requestLimits.anonymousAccount(com.languageapp.backend.security.RequestOperation.RESET_REDEEM, request.getToken());
         authenticationService.resetPassword(request.getToken(), request.getNewPassword());
         return ResponseEntity.ok("Jelszó sikeresen frissítve!");
     }
