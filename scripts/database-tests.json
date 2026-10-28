@@ -1,0 +1,98 @@
+{
+  "AccountDeletionPersistenceTest": {
+    "environment": "ACCOUNT_DELETION_TEST_DATABASE_URL",
+    "prefix": "languageapp_deletion_check_"
+  },
+  "AchievementMetricsPersistenceTest": {
+    "environment": "ACHIEVEMENT_TEST_DATABASE_URL",
+    "prefix": "languageapp_achievement_check_"
+  },
+  "AssignmentConcurrencyPersistenceTest": {
+    "environment": "ASSIGNMENT_CONCURRENCY_TEST_DATABASE_URL",
+    "prefix": "languageapp_exam_lock_check_"
+  },
+  "AssignmentExpirySelectionPersistenceTest": {
+    "environment": "EXPIRY_TEST_DATABASE_URL",
+    "prefix": "languageapp_expiry_check_"
+  },
+  "AssignmentRecoveryPersistenceTest": {
+    "environment": "ASSIGNMENT_RECOVERY_TEST_DATABASE_URL",
+    "prefix": "languageapp_exam_check_"
+  },
+  "AssignmentTimingPersistenceTest": {
+    "environment": "UTC_TEST_DATABASE_URL",
+    "prefix": "language_learning_utc_check_"
+  },
+  "BackendApplicationTests": {
+    "environment": "APPLICATION_SMOKE_TEST_DATABASE_URL",
+    "prefix": "languageapp_smoke_check_"
+  },
+  "BrowserOriginPersistenceTest": {
+    "environment": "SECURITY_FOUNDATIONS_TEST_DATABASE_URL",
+    "prefix": "languageapp_security_fix_check_"
+  },
+  "ClassroomReportingPersistenceTest": {
+    "environment": "REPORTING_TEST_DATABASE_URL",
+    "prefix": "languageapp_reporting_check_"
+  },
+  "DashboardMasteryPersistenceTest": {
+    "environment": "DASHBOARD_TEST_DATABASE_URL",
+    "prefix": "languageapp_dashboard_check_"
+  },
+  "DeviceSessionsPersistenceTest": {
+    "environment": "SECURITY_FOUNDATIONS_TEST_DATABASE_URL",
+    "prefix": "languageapp_security_fix_check_"
+  },
+  "DynamicPracticePersistenceTest": {
+    "environment": "DYNAMIC_PRACTICE_TEST_DATABASE_URL",
+    "prefix": "languageapp_practice_check_"
+  },
+  "EmailChangeLifecyclePersistenceTest": {
+    "environment": "VERIFICATION_TEST_DATABASE_URL",
+    "prefix": "languageapp_verification_check_"
+  },
+  "ExpiredTokenCleanupPersistenceTest": {
+    "environment": "TOKEN_CLEANUP_TEST_DATABASE_URL",
+    "prefix": "languageapp_token_cleanup_check_"
+  },
+  "FederatedIdentityPersistenceTest": {
+    "environment": "OAUTH_IDENTITY_TEST_DATABASE_URL",
+    "prefix": "languageapp_oauth_check_"
+  },
+  "InvitationPersistenceTest": {
+    "environment": "INVITATION_TEST_DATABASE_URL",
+    "prefix": "languageapp_invitation_check_"
+  },
+  "LessonMasteryPersistenceTest": {
+    "environment": "LESSON_MASTERY_TEST_DATABASE_URL",
+    "prefix": "languageapp_mastery_check_"
+  },
+  "OAuthLinkPersistenceTest": {
+    "environment": "OAUTH_LINK_TEST_DATABASE_URL",
+    "prefix": "languageapp_oauth_link_check_"
+  },
+  "OAuthTransportPersistenceTest": {
+    "environment": "OAUTH_TRANSPORT_TEST_DATABASE_URL",
+    "prefix": "languageapp_transport_check_"
+  },
+  "PasswordChangeSessionsPersistenceTest": {
+    "environment": "PASSWORD_CHANGE_TEST_DATABASE_URL",
+    "prefix": "languageapp_password_change_check_"
+  },
+  "SecurityFoundationsPersistenceTest": {
+    "environment": "SECURITY_FOUNDATIONS_TEST_DATABASE_URL",
+    "prefix": "languageapp_security_fix_check_"
+  },
+  "TranslationIsolationPersistenceTest": {
+    "environment": "TRANSLATION_ISOLATION_TEST_DATABASE_URL",
+    "prefix": "languageapp_translation_check_"
+  },
+  "UtcPersistenceTest": {
+    "environment": "UTC_TEST_DATABASE_URL",
+    "prefix": "language_learning_utc_check_"
+  },
+  "VerificationLifecyclePersistenceTest": {
+    "environment": "VERIFICATION_TEST_DATABASE_URL",
+    "prefix": "languageapp_verification_check_"
+  }
+}

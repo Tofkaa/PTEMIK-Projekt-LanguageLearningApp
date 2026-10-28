@@ -1,5 +1,34 @@
 TESZTELÉSRE:
 
+Az automatikus quality gate a gyökérből is futtatható (Python 3.12+, Java 21;
+az integrációs részhez Docker is szükséges):
+
+```powershell
+python -m unittest discover -s scripts -p 'test_*.py'
+python scripts/quality_gate.py unit
+python scripts/quality_gate.py integration
+```
+
+A `unit` mód törli a gyermekfolyamat örökölt teszt-URL-jeit és telepítési
+beállításait. Az `integration` egy saját, új, rögzített PostgreSQL 15 image-ből
+indított konténert használ véletlen localhost-porton, külön eldobható
+adatbázisokkal. Nem fogad meglévő adatbázist vagy konténernevet, nem csatol
+alkalmazásvolume-ot, és végül saját konténerét és volume-ját is eltávolítja.
+Megszakított CI-run után a GitHub runner megszűnik; helyi gép/terminál kényszerű
+leállításakor a `languageapp.quality=disposable` címkéjű maradék konténer kézzel
+takarítható. Az alkalmazás saját konténereit ne töröld.
+
+A gate ellenőrzi az integrációs osztályok nyilvántartását, a friss Surefire
+XML-eket, a hiányzó tesztosztályokat és a váratlan kihagyásokat. Az integrációs
+futásban egyetlen kihagyott teszt is hiba. A régi UTC-próbák frissen létrehozott,
+adatmentes sémamásolaton továbbra is `validate` módban futnak. A backend package
+ugyanebben a teljes futásban készül. A `.github/workflows/quality.yml` ezt,
+valamint a frontend `npm ci`, lint, unit teszt és build lépéseit futtatja push és
+pull request esetén; titkos konfigurációt nem igényel. A kapuk nem helyettesítik
+a kézi akadálymentességi próbákat, a függőségek biztonsági auditját vagy a
+terheléses kapacitásmérést. A GitHub branch protection beállításában külön kell
+kötelezővé tenni a `frontend` és `backend` ellenőrzést.
+
 Automatizált backendtesztek Java 21-gyel, a `backend` mappából:
 
 ```powershell

@@ -11,3 +11,6 @@ rootCA-key.pem
 # Local working documentation and manual migrations.
 /docs/
 /backend/database/manual/
+
+# Local quality-gate Python bytecode
+/scripts/__pycache__/
