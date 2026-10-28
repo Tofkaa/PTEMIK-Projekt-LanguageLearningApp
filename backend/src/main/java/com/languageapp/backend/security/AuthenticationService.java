@@ -186,7 +186,8 @@ public class AuthenticationService {
     public void requestPasswordReset(String email) {
         log.info("Password reset requested for email: {}", email);
 
-        userRepository.findByEmailForAuthentication(email).ifPresent(user -> {
+        userRepository.findByEmailForAuthentication(email)
+                .filter(user -> user.isActive() && user.getRole() != Role.DELETED).ifPresent(user -> {
             // Delete previous tokens
             passwordResetTokenRepository.deleteByUser_UserId(user.getUserId());
 
@@ -218,12 +219,13 @@ public class AuthenticationService {
         UUID userId = passwordResetTokenRepository.findUserIdByToken(token)
                 .orElseThrow(() -> new BadRequestException("Érvénytelen vagy már felhasznált token!"));
         User user = userRepository.findForSessionUpdate(userId)
+                .filter(account -> account.isActive() && account.getRole() != Role.DELETED)
                 .orElseThrow(() -> new BadRequestException("Érvénytelen vagy már felhasznált token!"));
         com.languageapp.backend.entity.PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
                 .orElseThrow(() -> new BadRequestException("Érvénytelen vagy már felhasznált token!"));
 
         if (!clock.instant().isBefore(resetToken.getExpiryDate())) {
-            passwordResetTokenRepository.delete(resetToken);
+            // Expired records are removed independently by the cleanup job, not this rolled-back request.
             throw new BadRequestException("A jelszóvisszaállító link lejárt. Kérlek, igényelj újat.");
         }
 

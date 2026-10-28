@@ -64,7 +64,9 @@ class PasswordChangeSessionsPersistenceTest {
     LoginRequest login(Fixture f,String password){LoginRequest r=new LoginRequest();r.setEmail(f.email());r.setPassword(password);return r;}
     void awaitBlocked(int expected){
         long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
-        while(System.nanoTime()<end){Number n=(Number)em.createNativeQuery("select count(*) from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid() and cardinality(pg_blocking_pids(pid))>0").getSingleResult();if(n.intValue()>=expected)return;
+        while(System.nanoTime()<end){
+            em.createNativeQuery("select 1 from pg_stat_clear_snapshot()").getSingleResult();
+            Number n=(Number)em.createNativeQuery("select count(*) from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid() and cardinality(pg_blocking_pids(pid))>0").getSingleResult();if(n.intValue()>=expected)return;
             try{Thread.sleep(10);}catch(InterruptedException e){Thread.currentThread().interrupt();throw new AssertionError(e);}}
         fail("Credential operation must be waiting for the account lock");
     }

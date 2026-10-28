@@ -76,6 +76,8 @@ class EmailChangeLifecyclePersistenceTest {
     void awaitBlockedOperations(int expected) {
         long deadline = System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime()<deadline) {
+            // Refresh the PostgreSQL statistics snapshot to observe newly opened worker connections.
+            em.createNativeQuery("select 1 from pg_stat_clear_snapshot()").getSingleResult();
             Number blocked = (Number) em.createNativeQuery("select count(*) from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid() and cardinality(pg_blocking_pids(pid))>0").getSingleResult();
             if (blocked.intValue()>=expected) return;
             try { Thread.sleep(10); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }

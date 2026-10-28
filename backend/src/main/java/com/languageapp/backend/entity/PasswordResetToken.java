@@ -12,7 +12,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "password_reset_tokens")
+@Table(name = "password_reset_tokens", indexes = @Index(name = "idx_reset_expiry_cleanup", columnList = "expiry_date,token_id"))
 public class PasswordResetToken {
 
     @Id

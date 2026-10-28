@@ -12,7 +12,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "verification_tokens")
+@Table(name = "verification_tokens", indexes = @Index(name = "idx_verification_expiry_cleanup", columnList = "expiry_date,token_id"))
 public class VerificationToken {
 
     @Id

@@ -6,7 +6,7 @@ import lombok.*;
 import java.time.Instant;
 import java.util.UUID;
 
-@Getter @Setter @NoArgsConstructor @Entity @Table(name="oauth_link_intents")
+@Getter @Setter @NoArgsConstructor @Entity @Table(name="oauth_link_intents", indexes=@Index(name="idx_oauth_link_expiry_cleanup", columnList="expires_at,user_id"))
 public class OAuthLinkIntent {
     @Id private UUID userId;
     @Column(nullable=false,unique=true) private UUID requestId;

@@ -14,7 +14,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "refresh_tokens", indexes = {
         @Index(name = "idx_refresh_token_hash", columnList = "token_hash"),
-        @Index(name = "idx_refresh_user", columnList = "user_id")
+        @Index(name = "idx_refresh_user", columnList = "user_id"),
+        @Index(name = "idx_refresh_expiry_cleanup", columnList = "expiry_date,refresh_token_id")
 })
 
 public class RefreshToken {

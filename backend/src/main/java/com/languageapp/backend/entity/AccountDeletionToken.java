@@ -8,7 +8,7 @@ import java.util.UUID;
 
 /** One current deletion challenge per account; never stores the emailed secret. */
 @Entity
-@Table(name = "account_deletion_tokens")
+@Table(name = "account_deletion_tokens", indexes = @Index(name = "idx_deletion_expiry_cleanup", columnList = "expires_at,user_id"))
 @Getter
 @Setter
 public class AccountDeletionToken {

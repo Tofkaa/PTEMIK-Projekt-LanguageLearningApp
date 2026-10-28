@@ -216,6 +216,8 @@ class DeviceSessionsPersistenceTest {
                 // Observe a real PostgreSQL lock wait rather than assuming the worker reached the query.
                 long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);boolean waiting=false;
                 while(System.nanoTime()<until) {
+                    // Refresh the PostgreSQL statistics snapshot to observe newly opened worker connections.
+                    em.createNativeQuery("select 1 from pg_stat_clear_snapshot()").getSingleResult();
                     Number count=(Number)em.createNativeQuery("select count(*) from pg_stat_activity where datname=current_database() and wait_event_type='Lock'").getSingleResult();
                     if(count.longValue()>0) {waiting=true;break;}
                     try {Thread.sleep(20);} catch(InterruptedException interrupted) {Thread.currentThread().interrupt();throw new IllegalStateException(interrupted);}

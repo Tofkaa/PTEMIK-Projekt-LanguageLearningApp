@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "email_change_tokens")
+@Table(name = "email_change_tokens", indexes = @Index(name = "idx_email_change_expiry_cleanup", columnList = "expiry_date,id"))
 @Data
 @NoArgsConstructor
 public class EmailChangeToken {

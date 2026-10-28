@@ -70,6 +70,8 @@ class VerificationLifecyclePersistenceTest {
     void awaitTwoBlockedConsumers() {
         long deadline = System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime()<deadline) {
+            // Refresh the PostgreSQL statistics snapshot to observe newly opened worker connections.
+            em.createNativeQuery("select 1 from pg_stat_clear_snapshot()").getSingleResult();
             Number blocked = (Number) em.createNativeQuery("select count(*) from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid() and cardinality(pg_blocking_pids(pid))>0").getSingleResult();
             if (blocked.intValue()>=2) return;
             try { Thread.sleep(10); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
@@ -155,5 +157,17 @@ class VerificationLifecyclePersistenceTest {
     @Test void unregisteredResetRecipientRemainsNonEnumerableAndDoesNotDispatchMail() {
         assertDoesNotThrow(() -> auth.requestPasswordReset("unknown-"+UUID.randomUUID()+"@example.test"));
         verifyNoInteractions(mail);
+    }
+    @Test void inactiveAccountCannotRequestOrConsumeAPasswordReset() {
+        Fixture f=fixture(300);
+        String token=UUID.randomUUID().toString();
+        tx.executeWithoutResult(s->{
+            var user=users.findById(f.userId()).orElseThrow();user.setActive(false);
+            var reset=new PasswordResetToken();reset.setUser(user);reset.setToken(token);reset.setExpiryDate(clock.instant().plusSeconds(300));resets.saveAndFlush(reset);
+        });
+        assertDoesNotThrow(()->auth.requestPasswordReset(f.email()));verifyNoInteractions(mail);
+        assertTrue(resets.findByToken(token).isPresent());
+        assertThrows(BadRequestException.class,()->auth.resetPassword(token,"New-valid-password-2026"));
+        assertFalse(users.findById(f.userId()).orElseThrow().isActive());assertTrue(resets.findByToken(token).isPresent());
     }
 }
