@@ -9,7 +9,7 @@ import { assignmentApi } from '../../services/assignmentApi';
 
 vi.mock('../../services/api', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
 vi.mock('../../services/assignmentApi', () => ({ assignmentApi: { submitAssignment: vi.fn(), getSession: vi.fn(), saveDraft: vi.fn() } }));
-const auth = vi.hoisted(() => ({ user: { xp: 0, streak: 0 }, updateProfile: vi.fn(), vocabularyMap: {} }));
+const auth = vi.hoisted(() => ({ user: { xp: 0, streak: 0, activeCourseId: 'course-en' }, updateProfile: vi.fn(), vocabularyMap: {} }));
 vi.mock('../../context/AuthContext', () => ({
     useAuth: () => auth,
 }));
@@ -31,7 +31,7 @@ beforeEach(() => {
     vi.resetAllMocks();
     api.get.mockImplementation(async url => ({ data: url.startsWith('/lessons/') ? questions
         : url === '/vocabulary/practice/generate' ? practice : { xp: 20, streak: 1 } }));
-    api.post.mockImplementation(async url => ({ data: /\/attempts(?:\?|$)/.test(url) ? { attemptId: 'attempt', difficulty: 'EASY', exercises: questions } : url.endsWith('/check')
+    api.post.mockImplementation(async (url, body) => ({ data: url === '/vocabulary/practice/start' ? { attemptId: 'practice-attempt', exercises: practice } : url === '/vocabulary/practice/check' ? { answer: body.answer, correct: true, correctAnswer: 'alma' } : /\/attempts(?:\?|$)/.test(url) ? { attemptId: 'attempt', difficulty: 'EASY', exercises: questions } : url.endsWith('/check')
         ? { correct: true, feedbackMessage: 'Helyes válasz.' } : lessonResult }));
     assignmentApi.submitAssignment.mockResolvedValue({ data: {} });
     assignmentApi.saveDraft.mockImplementation(async (_, draft) => ({ data: { revision: draft.revision + 1, timing: { finished: false } } }));
@@ -303,12 +303,12 @@ describe('self-paced vocabulary practice', () => {
         expect(screen.getByRole('progressbar', { name: 'Szókincsgyakorlás előrehaladása' })).toBeInTheDocument();
         const input = typeAnswer('alma');
         fireEvent.keyDown(input, { key: 'Enter' });
-        expect(screen.getByRole('status')).toHaveTextContent('Tökéletes!');
+        expect(await screen.findByRole('status')).toHaveTextContent('Tökéletes!');
         expect(screen.getByRole('button', { name: 'Következő feladat' })).toHaveFocus();
         vi.useFakeTimers();
         act(() => vi.advanceTimersByTime(10_000));
         expect(screen.getByRole('textbox')).toHaveValue('alma');
-        expect(api.post).not.toHaveBeenCalled();
+        expect(api.post.mock.calls.filter(([url]) => url === '/vocabulary/practice/submit')).toHaveLength(0);
         vi.useRealTimers();
         activate('Következő feladat');
         expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
@@ -319,20 +319,55 @@ describe('self-paced vocabulary practice', () => {
 
     it('keeps feedback and retries failed saving without recording another answer', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
-        api.get.mockResolvedValueOnce({ data: [practice[0]] });
+        api.post.mockResolvedValueOnce({ data: { attemptId: 'practice-attempt', exercises: [practice[0]] } });
         await openPractice();
         typeAnswer('alma');
         activate('Ellenőrzés');
-        expect(api.post).not.toHaveBeenCalled();
+        expect(api.post.mock.calls.filter(([url]) => url === '/vocabulary/practice/submit')).toHaveLength(0);
+        await screen.findByRole('button', { name: 'Befejezés és mentés' });
         api.post.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ data: { correctCount: 1, totalQuestions: 1, earnedXp: 10, newStreak: 1 } });
         activate('Befejezés és mentés');
         await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('A válaszaid megmaradtak'));
-        expect(screen.getByRole('status')).toHaveTextContent('Tökéletes!');
+        expect(await screen.findByRole('status')).toHaveTextContent('Tökéletes!');
         activate('Mentés újrapróbálása');
         const result = await screen.findByRole('heading', { name: 'Dinamikus gyakorlás teljesítve!' });
         expect(result).toHaveFocus();
         expect(screen.getByText('1 feladatból 1 helyes válasz')).toBeInTheDocument();
-        expect(api.post).toHaveBeenCalledTimes(2);
-        expect(api.post.mock.calls[1][1].results).toEqual([{ targetWord: 'apple', correct: true }]);
+        const submissions = api.post.mock.calls.filter(([url]) => url === '/vocabulary/practice/submit');
+        expect(submissions).toHaveLength(2);
+        expect(submissions[1][1]).toMatchObject({ attemptId: 'practice-attempt', results: [{ exerciseId: 'one', answer: 'alma' }] });
+    });
+
+    it('uses the server verdict instead of the locally available answer text', async () => {
+        await openPractice();
+        api.post.mockResolvedValueOnce({ data: { answer: 'alma', correct: false, correctAnswer: 'más jelentés' } });
+        typeAnswer('alma'); activate('Ellenőrzés');
+        expect(await screen.findByText(/Helytelen!/)).toBeInTheDocument();
+        expect(screen.getByText('más jelentés')).toHaveAttribute('lang', 'hu');
+        expect(screen.queryByText(/Tökéletes!/)).not.toBeInTheDocument();
+        const request = api.post.mock.calls.find(([url]) => url === '/vocabulary/practice/check');
+        expect(request[1]).toEqual({ attemptId: 'practice-attempt', exerciseId: 'one', answer: 'alma' });
+    });
+
+    it('retains the answer and question when checking fails, then retries the check', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        await openPractice();
+        api.post.mockRejectedValueOnce(new Error('offline'));
+        typeAnswer('alma'); activate('Ellenőrzés');
+        await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('A válaszod megmaradt'));
+        expect(screen.getByRole('textbox')).toHaveValue('alma');
+        expect(screen.queryByText(/Tökéletes!/)).not.toBeInTheDocument();
+        activate('Ellenőrzés');
+        expect(await screen.findByRole('status')).toHaveTextContent('Tökéletes!');
+        expect(api.post.mock.calls.filter(([url]) => url === '/vocabulary/practice/submit')).toHaveLength(0);
+    });
+
+    it('explains a server-side course change instead of offering an endless check retry', async () => {
+        await openPractice();
+        api.post.mockRejectedValueOnce({ response: { status: 409 } });
+        typeAnswer('alma'); activate('Ellenőrzés');
+        const heading = await screen.findByRole('heading', { name: 'A kurzus megváltozott. Nyisd meg újra a gyakorlást.' });
+        await waitFor(() => expect(heading).toHaveFocus());
+        expect(screen.getByRole('button', { name: 'Vissza a Dashboardra' })).toBeInTheDocument();
     });
 });

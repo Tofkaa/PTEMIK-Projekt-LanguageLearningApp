@@ -22,6 +22,8 @@ class VocabularyInputLimitsTest {
     @Mock VocabularyLookupStore lookupStore;
     @Mock TranslationClient translations;
     @InjectMocks VocabularyService service;
+    @Mock DynamicPracticeAttemptRepository attempts;
+    @InjectMocks DynamicPracticeService practice;
 
     @Test void validatesAndLooksUpBatchWordsWithTheSameLocaleIndependentNormalization() {
         when(lookupStore.snapshot(eq("test@example.test"),anyList())).thenReturn(new VocabularyLookupStore.Snapshot(
@@ -47,12 +49,12 @@ class VocabularyInputLimitsTest {
         assertThrows(BadRequestException.class,()->service.lookupAndSaveWord("test@example.test","apple","x".repeat(51)));
         verifyNoInteractions(vocabulary,users,streak,achievements,lookupStore,translations);
     }
-    @Test void boundsDynamicResultListsAndNestedWordsBeforeRewardOrDatabaseWork() {
-        var answer=new DynamicPracticeSubmitRequest.AnswerResult();answer.setTargetWord("apple");
-        var request=new DynamicPracticeSubmitRequest();request.setResults(Collections.nCopies(1001,answer));
-        assertThrows(BadRequestException.class,()->service.processDynamicPracticeSession("test@example.test",request));
-        request.setResults(List.of(answer));answer.setTargetWord("x".repeat(101));
-        assertThrows(BadRequestException.class,()->service.processDynamicPracticeSession("test@example.test",request));
+    @Test void boundsDynamicResultListsAndRawAnswersBeforeRewardOrDatabaseWork() {
+        var answer=new DynamicPracticeSubmitRequest.AnswerResult();answer.setExerciseId(UUID.randomUUID());answer.setAnswer("apple");
+        var request=new DynamicPracticeSubmitRequest();request.setAttemptId(UUID.randomUUID());request.setResults(Collections.nCopies(1001,answer));
+        assertThrows(BadRequestException.class,()->practice.submit("test@example.test",request));
+        request.setResults(List.of(answer));answer.setAnswer("x".repeat(10001));
+        assertThrows(BadRequestException.class,()->practice.submit("test@example.test",request));
         verifyNoInteractions(vocabulary,users,streak,achievements,lookupStore,translations);
     }
 }

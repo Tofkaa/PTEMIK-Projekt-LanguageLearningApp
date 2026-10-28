@@ -16,13 +16,14 @@ import { getAuthEpoch } from '../services/authSession';
 
 const VocabularyPractice = () => {
     const { user } = useAuth();
-    return <VocabularySession key={JSON.stringify([getAuthEpoch(), user?.userId, user?.activeCourseCode])} />;
+    return <VocabularySession key={JSON.stringify([getAuthEpoch(), user?.userId, user?.activeCourseCode, user?.activeCourseId])} courseId={user?.activeCourseId} />;
 };
 
-const VocabularySession = () => {
+const VocabularySession = ({ courseId }) => {
     const navigate = useNavigate();
     const { refreshNotifications } = useNotifications();
     const [exercises, setExercises] = useState([]);
+    const [attemptId, setAttemptId] = useState(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [currentAnswer, setCurrentAnswer] = useState('');
@@ -30,13 +31,13 @@ const VocabularySession = () => {
     const [feedback, setFeedback] = useState(null);
     const [error, setError] = useState(null);
     const [results, setResults] = useState([]);
-    const [startTime] = useState(Date.now());
     const [isCompleted, setIsCompleted] = useState(false);
     const [sessionSummary, setSessionSummary] = useState(null);
     const [saveError, setSaveError] = useState(null);
     const actionRef = useRef(null);
     const alive = useRef(false);
     const submission = useRef(null);
+    const checking = useRef(false);
     const headingRef = useStageFocus(isLoading ? 'loading' : error ? 'error'
         : isCompleted ? 'result' : exercises.length ? `question-${currentIndex}` : 'empty');
 
@@ -46,17 +47,18 @@ const VocabularySession = () => {
         alive.current = true;
         const fetchDynamicExercises = async () => {
             try {
-                const response = await api.get('/vocabulary/practice/generate', { signal: controller.signal });
+                const response = await api.post('/vocabulary/practice/start', { courseId }, { signal: controller.signal, skipGlobalError: true });
                 if (!active) return;
-                if (response.data.length === 0) {
+                setAttemptId(response.data.attemptId);
+                if (response.data.exercises.length === 0) {
                     setExercises([]);
                 } else {
-                    setExercises(response.data);
+                    setExercises(response.data.exercises);
                 }
             } catch (err) {
                 if (!active) return;
                 console.error("Hiba a dinamikus gyakorlás lekérésekor:", safeError(err));
-                setError("Nem sikerült betölteni a gyakorló feladatokat.");
+                setError(err.response?.status === 409 ? "A kurzus megváltozott. Nyisd meg újra a gyakorlást." : "Nem sikerült betölteni a gyakorló feladatokat.");
             } finally {
                 if (active) setIsLoading(false);
             }
@@ -64,24 +66,38 @@ const VocabularySession = () => {
 
         fetchDynamicExercises();
         return () => { active = false; alive.current = false; controller.abort(); submission.current?.abort(); };
-    }, []);
+    }, [courseId]);
 
-    const handleCheckAnswer = () => {
-        if (feedback || isChecking || !currentAnswer.trim()) return;
+    const handleCheckAnswer = async () => {
+        if (feedback || isChecking || checking.current || !currentAnswer.trim()) return;
+        checking.current = true;
         actionRef.current?.focus();
         const currentEx = exercises[currentIndex];
-        const userClean = currentAnswer.trim().toLowerCase();
-        const correctClean = currentEx.correctAnswer.trim().toLowerCase();
-
-        const isCorrect = userClean === correctClean;
-
-        if (isCorrect) {
-            setFeedback({ type: 'success', msg: <>Tökéletes! <span aria-hidden="true">✅</span></> });
-        } else {
-            setFeedback({ type: 'danger', msg: <>Helytelen! A helyes válasz: <span lang={currentEx.answerLang || 'hu'}>{currentEx.correctAnswer}</span> <span aria-hidden="true">❌</span></> });
+        const controller = new AbortController();
+        submission.current = controller;
+        setIsChecking(true);
+        setSaveError(null);
+        try {
+            const response = await api.post('/vocabulary/practice/check', {
+                attemptId, exerciseId: currentEx.exerciseId, answer: currentAnswer,
+            }, { signal: controller.signal, skipGlobalError: true });
+            if (!alive.current || controller.signal.aborted) return;
+            const checked = response.data;
+            setCurrentAnswer(checked.answer);
+            setFeedback(checked.correct
+                ? { type: 'success', msg: <>Tökéletes! <span aria-hidden="true">✅</span></> }
+                : { type: 'danger', msg: <>Helytelen! A helyes válasz: <span lang={currentEx.answerLang || 'hu'}>{checked.correctAnswer}</span> <span aria-hidden="true">❌</span></> });
+            setResults(prev => [...prev.filter(item => item.exerciseId !== currentEx.exerciseId),
+                { exerciseId: currentEx.exerciseId, answer: checked.answer }]);
+        } catch (err) {
+            if (!alive.current || controller.signal.aborted) return;
+            if (err.response?.status === 409) { setError('A kurzus megváltozott. Nyisd meg újra a gyakorlást.'); return; }
+            console.error('Hiba a válasz ellenőrzésekor:', safeError(err));
+            setSaveError('Nem sikerült ellenőrizni a választ. A válaszod megmaradt, próbáld újra az ellenőrzést.');
+        } finally {
+            checking.current = false;
+            if (alive.current && !controller.signal.aborted) setIsChecking(false);
         }
-
-        setResults(prev => [...prev, { targetWord: currentEx.targetWord, correct: isCorrect }]);
     };
 
     const handleNext = async () => {
@@ -97,17 +113,17 @@ const VocabularySession = () => {
         const controller = new AbortController();
         submission.current = controller;
         try {
-            const timeTaken = Math.floor((Date.now() - startTime) / 1000);
             const response = await api.post('/vocabulary/practice/submit', {
-                results,
-                timeTakenSeconds: timeTaken
-            }, { signal: controller.signal });
+                attemptId,
+                results
+            }, { signal: controller.signal, skipGlobalError: true });
             if (!alive.current || controller.signal.aborted) return;
             setSessionSummary(response.data);
             setIsCompleted(true);
             refreshNotifications?.();
         } catch (err) {
             if (!alive.current || controller.signal.aborted) return;
+            if (err.response?.status === 409) { setError('A kurzus megváltozott. Nyisd meg újra a gyakorlást.'); return; }
             console.error('Hiba az eredmények mentésekor:', safeError(err));
             setSaveError('Nem sikerült menteni az eredményeket. A válaszaid megmaradtak, próbáld újra a mentést.');
         } finally {
@@ -270,7 +286,7 @@ const VocabularySession = () => {
                             disabled={!feedback && !currentAnswer.trim()}
                             aria-disabled={isChecking || (!feedback && !currentAnswer.trim())} aria-busy={isChecking}
                         >
-                            {isChecking ? <><Spinner size="sm" animation="border" aria-hidden="true" /> Mentés folyamatban...</>
+                            {isChecking ? <><Spinner size="sm" animation="border" aria-hidden="true" /> {feedback ? 'Mentés folyamatban...' : 'Ellenőrzés folyamatban...'}</>
                                 : !feedback ? 'Ellenőrzés' : saveError ? 'Mentés újrapróbálása'
                                 : currentIndex < exercises.length - 1 ? 'Következő feladat' : 'Befejezés és mentés'}
                         </Button>

@@ -25,6 +25,7 @@ import java.util.UUID;
 public class VocabularyController {
 
     private final VocabularyService vocabularyService;
+    private final com.languageapp.backend.service.DynamicPracticeService practice;
 
     @PostMapping("/lookup")
     @PreAuthorize("isAuthenticated()")
@@ -85,18 +86,17 @@ public class VocabularyController {
         return ResponseEntity.ok(vocabularyService.getDetailedVocabularyForUser(principal.getName()));
     }
 
-    @GetMapping("/practice/generate")
-    public ResponseEntity<List<DynamicExerciseDTO>> generatePracticeSession(Principal principal) {
-        return ResponseEntity.ok(vocabularyService.generateDynamicPracticeSession(principal.getName(), 10));
+    public record StartRequest(@jakarta.validation.constraints.NotNull UUID courseId) { }
+    @PostMapping("/practice/start")
+    public ResponseEntity<com.languageapp.backend.service.DynamicPracticeService.Start> start(Principal principal,@Valid @RequestBody StartRequest request){
+        return ResponseEntity.ok(practice.start(principal.getName(),request.courseId()));
     }
-
+    @PostMapping("/practice/check")
+    public ResponseEntity<com.languageapp.backend.service.DynamicPracticeService.Checked> check(Principal principal,@Valid @RequestBody com.languageapp.backend.dto.request.DynamicPracticeCheckRequest request){
+        return ResponseEntity.ok(practice.check(principal.getName(),request));
+    }
     @PostMapping("/practice/submit")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Map<String, Object>> submitDynamicPractice(
-            Principal principal,
-            @Valid @RequestBody DynamicPracticeSubmitRequest request) {
-
-        Map<String, Object> result = vocabularyService.processDynamicPracticeSession(principal.getName(), request);
-        return ResponseEntity.ok(result);
+    public ResponseEntity<Map<String,Object>> submitDynamicPractice(Principal principal,@Valid @RequestBody DynamicPracticeSubmitRequest request){
+        return ResponseEntity.ok(practice.submit(principal.getName(),request));
     }
 }

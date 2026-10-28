@@ -43,6 +43,7 @@ public class UserService {
     private final FriendshipRepository friendshipRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final LessonAttemptRepository lessonAttemptRepository;
+    private final DynamicPracticeAttemptRepository dynamicPracticeAttemptRepository;
     private final UserAchievementRepository userAchievementRepository;
     private final InvitationLinkRepository invitationLinkRepository;
     private final OAuthIdentityRepository oAuthIdentityRepository;
@@ -377,6 +378,11 @@ public class UserService {
             return data;
         }).toList());
 
+        exportData.put("dynamicPracticeAttempts", dynamicPracticeAttemptRepository.findByUserUserId(user.getUserId()).stream().map(a -> {
+            Map<String,Object> data=new LinkedHashMap<>();data.put("attemptId",a.getAttemptId());data.put("courseId",a.getCourse().getCourseId());
+            data.put("startedAt",a.getStartedAt());data.put("completedAt",a.getCompletedAt());data.put("answers",a.getAcceptedAnswers());data.put("result",a.getResult());return data;
+        }).toList());
+
         // 3. Progress
         List<Progress> progress = progressRepository.findByUserUserId(user.getUserId());
         List<Map<String, Object>> progressData = progress.stream().map(p -> {
@@ -442,6 +448,7 @@ public class UserService {
         oAuthIdentityRepository.deleteByUserUserId(user.getUserId());
         invitationLinkRepository.revokeAllForOwner(user.getUserId(), clock.instant());
         lessonAttemptRepository.deleteByUserUserId(user.getUserId());
+        dynamicPracticeAttemptRepository.deleteByUserUserId(user.getUserId());
         friendshipRepository.deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
         refreshTokenRepository.deleteByUserUserId(user.getUserId());
         emailChangeTokenRepository.deleteByUser_UserId(user.getUserId());

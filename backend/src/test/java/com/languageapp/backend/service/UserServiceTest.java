@@ -1,5 +1,7 @@
 package com.languageapp.backend.service;
 
+import com.languageapp.backend.repository.DynamicPracticeAttemptRepository;
+
 import com.languageapp.backend.dto.response.UserResponse;
 import com.languageapp.backend.entity.Course;
 import com.languageapp.backend.entity.EmailChangeToken;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
+    @Mock private DynamicPracticeAttemptRepository dynamicPracticeAttemptRepository;
     @Mock private com.languageapp.backend.repository.InvitationLinkRepository invitationLinkRepository;
     @Mock private com.languageapp.backend.repository.OAuthIdentityRepository oAuthIdentityRepository;
     @Mock private com.languageapp.backend.repository.OAuthLinkIntentRepository oauthLinkIntentRepository;
@@ -115,6 +118,7 @@ class UserServiceTest {
         verify(passwordEncoder).matches("correct", "stored-hash");
         verify(refreshTokenRepository).deleteByUserUserId(user.getUserId());
         verify(lessonAttemptRepository).deleteByUserUserId(user.getUserId());
+        verify(dynamicPracticeAttemptRepository).deleteByUserUserId(user.getUserId());
         verify(emailChangeTokenRepository).deleteByUser_UserId(user.getUserId());
         verify(friendshipRepository).deleteByUserUserIdOrFriendUserId(user.getUserId(), user.getUserId());
         verify(userRepository).save(user);

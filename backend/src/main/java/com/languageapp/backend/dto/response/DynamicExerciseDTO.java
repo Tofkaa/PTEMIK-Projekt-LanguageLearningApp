@@ -6,8 +6,10 @@ import lombok.Data;
 import java.util.List;
 import java.util.UUID;
 
+@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 @Data
 @Builder
+@lombok.NoArgsConstructor
 @AllArgsConstructor
 public class DynamicExerciseDTO {
     private UUID exerciseId;

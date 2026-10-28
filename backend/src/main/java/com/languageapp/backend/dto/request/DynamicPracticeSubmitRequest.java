@@ -1,22 +1,16 @@
 package com.languageapp.backend.dto.request;
 
 import lombok.Data;
-import java.util.List;
-
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+import java.util.*;
 @Data
 public class DynamicPracticeSubmitRequest {
-    @jakarta.validation.Valid
-    @jakarta.validation.constraints.NotNull
-    @jakarta.validation.constraints.Size(max = com.languageapp.backend.validation.AnswerLimits.MAX_WORDS)
-    private List<@jakarta.validation.constraints.NotNull AnswerResult> results;
-    @jakarta.validation.constraints.Min(0)
-    private int timeTakenSeconds;
-
-    @Data
-    public static class AnswerResult {
-        @jakarta.validation.constraints.NotBlank
-        @jakarta.validation.constraints.Size(max = com.languageapp.backend.validation.AnswerLimits.MAX_WORD_CHARACTERS)
-        private String targetWord;
-        private boolean isCorrect;
+    @NotNull private UUID attemptId;
+    @Valid @NotNull @Size(min=1,max=10) private List<@NotNull AnswerResult> results;
+    @Min(0) private int timeTakenSeconds; // Informational only, never used for scoring.
+    @Data public static class AnswerResult {
+        @NotNull private UUID exerciseId;
+        @NotNull @Size(max=10000) private String answer;
     }
 }

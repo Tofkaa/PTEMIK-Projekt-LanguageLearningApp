@@ -1,7 +1,5 @@
 package com.languageapp.backend.service;
 
-import com.languageapp.backend.dto.request.DynamicPracticeSubmitRequest;
-import com.languageapp.backend.dto.response.DynamicExerciseDTO;
 import com.languageapp.backend.dto.response.VocabularyDetailDTO;
 import com.languageapp.backend.dto.response.VocabularyResponse;
 import com.languageapp.backend.entity.StudentVocabulary;
@@ -50,10 +48,12 @@ public class VocabularyService {
      */
     @Transactional
     public VocabularyResponse recordPracticeResult(UUID vocabularyId, String email, boolean isCorrect) {
+        User owner = userRepository.findByEmailForAuthentication(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         StudentVocabulary voc = vocabularyRepository.findById(vocabularyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Szó nem található"));
 
-        if (!voc.getUser().getEmail().equals(email)) {
+        if (!voc.getUser().getUserId().equals(owner.getUserId())) {
             throw new ForbiddenException("Nincs jogosultságod módosítani ezt a szót");
         }
 
@@ -162,182 +162,6 @@ public class VocabularyService {
         if(missing.isEmpty())return;
         var translated=translations.translateAll(snapshot.language(),missing);
         lookupStore.saveKnown(email,snapshot,translated);
-    }
-
-    /**
-     * Generate Dynamic Practice session from due words in the users vocabulary.
-     * Exercises and multiple-choice distractors are generated exclusively from the active course's word pool.
-     */
-    @Transactional(readOnly = true)
-    public List<DynamicExerciseDTO> generateDynamicPracticeSession(String email, int limit) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        Instant now = clock.instant();
-        UUID courseId = user.getActiveCourse().getCourseId();
-
-        // Fetch due words only from the currently active course
-        List<StudentVocabulary> dueWords = vocabularyRepository
-                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(user.getUserId(), courseId, now);
-
-        if (dueWords.size() > limit) {
-            dueWords = dueWords.subList(0, limit);
-        }
-
-        // Fetch all words from the active course to serve as wrong options (distractors)
-        List<StudentVocabulary> allCourseWords = vocabularyRepository.findAllByUserAndCourse(user, user.getActiveCourse());
-        List<DynamicExerciseDTO> dynamicExercises = new ArrayList<>();
-
-        for (StudentVocabulary item : dueWords) {
-            int exerciseTypeSelector = new Random().nextInt(3);
-
-            if (exerciseTypeSelector == 0) {
-
-                List<String> wrongOptions = allCourseWords.stream()
-                        .filter(w -> !w.getWord().equalsIgnoreCase(item.getWord()))
-                        .map(StudentVocabulary::getTranslation)
-                        .distinct()
-                        .collect(Collectors.toList());
-                Collections.shuffle(wrongOptions);
-
-                List<String> options = new ArrayList<>();
-                options.add(item.getTranslation());
-                if (wrongOptions.size() >= 3) {
-                    options.addAll(wrongOptions.subList(0, 3));
-                } else {
-                    options.addAll(wrongOptions);
-                    options.add("alternatív jelentés");
-                }
-                Collections.shuffle(options);
-
-                dynamicExercises.add(DynamicExerciseDTO.builder()
-                        .exerciseId(UUID.randomUUID())
-                        .type("MULTIPLE_CHOICE")
-                        .question("Mi a jelentése ennek a szónak: " + item.getWord() + "?")
-                        .questionLang("hu").answerLang("hu")
-                        .questionParts(List.of(new DynamicExerciseDTO.LanguagePart("Mi a jelentése ennek a szónak: ", "hu"),
-                                new DynamicExerciseDTO.LanguagePart(item.getWord(), user.getActiveCourse().getLanguageCode()),
-                                new DynamicExerciseDTO.LanguagePart("?", "hu")))
-                        .targetWord(item.getWord())
-                        .correctAnswer(item.getTranslation())
-                        .options(options)
-                        .build());
-
-            } else if (exerciseTypeSelector == 1 && item.getWord().contains(" ")) {
-                List<String> words = Arrays.asList(item.getWord().split(" "));
-                List<String> shuffledWords = new ArrayList<>(words);
-                Collections.shuffle(shuffledWords);
-
-                dynamicExercises.add(DynamicExerciseDTO.builder()
-                        .exerciseId(UUID.randomUUID())
-                        .type("WORD_BANK")
-                        .question("Rakd sorba a kifejezés szavait: " + item.getTranslation())
-                        .questionLang("hu").answerLang(user.getActiveCourse().getLanguageCode())
-                        .targetWord(item.getWord())
-                        .correctAnswer(item.getWord())
-                        .options(shuffledWords)
-                        .build());
-
-            } else {
-                dynamicExercises.add(DynamicExerciseDTO.builder()
-                        .exerciseId(UUID.randomUUID())
-                        .type("TRANSLATION")
-                        .question("Fordítsd le magyarra: " + item.getWord())
-                        .questionLang("hu").answerLang("hu")
-                        .questionParts(List.of(new DynamicExerciseDTO.LanguagePart("Fordítsd le magyarra: ", "hu"),
-                                new DynamicExerciseDTO.LanguagePart(item.getWord(), user.getActiveCourse().getLanguageCode())))
-                        .targetWord(item.getWord())
-                        .correctAnswer(item.getTranslation())
-                        .hint(item.getWord() + " = " + item.getTranslation())
-                        .build());
-            }
-        }
-
-        return dynamicExercises;
-    }
-
-    /**
-     * Processes practice session submissions, ensuring evaluations and SRS updates
-     * are strictly applied to words belonging to the active course context.
-     */
-    @Transactional
-    public Map<String, Object> processDynamicPracticeSession(String email, DynamicPracticeSubmitRequest request) {
-        var results = request.getResults();
-        if (results == null || results.size() > com.languageapp.backend.validation.AnswerLimits.MAX_WORDS || request.getTimeTakenSeconds() < 0)
-            throw new com.languageapp.backend.exception.BadRequestException("Érvénytelen vagy túl nagy gyakorlási eredmény.");
-        for (var result : results) {
-            if (result == null) throw new com.languageapp.backend.exception.BadRequestException("Hiányzó gyakorlási eredmény.");
-            com.languageapp.backend.validation.AnswerLimits.requireWord(result.getTargetWord());
-        }
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        int correctCount = 0;
-        int totalQuestions = request.getResults().size();
-        int earnedXp = 0;
-
-        // Ensure words are updated within the correct language course context
-        UUID courseId = user.getActiveCourse().getCourseId();
-
-        for (DynamicPracticeSubmitRequest.AnswerResult result : request.getResults()) {
-
-            // Search for the submitted word specifically within the active course's vocabulary
-            Optional<StudentVocabulary> vocOpt = vocabularyRepository
-                    .findByUser_UserIdAndCourse_CourseIdAndWordIgnoreCase(user.getUserId(), courseId, result.getTargetWord());
-
-            if (vocOpt.isPresent()) {
-                StudentVocabulary voc = vocOpt.get();
-                voc.setLastPracticedAt(clock.instant());
-
-                // Anti-Cheat protection: if the user manages to bypass the systems intended usage functions and practice ahead of time
-                // meaning the due date is in the future, we ignore it and do not update their srs level
-                if (voc.getNextPracticeAt() != null && voc.getNextPracticeAt().isAfter(clock.instant())) {
-                    log.warn("User {} tried to practice word '{}' ahead of time. Ignoring SRS update.", email, voc.getWord());
-                    continue;
-                }
-
-                voc.setLastPracticedAt(clock.instant());
-                if (result.isCorrect()) {
-                    correctCount++;
-                    earnedXp += 2;
-                    voc.setSrsLevel(Math.min(6, voc.getSrsLevel() + 1));
-                } else {
-                    voc.setSrsLevel(0);
-                }
-
-
-                int daysToAdd = switch (voc.getSrsLevel()) {
-                    case 0 -> 0;
-                    case 1 -> 1;
-                    case 2 -> 3;
-                    case 3 -> 7;
-                    case 4 -> 14;
-                    case 5 -> 30;
-                    default -> 90;
-                };
-
-                voc.setNextPracticeAt(clock.instant().plus(daysToAdd, ChronoUnit.DAYS));
-                vocabularyRepository.save(voc);
-            }
-        }
-
-        if (correctCount == totalQuestions && totalQuestions > 0) {
-            earnedXp += 10;
-        }
-
-        user.setXp(user.getXp() + earnedXp);
-        streakService.updateActivity(user);
-        userRepository.save(user);
-
-        var newAchievements = achievementService.checkAndAwardAchievements(user, (correctCount * 100) / (totalQuestions == 0 ? 1 : totalQuestions));
-
-        return Map.of(
-                "newAchievements", newAchievements,
-                "correctCount", correctCount,
-                "totalQuestions", totalQuestions,
-                "earnedXp", earnedXp,
-                "newStreak", user.getStreak()
-        );
     }
 
     /**

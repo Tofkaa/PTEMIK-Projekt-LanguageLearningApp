@@ -56,5 +56,8 @@ public interface StudentVocabularyRepository extends JpaRepository<StudentVocabu
      */
     List<StudentVocabulary> findAllByUserAndCourse(User user, Course course);
 
+    List<StudentVocabulary> findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(UUID userId,UUID courseId,Instant time,org.springframework.data.domain.Pageable page);
+    List<StudentVocabulary> findAllByUserAndCourse(User user,Course course,org.springframework.data.domain.Pageable page);
+
     long countByUser_UserIdAndNextPracticeAtLessThanEqual(UUID userId, Instant time);
 }

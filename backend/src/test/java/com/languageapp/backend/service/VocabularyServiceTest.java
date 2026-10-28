@@ -73,6 +73,7 @@ class VocabularyServiceTest {
 
     @Test
     void recordPracticeResult_CorrectAnswer_ShouldIncreaseLevelAndAdvanceDate() {
+        when(userRepository.findByEmailForAuthentication(USER_EMAIL)).thenReturn(Optional.of(testUser));
         // Arrange
         when(vocabularyRepository.findById(VOCAB_ID)).thenReturn(Optional.of(testVocabulary));
         when(vocabularyRepository.save(any(StudentVocabulary.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -108,19 +109,6 @@ class VocabularyServiceTest {
         assertFalse(result.get(0).isNewAddition(), "A lekérdezett szavaknál ez a flag false kell legyen");
     }
 
-    @Test void generatedExercisesDeclareQuestionAndAnswerLanguages() {
-        when(userRepository.findByEmail(USER_EMAIL)).thenReturn(Optional.of(testUser));
-        when(vocabularyRepository.findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(
-                eq(testUser.getUserId()), eq(COURSE_ID), any(Instant.class))).thenReturn(List.of(testVocabulary));
-        when(vocabularyRepository.findAllByUserAndCourse(testUser, testCourse)).thenReturn(List.of(testVocabulary));
-        var exercises = vocabularyService.generateDynamicPracticeSession(USER_EMAIL, 10);
-        assertEquals(1, exercises.size());
-        var exercise = exercises.getFirst();
-        assertEquals("hu", exercise.getQuestionLang()); assertEquals("hu", exercise.getAnswerLang());
-        assertEquals(exercise.getQuestion(), exercise.getQuestionParts().stream().map(p -> p.text()).collect(java.util.stream.Collectors.joining()));
-        assertTrue(exercise.getQuestionParts().stream().anyMatch(p -> p.text().equals("apple") && p.lang().equals("en")));
-    }
-
     @Test
     void getDueVocabularyForToday_UserNotFound_ShouldThrowException() {
         // Arrange
@@ -139,6 +127,7 @@ class VocabularyServiceTest {
 
     @Test
     void recordPracticeResult_IncorrectAnswer_ShouldResetLevel() {
+        when(userRepository.findByEmailForAuthentication(USER_EMAIL)).thenReturn(Optional.of(testUser));
         // Arrange
         testVocabulary.setSrsLevel(3); // Már egy haladó szinten van
         when(vocabularyRepository.findById(VOCAB_ID)).thenReturn(Optional.of(testVocabulary));
@@ -155,6 +144,8 @@ class VocabularyServiceTest {
 
     @Test
     void recordPracticeResult_WrongUser_ShouldThrowForbiddenException() {
+        var other=new User();other.setUserId(UUID.randomUUID());
+        when(userRepository.findByEmailForAuthentication("hacker@gmail.com")).thenReturn(Optional.of(other));
         // Arrange
         when(vocabularyRepository.findById(VOCAB_ID)).thenReturn(Optional.of(testVocabulary));
 
