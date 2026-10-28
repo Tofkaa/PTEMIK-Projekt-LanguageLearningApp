@@ -23,11 +23,17 @@ XML-eket, a hiányzó tesztosztályokat és a váratlan kihagyásokat. Az integr
 futásban egyetlen kihagyott teszt is hiba. A régi UTC-próbák frissen létrehozott,
 adatmentes sémamásolaton továbbra is `validate` módban futnak. A backend package
 ugyanebben a teljes futásban készül. A `.github/workflows/quality.yml` ezt,
-valamint a frontend `npm ci`, lint, unit teszt és build lépéseit futtatja push és
+valamint a frontend `npm ci`, függőségaudit, lint, unit teszt és build lépéseit futtatja push és
 pull request esetén; titkos konfigurációt nem igényel. A kapuk nem helyettesítik
-a kézi akadálymentességi próbákat, a függőségek biztonsági auditját vagy a
+a kézi akadálymentességi próbákat, a teljes függőség- és image-auditot vagy a
 terheléses kapacitásmérést. A GitHub branch protection beállításában külön kell
 kötelezővé tenni a `frontend` és `backend` ellenőrzést.
+
+A frontend fejlesztéséhez Node 22.22.0 vagy a `frontend/package.json` engines
+mezőjének megfelelő újabb verzió szükséges. A Docker build és a CI Node 22.22.0-t
+használ. Az npm audit a fejlesztői függőségeket is vizsgálja; már low szintű
+találatnál is hibára fut, ezért egy új advisory értékelést és szükség esetén
+javítást igényel. Ez önmagában nem bizonyítja egy adott alkalmazás támadhatóságát.
 
 Automatizált backendtesztek Java 21-gyel, a `backend` mappából:
 

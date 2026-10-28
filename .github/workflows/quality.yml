@@ -16,6 +16,8 @@ jobs:
   frontend:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      TZ: Europe/Budapest
     defaults:
       run:
         working-directory: frontend
@@ -29,8 +31,12 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Audit runtime and development dependencies
+        run: npm audit --audit-level=low
       - run: npm run lint
       - run: npm test -- --run
+      - name: Verify US daylight-saving boundaries too
+        run: TZ=America/New_York npm test -- --run src/utils/dateUtils.test.js
       - run: npm run build
 
   backend:
