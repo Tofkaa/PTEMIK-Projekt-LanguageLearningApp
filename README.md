@@ -1,105 +1,87 @@
-TESZTELÉSRE:
+# LanguageApp
 
-Az automatikus quality gate a gyökérből is futtatható (Python 3.12+, Java 21;
-az integrációs részhez Docker is szükséges):
+A LanguageApp nyelvtanulást támogató webalkalmazás, amely az önálló gyakorlást és a tanári feladatkiadást közös felületen biztosítja. A projekt szakdolgozati munka részeként készül.
 
-```powershell
-python -m unittest discover -s scripts -p 'test_*.py'
-python scripts/quality_gate.py unit
-python scripts/quality_gate.py integration
-```
+## Fő funkciók
 
-A `unit` mód törli a gyermekfolyamat örökölt teszt-URL-jeit és telepítési
-beállításait. Az `integration` a `database/Dockerfile` javított PostgreSQL 15
-image-ét építi, és saját, új konténert használ véletlen localhost-porton, külön eldobható
-adatbázisokkal. Nem fogad meglévő adatbázist vagy konténernevet, nem csatol
-alkalmazásvolume-ot, és végül saját konténerét és volume-ját is eltávolítja.
-Megszakított CI-run után a GitHub runner megszűnik; helyi gép/terminál kényszerű
-leállításakor a `languageapp.quality=disposable` címkéjű maradék konténer kézzel
-takarítható. Az alkalmazás saját konténereit ne töröld.
+- **Tanulás:** leckék, többféle feladattípus, dinamikus vagy rögzített nehézség, korábbi leckék ismétlése és szintenkénti mastery-csillagok.
+- **Szótár HUB:** mentett szavak, rendezés és szűrés, szókártyák, esedékességhez igazodó dinamikus gyakorlás.
+- **Osztálytermek:** meghívásos csatlakozás, tanári feladatok és vizsgák, egyéni időbeállítások, értékelés és haladási statisztikák.
+- **Közösség és motiváció:** barátkérelmek, kihívások, ranglisták, XP, napi sorozat és kitüntetések.
+- **Fiókkezelés:** e-mailes regisztráció és megerősítés, Google- és Discord-belépés, belépési módok összekapcsolása, profil- és biztonsági beállítások.
+- **Akadálymentes használat:** billentyűzetes navigáció, képernyőolvasót támogató jelölések, világos/sötét megjelenés és nagyítható felület.
 
-A gate ellenőrzi az integrációs osztályok nyilvántartását, a friss Surefire
-XML-eket, a hiányzó tesztosztályokat és a váratlan kihagyásokat. Az integrációs
-futásban egyetlen kihagyott teszt is hiba. A régi UTC-próbák frissen létrehozott,
-adatmentes sémamásolaton továbbra is `validate` módban futnak. A backend package
-ugyanebben a teljes futásban készül. A `.github/workflows/quality.yml` ezt,
-valamint a frontend `npm ci`, függőségaudit, lint, unit teszt és build lépéseit futtatja push és
-pull request esetén; titkos konfigurációt nem igényel. A kapuk nem helyettesítik
-a kézi akadálymentességi próbákat, az advisoryk alkalmazási feltételeinek értékelését vagy a
-terheléses kapacitásmérést. A GitHub branch protection beállításában külön kell
-kötelezővé tenni a `frontend`, `backend`, `container-images` és `secrets` ellenőrzést.
+A tananyag egyes képei jelenleg helykitöltők. Ezek nem minden esetben alkalmasak a képfelismerési feladatok tartalmi értékelésére.
 
-A frontend fejlesztéséhez Node 22.23.4 vagy a `frontend/package.json` engines
-mezőjének megfelelő újabb verzió szükséges. A Docker build és a CI Node 22.23.4-t
-használ. Az npm audit a fejlesztői függőségeket is vizsgálja; már low szintű
-találatnál is hibára fut, ezért egy új advisory értékelést és szükség esetén
-javítást igényel. Ez önmagában nem bizonyítja egy adott alkalmazás támadhatóságát.
+## Technológiák
 
-A backend build CycloneDX SBOM-ot készít a
-`backend/target/classes/META-INF/sbom/application.cdx.json` fájlba, és ezt a JAR is
-tartalmazza. Az OSV-audit csak a külső Maven-csomagok nevét/verzióját küldi ki,
-forráskódot és konfigurációt nem. A konténeraudit a helyi image-ek exportját
-vizsgálja rögzített Trivyvel, Docker-socket átadása nélkül; image-SBOM-okat is készít.
+| Réteg | Technológia |
+|---|---|
+| Felhasználói felület | React, Vite, Bootstrap / React Bootstrap |
+| Szerver | Java 21, Spring Boot, Spring Security, JPA / Hibernate |
+| Adatbázis | PostgreSQL 15 |
+| Futtatás | Docker Compose, Nginx, helyi HTTPS |
+| Külső szolgáltatások | SMTP / Mailtrap, Cloudinary, Google OAuth, Discord OAuth |
+
+## Telepítés Dockerrel
+
+Az alábbi lépések egy saját gépen futó, oktatói kipróbálásra használható példányt állítanak össze. A parancsok Windows PowerShellhez készültek; a Docker a Java-, Node.js- és adatbázis-környezetet is felépíti, ezért ezeket a futtatáshoz nem kell külön telepíteni.
+
+### 1. Előfeltételek
+
+Telepítsd a következőket:
+
+- [Git](https://git-scm.com/downloads).
+- [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/), működő Linux-konténeres környezettel.
+- [mkcert](https://github.com/FiloSottile/mkcert), a saját gépen megbízható localhost-tanúsítvány létrehozásához.
+
+Indítsd el a Docker Desktopot. Ellenőrizd a terminálban:
 
 ```powershell
-python scripts/dependency_audit.py backend/target/classes/META-INF/sbom/application.cdx.json --output .quality-reports/backend.json
-docker build -t quality-postgres database
-docker build -t quality-backend backend
-docker build -t quality-frontend frontend
-python scripts/image_audit.py quality-postgres quality-backend quality-frontend --report-dir .quality-reports/images --cache-dir .quality-reports/cache
+git --version
+docker version
+docker compose version
+mkcert -version
 ```
 
-Mindkét audit hibára fut hiányos vizsgálatnál vagy bármilyen ismert találatnál,
-a javítás nélküli és ismeretlen súlyosságú image-találatokat is beleértve.
-A `.quality-reports` helyi, Gitből kizárt könyvtár. A frontend npm-SBOM-ja az
-image-ben a `/usr/share/sbom/frontend.cdx.json` fájlban van, a webgyökéren kívül.
+A `docker version` parancsnál a szervernek is elérhetőnek kell lennie. Legyen szabad a 80-as, 443-as, 8080-as és 5432-es port, valamint elegendő hely az image-eknek és a build cache-nek a Docker által használt lemezen is.
 
-A Compose PostgreSQL-image továbbra is a 15-ös majoron marad, és közvetlenül a
-`postgres` rendszerfelhasználóval (UID/GID 70) indul. Az alkalmazás névvel ellátott
-adatvolume-ját használja. Meglévő telepítés frissítése előtt készíts adatbázismentést;
-külső bind mount használatakor az adatkönyvtárnak e felhasználó számára írhatónak
-kell lennie. A rootként végzett automatikus tulajdonosváltás nincs a javított image-ben.
-Az újraépítés a rögzített hivatalos bázisokat aktuális Alpine-javításokkal egészíti ki;
-új advisory esetén az érintett buildréteget frissíteni és ismét auditálni kell.
+### 2. A projekt letöltése
 
-A titokszkennelés a teljes aktuális HEAD-történetet és a publikálható fájlokat
-vizsgálja egy rögzített, hálózat nélküli Gitleaks-konténerben. A Gitből kizárt
-helyi `.env`, docs, mentések és tanúsítványok nem kerülnek a forrássnapshotba.
-Shallow checkout esetén hibát jelez; CI-ben ezért `fetch-depth: 0` szükséges.
+A jelenlegi kipróbálható változat a `feature/app-polishing-and-oauth` ágon található:
 
 ```powershell
-python scripts/secret_audit.py --report-dir .quality-reports/secrets
+git clone --branch feature/app-polishing-and-oauth https://github.com/Tofkaa/PTEMIK-Projekt-LanguageLearningApp.git
+cd PTEMIK-Projekt-LanguageLearningApp
 ```
 
-A kimenet csak helyadatokat tartalmaz, találati értéket vagy forrássort nem.
-A szabályokhoz futásonként pozitív/negatív canary-próbák tartoznak, a történetből
-már törölt próbakulcsokra is. A `.gitleaks.toml` kizárólag egy pontos dummy kulcsot
-enged meg a meghatározott tesztfájlokban; a `.gitleaksignore` egy igazoltan leváltott,
-régi fejlesztői kulcs egyetlen történeti fingerprintjét kezeli. Ezek nem általános
-tesztmappa-, privátkulcs- vagy teljes commit-kivételek. A scanner első letöltése
-hálózatot igényel, a vizsgálat sem forrást, sem Git-történetet nem küld külső szolgáltatásnak.
+A további parancsokat ebből a gyökérkönyvtárból futtasd. Ha másik kiadás vagy ág kipróbálására kaptál felkérést, annak verzióját használd.
 
-Automatizált backendtesztek Java 21-gyel, a `backend` mappából:
+### 3. Környezeti beállítások
+
+Első telepítéskor készíts helyi konfigurációt a [`.env.example`](.env.example) alapján:
 
 ```powershell
-.\mvnw.cmd test
+Copy-Item -LiteralPath .env.example -Destination .env
 ```
 
-Alapesetben az egységtesztek adatbázis nélkül futnak. A Spring Boot/persistence
-tesztek külön bekapcsolhatóak, és csak a tesztosztályukban rögzített nevű,
-eldobható PostgreSQL-adatbázist fogadják el. A kihagyott integrációs teszt nem
-jelent sikeres adatbázisos ellenőrzést.
+Nyisd meg a létrehozott `.env` fájlt egy szövegszerkesztőben, és töltsd ki a mezőket. Meglévő telepítés `.env` fájlját ne írd felül a mintával.
 
-Az alkalmazásindítási smoke teszthez az `APPLICATION_SMOKE_TEST_DATABASE_URL`
-környezeti változó szükséges, `jdbc:postgresql://host:port/languageapp_smoke_check_...`
-alakban. A sémát újraépíti; kizárólag előre létrehozott, eldobható tesztadatbázist
-adj meg. A seeder, levélküldő, képtároló, SSE és vizsga/kihívás háttérjobok ebben
-a tesztben mockoltak. A további persistence tesztek saját opt-in változóikat és
-adatbázisnév-előtagjukat használják a tesztforrásokban.
+| Változók | Kitöltés |
+|---|---|
+| `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Az új, saját adatbázis felhasználója, egyedi jelszava és neve. A Compose ezekkel hozza létre az első adatbázist. |
+| `JWT_SECRET` | Saját gépen generált, Base64-kódolt aláírókulcs; generálása lentebb. |
+| `FRONTEND_URL` | A mellékelt Dockeres telepítésnél `https://localhost`. Ez az e-mailes linkek és az engedélyezett böngészős eredet alapja. |
+| `OAUTH_AUTHORIZATION_BASE_URL` | Ennél a telepítésnél `http://localhost:8080`, a Google/Discord hitelesítés indításához. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` | A rendelkezésre álló SMTP-szolgáltatás beállításai. Teszteléshez Mailtrap sandbox használható. |
+| `CLOUDINARY_URL` | A képfeltöltést biztosító Cloudinary-fiók kapcsolati adata, a mintában jelzett formátumban. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | A Google OAuth-alkalmazás saját vagy külön biztosított azonosítói. |
+| `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | A Discord OAuth-alkalmazás saját vagy külön biztosított azonosítói. |
+| `VITE_APP_SECURITY_EXERCISE_SALT` | A kliens és a backend meglévő válasz-hash formátumához tartozó nyilvános kompatibilitási érték. A mintában megadott értéket hagyd változatlanul. Ez nem API-kulcs vagy JWT-titok. |
 
-A backendhez kötelező egy helyben generált JWT-aláírókulcs a gyökér `.env`
-`JWT_SECRET` változójában (közvetlen backendindításnál a környezetben).
-PowerShellben generálható:
+**A külső szolgáltatások oktatói kipróbálásához szükséges hozzáférések a projekt készítőjétől igényelhetők, külön egyeztetéssel.** A publikus repository nem tartalmaz használható szolgáltatói titkokat. Saját szolgáltatói fiókok is beállíthatók; az üres mezők és a mintabeli helykitöltők önmagukban nem adnak működő integrációt.
+
+A JWT-aláírókulcsot az alábbi PowerShell-paranccsal generálhatod:
 
 ```powershell
 $jwtBytes = New-Object byte[] 64
@@ -112,55 +94,111 @@ try {
 }
 ```
 
-A kapott értéket csak a helyi `.env`-be másold. Példakulcs vagy tesztkulcs nem
-használható valódi környezetben. Kulcscsere után a korábbi access tokenek
-érvénytelenek; új hitelesítés/tokenfrissítés szükséges. Hiányzó, hibás Base64 vagy
-32 bájtnál rövidebb kulccsal a backend nem indul el. A `.env.example` nem tartalmaz
-használható aláírókulcsot.
+A kiírt értéket a saját `.env` fájlod `JWT_SECRET` mezőjébe másold. Telepítésenként saját kulcsot használj; normál újraindításkor nem kell újragenerálni.
 
-A bejelentkezések eszközönként külön munkamenetet kapnak. Kijelentkezés csak az
-adott munkamenetet zárja le; az ahhoz kiadott access token sem használható tovább.
-Jelszó-visszaállítás az összes korábbi munkamenetet visszavonja. A munkamenethez
-nem kötött régi access tokeneket az új backend elutasítja; érvényes refresh cookie
-esetén háttérfrissítés, egyébként új belépés szükséges. Az API-válaszok és cookie-k
-formátuma változatlan.
+Saját OAuth-alkalmazásnál az engedélyezett visszatérési címek:
 
-Helyi HTTPS és az oktatói gépeken szükséges tanúsítványgenerálás:
-[Helyi HTTPS beállítása](docs/local-https.md).
+- Google: `http://localhost:8080/login/oauth2/code/google`
+- Discord: `http://localhost:8080/login/oauth2/code/discord`
 
--root .env tartalma: 
-DB_USER=app_user
-DB_PASSWORD=app_password
-DB_NAME=language_learning_db
-VITE_APP_SECURITY_EXERCISE_SALT=L4ngu4ge4ppS3cr3tS4lt2026!
+A frontend címe ettől továbbra is `https://localhost`. A Dockeres futtatáshoz elegendő a gyökér `.env`; a `frontend/.env.example` csak külön Vite-indítás esetén szükséges. A `VITE_` előtagú változók a böngészőnek készülő kódba kerülhetnek, ezért szolgáltatói titkot nem szabad ilyen változóba írni.
 
--frontend mappa .env tartalma:
-VITE_API_BASE_URL=http://localhost:8080/api
+### 4. Helyi HTTPS
 
-
-Az email-megerősítés, az emailcímcsere és a commit utáni levélindítás integrációs tesztjei külön
-`VERIFICATION_TEST_DATABASE_URL` változóval futtatható, kizárólag
-`jdbc:postgresql://host:port/languageapp_verification_check_...` nevű, előre
-létrehozott, eldobható adatbázison. A teszt újraépíti annak sémáját; az alkalmazás
-adatbázisát ne add meg. Külső levelet nem küld, a képtároló és háttérjobok is mockoltak.
-A változó beállítása után a `backend` mappából:
+Minden gépen saját tanúsítványt készíts. Először telepítsd a saját helyi hitelesítőt:
 
 ```powershell
-.\mvnw.cmd '-Dtest=VerificationLifecyclePersistenceTest,EmailChangeLifecyclePersistenceTest' test
+mkcert -install
 ```
 
-
-Az OAuth-fiókok azonosítója a szolgáltató és annak stabil felhasználói azonosítója.
-Emailcím-egyezés alapján nincs automatikus fiókösszekötés. A korábbi OAuth-fiók
-csak a tárolt szolgáltató/azonosító pár igazolt egyezésekor kap új azonosítókapcsolatot;
-az alkalmazásbeli emailcímét ez nem módosítja. Új szolgáltató meglévő fiókhoz
-hozzáadására ez a verzió még nem ad külön összekötési felületet.
-
-A helyi, szimulált Google/Discord integrációs teszt a
-`OAUTH_IDENTITY_TEST_DATABASE_URL` változóval indítható. Kizárólag előre létrehozott,
-eldobható `jdbc:postgresql://host:port/languageapp_oauth_check_...` adatbázist fogad el,
-annak sémáját újraépíti. Külső szolgáltatói fiók vagy éles OAuth-titok nem szükséges:
+Ez a gép tanúsítványtárát módosítja, ezért fogadd el a szükséges rendszerengedélyt. Intézményi gépen ehhez rendszergazdai segítségre lehet szükség. Ezután a projekt gyökerében:
 
 ```powershell
-.\mvnw.cmd '-Dtest=FederatedIdentityPersistenceTest' test
+New-Item -ItemType Directory -Path ./frontend/ssl -Force | Out-Null
+mkcert -cert-file ./frontend/ssl/cert.crt -key-file ./frontend/ssl/cert.key localhost 127.0.0.1 ::1
 ```
+
+A két fájlt az Nginx csak olvashatóan kapja meg a Compose-konfiguráción keresztül. A tanúsítványokat és a privát kulcsokat ne töltsd fel Gitbe, és az mkcert helyi hitelesítőjének privát kulcsát ne oszd meg. A generálás pontos működését az [mkcert hivatalos leírása](https://github.com/FiloSottile/mkcert) ismerteti.
+
+### 5. Első indítás
+
+Ha az `.env` kitöltése és a tanúsítványok létrehozása kész:
+
+```powershell
+docker compose up -d --build
+docker compose ps
+```
+
+Az első build a letöltések és a fordítás miatt több percig tarthat. A PostgreSQL, a backend és az Nginx/frontend külön konténerben indul. A backend az üres adatbázis sémáját létrehozza, és a csomagban található kezdő tananyagokat és kitüntetéseket betölti; első telepítéshez külön migrációs SQL nem szükséges.
+
+A konténerek elindulása után várd meg a backend indulásának végét:
+
+```powershell
+docker compose logs --tail 50 backend
+```
+
+Ezután nyisd meg: **[https://localhost](https://localhost)**. A böngészőnek érvényesnek kell elfogadnia a saját gépeden generált tanúsítványt.
+
+### 6. Első használat
+
+1. Regisztrálj saját tesztfiókot; a regisztráció során diák- vagy tanári szerepkör választható.
+2. Nyisd meg a megerősítő levelet, és erősítsd meg az e-mail-címet. Mailtrap sandbox esetén a levél a sandbox postaládájában jelenik meg, nem a tényleges címzett postaládájában.
+3. Jelentkezz be, és válassz tanulási irányt vagy hozz létre tanári osztálytermet.
+4. A tanári és diákfolyamatok közös kipróbálásához használj két saját tesztfiókot, például két külön böngészőben.
+5. A Google/Discord gombok a konfigurált szolgáltatói hozzáférésekkel használhatók. Meglévő fiókhoz új belépési mód a **Beállítások → Biztonság** oldalon kapcsolható.
+
+A telepítés új, saját adatbázist használ: nem tölti le a készítő felhasználóit, jelszavait vagy korábbi eredményeit. Általános, előre megadott adminisztrátori belépési adat nincs a telepítési útmutatóban; adminisztrátori bemutatóigényt külön egyeztess a készítővel.
+
+## Leállítás, újraindítás és frissítés
+
+```powershell
+# Leállítás az adatvolume megtartásával
+docker compose stop
+
+# A meglévő konténerek újraindítása
+docker compose start
+```
+
+Új forrásverzió átvételéhez előbb készíts adatbázismentést, majd a megfelelő ágon:
+
+```powershell
+git pull --ff-only
+docker compose up -d --build
+```
+
+Az adatbázis névvel ellátott Docker-volume-ban marad meg. A `docker compose down -v` ezt az adatot is törölné, ezért normál leállításhoz vagy frissítéshez ne használd. Már létrehozott adatbázis jelszavát az `.env` átírása önmagában nem módosítja.
+
+## Gyakori indulási problémák
+
+| Jelenség | Ellenőrzés |
+|---|---|
+| A Docker szerver nem érhető el | Indítsd el a Docker Desktopot, ellenőrizd a Linux-konténeres környezetet és a `docker version` kimenetét. |
+| Foglalt port | Állítsd le az ugyanazt a portot használó másik szolgáltatást. A mellékelt címek a változatlan Compose-portokra vonatkoznak. |
+| Hiányzó `JWT_SECRET` | A projekt gyökeréből indíts; legyen ott kitöltött `.env` és saját, érvényes Base64-kulcs. |
+| Tanúsítványhiba vagy újrainduló frontend | Ellenőrizd a `frontend/ssl/cert.crt` és `cert.key` fájlokat, az `mkcert -install` lépést, majd indítsd újra a böngészőt. |
+| Átmeneti 502 induláskor | Várd meg a backend indulását; tartós hibánál nézd meg a `docker compose logs --tail 50 backend frontend` kimenetét. |
+| Nem érkezik megerősítő levél | Ellenőrizd az SMTP-beállításokat és a megfelelő Mailtrap sandboxot; a kézbesítésre rövid ideig várni kellhet. |
+| Nem működik az OAuth | Ellenőrizd a provider-azonosítókat, a két regisztrált callback címet és a `FRONTEND_URL` értékét. |
+| Nem működik a profilképfeltöltés | Ellenőrizd a `CLOUDINARY_URL` szolgáltatói adatait. |
+| Docker `input/output error` | Ellenőrizd a Docker lemezének és a rendszermeghajtónak a szabad helyét; ne próbáld az alkalmazás adatvolume-jának törlésével javítani. |
+
+Hiba jelzésekor a hibaüzenetet és a kipróbált verziót add meg; `.env` fájlt, privát kulcsot, jelszót vagy teljes hitelesítési linket ne másolj nyilvános hibajegybe.
+
+## Automatizált ellenőrzések
+
+A [Quality gates](.github/workflows/quality.yml) GitHub Actions workflow négy ellenőrzést futtat:
+
+- `frontend`: függőségaudit, lint, tesztek és build.
+- `backend`: runner-tesztek, egységtesztek, izolált PostgreSQL-tesztek, csomagolás és Maven-függőségaudit.
+- `container-images`: a három futtatási image sérülékenységvizsgálata és SBOM-készítése.
+- `secrets`: titokellenőrzés a Git-történeten és a publikálható fájlokon.
+
+Ezek az alkalmazás kipróbálásához nem igényelnek külön kézi tesztkörnyezetet. A helyi CI-runner használatához Python 3.12+, Java 21 és Docker szükséges; a projekt gyökeréből:
+
+```powershell
+python -m unittest discover -s scripts -p 'test_*.py'
+python scripts/quality_gate.py unit
+python scripts/quality_gate.py integration
+```
+
+Az integrációs runner saját eldobható adatbázisokat hoz létre; ne helyettesítsd őket az alkalmazás adatbázisával. A tesztek nem helyettesítik a kézi képernyőolvasós és használhatósági ellenőrzéseket.
