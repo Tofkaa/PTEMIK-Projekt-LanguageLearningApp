@@ -50,6 +50,7 @@ class LessonServiceTest {
         student = new User();
         student.setUserId(UUID.randomUUID());
         student.setEmail("diak@test.com");
+        student.setVerified(true);
         student.setRole(Role.STUDENT); // Enum kezelés stringgé alakításhoz ha szükséges!
         student.setActiveCourse(course);
 

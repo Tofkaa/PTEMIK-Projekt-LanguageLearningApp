@@ -39,6 +39,7 @@ public class SecurityConfiguration {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final ApiRequestLimiter requestLimiter;
+    private final com.languageapp.backend.repository.UserRepository accessUsers;
     private final ClientAddressResolver clientAddresses;
     private final BrowserOriginPolicy browserOriginPolicy;
     private final CustomUserDetailsService userDetailsService;
@@ -106,6 +107,7 @@ public class SecurityConfiguration {
                 // Insert the JWT filter before the standard Spring UsernamePassword filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(new BrowserOriginFilter(browserOriginPolicy), JwtAuthenticationFilter.class)
+                .addFilterAfter(new AccountVerificationFilter(accessUsers, objectMapper, clock), org.springframework.security.web.access.intercept.AuthorizationFilter.class)
                 .addFilterAfter(new ApiRateLimitFilter(requestLimiter, clientAddresses, objectMapper, clock), org.springframework.security.web.access.intercept.AuthorizationFilter.class)
                 .addFilterAfter(new AnswerPayloadFilter(objectMapper, clock), org.springframework.security.web.access.intercept.AuthorizationFilter.class);
 

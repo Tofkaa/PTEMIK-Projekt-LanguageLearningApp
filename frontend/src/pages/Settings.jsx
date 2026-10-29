@@ -13,6 +13,7 @@ import OAuthConnections from '../components/OAuthConnections';
 
 const Settings = () => {
     const { user, setUser, logout } = useAuth();
+    const isAdminUser = ['ADMIN', 'ROLE_ADMIN'].includes(user?.role);
     const isOAuthUser = user?.authProvider && user.authProvider !== 'LOCAL';
     const navigate = useNavigate();
     const location = useLocation();
@@ -718,8 +719,11 @@ const Settings = () => {
                                 <p className="text-secondary small">
                                     A fiókod és a személyes adataid (PII) véglegesen törlésre kerülnek. A tanulási eredményeid név nélkül (anonimizálva) megmaradnak, hogy az osztálytermek és a közösség statisztikái ne sérüljenek. <strong className="text-light">Ez a művelet nem vonható vissza!</strong>
                                 </p>
-                                <Button 
-                                    variant="danger" 
+                                {isAdminUser && <p id="admin-account-delete-help" className="text-warning">Adminisztrátori fiókod törléséhez előbb egy másik admin módosítsa a jogosultságodat.</p>}
+                                <Button
+                                    disabled={isAdminUser}
+                                    aria-describedby={isAdminUser ? 'admin-account-delete-help' : undefined}
+                                    variant="danger"
                                     className="fw-bold px-4" 
                                     onClick={() => {
                                         setDeletePassword('');

@@ -51,6 +51,8 @@ public class AuthenticationService {
     @Transactional
     public AuthResult register(RegisterRequest request) {
         log.info("Attempting to register new user with email: {}", request.getEmail());
+        if (request.getRole() != null && request.getRole() != Role.STUDENT && request.getRole() != Role.TEACHER)
+            throw new BadRequestException("Csak diák- vagy tanárfiók regisztrálható.");
 
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             log.warn("Registration failed: Email already exists - {}", request.getEmail());
@@ -71,11 +73,6 @@ public class AuthenticationService {
             }
         } else {
             user.setPreferredDifficulty(com.languageapp.backend.enums.DifficultyLevel.DYNAMIC);
-        }
-
-        if (Role.ADMIN.equals(request.getRole())) {
-            log.warn("Security Alert: Attempted ADMIN registration with email: {}", request.getEmail());
-            throw new BadRequestException("Cannot register as an ADMIN user.");
         }
 
         user.setRole(request.getRole() != null ? request.getRole() : Role.STUDENT);
@@ -299,7 +296,7 @@ public class AuthenticationService {
                 .map(refreshTokenService::verifyExpiration)
                 .map(session -> {
                     User user = session.getUser();
-                    if (!user.isActive()) throw new BadRequestException("Session unavailable, please log in again.");
+                    if (!user.isActive() || user.getRole() == Role.DELETED) throw new BadRequestException("Session unavailable, please log in again.");
                     UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
                             .username(user.getEmail())
                             .password(user.getPasswordHash())

@@ -1,5 +1,6 @@
 import { useAuth } from '../context/AuthContext';
 import Unauthorized from '../pages/Unauthorized';
+import VerifiedRoute from './VerifiedRoute';
 
 const AdminRoute = ({ children }) => {
     const { user } = useAuth();
@@ -9,7 +10,7 @@ const AdminRoute = ({ children }) => {
         return <Unauthorized />;
     }
 
-    return children;
+    return <VerifiedRoute>{children}</VerifiedRoute>;
 };
 
 export default AdminRoute;

@@ -47,7 +47,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getEmail())
                 .password(user.getPasswordHash() != null ? user.getPasswordHash() : "")
-                .disabled(!user.isActive()) // Inaktív vagy törölt user nem léphet be!
+                .disabled(!user.isActive() || user.getRole() == com.languageapp.backend.enums.Role.DELETED) // Inaktív vagy törölt user nem léphet be!
                 .authorities("ROLE_" + user.getRole().name())
                 .build();
     }

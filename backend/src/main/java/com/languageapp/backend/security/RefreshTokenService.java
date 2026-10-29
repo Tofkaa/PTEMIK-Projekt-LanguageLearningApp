@@ -64,7 +64,7 @@ public class RefreshTokenService {
                     return new ResourceNotFoundException("No user found for token generation.");
                 });
 
-        if (!user.isActive()) throw new BadRequestException("Session unavailable, please log in again.");
+        if (!user.isActive() || user.getRole() == com.languageapp.backend.enums.Role.DELETED) throw new BadRequestException("Session unavailable, please log in again.");
 
         String rawToken = UUID.randomUUID().toString() + "-" + UUID.randomUUID().toString();
 

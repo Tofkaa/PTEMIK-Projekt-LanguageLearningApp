@@ -82,6 +82,7 @@ public class EvaluationService {
 
         // --- SECURE CHALLENGE BYPASS LOGIC & DIFFICULTY DETERMINATION ---
         if (challengeId != null) {
+            if (!user.isVerified()) throw new ForbiddenException("Kihíváshoz megerősített e-mail cím szükséges.");
             challenge = challengeRepository.findById(challengeId)
                     .orElseThrow(() -> new ForbiddenException("Security error: The specified challenge does not exist!"));
 
@@ -346,6 +347,8 @@ public class EvaluationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Lesson attempt not found"));
         if (!attempt.getUser().getEmail().equals(email) || !attempt.getLesson().getLessonId().equals(lessonId))
             throw new ForbiddenException("This attempt belongs to another user or lesson");
+        if (attempt.getChallengeId() != null && !attempt.getUser().isVerified())
+            throw new ForbiddenException("Kihíváshoz megerősített e-mail cím szükséges.");
         Exercise exercise = attempt.getExerciseSnapshot().stream().filter(e -> e.exerciseId().equals(exerciseId))
                 .findFirst().orElseThrow(() -> new ForbiddenException("Exercise outside the allocated lesson")).asExercise();
         return checkExerciseAnswer(exercise, answer);

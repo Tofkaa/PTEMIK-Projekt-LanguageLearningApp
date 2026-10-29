@@ -135,6 +135,7 @@ const UserManagement = () => {
                         ) : (
                             filteredUsers.map(u => {
                                 const isSelf = u.userId === currentUser?.userId;
+                            const isDeleted = u.role.replace('ROLE_', '') === 'DELETED';
 
                                 return (
                                 <tr key={u.userId} className={!u.active ? 'bg-danger bg-opacity-10' : ''}>
@@ -164,13 +165,14 @@ const UserManagement = () => {
                                             value={u.role.replace('ROLE_', '')}
                                             onChange={(e) => handleRoleChange(u.userId, e.target.value)}
                                             style={{ width: '110px', cursor: isSelf ? 'not-allowed' : 'pointer', margin: '0 auto' }}
-                                            disabled={isSelf}
+                                            disabled={isSelf || isDeleted}
                                             aria-describedby={isSelf ? `${id}-self` : undefined}
-                                            aria-disabled={isSelf || busyUserId !== null || isRefreshing}
+                                            aria-disabled={isSelf || isDeleted || busyUserId !== null || isRefreshing}
                                             aria-busy={busyUserId === u.userId}
                                             title={isSelf ? "Saját magad jogosultságát nem módosíthatod!" : ""}
                                         >
                                             <option value="STUDENT">Diák</option>
+                                            {isDeleted && <option value="DELETED">Törölt</option>}
                                             <option value="TEACHER">Tanár</option>
                                             <option value="ADMIN">Admin</option>
                                         </Form.Select>
@@ -183,9 +185,9 @@ const UserManagement = () => {
                                                 className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" 
                                                 onClick={() => handleStatusToggle(u.userId, u.active)}
                                                 aria-label={`Felfüggesztés: ${u.name} (${u.email})`}
-                                                disabled={isSelf}
+                                                disabled={isSelf || isDeleted}
                                                 aria-describedby={isSelf ? `${id}-self` : undefined}
-                                                aria-disabled={isSelf || busyUserId !== null || isRefreshing}
+                                                aria-disabled={isSelf || isDeleted || busyUserId !== null || isRefreshing}
                                                 aria-busy={busyUserId === u.userId}
                                                 title={isSelf ? "Saját magadat nem függesztheted fel!" : ""}
                                             >
@@ -198,9 +200,9 @@ const UserManagement = () => {
                                                 className="rounded-pill px-3 fw-bold d-flex align-items-center gap-2 ms-auto" 
                                                 onClick={() => handleStatusToggle(u.userId, u.active)}
                                                 aria-label={`Visszaállítás: ${u.name} (${u.email})`}
-                                                disabled={isSelf}
+                                                disabled={isSelf || isDeleted}
                                                 aria-describedby={isSelf ? `${id}-self` : undefined}
-                                                aria-disabled={isSelf || busyUserId !== null || isRefreshing}
+                                                aria-disabled={isSelf || isDeleted || busyUserId !== null || isRefreshing}
                                                 aria-busy={busyUserId === u.userId}
                                             >
                                                 <span aria-hidden="true">♻️</span> Visszaállítás

@@ -23,6 +23,6 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     int revokeByTokenHash(@Param("hash") String hash);
 
     @Query("select count(t) > 0 from RefreshToken t where t.refreshTokenId = :sid " +
-            "and t.user.email = :email and t.user.isActive = true and t.expiryDate > :now")
+            "and t.user.email = :email and t.user.isActive = true and t.user.role <> com.languageapp.backend.enums.Role.DELETED and t.expiryDate > :now")
     boolean isSessionActive(@Param("sid") UUID sessionId, @Param("email") String email, @Param("now") Instant now);
 }

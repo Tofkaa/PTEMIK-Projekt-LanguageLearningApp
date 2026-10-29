@@ -22,6 +22,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             + "from User u left join u.activeCourse c where u.email=:email and u.isActive=true and u.role<>com.languageapp.backend.enums.Role.DELETED")
     Optional<VocabularyContext> findVocabularyContext(@Param("email") String email);
 
+    record AccessState(UUID userId,boolean active,boolean verified,com.languageapp.backend.enums.Role role) { }
+    @Query("select new com.languageapp.backend.repository.UserRepository$AccessState(u.userId,u.isActive,u.isVerified,u.role) from User u where u.email=:email")
+    Optional<AccessState> findAccessState(@Param("email") String email);
+
+    /** Serialize rare privilege changes before reading the actor or locking the target row. */
+    @org.springframework.data.jpa.repository.QueryHints(@jakarta.persistence.QueryHint(name="jakarta.persistence.query.timeout",value="5000"))
+    @Query(value="select 1 from pg_advisory_xact_lock(hashtextextended('languageapp-admin-access',0))",nativeQuery=true)
+    int lockAdminMutations();
+    @Query("select count(u) from User u where u.role=com.languageapp.backend.enums.Role.ADMIN and u.isActive=true and u.isVerified=true")
+    long countUsableAdmins();
+
     Optional<User> findByEmail(String email);
     boolean existsByEmailIgnoreCase(String email);
 

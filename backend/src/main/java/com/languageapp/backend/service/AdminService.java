@@ -69,10 +69,16 @@ public class AdminService {
 
     @Transactional
     public void updateUserRole(UUID targetUserId, Role newRole, String adminEmail) {
-        User admin = userRepository.findByEmail(adminEmail).orElseThrow();
-        User targetUser = userRepository.findById(targetUserId)
+        if (newRole == null || newRole == Role.DELETED)
+            throw new com.languageapp.backend.exception.BadRequestException("Törölt állapot nem adható jogosultságként.");
+        User admin = adminMutationActor(adminEmail);
+        User targetUser = userRepository.findForSessionUpdate(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
+        if (targetUser.getRole() == Role.DELETED) throw new com.languageapp.backend.exception.ConflictException("Törölt fiók jogosultsága nem módosítható.");
+        if (targetUser.getUserId().equals(admin.getUserId()) && newRole != Role.ADMIN)
+            throw new com.languageapp.backend.exception.ForbiddenException("Saját adminjogosultságodat nem szüntetheted meg. Kérj meg egy másik adminisztrátort.");
+        protectLastAdmin(targetUser, newRole != Role.ADMIN);
         String oldRole = targetUser.getRole().name();
         targetUser.setRole(newRole);
         userRepository.save(targetUser);
@@ -83,17 +89,36 @@ public class AdminService {
 
     @Transactional
     public void toggleUserStatus(UUID targetUserId, boolean isActive, String adminEmail) {
-        User admin = userRepository.findByEmail(adminEmail).orElseThrow();
-        User targetUser = userRepository.findAllUsersIncludingDeleted().stream()
-                .filter(u -> u.getUserId().equals(targetUserId))
-                .findFirst()
+        User admin = adminMutationActor(adminEmail);
+        User targetUser = userRepository.findForSessionUpdate(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
-
-        userRepository.updateUserStatus(targetUserId, isActive);
+        if (targetUser.getRole() == Role.DELETED) throw new com.languageapp.backend.exception.ConflictException("A törölt fiók nem állítható vissza.");
+        if (targetUser.getUserId().equals(admin.getUserId()) && !isActive)
+            throw new com.languageapp.backend.exception.ForbiddenException("Saját adminfiókodat nem függesztheted fel. Kérj meg egy másik adminisztrátort.");
+        protectLastAdmin(targetUser, !isActive);
+        targetUser.setActive(isActive);
+        userRepository.save(targetUser);
 
         String action = isActive ? "USER_UNBANNED" : "USER_BANNED";
         logAdminAction(admin, action, targetUserId,
                 "Fiók " + (isActive ? "visszaállítva" : "felfüggesztve") + ": " + targetUser.getEmail() + " [ID: " + targetUserId + "]");
+    }
+
+    /** Recheck the actor after the shared DB guard: a concurrent demotion must revoke this mutation too. */
+    private User adminMutationActor(String email) {
+        try { userRepository.lockAdminMutations(); }
+        catch (org.springframework.dao.ConcurrencyFailureException | org.springframework.dao.QueryTimeoutException busy) {
+            throw new com.languageapp.backend.exception.ConflictException("Másik adminművelet van folyamatban. Töltsd újra az adatokat, majd próbáld ismét.");
+        }
+        User actor = userRepository.findByEmail(email).orElseThrow(() -> new com.languageapp.backend.exception.ForbiddenException("Adminisztrátori jogosultság szükséges."));
+        if (!actor.isActive() || !actor.isVerified() || actor.getRole() != Role.ADMIN)
+            throw new com.languageapp.backend.exception.ForbiddenException("Aktív, megerősített adminfiók szükséges.");
+        return actor;
+    }
+    private void protectLastAdmin(User target, boolean removesAccess) {
+        if (removesAccess && target.getRole() == Role.ADMIN && target.isActive() && target.isVerified()
+                && userRepository.countUsableAdmins() <= 1)
+            throw new com.languageapp.backend.exception.ConflictException("Az utolsó aktív, megerősített adminisztrátor hozzáférése nem szüntethető meg.");
     }
 
     private void logAdminAction(User admin, String actionType, UUID targetUserId, String details) {

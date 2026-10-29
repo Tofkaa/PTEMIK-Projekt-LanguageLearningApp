@@ -444,6 +444,8 @@ public class UserService {
 
     /** Only called after local credentials or an email challenge have been verified. */
     void anonymizeAccount(User user) {
+        if (user.getRole() == Role.ADMIN) throw new com.languageapp.backend.exception.ForbiddenException(
+                "Adminisztrátori fiók törléséhez előbb egy másik admin módosítsa a jogosultságodat.");
         oauthLinkIntentRepository.deleteById(user.getUserId());
         oAuthIdentityRepository.deleteByUserUserId(user.getUserId());
         invitationLinkRepository.revokeAllForOwner(user.getUserId(), clock.instant());

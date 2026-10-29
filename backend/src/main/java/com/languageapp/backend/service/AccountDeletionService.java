@@ -111,6 +111,8 @@ public class AccountDeletionService {
     private User account(String email, boolean lock) {
         User user = (lock ? users.findByEmailForAccountDeletion(email) : users.findByEmail(email))
                 .orElseThrow(() -> new BadRequestException(INVALID));
+        if (user.getRole() == com.languageapp.backend.enums.Role.ADMIN) throw new com.languageapp.backend.exception.ForbiddenException(
+                "Adminisztrátori fiók törléséhez előbb egy másik admin módosítsa a jogosultságodat.");
         if (!user.isActive() || (user.getAuthProvider() != AuthProvider.GOOGLE && user.getAuthProvider() != AuthProvider.DISCORD)) {
             throw new BadRequestException("Ez a jóváhagyási út csak aktív Google- és Discord-fióknál használható.");
         }

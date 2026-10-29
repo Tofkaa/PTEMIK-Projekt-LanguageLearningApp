@@ -118,6 +118,7 @@ public class LessonService {
         }
 
         if (challengeId != null) {
+            if (!user.isVerified()) throw new ForbiddenException("Kihíváshoz megerősített e-mail cím szükséges.");
             Challenge challenge = challengeRepository.findById(challengeId)
                     .orElseThrow(() -> new ForbiddenException("Challenge does not exist!"));
 

@@ -48,6 +48,7 @@ class AdminServiceTest {
         adminUser.setEmail("admin@languageapp.com");
         adminUser.setName("Fő Admin");
         adminUser.setRole(Role.ADMIN);
+        adminUser.setVerified(true);
 
         targetUser = new User();
         targetUser.setUserId(UUID.randomUUID());
@@ -83,7 +84,7 @@ class AdminServiceTest {
     void updateUserRole_ValidUser_ShouldUpdateRoleAndLogAction() {
         // Arrange
         when(userRepository.findByEmail(adminUser.getEmail())).thenReturn(Optional.of(adminUser));
-        when(userRepository.findById(targetUser.getUserId())).thenReturn(Optional.of(targetUser));
+        when(userRepository.findForSessionUpdate(targetUser.getUserId())).thenReturn(Optional.of(targetUser));
 
         // Act
         adminService.updateUserRole(targetUser.getUserId(), Role.TEACHER, adminUser.getEmail());
@@ -108,7 +109,7 @@ class AdminServiceTest {
     void updateUserRole_UserNotFound_ShouldThrowException() {
         // Arrange
         when(userRepository.findByEmail(adminUser.getEmail())).thenReturn(Optional.of(adminUser));
-        when(userRepository.findById(targetUser.getUserId())).thenReturn(Optional.empty());
+        when(userRepository.findForSessionUpdate(targetUser.getUserId())).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThrows(ResourceNotFoundException.class, () ->
