@@ -37,7 +37,7 @@ public enum RequestOperation {
                 case "/api/vocabulary/practice/check" -> CHECK;
                 case "/api/friendships/request", "/api/classrooms/join" -> MANUAL_CODE;
                 case "/api/users/me/profile-picture" -> UPLOAD;
-                default -> path.startsWith("/api/invitations/") ? INVITATION_MANAGE : path.matches("/api/(?:exercises/[^/]+/check|lessons/[^/]+/attempts/[^/]+/exercises/[^/]+/check)") ? CHECK : null;
+                default -> path.startsWith("/api/invitations/") ? INVITATION_MANAGE : path.matches("/api/(?:exercises/[^/]+/check|assignments/sessions/[^/]+/exercises/[^/]+/check|lessons/[^/]+/attempts/[^/]+/exercises/[^/]+/check)") ? CHECK : null;
             };
         }
         if("PUT".equals(method) && "/api/users/me/password".equals(path)) return SECURITY_VERIFY;

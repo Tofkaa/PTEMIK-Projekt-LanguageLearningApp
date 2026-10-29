@@ -24,6 +24,7 @@ public class ExerciseController {
      * Immediate feedback endpoint. Evaluates a single answer using Levenshtein distance
      * and WordBank logic without returning the correct answer beforehand.
      */
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('TEACHER', 'ADMIN')")
     @PostMapping("/{exerciseId}/check")
     public ResponseEntity<ExerciseCheckResponse> checkExercise(
             @PathVariable UUID exerciseId,

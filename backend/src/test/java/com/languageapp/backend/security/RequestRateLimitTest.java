@@ -28,7 +28,7 @@ class RequestRateLimitTest {
                 "/api/oauth-links/verify","/api/users/me/deletion/request","/api/users/me/deletion/confirm",
                 "/api/friendships/request","/api/classrooms/join","/api/vocabulary/lookup","/api/vocabulary/known-batch",
                 "/api/vocabulary/practice/check","/api/lessons/lesson/attempts/attempt/exercises/word/check",
-                "/api/exercises/word/check","/api/invitations/token/confirm"))
+                "/api/assignments/sessions/session/exercises/exercise/check","/api/exercises/word/check","/api/invitations/token/confirm"))
             assertNotNull(RequestOperation.route("POST",path),path);
         for(String path:List.of("/api/assignments/sessions/session/draft","/api/assignments/sessions/session/submit")) {
             assertNull(RequestOperation.route("POST",path));assertNull(RequestOperation.route("PUT",path));

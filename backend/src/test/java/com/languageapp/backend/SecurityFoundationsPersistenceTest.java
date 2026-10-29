@@ -311,7 +311,7 @@ class SecurityFoundationsPersistenceTest {
             var exercise=new Exercise();exercise.setLesson(lesson);exercise.setType("TRANSLATION");exercise.setDifficulty("EASY");
             exercise.setContent(Map.of("question","Question"));exercise.setCorrectAnswer(Map.of());em.persist(exercise);em.flush();return exercise.getExerciseId();
         });
-        mvc.perform(post("/api/exercises/"+exerciseId+"/check").header("Authorization",auth(f.student)).contentType(MediaType.APPLICATION_JSON).content("{\"answer\":\"\"}"))
+        mvc.perform(post("/api/exercises/"+exerciseId+"/check").header("Authorization",admin(f)).contentType(MediaType.APPLICATION_JSON).content("{\"answer\":\"\"}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.correct").doesNotExist());
     }
 
@@ -479,7 +479,7 @@ class SecurityFoundationsPersistenceTest {
             var exercise=new Exercise();exercise.setLesson(lesson);exercise.setType("TRANSLATION");exercise.setDifficulty("HARD");
             exercise.setContent(Map.of("question","Limits"));exercise.setCorrectAnswer(Map.of("answer",expected));em.persist(exercise);em.flush();return exercise.getExerciseId();
         });
-        String path="/api/exercises/"+id+"/check";String header=auth(f.student);
+        String path="/api/exercises/"+id+"/check";String header=admin(f);
         mvc.perform(post(path).header("Authorization",header).contentType(MediaType.APPLICATION_JSON).content("{\"answer\":\""+expected+"\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.correct").value(true));
         mvc.perform(post(path).header("Authorization",header).contentType(MediaType.APPLICATION_JSON).content("{\"answer\":\""+expected.substring(0,9998)+"bb\"}"))

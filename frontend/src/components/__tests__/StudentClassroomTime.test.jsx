@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import StudentClassroomDetail from '../StudentClassroomDetail';
@@ -7,6 +7,7 @@ import { assignmentApi } from '../../services/assignmentApi';
 vi.mock('../../services/assignmentApi', () => ({
     assignmentApi: {
         getClassroomAssignments: vi.fn(),
+        getMyAssignmentSessions: vi.fn(),
         getStudentClassroomStatistics: vi.fn(),
     },
 }));
@@ -45,6 +46,22 @@ describe('scheduled classroom assignment', () => {
         cleanup();
         vi.useRealTimers();
         vi.clearAllMocks();
+    });
+
+    it('shows a publication notice instead of null scores or a hidden answer from another attempt', async () => {
+        vi.useRealTimers();
+        assignmentApi.getClassroomAssignments.mockResolvedValue({ data: [{ assignmentId: 'assignment', title: 'Result', completed: true, hasGradedSession: true }] });
+        assignmentApi.getMyAssignmentSessions.mockResolvedValue({ data: [
+            { sessionId: 'pending', resultsAvailable: false, finalScore: null, teacherScore: null, answers: [] },
+            { sessionId: 'published', resultsAvailable: true, finalScore: 75, teacherScore: 80, answers: [] },
+        ] });
+        await openClassroom();
+        fireEvent.click(screen.getByRole('tab', { name: /Elvégzett|Lejárt/ }));
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Eredmény megtekintése: Result' })));
+        const modal = screen.getByRole('dialog');
+        expect(within(modal).getByRole('status')).toHaveTextContent('tanári közzététel után');
+        expect(within(modal).getAllByText(/Gép:/)).toHaveLength(1);
+        expect(within(modal).getByText('Gép: 75%')).toBeInTheDocument();
     });
 
     it('enables starting at the scheduled instant without reloading or refetching', async () => {

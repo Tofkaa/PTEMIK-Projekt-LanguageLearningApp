@@ -63,7 +63,7 @@ const AssignmentPlayerSession = ({ attempt, onReload }) => {
 
     // --- LOGIC FLAGS ---
     const hasFeedback = details?.hasFeedback === true || sessionData?.hasFeedback === true;
-    const allowRetries = details?.allowRetries === true || sessionData?.allowRetries === true;
+    const allowRetries = hasFeedback && (details?.allowRetries === true || sessionData?.allowRetries === true);
 
     // --- STATE MANAGEMENT ---
     const [exercises, setExercises] = useState(() => draft ? draft.queue.map((id, index) => ({
@@ -202,7 +202,7 @@ const AssignmentPlayerSession = ({ attempt, onReload }) => {
         let wasCloned = false; 
 
         try {
-            const response = await api.post(`/exercises/${currentExercise.exerciseId}/check`, {
+            const response = await api.post(`/assignments/sessions/${sessionId}/exercises/${currentExercise.exerciseId}/check`, {
                 answer: currentAnswer.trim()
             });
 

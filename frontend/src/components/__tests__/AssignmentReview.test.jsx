@@ -134,14 +134,17 @@ describe('review before final assignment submission', () => {
     it('preserves genuine retry history when a repeated exercise is corrected in the final review', async () => {
         api.post.mockResolvedValueOnce({ data: { correct: false } })
             .mockResolvedValue({ data: { correct: true } });
-        await openPlayer(false, { allowRetries: true });
+        await openPlayer(false, { hasFeedback: true, allowRetries: true });
         fireEvent.click(screen.getByRole('radio', { name: 'Red' }));
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Ellenőrzés' })));
         fireEvent.click(screen.getByRole('button', { name: 'Tovább' }));
         await screen.findByRole('textbox', { name: 'Válaszod' });
         fireEvent.change(screen.getByRole('textbox', { name: 'Válaszod' }), { target: { value: 'apple' } });
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Ellenőrzés' })));
         fireEvent.click(screen.getByRole('button', { name: 'Tovább' }));
         await screen.findByRole('radio', { name: 'Yellow' });
         fireEvent.click(screen.getByRole('radio', { name: 'Yellow' }));
+        await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Ellenőrzés' })));
         fireEvent.click(screen.getByRole('button', { name: 'Válaszok áttekintése' }));
         await screen.findByRole('heading', { name: 'Válaszok áttekintése' });
         // The cloned retry appears only once in the review, with its history intact.
@@ -156,5 +159,13 @@ describe('review before final assignment submission', () => {
         });
         await screen.findByRole('heading', { name: 'Sikeres Beküldés!' });
         expect(api.post).toHaveBeenCalledTimes(3);
+        expect(api.post.mock.calls.every(([url]) => url.startsWith('/assignments/sessions/session/exercises/'))).toBe(true);
+    });
+    it('ignores legacy retries without feedback and preserves free final review edits without an answer oracle', async () => {
+        await openPlayer(false, { hasFeedback: false, allowRetries: true }); enterReview();
+        expect(api.post).not.toHaveBeenCalled();
+        expect(screen.getAllByRole('button', { name: /Válasz javítása:/ })).toHaveLength(2);
+        editFirstAnswer();
+        expect(within(screen.getByRole('dialog')).getByRole('radio', { name: 'Yellow' })).toBeChecked();
     });
 });

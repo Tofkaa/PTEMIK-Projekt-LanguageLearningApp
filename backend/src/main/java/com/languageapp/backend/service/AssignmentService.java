@@ -92,6 +92,10 @@ public class AssignmentService {
             throw new BadRequestException("A határidőnek a kezdési időpont után kell lennie.");
         }
 
+        if (request.isAllowRetries() && !request.isHasFeedback()) {
+            throw new BadRequestException("Második esély csak azonnali visszajelzés mellett engedélyezhető.");
+        }
+
         ClassroomAssignment assignment = new ClassroomAssignment();
         assignment.setClassroom(classroom);
         assignment.setTitle(request.getTitle());
@@ -242,7 +246,7 @@ public class AssignmentService {
                 session.getSessionId(),
                 session.getStartedAt(),
                 session.getEffectiveTimeLimitMinutes(),
-                assignment.isAllowRetries(),
+                assignment.isAllowRetries() && assignment.isHasFeedback(),
                 assignment.isHasFeedback(),
                 exercises,
                 assignment.getClassroom().getClassroomId(),
@@ -448,7 +452,7 @@ public class AssignmentService {
         finishExpired(s);
         var a = s.getAssignment();
         return new AssignmentRecoveryResponse(new AssignmentStartResponse(id, s.getStartedAt(), s.getEffectiveTimeLimitMinutes(),
-                a.isAllowRetries(), a.isHasFeedback(), exercises, a.getClassroom().getClassroomId(), timingResponse(s)),
+                a.isAllowRetries() && a.isHasFeedback(), a.isHasFeedback(), exercises, a.getClassroom().getClassroomId(), timingResponse(s)),
                 mapToResponse(a, email), draft(s), s.getDraftRevision(), s.getDraftSavedAt());
     }
 
@@ -465,7 +469,7 @@ public class AssignmentService {
         var queue = request.getQueue();
         if (queue == null || queue.size() < base.size() || queue.size() > base.size() * 2
                 || !queue.subList(0, base.size()).equals(base) || queue.stream().anyMatch(idValue -> !base.contains(idValue))
-                || (!s.getAssignment().isAllowRetries() && queue.size() != base.size())
+                || (!(s.getAssignment().isAllowRetries() && s.getAssignment().isHasFeedback()) && queue.size() != base.size())
                 || queue.stream().anyMatch(idValue -> java.util.Collections.frequency(queue, idValue) > 2)
                 || request.getCurrentIndex() < 0 || request.getCurrentIndex() >= queue.size()
                 || request.getCurrentAnswer() == null || request.getCurrentAnswer().length() > 10000)
@@ -545,32 +549,7 @@ public class AssignmentService {
         return sessionRepository.findAllByAssignment_AssignmentIdOrderByStartedAtDesc(assignmentId)
                 .stream()
                 .filter(session -> session.getFinishedAt() != null)
-                .map(s -> {
-                    List<AssignmentSessionResponse.AnswerDetail> answersList = new ArrayList<>();
-                    try {
-                        if (s.getRawAnswers() != null) {
-                            answersList = objectMapper.readValue(s.getRawAnswers(), new TypeReference<List<AssignmentSessionResponse.AnswerDetail>>() {});
-                        }
-                    } catch (Exception e) {
-                        log.error("Hiba a válaszok visszaolvasásakor", e);
-                    }
-
-                    return new AssignmentSessionResponse(
-                            s.getSessionId(),
-                            s.getUser().getName(),
-                            s.getUser().getEmail(),
-                            s.getStartedAt(),
-                            s.getFinishedAt(),
-                            s.getFinalScore(),
-                            s.getTeacherScore(),
-                            s.getTeacherComment(),
-                            s.isGraded(),
-                            answersList,
-                            timingResponse(s).timeLimitMinutes(),
-                            timingResponse(s).deadline(),
-                            s.getDraftRevision()
-                    );
-                }).toList();
+                .map(s -> sessionResponse(s, true)).toList();
     }
 
     /**
@@ -585,35 +564,44 @@ public class AssignmentService {
         User student = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found."));
 
+        ClassroomAssignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found."));
+        requireAcceptedMember(assignment, student.getUserId());
         return sessionRepository.findAllByAssignment_AssignmentIdAndUser_UserId(assignmentId, student.getUserId())
-                .stream()
-                .filter(session -> session.getFinishedAt() != null)
-                .map(s -> {
-                    List<AssignmentSessionResponse.AnswerDetail> answersList = new ArrayList<>();
-                    try {
-                        if (s.getRawAnswers() != null) {
-                            answersList = objectMapper.readValue(s.getRawAnswers(), new TypeReference<List<AssignmentSessionResponse.AnswerDetail>>() {});
-                        }
-                    } catch (Exception e) {
-                        log.error("Failed to parse answers", e);
-                    }
+                .stream().filter(s -> s.getFinishedAt() != null)
+                .map(s -> sessionResponse(s, !s.getAssignment().isTest() || s.getAssignment().isHasFeedback() || s.isGraded()))
+                .toList();
+    }
 
-                    return new AssignmentSessionResponse(
-                            s.getSessionId(),
-                            s.getUser().getName(),
-                            s.getUser().getEmail(),
-                            s.getStartedAt(),
-                            s.getFinishedAt(),
-                            s.getFinalScore(),
-                            s.getTeacherScore(),
-                            s.getTeacherComment(),
-                            s.isGraded(),
-                            answersList,
-                            timingResponse(s).timeLimitMinutes(),
-                            timingResponse(s).deadline(),
-                            s.getDraftRevision()
-                    );
-                }).toList();
+    /** Do not deserialize or transmit unpublished answers, correctness flags or even an aggregate score. */
+    private AssignmentSessionResponse sessionResponse(AssignmentSession s, boolean visible) {
+        List<AssignmentSessionResponse.AnswerDetail> answers = List.of();
+        if (visible && s.getRawAnswers() != null) {
+            try { answers = objectMapper.readValue(s.getRawAnswers(), new TypeReference<List<AssignmentSessionResponse.AnswerDetail>>() {}); }
+            catch (Exception invalid) { log.warn("Saved assignment answers could not be decoded."); }
+        }
+        var timing = timingResponse(s);
+        return new AssignmentSessionResponse(s.getSessionId(), s.getUser().getName(), s.getUser().getEmail(),
+                s.getStartedAt(), s.getFinishedAt(), visible ? s.getFinalScore() : null,
+                visible ? s.getTeacherScore() : null, visible ? s.getTeacherComment() : null, s.isGraded(),
+                answers, timing.timeLimitMinutes(), timing.deadline(), s.getDraftRevision(), visible);
+    }
+
+    /** An answer oracle is available only inside the caller's live, feedback-enabled allocation. */
+    @Transactional
+    public ExerciseCheckResponse checkSessionExercise(UUID sessionId, UUID exerciseId, String email, String answer) {
+        com.languageapp.backend.validation.AnswerLimits.requireText(answer);
+        AssignmentSession s = lockedSession(sessionId);
+        requireStudentSession(s, email);
+        if (!s.getAssignment().isHasFeedback())
+            throw new ForbiddenException("Ehhez a feladathoz nincs azonnali visszajelzés.");
+        var timing = timingResponse(s);
+        if (s.getFinishedAt() != null || (!s.getAssignment().isAllowLateSubmission()
+                && timing.deadline() != null && !clock.instant().isBefore(timing.deadline())))
+            throw new com.languageapp.backend.exception.ConflictException("A próbálkozás már lezárult vagy lejárt.");
+        if (s.getAllocatedExerciseIds() == null || sessionExercises(s).stream().noneMatch(e -> e.getExerciseId().equals(exerciseId)))
+            throw new ForbiddenException("A feladat nincs kiosztva ebben a próbálkozásban.");
+        return evaluationService.checkSingleExercise(exerciseId, answer);
     }
 
     /**
@@ -695,7 +683,7 @@ public class AssignmentService {
                 effectiveUntil,
                 a.getExercises().size(),
                 a.isRandomized(),
-                a.isAllowRetries(),
+                a.isAllowRetries() && a.isHasFeedback(),
                 a.isHasFeedback(),
                 a.isAllowDictionary(),
                 a.isAllowLateSubmission(),
@@ -846,15 +834,17 @@ public class AssignmentService {
         if (!classroom.getTeacher().getEmail().equals(email)) {
             throw new ForbiddenException("Csak az osztályterem tanára láthatja a teljes statisztikát.");
         }
-        return calculateClassroomStatistics(classroomId);
+        return calculateClassroomStatistics(classroomId, false);
     }
 
     /** Only called after the public entry point has authorized the classroom. */
-    private ClassroomStatisticsResponse calculateClassroomStatistics(UUID classroomId) {
+    private ClassroomStatisticsResponse calculateClassroomStatistics(UUID classroomId, boolean publishedOnly) {
         long assignmentCount = assignmentRepository.countByClassroom_ClassroomId(classroomId);
         var students = classroomMemberRepository.findAcceptedStudents(classroomId);
         Map<UUID, AssignmentSessionRepository.StudentStatistics> byStudent = new HashMap<>();
-        sessionRepository.aggregateClassroomStatistics(classroomId).forEach(row -> byStudent.put(row.getUserId(), row));
+        var scoreRows = publishedOnly ? sessionRepository.aggregatePublishedClassroomStatistics(classroomId)
+                : sessionRepository.aggregateClassroomStatistics(classroomId);
+        scoreRows.forEach(row -> byStudent.put(row.getUserId(), row));
         List<ClassroomStatisticsResponse.StudentProgressDTO> progressList = new ArrayList<>();
         for (var student : students) {
             var row = byStudent.get(student.getUserId());
@@ -886,7 +876,7 @@ public class AssignmentService {
     @Transactional(readOnly = true)
     public java.util.Map<String, Object> getStudentClassroomStats(UUID classroomId, String email) {
         requireClassroomAccess(classroomId, email);
-        ClassroomStatisticsResponse allStats = calculateClassroomStatistics(classroomId);
+        ClassroomStatisticsResponse allStats = calculateClassroomStatistics(classroomId, true);
 
         ClassroomStatisticsResponse.StudentProgressDTO myProgress = allStats.getStudentProgress().stream()
                 .filter(p -> p.getStudentEmail().equals(email))

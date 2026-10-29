@@ -301,7 +301,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
                 allowDictionary: assignmentMode === 'TEST' ? assignmentForm.allowDictionary : true,
                 allowLateSubmission: assignmentMode === 'TEST' ? assignmentForm.allowLateSubmission : true,
                 randomized: assignmentForm.isRandomized,
-                allowRetries: assignmentMode === 'TEST' ? assignmentForm.allowRetries : true,
+                allowRetries: assignmentMode === 'TEST' ? assignmentForm.hasFeedback && assignmentForm.allowRetries : true,
                 maxAttempts: assignmentMode === 'TEST' && assignmentForm.maxAttempts ? parseInt(assignmentForm.maxAttempts) : null,
                 timeLimitMinutes: assignmentForm.timeLimitMinutes ? parseInt(assignmentForm.timeLimitMinutes) : null,
 
@@ -876,7 +876,7 @@ const TeacherClassroomDetail = ({ classroom }) => {
                                         <div className="small border-top pt-2">
                                             <Form.Check id="assignment-feedback" type="switch" label="Azonnali visszajelzés" className="mb-1"
                                                 checked={assignmentForm.hasFeedback} 
-                                                onChange={e => setAssignmentForm({...assignmentForm, hasFeedback: e.target.checked})} />
+                                                onChange={e => setAssignmentForm({...assignmentForm, hasFeedback: e.target.checked, allowRetries: e.target.checked && assignmentForm.allowRetries})} />
 
                                              <Form.Check id="assignment-dictionary" type="switch" label="Szótár és Tippek engedélyezése" className="mb-1"
                                                 checked={assignmentForm.allowDictionary} 
@@ -887,8 +887,11 @@ const TeacherClassroomDetail = ({ classroom }) => {
                                                 onChange={e => setAssignmentForm({...assignmentForm, isRandomized: e.target.checked})} />
                                                 
                                             <Form.Check id="assignment-retries" type="switch" label="Második esély a hibás válaszoknál"
-                                                checked={assignmentForm.allowRetries} 
+                                                checked={assignmentForm.hasFeedback && assignmentForm.allowRetries}
+                                                disabled={!assignmentForm.hasFeedback}
+                                                aria-describedby="assignment-retries-help"
                                                 onChange={e => setAssignmentForm({...assignmentForm, allowRetries: e.target.checked})} />
+                                            <p id="assignment-retries-help" className="text-secondary small mt-1">Második esély csak azonnali visszajelzéssel használható. Beadás előtt minden válasz áttekinthető és javítható.</p>
                                             
                                             {assignmentForm.timeLimitMinutes > 0 && (
                                                 <Form.Check id="assignment-late" type="switch" label="Késedelmes beadás engedélyezése"

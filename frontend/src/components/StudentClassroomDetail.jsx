@@ -374,6 +374,10 @@ const StudentClassroomDetail = ({ classroom }) => {
                     ) : (
                         studentSessions.map((session, idx) => (
                             <div key={session.sessionId} className="mb-5 bg-black bg-opacity-25 p-3 rounded border border-secondary">
+                                {session.resultsAvailable === false ? (
+                                    <><h5 className="fw-bold text-primary">{idx + 1}. Próbálkozás</h5>
+                                    <p role="status">Az eredmény és a részletes visszajelzés a tanári közzététel után lesz elérhető.</p></>
+                                ) : <>
                                 <div className="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
                                     <h5 className="fw-bold m-0 text-primary">{idx + 1}. Próbálkozás</h5>
                                     <div>
@@ -432,6 +436,7 @@ const StudentClassroomDetail = ({ classroom }) => {
                                         );
                                     })}
                                 </ul>
+                                </>}
                             </div>
                         ))
                     )}

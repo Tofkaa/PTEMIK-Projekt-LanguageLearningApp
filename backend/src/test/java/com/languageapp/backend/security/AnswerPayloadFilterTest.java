@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AnswerPayloadFilterTest {
     final AnswerPayloadFilter filter = new AnswerPayloadFilter(JsonMapper.builder().build(),Clock.systemUTC());
-    @ParameterizedTest @ValueSource(strings={"/api/exercises/id/check","/api/lessons/id/attempts/a/exercises/e/check",
+    @ParameterizedTest @ValueSource(strings={"/api/assignments/sessions/session/exercises/exercise/check","/api/exercises/id/check","/api/lessons/id/attempts/a/exercises/e/check",
             "/api/lessons/id/submit","/api/assignments/sessions/id/submit","/api/assignments/sessions/id/draft",
             "/api/vocabulary/lookup","/api/vocabulary/id/practice","/api/vocabulary/known-batch","/api/vocabulary/practice/submit"})
     void oversizedAnswerPathsAreRejectedBeforeTheController(String path) throws Exception {

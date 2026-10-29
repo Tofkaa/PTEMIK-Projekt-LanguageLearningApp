@@ -35,6 +35,14 @@ public class AssignmentController {
                 .body(assignmentService.saveDraft(sessionId, request, auth.getName()));
     }
 
+    @PostMapping("/sessions/{sessionId}/exercises/{exerciseId}/check")
+    public ResponseEntity<ExerciseCheckResponse> checkSessionExercise(@PathVariable UUID sessionId,
+            @PathVariable UUID exerciseId, @Valid @RequestBody com.languageapp.backend.dto.request.ExerciseCheckRequest request,
+            Authentication auth) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(assignmentService.checkSessionExercise(sessionId, exerciseId, auth.getName(), request.getAnswer()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<AssignmentResponse> getDetails(@PathVariable UUID id, Authentication auth) {
         return ResponseEntity.ok(assignmentService.getAssignmentDetails(id, auth.getName()));
@@ -148,7 +156,7 @@ public class AssignmentController {
     public ResponseEntity<List<AssignmentSessionResponse>> getMyAssignmentSessions(
             @PathVariable UUID id,
             Authentication auth) {
-        return ResponseEntity.ok(assignmentService.getMySessionsForAssignment(id, auth.getName()));
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(assignmentService.getMySessionsForAssignment(id, auth.getName()));
     }
 
     @GetMapping("/classroom/{classroomId}/statistics")

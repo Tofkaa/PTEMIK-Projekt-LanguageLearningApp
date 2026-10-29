@@ -93,6 +93,16 @@ public interface AssignmentSessionRepository extends JpaRepository<AssignmentSes
             "and m.status = com.languageapp.backend.enums.MembershipStatus.ACCEPTED) group by s.user.userId")
     List<StudentStatistics> aggregateClassroomStatistics(@Param("classroomId") UUID classroomId);
 
+    /** Completion is not secret; score aggregates must not reveal an unpublished strict result. */
+    @Query("select s.user.userId as userId, count(distinct a.assignmentId) as completedCount, " +
+            "coalesce(avg(case when (a.isTest = false or a.hasFeedback = true or s.isGraded = true) " +
+            "then coalesce(s.teacherScore, s.finalScore, 0) else null end), 0.0) as averageScore, max(s.finishedAt) as lastActivity " +
+            "from AssignmentSession s join s.assignment a where a.classroom.classroomId = :classroomId " +
+            "and s.finishedAt is not null and exists (select m.classroomMemberId from ClassroomMember m " +
+            "where m.classroom = a.classroom and m.user = s.user " +
+            "and m.status = com.languageapp.backend.enums.MembershipStatus.ACCEPTED) group by s.user.userId")
+    List<StudentStatistics> aggregatePublishedClassroomStatistics(@Param("classroomId") UUID classroomId);
+
     interface BestAnalyticsSession {
         UUID getSessionId();
         UUID getUserId();
