@@ -36,7 +36,7 @@ public class VocabularyController {
         VocabularyResponse response = vocabularyService.lookupAndSaveWord(
                 authentication.getName(),
                 request.getWord(),
-                request.getSource()
+                request.getSource(), request.getCourseId()
         );
 
         return ResponseEntity.ok(response);
@@ -52,22 +52,22 @@ public class VocabularyController {
         VocabularyResponse response = vocabularyService.recordPracticeResult(
                 id,
                 authentication.getName(),
-                request.getIsCorrect()
+                request.getIsCorrect(), request.getCourseId()
         );
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/due")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<VocabularyResponse>> getDueVocabulary(Authentication authentication) {
-        List<VocabularyResponse> dueWords = vocabularyService.getDueVocabularyForToday(authentication.getName());
+    public ResponseEntity<List<VocabularyResponse>> getDueVocabulary(Authentication authentication, @RequestParam(required=false) UUID courseId) {
+        List<VocabularyResponse> dueWords = vocabularyService.getDueVocabularyForToday(authentication.getName(), courseId);
         return ResponseEntity.ok(dueWords);
     }
 
     @GetMapping("/learned")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Map<String, Integer>> getVocabularyMap(Authentication authentication) {
-        Map<String, Integer> vocabMap = vocabularyService.getVocabularyMap(authentication.getName());
+    public ResponseEntity<Map<String, Integer>> getVocabularyMap(Authentication authentication, @RequestParam(required=false) UUID courseId) {
+        Map<String, Integer> vocabMap = vocabularyService.getVocabularyMap(authentication.getName(), courseId);
         return ResponseEntity.ok(vocabMap);
     }
 
@@ -77,13 +77,13 @@ public class VocabularyController {
             Authentication authentication,
             @Valid @RequestBody com.languageapp.backend.dto.request.KnownWordsRequest request) {
 
-        vocabularyService.addKnownWordsBatch(authentication.getName(), request.getWords());
+        vocabularyService.addKnownWordsBatch(authentication.getName(), request.getWords(), request.getCourseId());
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/hub")
-    public ResponseEntity<List<VocabularyDetailDTO>> getVocabularyHub(Principal principal) {
-        return ResponseEntity.ok(vocabularyService.getDetailedVocabularyForUser(principal.getName()));
+    public ResponseEntity<List<VocabularyDetailDTO>> getVocabularyHub(Principal principal, @RequestParam(required=false) UUID courseId) {
+        return ResponseEntity.ok(vocabularyService.getDetailedVocabularyForUser(principal.getName(), courseId));
     }
 
     public record StartRequest(@jakarta.validation.constraints.NotNull UUID courseId) { }

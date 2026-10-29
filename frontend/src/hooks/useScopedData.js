@@ -3,19 +3,20 @@ import axios from 'axios';
 import api from '../services/api';
 
 /** A replaced account/course view must never consume an earlier view's response. */
-export default function useScopedData(url, scope, enabled = true) {
+export default function useScopedData(url, scope, enabled = true, params) {
     const [result, setResult] = useState(null);
+    const paramsKey = JSON.stringify(params || null);
     useEffect(() => {
         if (!enabled) return;
         const controller = new AbortController();
         let active = true;
-        api.get(url, { signal: controller.signal }).then(response => {
+        api.get(url, { signal: controller.signal, ...(paramsKey === 'null' ? {} : { params: JSON.parse(paramsKey) }) }).then(response => {
             if (active) setResult({ scope, url, data: response.data, error: null });
         }).catch(error => {
             if (active && !axios.isCancel(error)) setResult({ scope, url, data: [], error });
         });
         return () => { active = false; controller.abort(); };
-    }, [url, scope, enabled]);
+    }, [url, scope, enabled, paramsKey]);
 
     if (!enabled || result?.scope !== scope || result?.url !== url) {
         return { data: [], isLoading: enabled, error: null };

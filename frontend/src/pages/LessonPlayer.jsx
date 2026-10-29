@@ -1,4 +1,6 @@
 import { safeError } from '../utils/safeError';
+import { VocabularyCourseProvider } from '../context/VocabularyCourseContext';
+import { getAuthEpoch } from '../services/authSession';
 import EarnedAchievements from '../components/EarnedAchievements';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -123,7 +125,7 @@ const LessonPlayer = () => {
         const unclicked = renderedWords.filter(w => !clickedWords.has(w));
         
         if (unclicked.length > 0) {
-            api.post('/vocabulary/known-batch', { words: unclicked })
+            api.post('/vocabulary/known-batch', { words: unclicked, courseId: attempt.courseId })
                 .catch(err => console.error("Auto-add sikertelen:", safeError(err)));
         }
     };
@@ -571,6 +573,7 @@ const LessonPlayer = () => {
     }
 
     return (
+        <VocabularyCourseProvider courseId={attempt?.courseId} courseCode={attempt?.courseCode}>
         <div className="min-vh-100 pb-5 text-light d-flex align-items-center">
             <Container>
                 {/* Progress Bar Header */}
@@ -623,11 +626,13 @@ const LessonPlayer = () => {
                 </Card>
             </Container>
         </div>
+        </VocabularyCourseProvider>
     );
 };
 
 export default function LessonPlayerRoute() {
+    const { user } = useAuth() || {};
     const { id } = useParams();
     const [params] = useSearchParams();
-    return <LessonPlayer key={`${id}-${params.get('challengeId') || ''}-${params.get('difficulty') || ''}`} />;
+    return <LessonPlayer key={`${getAuthEpoch()}-${user?.userId}-${id}-${params.get('challengeId') || ''}-${params.get('difficulty') || ''}`} />;
 }

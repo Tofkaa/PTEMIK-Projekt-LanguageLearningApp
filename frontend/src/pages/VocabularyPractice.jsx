@@ -16,7 +16,7 @@ import { getAuthEpoch } from '../services/authSession';
 
 const VocabularyPractice = () => {
     const { user } = useAuth();
-    return <VocabularySession key={JSON.stringify([getAuthEpoch(), user?.userId, user?.activeCourseCode, user?.activeCourseId])} courseId={user?.activeCourseId} />;
+    return <VocabularySession key={JSON.stringify([getAuthEpoch(), user?.userId, user?.activeCourseCode, user?.activeCourseId, user?.activeCourseRevision])} courseId={user?.activeCourseId} />;
 };
 
 const VocabularySession = ({ courseId }) => {

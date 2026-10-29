@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect } from 'react';
 import SmartWord from './SmartWord';
 import LanguageText from './LanguageText';
+import { useVocabularyCourse } from '../context/VocabularyCourseContext';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -33,8 +34,10 @@ const STOP_WORDS = new Set([
  * @param {function} onWordsFound - Callback that passes all clickable English words to the parent.
  */
 const ClickableText = ({ text, disabled = false, source = 'LESSON', hint = '', hintDirection, onWordClick, onWordsFound, lang, languageParts }) => {
-    const { vocabularyMap, user } = useAuth();
-    const wordLanguage = lang || user?.activeCourseCode;
+    const { vocabularyMap: globalMap, user } = useAuth();
+    const course = useVocabularyCourse();
+    const vocabularyMap = course.courseId === user?.activeCourseId ? globalMap : null;
+    const wordLanguage = lang || course.courseCode;
 
     // Process string hints received from the backend into a fast-lookup object
     const hintMap = useMemo(() => {

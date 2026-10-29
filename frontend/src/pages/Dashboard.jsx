@@ -19,8 +19,8 @@ const Dashboard = () => {
     const navigate = useNavigate();
 
     // --- LOCAL STATE ---
-    const scope = JSON.stringify([user?.userId, user?.activeCourseCode, user?.preferredDifficulty]);
-    const { data: lessons, isLoading, error: loadError } = useScopedData('/lessons', scope, hasUser);
+    const scope = JSON.stringify([user?.userId, user?.activeCourseCode, user?.activeCourseId, user?.activeCourseRevision, user?.preferredDifficulty]);
+    const { data: lessons, isLoading, error: loadError } = useScopedData('/lessons', scope, hasUser, { courseId: user?.activeCourseId });
     const error = loadError ? 'Nem sikerült betölteni a leckéket a szerverről.' : '';
 
     // --- DERIVED STATE: XP & LEVEL CALCULATIONS ---

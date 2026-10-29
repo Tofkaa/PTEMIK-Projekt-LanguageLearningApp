@@ -102,7 +102,7 @@ class DynamicPracticePersistenceTest {
         var duplicate=submit(start.attemptId(),true);duplicate.getResults().getLast().setExerciseId(duplicate.getResults().getFirst().getExerciseId());assertThrows(BadRequestException.class,()->service.submit(f.email,duplicate));verifyNoInteractions(streak,achievements);
     }
     @Test void foreignUserAndCourseSwitchCannotUseTheAttempt(){Fixture f=fixture(1,true),other=fixture(1,true);var start=service.start(f.email,f.course);var request=submit(start.attemptId(),true);
-        assertThrows(ForbiddenException.class,()->service.submit(other.email,request));tx.executeWithoutResult(s->users.findForSessionUpdate(f.user).orElseThrow().setActiveCourse(em.getReference(Course.class,other.course)));
+        assertThrows(ForbiddenException.class,()->service.submit(other.email,request));tx.executeWithoutResult(s->users.changeCourseSelection(f.user,other.course,0,UUID.randomUUID()));
         assertThrows(ConflictException.class,()->service.submit(f.email,request));assertEquals(10,xp(f));assertNull(attempts.findById(start.attemptId()).orElseThrow().getCompletedAt());
     }
     @Test void aWordPracticedElsewhereCannotEarnDuplicateXpOrThePerfectBonus(){Fixture f=fixture(1,true);var start=service.start(f.email,f.course);

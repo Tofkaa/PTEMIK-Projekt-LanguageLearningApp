@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import FlashcardPractice from '../../pages/FlashcardPractice';
 import VocabularyPractice from '../../pages/VocabularyPractice';
 import SmartWord from '../SmartWord';
+import { VocabularyCourseProvider } from '../../context/VocabularyCourseContext';
+import ClickableText from '../ClickableText';
 import api from '../../services/api';
 import { vocabularyApi } from '../../services/vocabularyApi';
 
@@ -106,4 +108,31 @@ it('aborts an old course answer check and ignores its late feedback', async () =
     expect(screen.queryByText(/Tökéletes!/)).not.toBeInTheDocument();
     const starts = api.post.mock.calls.filter(([url]) => url === '/vocabulary/practice/start');
     expect(starts.at(-1)[1]).toEqual({ courseId: 'course-de' });
+});
+
+it('keeps a fixed lesson translation in its original course after a global course switch', async () => {
+    const lookups = [];
+    vocabularyApi.lookupWord.mockImplementation((word, source, config) => new Promise(resolve => lookups.push({ word, ...config, resolve })));
+    const content = <VocabularyCourseProvider courseId="course-en" courseCode="en"><SmartWord word="apple" /></VocabularyCourseProvider>;
+    const view = render(content);fireEvent.click(screen.getByRole('button', { name: 'apple' }));
+    expect(lookups[0].courseId).toBe('course-en');
+    state.user = { ...state.user, activeCourseId: 'course-de', activeCourseCode: 'de', activeCourseRevision: 1 };
+    view.rerender(<VocabularyCourseProvider courseId="course-en" courseCode="en"><SmartWord word="apple" /></VocabularyCourseProvider>);
+    expect(lookups[0].signal.aborted).toBe(false);
+    await act(() => lookups[0].resolve({ data: { translation: 'alma', srsLevel: 1 } }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('alma');
+});
+it('does not apply the active dictionary known flags to a different fixed lesson course', () => {
+    state.user = { ...state.user, activeCourseId: 'course-de', activeCourseCode: 'de' };
+    render(<VocabularyCourseProvider courseId="course-en" courseCode="en"><ClickableText text="apple" /></VocabularyCourseProvider>);
+    expect(screen.getByRole('button', { name: 'apple' })).toHaveAttribute('lang', 'en');
+});
+it('replaces practice state after an ABA course switch with a newer revision', async () => {
+    state.user.activeCourseRevision = 0;
+    const view=render(<MemoryRouter><FlashcardPractice /></MemoryRouter>);
+    await act(() => requests[0].resolve({ data: [{ word: 'apple', translation: 'alma' }] }));
+    state.user = { ...state.user, activeCourseRevision: 2 };
+    view.rerender(<MemoryRouter><FlashcardPractice /></MemoryRouter>);
+    expect(screen.queryByText('apple')).not.toBeInTheDocument();
+    expect(requests[1].params.courseId).toBe('course-en');
 });

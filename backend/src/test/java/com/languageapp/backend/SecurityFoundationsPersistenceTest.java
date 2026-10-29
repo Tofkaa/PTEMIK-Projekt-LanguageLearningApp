@@ -431,8 +431,8 @@ class SecurityFoundationsPersistenceTest {
     void vocabularyWordBoundsAreValidatedBeforeExternalOrRewardWork(String operation) throws Exception {
         var f=fixture();String word="x".repeat(101);
         String body=switch(operation) {
-            case "lookup" -> "{\"word\":\""+word+"\"}";
-            case "known-batch" -> "{\"words\":[\""+word+"\"]}";
+            case "lookup" -> "{\"word\":\""+word+"\",\"courseId\":\""+UUID.randomUUID()+"\"}";
+            case "known-batch" -> "{\"words\":[\""+word+"\"],\"courseId\":\""+UUID.randomUUID()+"\"}";
             default -> "{\"results\":[{\"targetWord\":\""+word+"\",\"isCorrect\":true}]}";
         };
         mvc.perform(post("/api/vocabulary/"+operation).header("Authorization",auth(f.student)).contentType(MediaType.APPLICATION_JSON).content(body))
@@ -441,9 +441,9 @@ class SecurityFoundationsPersistenceTest {
     @Test void vocabularyBatchListIsBoundedAndAnEmptyBatchKeepsItsContract() throws Exception {
         var f=fixture();String header=auth(f.student);
         mvc.perform(post("/api/vocabulary/known-batch").header("Authorization",header).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"words\":["+String.join(",",Collections.nCopies(1001,"\"apple\""))+"]}"))
+                .content("{\"words\":["+String.join(",",Collections.nCopies(1001,"\"apple\""))+"],\"courseId\":\""+UUID.randomUUID()+"\"}"))
                 .andExpect(status().isBadRequest());
-        mvc.perform(post("/api/vocabulary/known-batch").header("Authorization",header).contentType(MediaType.APPLICATION_JSON).content("{\"words\":[]}"))
+        mvc.perform(post("/api/vocabulary/known-batch").header("Authorization",header).contentType(MediaType.APPLICATION_JSON).content("{\"words\":[],\"courseId\":\""+UUID.randomUUID()+"\"}"))
                 .andExpect(status().isOk());
     }
 

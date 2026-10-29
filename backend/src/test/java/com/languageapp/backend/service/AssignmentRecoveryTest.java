@@ -36,7 +36,8 @@ class AssignmentRecoveryTest {
         lenient().when(clock.instant()).thenReturn(now);
         student = new User(); student.setUserId(UUID.randomUUID()); student.setEmail("student@example.test");
         User teacher = new User(); teacher.setEmail("teacher@example.test");
-        Classroom room = new Classroom(); room.setClassroomId(UUID.randomUUID()); room.setTeacher(teacher);
+        Classroom room = new Classroom();
+        room.setCourse(new com.languageapp.backend.entity.Course()); room.getCourse().setCourseId(UUID.randomUUID()); room.getCourse().setLanguageCode("en"); room.setClassroomId(UUID.randomUUID()); room.setTeacher(teacher);
         assignment = new ClassroomAssignment(); assignment.setAssignmentId(UUID.randomUUID()); assignment.setClassroom(room);
         assignment.setTitle("Recovery test"); assignment.setRandomized(false); assignment.setAllowLateSubmission(false);
         assignment.setTimeLimitMinutes(10);
@@ -65,6 +66,10 @@ class AssignmentRecoveryTest {
         var d = draft(); d.setCurrentIndex(1); d.setAnswers(List.of(answer(first.getExerciseId(),"first")));
         service.saveDraft(session.getSessionId(),d,student.getEmail());
         var recovered = service.recoverSession(session.getSessionId(),student.getEmail());
+        var other=new com.languageapp.backend.entity.Course();other.setCourseId(UUID.randomUUID());other.setLanguageCode("de");student.setActiveCourse(other);
+        recovered=service.recoverSession(session.getSessionId(),student.getEmail());
+        assertEquals(assignment.getClassroom().getCourse().getCourseId(),recovered.sessionData().getCourseId());
+        assertEquals("en",recovered.sessionData().getCourseCode());
         assertEquals("saved apple",recovered.draft().getCurrentAnswer()); assertEquals(1,recovered.draft().getCurrentIndex());
         assertEquals(1,recovered.revision()); assertEquals(now.minusSeconds(60),recovered.sessionData().getStartedAt());
         assertEquals(session.getSessionId(), recovered.assignmentDetails().getOngoingSessionId());

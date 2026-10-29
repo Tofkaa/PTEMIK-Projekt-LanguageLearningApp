@@ -62,6 +62,7 @@ class AssignmentServiceTest {
         student.setEmail("diak@test.com");
 
         classroom = new Classroom();
+        classroom.setCourse(new com.languageapp.backend.entity.Course());
         classroom.setClassroomId(UUID.randomUUID());
         classroom.setTeacher(teacher);
 

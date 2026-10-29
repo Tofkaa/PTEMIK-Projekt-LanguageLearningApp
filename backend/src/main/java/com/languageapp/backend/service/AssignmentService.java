@@ -250,7 +250,7 @@ public class AssignmentService {
                 assignment.isHasFeedback(),
                 exercises,
                 assignment.getClassroom().getClassroomId(),
-                timingResponse(session)
+                timingResponse(session), assignment.getClassroom().getCourse().getCourseId(), assignment.getClassroom().getCourse().getLanguageCode()
         );
     }
 
@@ -452,7 +452,7 @@ public class AssignmentService {
         finishExpired(s);
         var a = s.getAssignment();
         return new AssignmentRecoveryResponse(new AssignmentStartResponse(id, s.getStartedAt(), s.getEffectiveTimeLimitMinutes(),
-                a.isAllowRetries() && a.isHasFeedback(), a.isHasFeedback(), exercises, a.getClassroom().getClassroomId(), timingResponse(s)),
+                a.isAllowRetries() && a.isHasFeedback(), a.isHasFeedback(), exercises, a.getClassroom().getClassroomId(), timingResponse(s), a.getClassroom().getCourse().getCourseId(), a.getClassroom().getCourse().getLanguageCode()),
                 mapToResponse(a, email), draft(s), s.getDraftRevision(), s.getDraftSavedAt());
     }
 

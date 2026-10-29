@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -123,4 +124,22 @@ it('synchronizes server XP from an accepted notification snapshot', async () => 
     api.get.mockResolvedValue({ data: { pendingFriendRequests: 2, currentXp: 525 } });
     render(<Example />); await screen.findByText('Kérelmek: 2');
     expect(auth.syncXp).toHaveBeenCalledWith('teacher', 525);
+});
+
+it('rejects a late old-course summary and even a callback retained from the previous course', async () => {
+    const pending=[];let retained;
+    api.get.mockImplementation((url, config) => new Promise(resolve => pending.push({ config, resolve })));
+    function Probe() {const value=useNotifications();useEffect(() => { retained=value.refreshNotifications; }, [value.refreshNotifications]);return <p>Due: {value.notifications.dueVocabularyCount}</p>;}
+    auth.user = { userId: 'teacher', activeCourseId: 'en', activeCourseRevision: 0 };
+    const view=render(<NotificationProvider><Probe /></NotificationProvider>);
+    const oldRefresh=retained;
+    auth.user = { ...auth.user, activeCourseId: 'de', activeCourseRevision: 1 };
+    view.rerender(<NotificationProvider><Probe /></NotificationProvider>);
+    expect(pending).toHaveLength(2);
+    await act(async () => { await oldRefresh(); });
+    expect(pending).toHaveLength(2);
+    expect(pending[1].config.params.courseId).toBe('de');
+    await act(() => pending[1].resolve({ data: { vocabularyCourseId: 'de', dueVocabularyCount: 3 } }));
+    await act(() => pending[0].resolve({ data: { vocabularyCourseId: 'en', dueVocabularyCount: 99 } }));
+    expect(screen.getByText('Due: 3')).toBeInTheDocument();
 });

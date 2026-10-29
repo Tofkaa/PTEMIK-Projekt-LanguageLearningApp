@@ -85,3 +85,4 @@ export const setScopedCounter = (baseKey, userId, value) => {
     localStorage.setItem(key, String(value));
     window.dispatchEvent(new Event('local-storage-update'));
 };
+export const vocabularyViewedScope = user => user?.userId ? `${user.userId}:${user.activeCourseId || user.activeCourseCode || "none"}` : null;

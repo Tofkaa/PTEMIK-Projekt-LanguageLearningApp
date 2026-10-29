@@ -80,7 +80,7 @@ class TranslationIsolationPersistenceTest {
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive());entered.countDown();assertTrue(release.await(10,TimeUnit.SECONDS));return Map.of(call.<List<String>>getArgument(1).getFirst(),"valid meaning");
         });
         try {
-            Callable<Integer> lookup=()->mvc.perform(post("/api/vocabulary/lookup").header("Authorization",bearer).contentType("application/json").content("{\"word\":\"apple\"}"))
+            Callable<Integer> lookup=()->mvc.perform(post("/api/vocabulary/lookup").header("Authorization",bearer).contentType("application/json").content("{\"word\":\"apple\",\"courseId\":\""+user.getActiveCourse().getCourseId()+"\"}"))
                     .andReturn().getResponse().getStatus();
             var first=workers.submit(lookup);var second=workers.submit(lookup);assertTrue(entered.await(5,TimeUnit.SECONDS));
             assertEquals(0,pool.getHikariPoolMXBean().getActiveConnections(),"Slow provider must not retain a JDBC connection with the production Open-in-View setting disabled");
@@ -93,7 +93,7 @@ class TranslationIsolationPersistenceTest {
     }
     @Test void courseChangeDuringProviderWaitRejectsTheLateWrite() {
         User user=account();when(translations.translateAll(anyString(),anyList())).thenAnswer(call->{
-            tx.executeWithoutResult(s->{var other=new Course();other.setLanguageCode(UUID.randomUUID().toString().substring(0,8));other.setLanguageName("Other");em.persist(other);users.findForSessionUpdate(user.getUserId()).orElseThrow().setActiveCourse(other);});
+            tx.executeWithoutResult(s->{var other=new Course();other.setLanguageCode(UUID.randomUUID().toString().substring(0,8));other.setLanguageName("Other");em.persist(other);em.flush();users.changeCourseSelection(user.getUserId(),other.getCourseId(),0,UUID.randomUUID());});
             return Map.of("apple","alma");
         });
         assertThrows(ConflictException.class,()->service.lookupAndSaveWord(user.getEmail(),"apple",null));assertTrue(words.findAllByUser_UserIdAndCourse_CourseIdOrderByFirstSeenAtDesc(user.getUserId(),user.getActiveCourse().getCourseId()).isEmpty());
@@ -105,7 +105,7 @@ class TranslationIsolationPersistenceTest {
     }
     @Test void unavailableTranslationReturns503AndDoesNotSaveAnyNewWord()throws Exception {
         User user=account();long before=words.count();when(translations.translateAll(anyString(),anyList())).thenThrow(new TranslationUnavailableException());
-        mvc.perform(post("/api/vocabulary/lookup").header("Authorization",access(user)).contentType("application/json").content("{\"word\":\"apple\"}"))
+        mvc.perform(post("/api/vocabulary/lookup").header("Authorization",access(user)).contentType("application/json").content("{\"word\":\"apple\",\"courseId\":\""+user.getActiveCourse().getCourseId()+"\"}"))
                 .andExpect(status().isServiceUnavailable()).andExpect(header().string("Retry-After","30"));
         assertThrows(TranslationUnavailableException.class,()->service.addKnownWordsBatch(user.getEmail(),List.of("apple","pear")));assertEquals(before,words.count());
     }
@@ -137,7 +137,7 @@ class TranslationIsolationPersistenceTest {
             return Map.of("apple","alma");
         });
         try {
-            mvc.perform(post("/api/vocabulary/lookup").header("Authorization",bearer).contentType("application/json").content("{\"word\":\"apple\"}"))
+            mvc.perform(post("/api/vocabulary/lookup").header("Authorization",bearer).contentType("application/json").content("{\"word\":\"apple\",\"courseId\":\""+user.getActiveCourse().getCourseId()+"\"}"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.srsLevel").value(6));
             assertEquals(6,words.findById(original.getVocabularyId()).orElseThrow().getSrsLevel());
         }finally{concurrent.shutdownNow();}

@@ -22,6 +22,10 @@ public class NotificationSummaryDTO {
     private long lastPingTime;
     private int dueVocabularyCount;
     private int currentXp;
+    private java.util.UUID vocabularyCourseId;
+    private java.util.UUID activeCourseId;
+    private String activeCourseCode;
+    private long activeCourseRevision;
 
     public int getTotal() {
         return pendingFriendRequests + pendingChallenges +

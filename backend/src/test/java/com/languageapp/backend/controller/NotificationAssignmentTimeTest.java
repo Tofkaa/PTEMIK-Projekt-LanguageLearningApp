@@ -45,9 +45,10 @@ class NotificationAssignmentTimeTest {
         User student = new User();
         student.setUserId(UUID.randomUUID());
         student.setXp(525);
+        Course course = new Course(); course.setCourseId(UUID.randomUUID()); student.setActiveCourse(course);
         UUID room=UUID.randomUUID(), assignment=UUID.randomUUID(), session=UUID.randomUUID(), applicant=UUID.randomUUID();
         when(authentication.getName()).thenReturn("student@test.com");
-        when(userRepository.findByEmail("student@test.com")).thenReturn(Optional.of(student));
+        when(userRepository.findNotificationUser("student@test.com")).thenReturn(Optional.of(new UserRepository.NotificationUser(student.getUserId(),student.getXp(),course.getCourseId(),"en",0)));
         when(classroomMemberRepository.findPendingNotificationReferences(student.getUserId()))
                 .thenReturn(List.of(new PendingJoinNotification(room,applicant)));
         when(sessionRepository.findUngradedNotificationReferences(student.getUserId()))
@@ -61,7 +62,7 @@ class NotificationAssignmentTimeTest {
         when(friendshipRepository.countByUserUserIdAndStatus(student.getUserId(),FriendshipStatus.ACCEPTED)).thenReturn(4);
         when(challengeRepository.countByOpponentUserIdAndStatus(student.getUserId(),ChallengeStatus.PENDING)).thenReturn(5);
         when(challengeRepository.countHistoryForUser(student.getUserId())).thenReturn(8);
-        when(studentVocabularyRepository.countByUser_UserIdAndNextPracticeAtLessThanEqual(student.getUserId(),NOW)).thenReturn(9L);
+        when(studentVocabularyRepository.countByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqual(student.getUserId(),course.getCourseId(),NOW)).thenReturn(9L);
 
         var summary = controller.getSummary(authentication).getBody();
 

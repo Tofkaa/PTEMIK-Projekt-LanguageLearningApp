@@ -42,6 +42,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
+    @Mock private SseService courseNotifications;
     @Mock private DynamicPracticeAttemptRepository dynamicPracticeAttemptRepository;
     @Mock private com.languageapp.backend.repository.InvitationLinkRepository invitationLinkRepository;
     @Mock private com.languageapp.backend.repository.OAuthIdentityRepository oAuthIdentityRepository;
@@ -379,49 +380,21 @@ class UserServiceTest {
         verify(emailChangeTokenRepository, never()).delete(any());
     }
 
-    // --- ÚJ TESZT: Nyelvváltás (changeActiveCourse) ---
-    @Test
-    void changeActiveCourse_WithValidCourse_ShouldUpdateAndReturnProfile() {
-        // 1. Arrange
-        String email = "diak@gmail.com";
-        User mockUser = createTestUserWithCourse(email); // Jelenleg 'en'
-        mockUser.setRole(Role.STUDENT);
-        mockUser.setPreferredDifficulty(DifficultyLevel.EASY);
-
-        Course newCourse = new Course();
-        newCourse.setCourseId(UUID.randomUUID());
-        newCourse.setLanguageCode("es");
-
-        when(userRepository.findByEmail(email)).thenReturn(Optional.of(mockUser));
-        when(courseRepository.findByLanguageCode("es")).thenReturn(Optional.of(newCourse));
-        // A save() ne csináljon semmit, csak fusson le
-
-        // 2. Act
-        UserResponse response = userService.changeActiveCourse(email, "es");
-
-        // 3. Assert
-        assertEquals("es", mockUser.getActiveCourse().getLanguageCode());
-        assertEquals("es", response.getActiveCourseCode());
-        verify(userRepository, times(1)).save(mockUser);
+    @Test void changeActiveCourseUsesCompareAndSetAndReturnsFreshProfile() {
+        String email="course@example.test";User u=createTestUserWithCourse(email);UUID intent=UUID.randomUUID();
+        Course next=new Course();next.setCourseId(UUID.randomUUID());next.setLanguageCode("es");
+        when(userRepository.findCourseSelection(email)).thenReturn(Optional.of(new UserRepository.CourseSelection(u.getUserId(),u.getActiveCourse().getCourseId(),"en",0,null)));
+        when(courseRepository.findByLanguageCode("es")).thenReturn(Optional.of(next));
+        when(userRepository.changeCourseSelection(u.getUserId(),next.getCourseId(),0,intent)).thenAnswer(call->{u.setActiveCourse(next);u.setActiveCourseRevision(1);return 1;});
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(u));
+        assertEquals("es",userService.changeActiveCourse(email,"es",0,intent).getActiveCourseCode());
+        verify(courseNotifications).sendPingAfterCommit(email);
     }
-
-    @Test
-    void changeActiveCourse_SameCourse_ShouldNotHitDatabase() {
-        // 1. Arrange
-        String email = "diak@gmail.com";
-        User mockUser = createTestUserWithCourse(email); // Jelenleg 'en'
-        mockUser.setRole(Role.STUDENT);
-        mockUser.setPreferredDifficulty(DifficultyLevel.EASY);
-
-        when(userRepository.findByEmail(email)).thenReturn(Optional.of(mockUser));
-
-        // 2. Act
-        UserResponse response = userService.changeActiveCourse(email, "en");
-
-        // 3. Assert
-        assertEquals("en", response.getActiveCourseCode());
-        verify(courseRepository, never()).findByLanguageCode(anyString());
-        verify(userRepository, never()).save(any());
+    @Test void staleCourseIntentIsRejectedBeforeAnyUpdate() {
+        String email="course@example.test";
+        when(userRepository.findCourseSelection(email)).thenReturn(Optional.of(new UserRepository.CourseSelection(UUID.randomUUID(),UUID.randomUUID(),"en",2,null)));
+        assertThrows(com.languageapp.backend.exception.ConflictException.class,()->userService.changeActiveCourse(email,"es",0,UUID.randomUUID()));
+        verify(userRepository,never()).changeCourseSelection(any(),any(),anyLong(),any());
     }
     @Test void accountAnonymizationRevokesReusableInvitationLinks() {
         User user = createTestUserWithCourse("invitation-deletion@example.test");

@@ -1,3 +1,4 @@
+import { vocabularyViewedScope } from '../utils/viewedStore';
 import { safeError } from '../utils/safeError';
 import { Navbar, Container, Nav, Badge, NavDropdown } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -49,9 +50,9 @@ const NavigationBar = () => {
     const activeCourseCode = user.activeCourseCode || 'en';
     const activeCourseData = AVAILABLE_COURSES[activeCourseCode] || AVAILABLE_COURSES['en'];
     const rawDueVocabCount = notifications?.dueVocabularyCount || 0;
-    const seenDueVocabCount = getScopedCounter('seenDueVocabCount', user.userId);
-    if (rawDueVocabCount < seenDueVocabCount) {
-        setScopedCounter('seenDueVocabCount', user.userId, rawDueVocabCount);
+    const seenDueVocabCount = getScopedCounter('seenDueVocabCount', vocabularyViewedScope(user));
+    if (notifications.vocabularyCourseId === user.activeCourseId && rawDueVocabCount < seenDueVocabCount) {
+        setScopedCounter('seenDueVocabCount', vocabularyViewedScope(user), rawDueVocabCount);
     }
 
     const dueVocabCount = rawDueVocabCount > seenDueVocabCount ? rawDueVocabCount : 0;

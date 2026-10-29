@@ -49,11 +49,13 @@ public class NotificationController {
      * @param authentication The security context containing the authenticated user's details.
      * @return ResponseEntity containing the aggregated NotificationSummaryDTO.
      */
+    public ResponseEntity<NotificationSummaryDTO> getSummary(Authentication authentication) {return getSummary(authentication,null);}
+
     @GetMapping("/summary")
     @Transactional(readOnly = true)
-    public ResponseEntity<NotificationSummaryDTO> getSummary(Authentication authentication) {
-        User user = userRepository.findByEmail(authentication.getName()).orElseThrow();
-        java.util.UUID userId = user.getUserId();
+    public ResponseEntity<NotificationSummaryDTO> getSummary(Authentication authentication, @org.springframework.web.bind.annotation.RequestParam(required=false) java.util.UUID courseId) {
+        var user = userRepository.findNotificationUser(authentication.getName()).orElseThrow();
+        java.util.UUID userId = user.userId();
         Instant now = clock.instant();
 
         int pendingFriends = friendshipRepository.countByFriendUserIdAndStatus(userId, FriendshipStatus.PENDING);
@@ -61,7 +63,9 @@ public class NotificationController {
         int totalFriends = friendshipRepository.countByFriendUserIdAndStatus(userId, FriendshipStatus.ACCEPTED)
                 + friendshipRepository.countByUserUserIdAndStatus(userId, FriendshipStatus.ACCEPTED);
         int totalHistory = challengeRepository.countHistoryForUser(userId);
-        int dueVocabCount = (int) studentVocabularyRepository.countByUser_UserIdAndNextPracticeAtLessThanEqual(userId, now);
+        java.util.UUID activeCourseId=user.courseId();
+        java.util.UUID selectedCourseId=courseId==null?activeCourseId:courseId;
+        int dueVocabCount = selectedCourseId==null?0:Math.toIntExact(studentVocabularyRepository.countByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqual(userId,selectedCourseId,now));
 
         var tPendingIds = classroomMemberRepository.findPendingNotificationReferences(userId).stream()
                 .map(PendingJoinNotification::key).toList();
@@ -75,7 +79,7 @@ public class NotificationController {
         return ResponseEntity.ok(new NotificationSummaryDTO(
                 pendingFriends, pendingChallenges, totalFriends, totalHistory,
                 tPendingIds, tUngradedIds, sActiveIds, sGradedIds,
-                now.toEpochMilli(), dueVocabCount, user.getXp()
+                now.toEpochMilli(), dueVocabCount, user.xp(), selectedCourseId, activeCourseId, user.courseCode(), user.courseRevision()
         ));
     }
 

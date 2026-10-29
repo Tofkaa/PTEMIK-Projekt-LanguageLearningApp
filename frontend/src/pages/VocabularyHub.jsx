@@ -1,3 +1,4 @@
+import { vocabularyViewedScope } from '../utils/viewedStore';
 import { useState, useEffect } from 'react';
 import { Container, Card, Table, Button, Form, Spinner, Badge, Row, Col, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
@@ -13,15 +14,16 @@ const VocabularyHub = () => {
     const [filterLevel, setFilterLevel] = useState('ALL');
     const [dateOrder, setDateOrder] = useState('ASC');
     const { user } = useAuth();
-    const scope = JSON.stringify([user?.userId, user?.activeCourseCode]);
-    const { data: vocabulary, isLoading, error } = useScopedData('/vocabulary/hub', scope, Boolean(user));
+    const scope = JSON.stringify([user?.userId, user?.activeCourseCode, user?.activeCourseId, user?.activeCourseRevision]);
+    const { data: vocabulary, isLoading, error } = useScopedData('/vocabulary/hub', scope, Boolean(user), { courseId: user?.activeCourseId });
     const { notifications } = useNotifications();
 
     useEffect(() => {
     if (user?.userId && notifications?.dueVocabularyCount != null) {
-        setScopedCounter('seenDueVocabCount', user.userId, notifications.dueVocabularyCount);
+        if (isLoading || error || notifications.vocabularyCourseId !== user.activeCourseId) return;
+        setScopedCounter('seenDueVocabCount', vocabularyViewedScope(user), notifications.dueVocabularyCount);
     }
-    }, [user?.userId, notifications?.dueVocabularyCount]);
+    }, [user, notifications?.dueVocabularyCount, notifications.vocabularyCourseId, isLoading, error]);
 
     const getSrsBadgeVariant = (level) => {
         if (level === 0) return 'danger';

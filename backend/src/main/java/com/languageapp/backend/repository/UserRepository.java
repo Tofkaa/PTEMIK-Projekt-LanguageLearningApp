@@ -33,6 +33,19 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("select count(u) from User u where u.role=com.languageapp.backend.enums.Role.ADMIN and u.isActive=true and u.isVerified=true")
     long countUsableAdmins();
 
+    record CourseSelection(UUID userId, UUID courseId, String code, long revision, UUID lastIntentId) { }
+    @Query("select new com.languageapp.backend.repository.UserRepository$CourseSelection(u.userId,c.courseId,c.languageCode,u.activeCourseRevision,u.lastCourseIntentId) " +
+            "from User u left join u.activeCourse c where u.email=:email and u.isActive=true and u.role<>com.languageapp.backend.enums.Role.DELETED")
+    Optional<CourseSelection> findCourseSelection(@Param("email") String email);
+    @Modifying(flushAutomatically=true, clearAutomatically=true)
+    @Query(value="update users set active_course_id=:courseId, active_course_revision=active_course_revision+1, last_course_intent_id=:intent " +
+            "where user_id=:id and active_course_revision=:revision and is_active=true and role<>'DELETED'",nativeQuery=true)
+    int changeCourseSelection(@Param("id") UUID id,@Param("courseId") UUID courseId,@Param("revision") long revision,@Param("intent") UUID intent);
+    record NotificationUser(UUID userId,int xp,UUID courseId,String courseCode,long courseRevision) { }
+    @Query("select new com.languageapp.backend.repository.UserRepository$NotificationUser(u.userId,u.xp,c.courseId,c.languageCode,u.activeCourseRevision) " +
+            "from User u left join u.activeCourse c where u.email=:email")
+    Optional<NotificationUser> findNotificationUser(@Param("email") String email);
+
     Optional<User> findByEmail(String email);
     boolean existsByEmailIgnoreCase(String email);
 

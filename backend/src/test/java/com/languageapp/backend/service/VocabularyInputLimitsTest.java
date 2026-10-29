@@ -26,12 +26,12 @@ class VocabularyInputLimitsTest {
     @InjectMocks DynamicPracticeService practice;
 
     @Test void validatesAndLooksUpBatchWordsWithTheSameLocaleIndependentNormalization() {
-        when(lookupStore.snapshot(eq("test@example.test"),anyList())).thenReturn(new VocabularyLookupStore.Snapshot(
-                UUID.randomUUID(),UUID.randomUUID(),"en",Map.of("i",com.languageapp.backend.dto.response.VocabularyResponse.builder().word("i").build())));
+        when(lookupStore.snapshot(eq("test@example.test"),anyList(),isNull())).thenReturn(new VocabularyLookupStore.Snapshot(
+                UUID.randomUUID(),UUID.randomUUID(),"en",Map.of("i",com.languageapp.backend.dto.response.VocabularyResponse.builder().word("i").build()),false));
         Locale previous=Locale.getDefault();
         try { Locale.setDefault(Locale.forLanguageTag("tr-TR"));service.addKnownWordsBatch("test@example.test",List.of("I")); }
         finally { Locale.setDefault(previous); }
-        verify(lookupStore).snapshot("test@example.test",List.of("i"));
+        verify(lookupStore).snapshot("test@example.test",List.of("i"),null);
         verifyNoInteractions(translations);
 
     }

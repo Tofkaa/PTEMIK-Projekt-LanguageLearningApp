@@ -4,19 +4,19 @@ import api from './api';
  * Vocabulary and SRS management
  */
 export const vocabularyApi = {
-    
+
 
     lookupWord: (word, source = 'DICTIONARY_TOOLTIP', config) =>
-        api.post('/vocabulary/lookup', { word, source }, config),
-
-  
-    recordPractice: (vocabularyId, isCorrect) => 
-        api.post(`/vocabulary/${vocabularyId}/practice`, { isCorrect }),
+        api.post('/vocabulary/lookup', { word, source, courseId: config?.courseId }, config),
 
 
-    getDueVocabulary: () => 
-        api.get('/vocabulary/due'),
+    recordPractice: (vocabularyId, isCorrect, courseId) =>
+        api.post(`/vocabulary/${vocabularyId}/practice`, { isCorrect, courseId }),
 
-    getVocabularyMap: () => 
-        api.get('/vocabulary/learned')
+
+    getDueVocabulary: courseId =>
+        api.get('/vocabulary/due', { params: { courseId } }),
+
+    getVocabularyMap: courseId =>
+        api.get('/vocabulary/learned', { params: { courseId } })
 };

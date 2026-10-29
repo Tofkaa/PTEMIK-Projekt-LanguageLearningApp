@@ -39,6 +39,7 @@ public class UserService {
     private final EmailChangeTokenRepository emailChangeTokenRepository;
     private final EmailService emailService;
     private final CourseRepository courseRepository;
+    private final SseService courseNotifications;
     private final ResultRepository resultRepository;
     private final FriendshipRepository friendshipRepository;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -75,6 +76,7 @@ public class UserService {
                 .profilePictureUrl(user.getProfilePictureUrl())
                 .activeCourseId(user.getActiveCourse().getCourseId())
                 .activeCourseCode(user.getActiveCourse().getLanguageCode())
+                .activeCourseRevision(user.getActiveCourseRevision())
                 .authProvider(user.getAuthProvider() != null ? user.getAuthProvider().name() : "LOCAL")
                 .build();
     }
@@ -131,28 +133,27 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse changeActiveCourse(String email, String courseCode) {
-        if (courseCode == null || courseCode.trim().isEmpty()) {
-            throw new BadRequestException("A kurzus kódja nem lehet üres!");
+    public UserResponse changeActiveCourse(String email, String courseCode, long expectedRevision, UUID intentId) {
+        if (courseCode == null || courseCode.isBlank() || expectedRevision < 0 || intentId == null)
+            throw new BadRequestException("Érvényes kurzus, verzió és műveletazonosító szükséges.");
+        String code=courseCode.trim().toLowerCase(Locale.ROOT);
+        var selection=userRepository.findCourseSelection(email).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (intentId.equals(selection.lastIntentId())) {
+            if (!code.equals(selection.code())) throw new com.languageapp.backend.exception.ConflictException("A műveletazonosító már másik kurzushoz tartozik.");
+            return getUserProfile(email);
         }
-
-        User user = getUserByEmail(email);
-
-        // Check if the active course is already this one
-        if (user.getActiveCourse().getLanguageCode().equalsIgnoreCase(courseCode)) {
-            return getUserProfile(email); // Nothing to do, return the profile
-        }
-
-        Course newCourse = courseRepository.findByLanguageCode(courseCode.toLowerCase())
-                .orElseThrow(() -> new ResourceNotFoundException("Nem található kurzus ezzel a kóddal: " + courseCode));
-
-        user.setActiveCourse(newCourse);
-        userRepository.save(user);
-
-        log.info("User {} successfully changed active course to {}", email, courseCode);
-
-        // Return the updated profile
+        if (selection.revision()!=expectedRevision) throw courseConflict();
+        Course course=code.equals(selection.code()) ? null : courseRepository.findByLanguageCode(code)
+                .orElseThrow(() -> new ResourceNotFoundException("Nem található kurzus ezzel a kóddal: "+code));
+        UUID target=course==null?selection.courseId():course.getCourseId();
+        if (userRepository.changeCourseSelection(selection.userId(),target,expectedRevision,intentId)!=1) {
+            var latest=userRepository.findCourseSelection(email).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            if (!intentId.equals(latest.lastIntentId()) || !code.equals(latest.code())) throw courseConflict();
+        } else courseNotifications.sendPingAfterCommit(email);
         return getUserProfile(email);
+    }
+    private com.languageapp.backend.exception.ConflictException courseConflict() {
+        return new com.languageapp.backend.exception.ConflictException("A kurzusválasztás egy másik lapon vagy eszközön megváltozott. Frissítettük az állapotot; válassz újra.");
     }
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)

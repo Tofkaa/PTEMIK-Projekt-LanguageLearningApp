@@ -76,8 +76,15 @@ public class User {
 //    @Column(name = "preferred_language", nullable = false, length = 10)
 //    private String preferredLanguage = "en";
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "active_course_id")
+    @JoinColumn(name = "active_course_id", updatable = false)
     private Course activeCourse;
+
+    // Only the compare-and-set repository operation may change selection metadata.
+    // Other stale ORM updates (XP, profile, login) must never write these columns back.
+    @Column(nullable = false, updatable = false, columnDefinition = "bigint default 0")
+    private long activeCourseRevision;
+    @Column(updatable = false)
+    private UUID lastCourseIntentId;
 
     /**
      * User's preferred difficulty level for adaptive learning.

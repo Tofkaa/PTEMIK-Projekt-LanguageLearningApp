@@ -17,18 +17,23 @@ import java.util.*;
 public class VocabularyLookupStore {
     private final UserRepository users;
     private final StudentVocabularyRepository vocabulary;
+    private final CourseRepository courses;
     private final AchievementService achievements;
     private final Clock clock;
-    public record Snapshot(UUID userId,UUID courseId,String language,Map<String,VocabularyResponse> existing) { }
+    public record Snapshot(UUID userId,UUID courseId,String language,Map<String,VocabularyResponse> existing,boolean explicitCourse) { }
     @Transactional(readOnly=true)
-    public Snapshot snapshot(String email,List<String> words) {
+    public Snapshot snapshot(String email,List<String> words) {return snapshot(email,words,null);}
+    @Transactional(readOnly=true)
+    public Snapshot snapshot(String email,List<String> words,UUID courseId) {
         var context=users.findVocabularyContext(email).orElseThrow(()->new ResourceNotFoundException("User not found"));
-        if(context.courseId()==null)throw new BadRequestException("Előbb válassz kurzust.");
+        UUID selected=courseId==null?context.courseId():courseId;
+        if(selected==null)throw new BadRequestException("Előbb válassz kurzust.");
+        String language=courseId==null?context.language():courses.findById(courseId).orElseThrow(()->new ResourceNotFoundException("Course not found")).getLanguageCode();
         Map<String,VocabularyResponse> existing=new HashMap<>();
-        vocabulary.findLookupWordSnapshots(context.userId(),context.courseId(),words).stream().filter(v->usableTranslation(v.translation()))
+        vocabulary.findLookupWordSnapshots(context.userId(),selected,words).stream().filter(v->usableTranslation(v.translation()))
                 .forEach(v->existing.put(v.word().toLowerCase(Locale.ROOT),VocabularyResponse.builder().vocabularyId(v.id()).word(v.word())
                         .translation(v.translation()).srsLevel(v.level()).nextPracticeAt(v.nextPractice()).isNewAddition(false).build()));
-        return new Snapshot(context.userId(),context.courseId(),context.language(),Map.copyOf(existing));
+        return new Snapshot(context.userId(),selected,language,Map.copyOf(existing),courseId!=null);
     }
     @Transactional
     public VocabularyResponse saveLookup(String email,Snapshot snapshot,String word,String translation,String source) {
@@ -39,7 +44,7 @@ public class VocabularyLookupStore {
             if(!usableTranslation(entry.getTranslation()))entry.setTranslation(translation);
             return response(entry,false);
         }
-        var entry=entry(user,word,translation,source==null?"DICTIONARY":source,false);vocabulary.saveAndFlush(entry);
+        var entry=entry(user,snapshot,word,translation,source==null?"DICTIONARY":source,false);vocabulary.saveAndFlush(entry);
         achievements.checkAndAwardAchievements(user,-1);return response(entry,true);
     }
     @Transactional
@@ -54,13 +59,13 @@ public class VocabularyLookupStore {
                 if(!usableTranslation(previous.getTranslation())){previous.setTranslation(translation.getValue());changed=true;}
                 continue;
             }
-            vocabulary.save(entry(user,translation.getKey(),translation.getValue(),"AUTO_LEARNED",true));changed=true;
+            vocabulary.save(entry(user,snapshot,translation.getKey(),translation.getValue(),"AUTO_LEARNED",true));changed=true;
         }
         if(changed){vocabulary.flush();achievements.checkAndAwardAchievements(user,-1);}
     }
     private User current(String email,Snapshot snapshot) {
         User user=users.findByEmailForAuthentication(email).filter(this::active).orElseThrow(()->new ResourceNotFoundException("User not found"));
-        if(!user.getUserId().equals(snapshot.userId()) || user.getActiveCourse()==null || !user.getActiveCourse().getCourseId().equals(snapshot.courseId()))
+        if(!user.getUserId().equals(snapshot.userId()) || (!snapshot.explicitCourse() && (user.getActiveCourse()==null || !user.getActiveCourse().getCourseId().equals(snapshot.courseId()))))
             throw new ConflictException("A fiók vagy a kiválasztott kurzus megváltozott. Nyisd meg újra a szót az aktuális kurzusban.");
         return user;
     }
@@ -68,8 +73,8 @@ public class VocabularyLookupStore {
         return text!=null && !text.isBlank() && !Set.of("Ismeretlen jelentés","Fordítás nem érhető el").contains(text);
     }
     private boolean active(User u){return u.isActive() && u.getRole()!=Role.DELETED;}
-    private StudentVocabulary entry(User user,String word,String translation,String source,boolean known) {
-        var entry=new StudentVocabulary();entry.setUser(user);entry.setCourse(user.getActiveCourse());entry.setWord(word);entry.setTranslation(translation);entry.setSource(source);
+    private StudentVocabulary entry(User user,Snapshot snapshot,String word,String translation,String source,boolean known) {
+        var entry=new StudentVocabulary();entry.setUser(user);entry.setCourse(courses.getReferenceById(snapshot.courseId()));entry.setWord(word);entry.setTranslation(translation);entry.setSource(source);
         if(known){entry.setSrsLevel(2);entry.setNextPracticeAt(clock.instant().plus(3,ChronoUnit.DAYS));entry.setLastPracticedAt(clock.instant());}
         return entry;
     }

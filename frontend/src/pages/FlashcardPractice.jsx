@@ -9,7 +9,7 @@ import { getAuthEpoch } from '../services/authSession';
 
 const FlashcardPractice = () => {
     const { user } = useAuth();
-    return <FlashcardSession key={JSON.stringify([getAuthEpoch(), user?.userId, user?.activeCourseCode])} />;
+    return <FlashcardSession key={JSON.stringify([getAuthEpoch(), user?.userId, user?.activeCourseCode, user?.activeCourseId, user?.activeCourseRevision])} />;
 };
 
 const FlashcardSession = () => {
@@ -47,7 +47,7 @@ const FlashcardSession = () => {
         let active = true;
         const fetchAllWords = async () => {
             try {
-                const response = await api.get('/vocabulary/hub', { signal: controller.signal });
+                const response = await api.get('/vocabulary/hub', { signal: controller.signal, params: { courseId: user?.activeCourseId } });
                 if (!active) return;
 
                 const shuffled = [...response.data].sort(() => Math.random() - 0.5);
@@ -63,7 +63,7 @@ const FlashcardSession = () => {
 
         fetchAllWords();
         return () => { active = false; controller.abort(); };
-    }, []);
+    }, [user?.activeCourseId]);
 
     const handleNextCard = () => {
         if (currentIndex < words.length - 1) {

@@ -42,12 +42,12 @@ public class LessonController {
      * @return a {@link ResponseEntity} containing a list of {@link LessonResponse}
      */
     @GetMapping
-    public ResponseEntity<List<LessonResponse>> getAllLessons(Authentication authentication) {
+    public ResponseEntity<List<LessonResponse>> getAllLessons(Authentication authentication, @RequestParam(required=false) UUID courseId) {
         log.info("REST request to get all lessons for authenticated user");
 
         String userEmail = authentication.getName();
 
-        return ResponseEntity.ok(lessonService.getAllLessonsForUser(userEmail));
+        return ResponseEntity.ok(lessonService.getAllLessonsForUser(userEmail, courseId));
     }
 
     /**

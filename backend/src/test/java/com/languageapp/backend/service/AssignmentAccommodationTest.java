@@ -40,7 +40,8 @@ class AssignmentAccommodationTest {
     @BeforeEach void setup() {
         teacher = new User(); teacher.setUserId(UUID.randomUUID()); teacher.setEmail("teacher@test.invalid");
         student = new User(); student.setUserId(UUID.randomUUID()); student.setEmail("student@test.invalid");
-        Classroom classroom = new Classroom(); classroom.setClassroomId(UUID.randomUUID()); classroom.setTeacher(teacher);
+        Classroom classroom = new Classroom();
+        classroom.setCourse(new com.languageapp.backend.entity.Course()); classroom.setClassroomId(UUID.randomUUID()); classroom.setTeacher(teacher);
         assignment = new ClassroomAssignment(); assignment.setAssignmentId(UUID.randomUUID()); assignment.setClassroom(classroom);
         assignment.setTimeLimitMinutes(10); assignment.setAvailableUntil(NOW.plusSeconds(7200));
         member = new ClassroomMember(); member.setClassroom(classroom); member.setUser(student); member.setStatus(MembershipStatus.ACCEPTED);

@@ -32,12 +32,14 @@ public class VocabularyService {
     private final AchievementService achievementService;
 
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NEVER)
-    public VocabularyResponse lookupAndSaveWord(String email,String word,String source) {
+    public VocabularyResponse lookupAndSaveWord(String email,String word,String source) { return lookupAndSaveWord(email,word,source,null); }
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NEVER)
+    public VocabularyResponse lookupAndSaveWord(String email,String word,String source,UUID courseId) {
         com.languageapp.backend.validation.AnswerLimits.requireWord(word);
         String normalized=word.trim().toLowerCase(Locale.ROOT);
         com.languageapp.backend.validation.AnswerLimits.requireWord(normalized);
         if(source!=null && source.length()>50)throw new com.languageapp.backend.exception.BadRequestException("A szótári forrás legfeljebb 50 karakter lehet.");
-        var snapshot=lookupStore.snapshot(email,List.of(normalized));
+        var snapshot=lookupStore.snapshot(email,List.of(normalized),courseId);
         var existing=snapshot.existing().get(normalized);if(existing!=null)return existing;
         String translation=translations.translateAll(snapshot.language(),List.of(normalized)).get(normalized);
         return lookupStore.saveLookup(email,snapshot,normalized,translation,source);
@@ -47,7 +49,9 @@ public class VocabularyService {
      * Processes the training results and updates the SRS levels.
      */
     @Transactional
-    public VocabularyResponse recordPracticeResult(UUID vocabularyId, String email, boolean isCorrect) {
+    public VocabularyResponse recordPracticeResult(UUID vocabularyId, String email, boolean isCorrect) {return recordPracticeResult(vocabularyId,email,isCorrect,null);}
+    @Transactional
+    public VocabularyResponse recordPracticeResult(UUID vocabularyId, String email, boolean isCorrect, UUID courseId) {
         User owner = userRepository.findByEmailForAuthentication(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         StudentVocabulary voc = vocabularyRepository.findById(vocabularyId)
@@ -57,6 +61,8 @@ public class VocabularyService {
             throw new ForbiddenException("Nincs jogosultságod módosítani ezt a szót");
         }
 
+        if (courseId != null && !courseId.equals(voc.getCourse().getCourseId()))
+            throw new com.languageapp.backend.exception.ConflictException("A szó másik kurzushoz tartozik.");
         voc.setLastPracticedAt(clock.instant());
 
         if (isCorrect) {
@@ -88,7 +94,9 @@ public class VocabularyService {
      * Now strictly filtered by the user's actively selected language course.
      */
     @Transactional(readOnly = true)
-    public List<VocabularyResponse> getDueVocabularyForToday(String email) {
+    public List<VocabularyResponse> getDueVocabularyForToday(String email) { return getDueVocabularyForToday(email,null); }
+    @Transactional(readOnly = true)
+    public List<VocabularyResponse> getDueVocabularyForToday(String email,UUID courseId) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -96,7 +104,7 @@ public class VocabularyService {
 
         // Query due vocabulary specifically isolated to the active course ID
         List<StudentVocabulary> dueVocabs = vocabularyRepository
-                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(user.getUserId(), user.getActiveCourse().getCourseId(), now);
+                .findAllByUser_UserIdAndCourse_CourseIdAndNextPracticeAtLessThanEqualOrderByNextPracticeAtAsc(user.getUserId(), courseId != null ? courseId : user.getActiveCourse().getCourseId(), now);
 
         return dueVocabs.stream()
                 .map(voc -> buildVocabularyResponse(voc, false))
@@ -109,13 +117,15 @@ public class VocabularyService {
      * Generates the map exclusively from words belonging to the currently active course.
      */
     @Transactional(readOnly = true)
-    public Map<String, Integer> getVocabularyMap(String email) {
+    public Map<String, Integer> getVocabularyMap(String email) { return getVocabularyMap(email,null); }
+    @Transactional(readOnly = true)
+    public Map<String, Integer> getVocabularyMap(String email,UUID courseId) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Fetch words tied to the currently active course
         List<StudentVocabulary> allVocabs = vocabularyRepository
-                .findAllByUser_UserIdAndCourse_CourseIdOrderByFirstSeenAtDesc(user.getUserId(), user.getActiveCourse().getCourseId());
+                .findAllByUser_UserIdAndCourse_CourseIdOrderByFirstSeenAtDesc(user.getUserId(), courseId != null ? courseId : user.getActiveCourse().getCourseId());
 
         return allVocabs.stream()
                 .filter(voc -> voc.getSrsLevel() >= 3)
@@ -131,12 +141,15 @@ public class VocabularyService {
      * Added course-level filtering.
      */
     @Transactional(readOnly = true)
-    public List<VocabularyDetailDTO> getDetailedVocabularyForUser(String email) {
+    public List<VocabularyDetailDTO> getDetailedVocabularyForUser(String email) { return getDetailedVocabularyForUser(email,null); }
+    @Transactional(readOnly = true)
+    public List<VocabularyDetailDTO> getDetailedVocabularyForUser(String email,UUID courseId) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         // Fetch dictionary entries specifically for the active course
-        List<StudentVocabulary> entries = vocabularyRepository.findAllByUserAndCourse(user, user.getActiveCourse());
+        List<StudentVocabulary> entries = courseId == null ? vocabularyRepository.findAllByUserAndCourse(user, user.getActiveCourse())
+                : vocabularyRepository.findAllByUser_UserIdAndCourse_CourseIdOrderByFirstSeenAtDesc(user.getUserId(),courseId);
 
         return entries.stream().map(v -> new VocabularyDetailDTO(
                 v.getWord(),
@@ -153,11 +166,13 @@ public class VocabularyService {
      * The batch process now respects the multi-language boundary.
      */
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NEVER)
-    public void addKnownWordsBatch(String email,List<String> words) {
+    public void addKnownWordsBatch(String email,List<String> words) { addKnownWordsBatch(email,words,null); }
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NEVER)
+    public void addKnownWordsBatch(String email,List<String> words,UUID courseId) {
         if(words==null || words.isEmpty())return;
         com.languageapp.backend.validation.AnswerLimits.requireWords(words);
         List<String> normalized=words.stream().map(word->word.trim().toLowerCase(Locale.ROOT)).distinct().toList();
-        var snapshot=lookupStore.snapshot(email,normalized);
+        var snapshot=lookupStore.snapshot(email,normalized,courseId);
         List<String> missing=normalized.stream().filter(word->!snapshot.existing().containsKey(word)).toList();
         if(missing.isEmpty())return;
         var translated=translations.translateAll(snapshot.language(),missing);

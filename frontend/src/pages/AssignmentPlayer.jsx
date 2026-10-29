@@ -1,4 +1,7 @@
 import { safeError } from '../utils/safeError';
+import { VocabularyCourseProvider } from '../context/VocabularyCourseContext';
+import { useAuth } from '../context/AuthContext';
+import { getAuthEpoch } from '../services/authSession';
 /**
  * @file AssignmentPlayer.jsx
  * @description Manages the interactive quiz engine for classroom assignments.
@@ -28,7 +31,8 @@ import useAssignmentDraft from '../hooks/useAssignmentDraft';
  */
 const AssignmentPlayer = () => {
     const { sessionId } = useParams();
-    return <AssignmentLoader key={sessionId} sessionId={sessionId} />;
+    const { user } = useAuth() || {};
+    return <AssignmentLoader key={`${getAuthEpoch()}:${user?.userId}:${sessionId}`} sessionId={sessionId} />;
 };
 
 const AssignmentLoader = ({ sessionId }) => {
@@ -49,9 +53,10 @@ const AssignmentLoader = ({ sessionId }) => {
         <LearningFeedback error={error} />
         {error && <Button onClick={() => setReload(value => value + 1)}>Betöltés újrapróbálása</Button>}
     </Container>;
-    return <AssignmentPlayerSession key={`${sessionId}:${reload}`} attempt={attempt} onReload={() => {
+    return <VocabularyCourseProvider courseId={attempt.sessionData?.courseId} courseCode={attempt.sessionData?.courseCode}>
+    <AssignmentPlayerSession key={`${sessionId}:${reload}`} attempt={attempt} onReload={() => {
         setAttempt(null); setReload(value => value + 1);
-    }} />;
+    }} /></VocabularyCourseProvider>;
 };
 
 const AssignmentPlayerSession = ({ attempt, onReload }) => {

@@ -22,4 +22,6 @@ public class AssignmentStartResponse {
     private List<Exercise> exercises;
     private UUID classroomId;
     private AssignmentTimingResponse timing;
+    private UUID courseId;
+    private String courseCode;
 }

@@ -3,17 +3,19 @@ import { OverlayTrigger, Popover, Spinner, Badge } from 'react-bootstrap';
 import { vocabularyApi } from '../services/vocabularyApi';
 import { formatToLocalDisplay } from '../utils/dateUtils';
 import { useAuth } from '../context/AuthContext';
+import { useVocabularyCourse } from '../context/VocabularyCourseContext';
 import { getAuthEpoch } from '../services/authSession';
 
 /** Opens a translation and preserves the existing lookup/SRS side effects. */
 const SmartWord = props => {
     const { user } = useAuth() || {};
-    const scope = JSON.stringify([getAuthEpoch(), user?.userId, user?.activeCourseCode, props.word,
+    const course = useVocabularyCourse();
+    const scope = JSON.stringify([getAuthEpoch(), user?.userId, course.courseId, course.courseCode, course.revision, props.word,
         props.queryWord, props.lang, props.source, props.preloadedTranslation, props.disabled]);
-    return <WordTranslation key={scope} {...props} />;
+    return <WordTranslation key={scope} {...props} courseId={course.courseId} />;
 };
 
-const WordTranslation = ({ word, queryWord, disabled = false, source = 'LESSON', preloadedTranslation = null, onWordClick, lang }) => {
+const WordTranslation = ({ word, queryWord, disabled = false, source = 'LESSON', preloadedTranslation = null, onWordClick, lang, courseId }) => {
     const id = useId();
     const triggerRef = useRef(null);
     const closeRef = useRef(null);
@@ -40,7 +42,7 @@ const WordTranslation = ({ word, queryWord, disabled = false, source = 'LESSON',
         const controller = new AbortController();
         lookup.current = controller;
         try {
-            const response = await vocabularyApi.lookupWord(queryWord || word.toLowerCase(), source, { signal: controller.signal });
+            const response = await vocabularyApi.lookupWord(queryWord || word.toLowerCase(), source, { signal: controller.signal, courseId });
             if (!alive.current || controller.signal.aborted) return;
             setTranslationData(response.data);
         } catch {

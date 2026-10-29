@@ -43,6 +43,10 @@
     "environment": "REPORTING_TEST_DATABASE_URL",
     "prefix": "languageapp_reporting_check_"
   },
+  "CourseScopePersistenceTest": {
+    "environment": "COURSE_SCOPE_TEST_DATABASE_URL",
+    "prefix": "languageapp_course_scope_check_"
+  },
   "DashboardMasteryPersistenceTest": {
     "environment": "DASHBOARD_TEST_DATABASE_URL",
     "prefix": "languageapp_dashboard_check_"

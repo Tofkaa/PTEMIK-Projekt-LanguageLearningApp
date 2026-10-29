@@ -5,10 +5,10 @@ import { safeError } from '../utils/safeError';
  * utilizing a hybrid approach of Server-Sent Events (SSE) and periodic polling.
  */
 
-import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
+import React, { createContext, useState, useEffect, useLayoutEffect, useContext, useCallback, useRef } from 'react';
 import api from '../services/api';
 import { openNotificationStream } from '../services/notificationStream';
-import { getAccessToken } from '../services/authSession';
+import { getAccessToken, getAuthEpoch } from '../services/authSession';
 import { useAuth } from './AuthContext';
 import { pruneViewedStore } from '../utils/viewedStore';
 
@@ -51,10 +51,15 @@ const mapSummaryData = (data) => ({
 });
 
 export const NotificationProvider = ({ children }) => {
-    const { user, syncXp } = useAuth();
+    const { user, syncXp, syncCourseSelection } = useAuth();
     const userId = user?.userId;
 
-    const [notificationState, setNotificationState] = useState({ userId: null, data: EMPTY_NOTIFICATIONS });
+    const courseId = user?.activeCourseId;
+    const authEpoch = getAuthEpoch();
+    const scope = JSON.stringify([authEpoch, userId, courseId, user?.activeCourseRevision]);
+    const currentScope = useRef(scope);
+    useLayoutEffect(() => { currentScope.current = scope; }, [scope]);
+    const [notificationState, setNotificationState] = useState({ scope: null, data: EMPTY_NOTIFICATIONS });
     const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(() => {
         try { return localStorage.getItem('notificationAutoRefresh') !== 'paused'; }
         catch { return true; }
@@ -66,7 +71,7 @@ export const NotificationProvider = ({ children }) => {
      * Manuális és automatikus frissítést indító függvény
      */
     const fetchSummary = useCallback(async () => {
-        if (!userId) return;
+        if (!userId || currentScope.current !== scope || getAuthEpoch() !== authEpoch) return;
         const currentToken = getAccessToken();
         if (!currentToken || currentToken === 'null') return;
 
@@ -74,15 +79,17 @@ export const NotificationProvider = ({ children }) => {
 
         try {
             const response = await api.get('/notifications/summary', {
-                params: { _t: Date.now() }
+                params: { _t: Date.now(), courseId }
             });
 
-            if (requestId !== requestCounterRef.current) return;
+            if (requestId !== requestCounterRef.current || currentScope.current !== scope || getAuthEpoch() !== authEpoch) return;
 
             const data = response.data;
+            if (syncCourseSelection?.(userId, data)) return false;
+            if (data.vocabularyCourseId && data.vocabularyCourseId !== courseId) return false;
             syncXp?.(userId, data.currentXp);
             pruneViewedStore(userId, data);
-            setNotificationState({ userId, data: mapSummaryData(data) });
+            setNotificationState({ scope, data: mapSummaryData(data) });
             window.dispatchEvent(new Event('achievement-refresh'));
             return true;
         } catch (error) {
@@ -91,38 +98,14 @@ export const NotificationProvider = ({ children }) => {
             }
             return false;
         }
-    }, [userId, syncXp]);
+    }, [userId, courseId, scope, authEpoch, syncXp, syncCourseSelection]);
 
     useEffect(() => {
         if (!userId || !autoRefreshEnabled) return;
 
         let isMounted = true;
 
-        const loadInitialData = async () => {
-            if (!isMounted) return;
-            const currentToken = getAccessToken();
-            if (!currentToken || currentToken === 'null') return;
-
-            const requestId = ++requestCounterRef.current;
-
-            try {
-                const response = await api.get('/notifications/summary', {
-                    params: { _t: Date.now() }
-                });
-
-                if (isMounted && requestId === requestCounterRef.current) {
-                    const data = response.data;
-                    syncXp?.(userId, data.currentXp);
-                    pruneViewedStore(userId, data);
-                    setNotificationState({ userId, data: mapSummaryData(data) });
-                    window.dispatchEvent(new Event('achievement-refresh'));
-                }
-            } catch (error) {
-                if (error.response?.status !== 403) {
-                    console.error("Értesítések lekérése sikertelen", safeError(error));
-                }
-            }
-        };
+        const loadInitialData = () => { if (isMounted) void fetchSummary(); };
 
         loadInitialData();
 
@@ -144,14 +127,14 @@ export const NotificationProvider = ({ children }) => {
             clearInterval(intervalId);
             window.removeEventListener('focus', handleFocus);
         };
-    }, [userId, autoRefreshEnabled, invalidateRequests, syncXp]);
+    }, [userId, autoRefreshEnabled, invalidateRequests, fetchSummary]);
 
     const setAutomaticRefresh = enabled => {
         setAutoRefreshEnabled(enabled);
         try { localStorage.setItem('notificationAutoRefresh', enabled ? 'enabled' : 'paused'); }
         catch { /* The setting still applies to this page when browser storage is unavailable. */ }
     };
-    const activeNotifications = user && notificationState.userId === userId ? notificationState.data : EMPTY_NOTIFICATIONS;
+    const activeNotifications = user && notificationState.scope === scope ? notificationState.data : EMPTY_NOTIFICATIONS;
 
     return (
         <NotificationContext.Provider value={{ notifications: activeNotifications, refreshNotifications: fetchSummary,

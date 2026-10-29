@@ -122,7 +122,7 @@ class DashboardMasteryPersistenceTest {
         });
         assertTrue(lessons.getAllLessonsForUser(f.user().getEmail()).getFirst().isMastered());
         assertFalse(lessons.getAllLessonsForUser(f.other().getEmail()).getFirst().isMastered());
-        tx.executeWithoutResult(status -> em.find(User.class,f.user().getUserId()).setActiveCourse(em.getReference(Course.class,foreignId[0])));
+        tx.executeWithoutResult(status -> em.createNativeQuery("update users set active_course_id=:c, active_course_revision=active_course_revision+1 where user_id=:u").setParameter("c",foreignId[0]).setParameter("u",f.user().getUserId()).executeUpdate());
         var changed=lessons.getAllLessonsForUser(f.user().getEmail());assertEquals("Foreign",changed.getFirst().getTitle());assertFalse(changed.getFirst().isCompleted());
     }
 

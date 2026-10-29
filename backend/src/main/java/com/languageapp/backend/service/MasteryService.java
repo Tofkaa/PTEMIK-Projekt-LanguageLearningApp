@@ -59,8 +59,9 @@ public class MasteryService {
     }
 
     @Transactional(readOnly = true)
-    public CourseSnapshot getCourseSnapshot(User user) {
-        UUID courseId = user.getActiveCourse().getCourseId();
+    public CourseSnapshot getCourseSnapshot(User user) { return getCourseSnapshot(user,user.getActiveCourse().getCourseId()); }
+    @Transactional(readOnly = true)
+    public CourseSnapshot getCourseSnapshot(User user, UUID courseId) {
         var lessons = lessonRepository.findCourseOverview(courseId);
         Map<UUID, Set<String>> available = new HashMap<>();
         for (var level : lessonRepository.findAvailableCourseLevels(courseId)) {

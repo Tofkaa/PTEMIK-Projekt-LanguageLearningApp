@@ -55,11 +55,11 @@ public class UserController {
      */
     @PatchMapping("/me/active-course")
     public ResponseEntity<UserResponse> updateActiveCourse(
-            @RequestParam String courseCode,
+            @RequestParam String courseCode, @RequestParam long expectedRevision, @RequestParam java.util.UUID intentId,
             Authentication authentication) {
 
         log.info("REST request to change active course to '{}' for user: {}", courseCode, authentication.getName());
-        UserResponse updatedUser = userService.changeActiveCourse(authentication.getName(), courseCode);
+        UserResponse updatedUser = userService.changeActiveCourse(authentication.getName(), courseCode, expectedRevision, intentId);
         return ResponseEntity.ok(updatedUser);
     }
 

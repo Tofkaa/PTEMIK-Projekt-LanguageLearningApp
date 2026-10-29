@@ -55,14 +55,16 @@ public class LessonService {
     private final Clock clock;
 
     @Transactional(readOnly = true)
-    public List<LessonResponse> getAllLessonsForUser(String userEmail) {
+    public List<LessonResponse> getAllLessonsForUser(String userEmail) { return getAllLessonsForUser(userEmail,null); }
+    @Transactional(readOnly = true)
+    public List<LessonResponse> getAllLessonsForUser(String userEmail, UUID courseId) {
         log.debug("Fetching ordered lessons for user: {}", userEmail);
 
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
 
-        String currentDifficulty = userDifficultyCalculator.determineTargetDifficulty(user);
-        MasteryService.CourseSnapshot mastery = masteryService.getCourseSnapshot(user);
+        String currentDifficulty = courseId == null ? userDifficultyCalculator.determineTargetDifficulty(user) : userDifficultyCalculator.determineTargetDifficulty(user,courseId);
+        MasteryService.CourseSnapshot mastery = courseId == null ? masteryService.getCourseSnapshot(user) : masteryService.getCourseSnapshot(user,courseId);
 
         // 3. Magyar nyelvű ABC rendező (hogy az Ételek ne kerüljön a végére)
         Collator huCollator = Collator.getInstance(new Locale("hu", "HU"));
@@ -204,7 +206,7 @@ public class LessonService {
                 .filter(e -> attempt.getExerciseIds().contains(e.getExerciseId()))
                 .map(LessonAttempt.AllocatedExercise::capture).toList());
         attemptRepository.save(attempt);
-        return new LessonStartResponse(attempt.getAttemptId(), difficulty, manual, exercises);
+        return new LessonStartResponse(attempt.getAttemptId(), difficulty, manual, exercises, lesson.getTopic().getCourse().getCourseId(), lesson.getTopic().getCourse().getLanguageCode());
     }
 
     @Transactional(readOnly = true)

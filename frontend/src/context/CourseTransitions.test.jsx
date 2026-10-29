@@ -4,12 +4,14 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthContext';
 import { vocabularyApi } from '../services/vocabularyApi';
 import { userApi } from '../services/userApi';
+import api from '../services/api';
 import { endSession } from '../services/authSession';
 
+vi.mock('../services/api', () => ({ default: { get: vi.fn() } }));
 vi.mock('../services/vocabularyApi', () => ({ vocabularyApi: { getVocabularyMap: vi.fn() } }));
 vi.mock('../services/userApi', () => ({ userApi: { changeActiveCourse: vi.fn() } }));
 let auth, requests;
-const profile = course => ({ userId: 'student', activeCourseCode: course, xp: 0 });
+const profile = course => ({ userId: 'student', activeCourseCode: course, activeCourseId: course, activeCourseRevision: { en: 0, de: 1, es: 2 }[course], xp: 0 });
 function Probe() {
     const currentAuth = useAuth();
     useEffect(() => { auth = currentAuth; }, [currentAuth]);
@@ -19,6 +21,7 @@ function Probe() {
 beforeEach(() => {
     endSession(); localStorage.clear(); sessionStorage.clear(); vi.clearAllMocks(); requests = [];
     vocabularyApi.getVocabularyMap.mockResolvedValue({ data: {} });
+    api.get.mockRejectedValue(new Error('offline'));
     userApi.changeActiveCourse.mockImplementation(course => new Promise((resolve, reject) => requests.push({ course, resolve, reject })));
 });
 afterEach(() => { cleanup(); endSession(); });
@@ -91,4 +94,39 @@ it('does not switch back when a lesson returns an older profile', async () => {
     await act(async () => { requests[0].resolve({ data: profile('de') }); await change; });
     await act(() => auth.updateProfile({ ...profile('en'), xp: 20 }));
     expect(screen.getByLabelText('course')).toHaveTextContent('de');
+});
+
+it('dispatches each serialized intent against the latest committed server revision', async () => {
+    await mount(); let first, second;
+    act(() => { first = auth.changeLanguage('de'); second = auth.changeLanguage('es'); });
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(userApi.changeActiveCourse).toHaveBeenNthCalledWith(1, 'de', 0, expect.any(String));
+    await act(async () => { requests[0].resolve({ data: profile('de') }); await first; });
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(userApi.changeActiveCourse).toHaveBeenNthCalledWith(2, 'es', 1, expect.any(String));
+    await act(async () => { requests[1].resolve({ data: profile('es') }); await second; });
+});
+it('treats cross-tab storage as a hint and reads the authoritative server course', async () => {
+    await mount(); api.get.mockResolvedValue({ data: profile('de') });
+    act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'languageapp-course-change',
+        newValue: JSON.stringify({ userId: 'student', revision: 900, activeCourseCode: 'forged' }) })));
+    await waitFor(() => expect(auth.user.activeCourseCode).toBe('de'));
+    expect(auth.user.activeCourseRevision).toBe(1);
+    expect(vocabularyApi.getVocabularyMap).toHaveBeenLastCalledWith('de');
+});
+it('reconciles a timed-out accepted mutation without replaying the write', async () => {
+    await mount(); api.get.mockResolvedValue({ data: profile('de') }); let pending;
+    act(() => { pending = auth.changeLanguage('de').catch(() => false); });
+    await waitFor(() => expect(requests).toHaveLength(1));
+    await act(async () => { requests[0].reject(new Error('timeout')); await pending; });
+    expect(auth.user.activeCourseCode).toBe('de');
+    expect(userApi.changeActiveCourse).toHaveBeenCalledTimes(1);
+});
+it('ignores a profile read that predates a newer server notification', async () => {
+    await mount(); let finish;
+    api.get.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    act(() => window.dispatchEvent(new Event('focus')));
+    await act(async () => { auth.syncCourseSelection('student', profile('es')); });
+    await act(async () => { finish({ data: profile('de') }); });
+    expect(auth.user.activeCourseId).toBe('es'); expect(auth.user.activeCourseRevision).toBe(2);
 });
