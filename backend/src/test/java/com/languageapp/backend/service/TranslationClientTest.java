@@ -74,6 +74,15 @@ class TranslationClientTest {
         status.set(503);assertThrows(TranslationUnavailableException.class,()->client.translateAll("en",List.of("one","two")));
         status.set(200);assertEquals("alma",client.translateAll("en",List.of("one")).get("one"));
     }
+    @Test void immediateRetryAfterFailedFlightStartsFreshProviderWork() {
+        for(int n=0;n<20;n++) {
+            String word="retry"+n;status.set(503);
+            assertThrows(TranslationUnavailableException.class,()->client.translateAll("en",List.of(word)));
+            status.set(200);
+            assertEquals("alma",client.translateAll("en",List.of(word)).get(word));
+        }
+        assertEquals(40,calls.get());
+    }
     @Test void wordAndLanguageParametersAreEncodedAsValues() {
         client.translateAll("en",List.of("c++ & apple?"));
         var decoded=new HashMap<String,String>();for(String pair:query.get().split("&")) {

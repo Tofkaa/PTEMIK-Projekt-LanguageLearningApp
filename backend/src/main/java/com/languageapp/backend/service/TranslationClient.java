@@ -86,7 +86,12 @@ public class TranslationClient {
                             while(cache.size()>CACHE_LIMIT)cache.remove(cache.keySet().iterator().next());
                         }
                         promise.complete(translation);
-                    }catch(RuntimeException rejected){promise.completeExceptionally(rejected instanceof TooManyRequestsException?rejected:new TranslationUnavailableException());}
+                    }catch(RuntimeException rejected){
+                        // Completing wakes callers immediately: remove the failed flight before they can retry.
+                        // The finally compare-remove must not remove a replacement flight created by that retry.
+                        synchronized(gate){flights.remove(key,promise);}
+                        promise.completeExceptionally(rejected instanceof TooManyRequestsException?rejected:new TranslationUnavailableException());
+                    }
                     finally{synchronized(gate){flights.remove(key,promise);}}
                 });requests++;
             }catch(RejectedExecutionException busy){flights.remove(key,promise);throw new TranslationUnavailableException();}
