@@ -94,7 +94,7 @@ public class JwtService {
      * @return a signed JWT token string
      */
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
-        log.debug("Generating JWT token for user: {}", userDetails.getUsername());
+        log.debug("Generating JWT access token.");
 
         // Add the user's primary authority (role) to the token payload
         extraClaims.put("role", userDetails.getAuthorities().iterator().next().getAuthority());
@@ -108,7 +108,7 @@ public class JwtService {
                 .signWith(getSigningKey())
                 .compact();
 
-        log.info("JWT token successfully generated for user: {}", userDetails.getUsername());
+        log.debug("JWT access token generated.");
         return token;
     }
 
@@ -135,11 +135,11 @@ public class JwtService {
             boolean isValid = username.equals(userDetails.getUsername()) && !isTokenExpired(token);
 
             if (!isValid) {
-                log.warn("JWT validation failed for user: {}. Token might be expired or subject mismatch.", userDetails.getUsername());
+                log.warn("JWT subject validation failed.");
             }
             return isValid;
         } catch (Exception e) {
-            log.error("JWT validation encountered an unexpected error: {}", e.getMessage());
+            log.error("JWT validation could not complete.");
             return false;
         }
     }
@@ -196,10 +196,10 @@ public class JwtService {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (ExpiredJwtException e) {
-            log.warn("JWT Token is expired: {}", e.getMessage());
+            log.warn("JWT token expired.");
             throw e; // Rethrow to be handled by the security filter
         } catch (JwtException e) {
-            log.error("Invalid JWT token detected (Possible tampering attempt): {}", e.getMessage());
+            log.warn("JWT token rejected.");
             throw e; // Rethrow to be handled by the security filter
         }
     }
