@@ -1,0 +1,3 @@
+# Runtime Linux scripts must survive Windows checkouts.
+*.sh text eol=lf
+*.awk text eol=lf

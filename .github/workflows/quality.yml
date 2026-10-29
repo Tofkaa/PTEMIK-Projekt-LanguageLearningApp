@@ -76,6 +76,8 @@ jobs:
       - run: docker build -t quality-postgres database
       - run: docker build -t quality-backend backend
       - run: docker build -t quality-frontend frontend
+      - name: Verify retained and redacted edge diagnostics
+        run: python scripts/check_nginx_logging.py quality-frontend --output .quality-reports/images/nginx-log-policy.json
       - name: Audit all runtime images and generate their SBOMs
         run: python scripts/image_audit.py quality-postgres quality-backend quality-frontend --report-dir .quality-reports/images
 

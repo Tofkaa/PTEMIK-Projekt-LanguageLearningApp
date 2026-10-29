@@ -19,6 +19,10 @@ RUN apk upgrade --no-cache
 
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY redact-nginx-errors.awk /usr/local/lib/redact-nginx-errors.awk
+COPY start-safe-error-log.sh /docker-entrypoint.d/99-safe-error-log.sh
+RUN chmod 755 /docker-entrypoint.d/99-safe-error-log.sh
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD test -p /var/log/nginx/diagnostic.pipe && kill -0 "$(cat /run/nginx-log-redactor.pid)" && nginx -t
 
 # Local SSL files are mounted read-only by Docker Compose at runtime.
 

@@ -202,3 +202,26 @@ python scripts/quality_gate.py integration
 ```
 
 Az integrációs runner saját eldobható adatbázisokat hoz létre; ne helyettesítsd őket az alkalmazás adatbázisával. A tesztek nem helyettesítik a kézi képernyőolvasós és használhatósági ellenőrzéseket.
+
+
+## Üzemeltetési diagnosztika
+
+Az API minden kéréshez saját `X-Request-ID` azonosítót ad, a hibaválaszban `requestId` mezővel. Hibajegyhez ezt és a verziót add meg. A kliens által küldött azonosítót a backend nem fogadja el. A backend JSON-naplója nem tartalmaz alkalmazásszintű személyes azonosítókat, bemenetet, SQL-paramétert, tokent vagy nyers kivételüzenetet; a hibakategória és a kódhely segíti a hibakeresést. A PostgreSQL hibákhoz nem írunk normál SQL-utasítást, bindértéket vagy DETAIL sort. Ne kapcsold be az SQL-, bind-, HTTP-body- vagy SMTP-wire debug naplózást személyes adatokkal működő környezetben.
+
+A Nginx hozzáférési naplója csak időt, kérésazonosítót, státuszt, válaszméretet és időtartamot tartalmaz. A hibanapló sorai megmaradnak, de az idézett kérés-/upstream-/headerértékek, klienscímek és queryértékek kiírás előtt redakciót kapnak. A frontend healthcheck ellenőrzi a szűrőfolyamat életét és a Nginx-konfigurációt; `unhealthy` állapotnál ellenőrizd a konténert és a naplókat, majd javítás után hozd újra létre. A naplózási szabályt az image-CI külön szintetikus esetekkel ellenőrzi.
+
+A Compose `local` naplódriver szolgáltatásonként legfeljebb három 10 MiB-os naplófájlt tart, tömörítéssel. Ez méretkorlát, nem garantált napalapú megőrzés. A forgatás a régebbi operatív sorokat felülírhatja; konténer-újralétrehozáskor sincs automatikus naplóarchívum; időtartamhoz kötött vagy távoli archiválást az üzemeltető külön állítson be. A konfiguráció frissítése a konténerek újralétrehozásakor érvényesül, az adatvolume megmarad. A mentéseket és az adminisztrációs alkalmazásnaplót ez nem törli.
+
+A `/actuator/health` és `/actuator/metrics` végpont kizárólag aktuálisan aktív, megerősített adminisztrátori JWT-vel érhető el. Az `env`, `configprops`, `loggers`, dumpok és részletes health-adatok nem publikusak. A metrikák rögzített művelet-/eredménycímkéket használnak, nem felhasználót vagy nyers URL-t. Az alap HTTP URI-címkék száma is korlátozott, és nyers URL nem kerül trace-attribútumba.
+
+| Megfigyelés | Metrika / jelzés |
+|---|---|
+| HTTP hibák és időtartam | `http.server.requests`, `app.http.completed`; legalább 100 befejezett kérésből legalább 1% 5xx egy mintában `HTTP_5XX` jelzés |
+| DB-kapcsolatok és várakozás | `hikaricp.connections.active`, `.pending`, `.acquire`; `app.database.lock.waiters`, `.oldest` (másodperc), `app.database.query.active`, `.oldest`; 5 s feletti aktív querynél `SLOW_QUERY`, várakozó kapcsolat vagy lock esetén `DATABASE_WAIT` |
+| Ütközések | `app.persistence.conflicts`, rögzített `CONSTRAINT`, `OPTIMISTIC`, `LOCK` kategóriával |
+| Levelezés | `app.mail.queue`, `.active`, `.events`, `app.operation.duration{operation=MAIL}`; 80 várakozó vagy új hiba/visszautasítás esetén `MAIL_QUEUE` / `MAIL_FAILURE` |
+| SSE | `app.sse.connections`, `app.operation.active{operation=SSE_SEND}`; 5 másodpercnél hosszabb folyamatban lévő küldésnél `SSE_STALL` |
+| Háttérjobok | `app.operation.duration`, `.success.age`, `app.job.item.failures`, `.scan.saturated`; friss siker nélkül 45 s vizsga-, 900 s token-, 3 h kihívás- és 48 h streak-job küszöb után `JOB_STALE` |
+| A mérés frissessége | `app.observability.probe.age`, `.failures`; 180 s után `PROBE_STALE` |
+
+A külön mintavevő 60 másodpercenként ellenőriz; a DB-próba csak összesített kapcsolatszámot és lockvárakozási kort olvas, legfeljebb két másodperces SQL-időkorláttal. Már várakozó kapcsolatkészletnél kihagyja az új DB-próbát. A `app.operations.signal` értéke 1 aktív és 0 megszűnt jelzés; az állapotváltozás a naplóba is bekerül. A jobkor az első futásig az indulástól számolódik. A küszöbök kezdeti üzemeltetési jelzések, nem igazolt kapacitás/SLA vagy automatikus javítás; tartós jelzésnél a hibakategóriát, a poolt, a külső szolgáltatót és a jobokat vizsgáld. A HTTP/worker/SSE mérés példányonkénti; a PostgreSQL-aggregátum az azonos adatbázis és szerepkör összes kapcsolatát látja, queryszöveg és szereplők nélkül. Több replikánál minden példányt gyűjteni kell, a közös DB-aggregátumot ne összegezd többször. Külső riasztási címzett/gyűjtő nincs automatikusan telepítve.

@@ -1,11 +1,18 @@
-version: '3.8'
+x-logging: &bounded-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+    compress: "true"
 
 services:
   db:
     build: ./database
     image: languageapp-postgres
     container_name: language_app_db
+    command: ["postgres", "-c", "log_error_verbosity=terse", "-c", "log_min_error_statement=panic", "-c", "log_parameter_max_length_on_error=0", "-c", "log_statement=none"]
     restart: always
+    logging: *bounded-logging
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -41,6 +48,7 @@ services:
     ports:
       - "8080:8080"
     restart: always
+    logging: *bounded-logging
 
   frontend:
     build:
@@ -57,6 +65,7 @@ services:
       - "80:80"     # HTTP -> HTTPS átirányításhoz
       - "443:443"   # A tényleges HTTPS forgalomhoz
     restart: always
+    logging: *bounded-logging
 
 volumes:
   postgres_data:
