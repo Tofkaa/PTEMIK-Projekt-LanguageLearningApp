@@ -19,7 +19,7 @@ public final class AccountVerificationFilter extends OncePerRequestFilter {
     private final Clock clock;
     public AccountVerificationFilter(UserRepository users,ObjectMapper mapper,Clock clock){this.users=users;this.mapper=mapper;this.clock=clock;}
     static boolean requiresVerification(String path,String challengeId){
-        for(String prefix:new String[]{"/api/classrooms","/api/assignments","/api/friendships","/api/challenges","/api/invitations","/api/admin","/api/exercises"})
+        for(String prefix:new String[]{"/actuator","/api/classrooms","/api/assignments","/api/friendships","/api/challenges","/api/invitations","/api/admin","/api/exercises"})
             if(path.equals(prefix)||path.startsWith(prefix+"/"))return true;
         return path.equals("/api/lessons/all-for-challenge") || (path.startsWith("/api/lessons/") && challengeId!=null);
     }

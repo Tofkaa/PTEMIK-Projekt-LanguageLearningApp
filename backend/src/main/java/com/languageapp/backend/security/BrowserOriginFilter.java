@@ -37,7 +37,7 @@ public final class BrowserOriginFilter extends OncePerRequestFilter {
             response.setContentType("application/json;charset=UTF-8");
             response.setHeader("Cache-Control", "no-store");
             response.addHeader("Vary", "Origin, Sec-Fetch-Site");
-            response.getWriter().write("{\"message\":\"A művelet csak az alkalmazás oldaláról indítható.\"}");
+            com.languageapp.backend.observability.ApiErrors.write(request,response,403,"A művelet csak az alkalmazás oldaláról indítható.");
             return;
         }
         chain.doFilter(request, response);

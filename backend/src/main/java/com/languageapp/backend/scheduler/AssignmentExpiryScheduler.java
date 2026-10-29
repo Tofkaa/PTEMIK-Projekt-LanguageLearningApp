@@ -14,6 +14,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class AssignmentExpiryScheduler {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.languageapp.backend.observability.OperationsMetrics operations;
+
     private final AssignmentSessionRepository sessions;
     private final AssignmentService assignments;
     private final Clock clock;
@@ -24,6 +27,9 @@ public class AssignmentExpiryScheduler {
 
     @Scheduled(fixedDelayString = "${app.assignments.expiry-scan-ms:15000}")
     public synchronized void closeExpired() {
+        var work=operations==null?null:operations.begin(com.languageapp.backend.observability.OperationsMetrics.Operation.ASSIGNMENT_EXPIRY);
+        boolean successful=true;
+        try {
         var cutoff = clock.instant();
         for (int batch = 0; batch < MAX_BATCHES_PER_SCAN; batch++) {
             var ids = sessions.findExpiredCandidateIds(cutoff, afterId, BATCH_SIZE);
@@ -32,11 +38,16 @@ public class AssignmentExpiryScheduler {
                 // Selection is only a hint: the transactional consumer rechecks current timing under its lock.
                 try { assignments.closeExpiredSession(id); }
                 catch (RuntimeException failure) {
-                    log.warn("Could not finalize expired assignment session {} ({})", id, failure.getClass().getSimpleName());
+                    successful=false;if(operations!=null)operations.jobItemFailed();
+                    log.warn("job.assignment.item_failed");
                 }
             }
             afterId = ids.getLast();
             if (ids.size() < BATCH_SIZE) { afterId = null; return; }
         }
+            if(operations!=null)operations.scanSaturated();
+        } catch(RuntimeException failure){successful=false;throw failure;}
+        finally{if(work!=null)operations.finishJob(work,successful);}
+
     }
 }

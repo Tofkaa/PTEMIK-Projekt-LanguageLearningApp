@@ -72,7 +72,7 @@ public class ClassroomService {
         classroom.setInviteCode(inviteCode);
 
         Classroom savedClassroom = classroomRepository.save(classroom);
-        log.info("Classroom created successfully: {} with code {}", savedClassroom.getName(), savedClassroom.getInviteCode());
+        log.info("classroom.created");
 
         return mapToResponse(savedClassroom, 0);
     }
@@ -136,10 +136,10 @@ public class ClassroomService {
         if (isApproved) {
             member.setStatus(MembershipStatus.ACCEPTED);
             classroomMemberRepository.save(member);
-            log.info("Student {} accepted into classroom {}", studentId, classroomId);
+            log.info("classroom.member.accepted");
         } else {
             classroomMemberRepository.delete(member);
-            log.info("Student {} rejected from classroom {}", studentId, classroomId);
+            log.info("classroom.member.rejected");
         }
     }
 
@@ -253,7 +253,7 @@ public class ClassroomService {
                 .orElseThrow(() -> new ResourceNotFoundException("Student is not a member of this classroom."));
 
         classroomMemberRepository.delete(member);
-        log.info("Student {} was kicked from classroom {} by teacher {}", studentId, classroomId, teacherEmail);
+        log.info("classroom.member.removed");
     }
 
     // --- Helper methods ---

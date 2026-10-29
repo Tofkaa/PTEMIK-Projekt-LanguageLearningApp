@@ -217,7 +217,7 @@ public class AssignmentService {
         AssignmentSession session;
         if (ongoingSession.isPresent()) {
             session = ongoingSession.get();
-            log.info("Student {} is resuming assignment {}", email, assignmentId);
+            log.info("assignment.resumed");
         } else {
             Instant availableUntil = configuredDeadline(assignment, user.getUserId());
             if (availableUntil != null && !clock.instant().isBefore(availableUntil)) {
@@ -235,7 +235,7 @@ public class AssignmentService {
             session.setStartedAt(clock.instant());
             initializeTiming(session);
             session = sessionRepository.save(session);
-            log.info("Student {} started attempt {} for assignment {}", email, completedCount + 1, assignmentId);
+            log.info("assignment.started");
         }
 
         initializeTiming(session);
@@ -378,8 +378,7 @@ public class AssignmentService {
 
         streakService.updateActivity(session.getUser());
 
-        log.info("Student {} successfully submitted assignment '{}'. Score: {}%",
-                session.getUser().getEmail(), session.getAssignment().getTitle(), finalScore);
+        log.info("assignment.submitted");
     }
 
     /** Lock order: shared assignment metadata, then this session exclusively; no other student is excluded. */
@@ -636,7 +635,7 @@ public class AssignmentService {
         sessionRepository.save(session);
         notifyAfterCommit(List.of(session.getUser().getEmail()));
 
-        log.info("Teacher {} graded session {}. Published: true", teacherEmail, sessionId);
+        log.info("assignment.published");
         return session.getDraftRevision();
     }
 
@@ -998,7 +997,7 @@ public class AssignmentService {
             return answers == null ? List.of() : answers;
         } catch (Exception failure) {
             // Parser messages may contain student answers: keep them out of operational logs.
-            log.warn("Could not read stored answers for analytics session {}", session.getSessionId());
+            log.warn("assignment.analytics.invalid");
             return List.of();
         }
     }

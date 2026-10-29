@@ -61,7 +61,7 @@ public class EvaluationService {
     @Transactional
     public LessonSubmitResponse evaluateLesson(UUID userId, UUID lessonId, UUID challengeId, LessonSubmitRequest request) {
         AnswerLimits.requireSubmissions(request.getAnswers(), AnswerLimits.MAX_LESSON_SUBMISSIONS);
-        log.debug("Starting evaluation for user: {} and lesson: {}", userId, lessonId);
+        log.debug("lesson.evaluation.started");
 
         User user = userRepository.findForLearningUpdate(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
@@ -90,16 +90,16 @@ public class EvaluationService {
             boolean isOpponent = challenge.getOpponent().getUserId().equals(userId);
 
             if (!isChallenger && !isOpponent) {
-                log.warn("SECURITY ALERT: User {} attempted to submit an external challenge (ID: {})!", user.getEmail(), challengeId);
+                log.warn("challenge.submission.denied");
                 throw new ForbiddenException("Security error: You are not a participant in this challenge!");
             }
 
             if (!challenge.getLesson().getLessonId().equals(lessonId)) {
-                log.warn("SECURITY ALERT: User {} manipulated the lesson ID during submission!", user.getEmail());
+                log.warn("lesson.submission.denied");
                 throw new ForbiddenException("Security error: This challenge does not belong to the requested lesson!");
             }
 
-            log.info("Difficulty securely overridden by challenge ID: {}", challengeId);
+            log.info("challenge.difficulty.bound");
             currentAttemptDifficulty = attempt.getDifficulty();
         } else {
             // Standard gameplay: Use current adaptive difficulty
@@ -156,9 +156,9 @@ public class EvaluationService {
         if (passed && !progress.getIsCompleted()) {
             xpEarned = potentialXp;
             user.setXp(user.getXp() + xpEarned);
-            log.info("User {} earned {} XP. Total XP: {}", user.getEmail(), xpEarned, user.getXp());
+            log.info("lesson.xp.awarded");
         } else if (passed && progress.getIsCompleted()) {
-            log.debug("User {} already completed this lesson at this difficulty. No new XP awarded.", user.getEmail());
+            log.debug("lesson.xp.unchanged");
         }
 
         // --- 2. GAMIFICATION: DAILY STREAK ENGINE ---

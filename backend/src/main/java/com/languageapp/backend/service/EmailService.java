@@ -16,6 +16,9 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class EmailService {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.languageapp.backend.observability.OperationsMetrics operations;
+
 
     private final JavaMailSender mailSender;
 
@@ -28,7 +31,7 @@ public class EmailService {
     @Value("${app.mail.rate-limit-retry-delay-ms:11000}")
     private long rateLimitRetryDelayMillis = 11000;
 
-    @Async
+    @Async("mailExecutor")
     public void sendVerificationEmail(String toEmail, String name, String token) {
         String verificationUrl = frontendUrl + "/verify?token=" + token;
 
@@ -43,7 +46,7 @@ public class EmailService {
         sendHtmlEmail(toEmail, "Erősítsd meg az e-mail címedet", htmlBody);
     }
 
-    @Async
+    @Async("mailExecutor")
     public void sendPasswordResetEmail(String toEmail, String token) {
         String resetUrl = frontendUrl + "/reset-password?token=" + token;
 
@@ -59,6 +62,8 @@ public class EmailService {
     }
 
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
+        var work=operations==null?null:operations.begin(com.languageapp.backend.observability.OperationsMetrics.Operation.MAIL);
+        boolean delivered=false;
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -74,13 +79,14 @@ public class EmailService {
             helper.setText(document, true);
 
             sendWithRateLimitRetry(message);
-            log.info("Email sent successfully to: {}", to);
+            delivered=true;
+            log.info("mail.sent");
         } catch (MessagingException e) {
-            log.error("Failed to send email to {}", to, e);
-        }
+            com.languageapp.backend.observability.SafeDiagnostics.failure(log,"mail.failed",e);
+        } finally {if(work!=null)operations.finish(work,delivered);}
     }
 
-    @Async
+    @Async("mailExecutor")
     public void sendAccountDeletionConfirmation(String recipient, String token) {
         // Fragment keeps the secret out of HTTP URLs, referrers and proxy access logs.
         String url = frontendUrl + "/account-deletion#token=" + token;
@@ -104,8 +110,8 @@ public class EmailService {
                 boolean throttled = details != null
                         && details.toLowerCase(Locale.ROOT).contains("too many emails per second");
                 if (!throttled || attempt == 3) throw ex;
-                log.warn("SMTP rate limit; retrying email delivery in {} ms ({}/3).",
-                        rateLimitRetryDelayMillis, attempt + 1);
+                if(operations!=null)operations.mailRetry();
+                log.warn("mail.retry");
                 try {
                     Thread.sleep(rateLimitRetryDelayMillis);
                 } catch (InterruptedException interrupted) {
@@ -115,9 +121,9 @@ public class EmailService {
             }
         }
     }
-    @Async
+    @Async("mailExecutor")
     public void sendEmailChangeOtp(String toNewEmail, String otpCode) {
-        log.info("Sending email change OTP to new address: {}", toNewEmail);
+        log.info("mail.email_change.requested");
 
         String htmlBody = String.format(
                 "<h1>E-mail cím módosításának megerősítése</h1>" +
@@ -131,9 +137,9 @@ public class EmailService {
         sendHtmlEmail(toNewEmail, "E-mail cím módosítás megerősítése - LanguageApp", htmlBody);
     }
 
-    @Async
+    @Async("mailExecutor")
     public void sendEmailChangeSecurityAlert(String toOldEmail, String newEmail) {
-        log.info("Sending email change security alert to old address: {}", toOldEmail);
+        log.info("mail.email_change.notice");
 
         String htmlBody = String.format(
                 "<h1>Biztonsági értesítés: E-mail cím módosítás</h1>" +
@@ -145,7 +151,7 @@ public class EmailService {
 
         sendHtmlEmail(toOldEmail, "Biztonsági értesítés: E-mail módosítási kérelem - LanguageApp", htmlBody);
     }
-    @Async
+    @Async("mailExecutor")
     public void sendOAuthLinkCode(String recipient,String provider,String code) {
         sendHtmlEmail(recipient,"Belépési mód összekapcsolása – LanguageApp",
                 "<h1>"+provider+"-belépés hozzáadása</h1><p>A meglévő LanguageApp-fiókod megerősítéséhez írd be ezt az egyszeri kódot a Beállítások oldalon:</p>"
@@ -153,7 +159,7 @@ public class EmailService {
                 +"<p>A kód 15 percig, legfeljebb öt hibás próbálkozásig érvényes. Maradj a kérést indító bejelentkezésben.</p>"
                 +"<p>Ez még nem kapcsol össze fiókokat: a szolgáltatói hitelesítés után külön jóváhagyás szükséges. Ha nem te kérted, ne add meg a kódot.</p>");
     }
-    @Async
+    @Async("mailExecutor")
     public void sendOAuthLinkSecurityAlert(String recipient,String provider) {
         sendHtmlEmail(recipient,"Új belépési mód hozzáadva – LanguageApp","<h1>Új belépési mód</h1><p>A fiókodhoz sikeresen hozzákapcsoltál egy "+provider+"-fiókot.</p>"
                 +"<p>Az eredeti e-mail-címed, jelszavad és tanulási adataid változatlanok.</p><p>Ha nem te végezted a módosítást, ellenőrizd a fiókod biztonságát.</p>");

@@ -53,7 +53,7 @@ public class CurriculumService {
     @Transactional
     public void importTopicAndLessons(TopicImportRequest request) {
         validateTopic(request);
-        log.info("Starting curriculum import for topic: {}", request.getTopicName());
+        log.info("curriculum.import.started");
         String targetCourseCode = request.getCourseCode() != null ? request.getCourseCode() : "en";
 
         Course course = courseRepository.findByLanguageCode(targetCourseCode)
@@ -65,7 +65,7 @@ public class CurriculumService {
         topic.setCourse(course);
 
         LessonTopic savedTopic = topicRepository.save(topic);
-        log.info("Saved Topic with ID: {}", savedTopic.getTopicId());
+        log.info("curriculum.topic.saved");
 
         if (request.getLessons() != null) {
             importLessonsInternal(savedTopic, request.getLessons());
@@ -76,7 +76,7 @@ public class CurriculumService {
     @Transactional
     public void importLessonsToExistingTopic(UUID topicId, List<LessonImportRequest> lessonRequests) {
         com.languageapp.backend.validation.CurriculumRules.list(lessonRequests,IMPORT_LIMIT);
-        log.info("Importing {} new lessons to existing topic ID: {}", lessonRequests.size(), topicId);
+        log.info("curriculum.lessons.importing");
 
         LessonTopic existingTopic = topicRepository.findById(topicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Topic nem található az importáláshoz!"));
@@ -89,7 +89,7 @@ public class CurriculumService {
     @Transactional
     public void importExercisesToExistingLesson(UUID lessonId, List<ExerciseImportRequest> exerciseRequests) {
         com.languageapp.backend.validation.CurriculumRules.list(exerciseRequests,IMPORT_LIMIT);
-        log.info("Importing {} new exercises to existing lesson ID: {}", exerciseRequests.size(), lessonId);
+        log.info("curriculum.exercises.importing");
 
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lecke nem található az importáláshoz!"));

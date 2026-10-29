@@ -58,7 +58,7 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public UserResponse getUserProfile(String email) {
-        log.debug("Fetching profile for user: {}", email);
+        log.debug("profile.read_requested");
 
         User user = getUserByEmail(email);
 
@@ -89,7 +89,7 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public List<ProgressResponse> getUserProgress(String email) {
-        log.debug("Fetching progress for user: {}", email);
+        log.debug("profile.progress.requested");
 
         User user = getUserByEmail(email);
 
@@ -111,7 +111,7 @@ public class UserService {
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> {
-                    log.error("Authenticated user not found in the database with email: {}", email);
+                    log.error("profile.account_missing");
                     return new ResourceNotFoundException("User not found");
                 });
     }
@@ -129,7 +129,7 @@ public class UserService {
 
         user.setPreferredDifficulty(DifficultyLevel.valueOf(newDifficulty));
         userRepository.save(user);
-        log.info("User {} updated preferred difficulty to {}", email, newDifficulty);
+        log.info("profile.difficulty.updated");
     }
 
     @Transactional
@@ -169,10 +169,10 @@ public class UserService {
             if (userRepository.updateActiveProfilePicture(userId, imageUrl) != 1)
                 throw new ResourceNotFoundException("A fiók a feltöltés közben megszűnt vagy inaktívvá vált.");
 
-            log.info("User {} updated profile picture", email);
+            log.info("profile.picture.updated");
             return imageUrl;
         } catch (IOException e) {
-            log.error("Failed to upload profile picture for user {}: {}", email, e.getMessage());
+            log.error("profile.picture.failed");
             throw new RuntimeException("Nem sikerült feltölteni a képet. Kérlek, próbáld újra.");
         }
     }
@@ -209,7 +209,7 @@ public class UserService {
         user.setUserTag(generatedTag);
         userRepository.save(user);
 
-        log.info("User {} updated name to {}#{}", email, trimmedName, generatedTag);
+        log.info("profile.name.updated");
 
         return getUserProfile(email);
     }
@@ -240,7 +240,7 @@ public class UserService {
         userRepository.save(user);
         // Atomic with the credential write: every prior access-token SID and refresh token is revoked.
         refreshTokenRepository.deleteByUserUserId(user.getUserId());
-        log.info("Password changed and prior sessions revoked for account ID: {}", user.getUserId());
+        log.info("profile.password.updated");
     }
 
     /**
@@ -286,7 +286,7 @@ public class UserService {
         // Independent callbacks: failure to schedule one email must not suppress the other.
         CommittedEmail.send(() -> emailService.sendEmailChangeOtp(normalizedNewEmail, otpCode));
         CommittedEmail.send(() -> emailService.sendEmailChangeSecurityAlert(recipient, normalizedNewEmail));
-        log.info("Email change OTP generated for user {} -> new email: {}", currentEmail, normalizedNewEmail);
+        log.info("profile.email.otp_created");
     }
 
     /**
@@ -325,7 +325,7 @@ public class UserService {
         userRepository.save(user);
 
         emailChangeTokenRepository.delete(token);
-        log.info("User successfully changed email from {} to {}", oldEmail, user.getEmail());
+        log.info("profile.email.updated");
     }
 
     /** Serialize issue/reissue/consume and avoid loading a stale User before the shared account lock. */
@@ -470,6 +470,6 @@ public class UserService {
 
         userRepository.save(user);
 
-        log.info("GDPR Anonymization completed for user ID: {}", user.getUserId());
+        log.info("profile.anonymized");
     }
 }

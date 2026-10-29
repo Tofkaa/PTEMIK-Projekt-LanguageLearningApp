@@ -17,6 +17,12 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 public class SseService {
+    private com.languageapp.backend.observability.OperationsMetrics operations;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void observe(com.languageapp.backend.observability.OperationsMetrics metrics){
+        this.operations=metrics;metrics.gauge("app.sse.connections",this,value->value.emitters.values().stream().mapToInt(List::size).sum());
+    }
+
 
 
     private final Map<String, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
@@ -46,7 +52,7 @@ public class SseService {
 
 
         try {
-            emitter.send(SseEmitter.event().name("connected").data("ok"));
+            sendObserved(emitter,SseEmitter.event().name("connected").data("ok"));
         } catch (IOException e) {
             removeEmitter(email, emitter);
         }
@@ -72,7 +78,7 @@ public class SseService {
 
         for (SseEmitter emitter : userEmitters) {
             try {
-                emitter.send(SseEmitter.event().name("ping").data("update"));
+                sendObserved(emitter,SseEmitter.event().name("ping").data("update"));
             } catch (Exception e) {
                 removeEmitter(targetEmail, emitter);
             }
@@ -83,12 +89,19 @@ public class SseService {
         emitters.forEach((email, userEmitters) -> {
             for (SseEmitter emitter : userEmitters) {
                 try {
-                    emitter.send(SseEmitter.event().comment("heartbeat"));
+                    sendObserved(emitter,SseEmitter.event().comment("heartbeat"));
                 } catch (Exception e) {
                     removeEmitter(email, emitter);
                 }
             }
         });
+    }
+
+    private void sendObserved(SseEmitter emitter,SseEmitter.SseEventBuilder event)throws IOException {
+        var work=operations==null?null:operations.begin(com.languageapp.backend.observability.OperationsMetrics.Operation.SSE_SEND);
+        boolean successful=false;
+        try{emitter.send(event);successful=true;}
+        finally{if(work!=null)operations.finish(work,successful);}
     }
 
     private void removeEmitter(String email, SseEmitter emitter) {

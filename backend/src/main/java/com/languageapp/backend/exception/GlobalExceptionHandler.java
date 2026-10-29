@@ -45,6 +45,47 @@ public class GlobalExceptionHandler {
                 HttpStatus.FORBIDDEN, "Nincs jogosultságod ehhez a művelethez.", request.getRequestURI()));
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.languageapp.backend.observability.OperationsMetrics operations;
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraint(Exception ex,HttpServletRequest request) {
+        if(operations!=null)operations.conflict(com.languageapp.backend.observability.OperationsMetrics.Conflict.CONSTRAINT);
+        return ResponseEntity.status(409).body(buildErrorResponse(HttpStatus.CONFLICT,
+                "Az adatok ütköznek egy meglévő vagy időközben megváltozott adattal. Frissíts, majd próbáld újra.",request.getRequestURI()));
+    }
+    @ExceptionHandler({org.springframework.dao.OptimisticLockingFailureException.class,jakarta.persistence.OptimisticLockException.class})
+    public ResponseEntity<ErrorResponse> handleOptimistic(Exception ex,HttpServletRequest request) {
+        if(operations!=null)operations.conflict(com.languageapp.backend.observability.OperationsMetrics.Conflict.OPTIMISTIC);
+        return ResponseEntity.status(409).body(buildErrorResponse(HttpStatus.CONFLICT,
+                "Az adatok időközben megváltoztak. Frissíts, majd próbáld újra.",request.getRequestURI()));
+    }
+    @ExceptionHandler({org.springframework.dao.PessimisticLockingFailureException.class,jakarta.persistence.LockTimeoutException.class,jakarta.persistence.PessimisticLockException.class})
+    public ResponseEntity<ErrorResponse> handleLock(Exception ex,HttpServletRequest request) {
+        if(operations!=null)operations.conflict(com.languageapp.backend.observability.OperationsMetrics.Conflict.LOCK);
+        return ResponseEntity.status(409).header("Retry-After","1").body(buildErrorResponse(HttpStatus.CONFLICT,
+                "Egy másik művelet még folyamatban van. Várj egy kicsit, majd próbáld újra.",request.getRequestURI()));
+    }
+    @ExceptionHandler(org.springframework.core.task.TaskRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleCapacity(Exception ex,HttpServletRequest request) {
+        return ResponseEntity.status(503).header("Retry-After","1").body(buildErrorResponse(HttpStatus.SERVICE_UNAVAILABLE,
+                "A kiszolgáló most foglalt. Próbáld újra később.",request.getRequestURI()));
+    }
+    @ExceptionHandler(org.springframework.dao.QueryTimeoutException.class)
+    public ResponseEntity<ErrorResponse> handleQueryTimeout(Exception ex,HttpServletRequest request) {
+        return ResponseEntity.status(503).header("Retry-After","1").body(buildErrorResponse(HttpStatus.SERVICE_UNAVAILABLE,
+                "A művelet most nem fejeződött be. Próbáld újra később.",request.getRequestURI()));
+    }
+    @ExceptionHandler({jakarta.validation.ConstraintViolationException.class,org.springframework.web.method.annotation.HandlerMethodValidationException.class})
+    public ResponseEntity<ErrorResponse> handleMethodValidation(Exception ex,HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(buildErrorResponse(HttpStatus.BAD_REQUEST,"Hibás vagy hiányzó bemeneti adat.",request.getRequestURI()));
+    }
+
+    @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,org.springframework.web.servlet.NoHandlerFoundException.class})
+    public ResponseEntity<ErrorResponse> handleUnmappedRoute(Exception ex,HttpServletRequest request) {
+        return ResponseEntity.status(404).body(buildErrorResponse(HttpStatus.NOT_FOUND,"A keresett végpont nem található.",request.getRequestURI()));
+    }
+
     @ExceptionHandler(TooManyRequestsException.class)
     public ResponseEntity<ErrorResponse> handleThrottled(TooManyRequestsException ex,HttpServletRequest request) {
         return ResponseEntity.status(429).header("Retry-After",Long.toString(ex.retryAfterSeconds()))
@@ -110,7 +151,7 @@ public class GlobalExceptionHandler {
             ResourceNotFoundException ex,
             HttpServletRequest request) {
 
-        log.warn("Resource not found at {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("http.not_found");
 
         ErrorResponse errorResponse = buildErrorResponse(
                 HttpStatus.NOT_FOUND,
@@ -129,7 +170,7 @@ public class GlobalExceptionHandler {
             BadRequestException ex,
             HttpServletRequest request) {
 
-        log.warn("Bad request at {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("http.bad_request");
 
         ErrorResponse errorResponse = buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
@@ -145,7 +186,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<ErrorResponse> handleForbiddenException(ForbiddenException ex, HttpServletRequest request) {
-        log.warn("Forbidden at {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("http.forbidden");
 
         ErrorResponse errorResponse = buildErrorResponse(
                 HttpStatus.FORBIDDEN,
@@ -168,7 +209,7 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
 
-        log.warn("Validation failed at {}: {}", request.getRequestURI(), errorMessage);
+        log.warn("http.validation_failed");
 
         ErrorResponse errorResponse = buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
@@ -187,7 +228,7 @@ public class GlobalExceptionHandler {
             BadCredentialsException ex,
             HttpServletRequest request) {
 
-        log.warn("Failed login attempt at {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("auth.credentials.rejected");
 
         ErrorResponse errorResponse = buildErrorResponse(
                 HttpStatus.UNAUTHORIZED,
@@ -207,7 +248,7 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request) {
 
-        log.error("Unhandled exception occurred at {}", request.getRequestURI(), ex);
+        com.languageapp.backend.observability.SafeDiagnostics.failure(log,"http.unhandled",ex);
 
         ErrorResponse errorResponse = buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
@@ -223,7 +264,7 @@ public class GlobalExceptionHandler {
             org.springframework.security.authentication.DisabledException ex,
             HttpServletRequest request) {
 
-        log.warn("Disabled account login attempt at {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("auth.disabled");
 
         ErrorResponse errorResponse = buildErrorResponse(
                 HttpStatus.FORBIDDEN,

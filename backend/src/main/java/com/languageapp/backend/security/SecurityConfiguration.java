@@ -73,6 +73,7 @@ public class SecurityConfiguration {
 
                 // Define authorization rules for HTTP requests
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/**").hasRole("ADMIN")
                         .requestMatchers("/api/auth/**").permitAll() // Public endpoints (login, register)
                         .anyRequest().authenticated() // All other endpoints require valid JWT
                 )
@@ -94,11 +95,10 @@ public class SecurityConfiguration {
 
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) -> {
-                            log.warn("Jogosulatlan API hívás blokkolva: {}", request.getRequestURI());
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json;charset=UTF-8");
-                            response.getWriter().write("{\"message\": \"Unauthorized\"}");
+                            log.warn("http.unauthorized");
+                            com.languageapp.backend.observability.ApiErrors.write(request,response,401,"Unauthorized");
                         })
+                        .accessDeniedHandler((request,response,denied)->com.languageapp.backend.observability.ApiErrors.write(request,response,403,"Nincs jogosultságod ehhez a művelethez."))
                 )
 
                 // Register our custom authentication provider
@@ -139,7 +139,7 @@ public class SecurityConfiguration {
 
         // Must be true for the frontend to receive/send HttpOnly cookies
         configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(List.of("Retry-After"));
+        configuration.setExposedHeaders(List.of("Retry-After", "X-Request-ID"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

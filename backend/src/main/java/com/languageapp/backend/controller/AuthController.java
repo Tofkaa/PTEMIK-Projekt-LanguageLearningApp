@@ -91,7 +91,7 @@ public class AuthController {
                 .sameSite("Lax")
                 .build();
 
-        log.info("User: {} successfully logged out, cookie invalidated.", loggedOutUser);
+        log.info("auth.logout.completed");
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, deadCookie.toString())

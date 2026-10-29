@@ -144,7 +144,7 @@ public class FriendshipService {
 
         friendship.setStatus(FriendshipStatus.ACCEPTED);
         friendshipRepository.save(friendship);
-        log.info("Friendship request {} ACCEPTED by user {}", friendshipId, receiverId);
+        log.info("friendship.accepted");
 
         events.publishEvent(new SocialAchievementEvent(List.of(friendship.getUser().getUserId(), friendship.getFriend().getUserId())));
         sseService.sendPingAfterCommit(friendship.getUser().getEmail());
@@ -165,7 +165,7 @@ public class FriendshipService {
         }
 
         friendshipRepository.delete(friendship);
-        log.info("Friendship request {} REJECTED by user {}", friendshipId, receiverId);
+        log.info("friendship.rejected");
     }
 
     /**
@@ -187,7 +187,7 @@ public class FriendshipService {
         }
 
         friendshipRepository.delete(friendship);
-        log.info("Friendship {} REMOVED by user {}", friendshipId, currentUserId);
+        log.info("friendship.removed");
     }
 
     /**

@@ -50,12 +50,12 @@ public class AuthenticationService {
 
     @Transactional
     public AuthResult register(RegisterRequest request) {
-        log.info("Attempting to register new user with email: {}", request.getEmail());
+        log.info("auth.registration.requested");
         if (request.getRole() != null && request.getRole() != Role.STUDENT && request.getRole() != Role.TEACHER)
             throw new BadRequestException("Csak diák- vagy tanárfiók regisztrálható.");
 
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            log.warn("Registration failed: Email already exists - {}", request.getEmail());
+            log.warn("auth.registration.duplicate");
             throw new BadRequestException("This email already exists!");
         }
 
@@ -76,7 +76,7 @@ public class AuthenticationService {
         }
 
         user.setRole(request.getRole() != null ? request.getRole() : Role.STUDENT);
-        log.info("Registering {} user with email: {}...", user.getRole(), request.getEmail());
+        log.info("auth.registration.creating");
 
         if (Boolean.TRUE.equals(request.getAcceptTerms())) {
             user.setTermsAcceptedAt(clock.instant());
@@ -106,7 +106,7 @@ public class AuthenticationService {
         user.setActiveCourse(defaultCourse);
 
         userRepository.save(user);
-        log.info("User successfully saved to database with ID: {}", user.getUserId());
+        log.info("auth.registration.saved");
 
         String tokenStr = UUID.randomUUID().toString();
         VerificationToken verificationToken = new VerificationToken();
@@ -146,7 +146,7 @@ public class AuthenticationService {
                 user.getActiveCourse().getLanguageCode()
         );
 
-        log.info("Tokens successfully generated for user: {}", user.getEmail());
+        log.info("auth.tokens.created");
         return new AuthResult(response, refreshToken);
     }
 
@@ -173,7 +173,7 @@ public class AuthenticationService {
         userRepository.save(user);
 
         verificationTokenRepository.delete(verificationToken);
-        log.info("User {} successfully verified their email address.", user.getEmail());
+        log.info("auth.email.verified");
     }
 
     /**
@@ -181,7 +181,7 @@ public class AuthenticationService {
      */
     @Transactional
     public void requestPasswordReset(String email) {
-        log.info("Password reset requested for email: {}", email);
+        log.info("auth.reset.requested");
 
         userRepository.findByEmailForAuthentication(email)
                 .filter(user -> user.isActive() && user.getRole() != Role.DELETED).ifPresent(user -> {
@@ -200,7 +200,7 @@ public class AuthenticationService {
             // Capture scalars; the async dispatcher must not see an uncommitted token or a managed entity.
             String recipient = user.getEmail();
             CommittedEmail.send(() -> emailService.sendPasswordResetEmail(recipient, tokenStr));
-            log.info("Password reset token generated; email scheduled after commit for user ID: {}", user.getUserId());
+            log.info("auth.reset.scheduled");
         });
 
         // No exception, if the email does not exist
@@ -238,12 +238,12 @@ public class AuthenticationService {
 
         // Security step: log out all sessions
         refreshTokenService.revokeAllForUser(user.getUserId());
-        log.info("Password successfully reset for user: {}", user.getEmail());
+        log.info("auth.reset.completed");
     }
 
     @Transactional
     public AuthResult authenticate(LoginRequest request) {
-        log.info("Authentication attempt for email: {}", request.getEmail());
+        log.info("auth.login.requested");
 
         User user = userRepository.findByEmailForAuthentication(request.getEmail()).orElse(null);
 
@@ -279,7 +279,7 @@ public class AuthenticationService {
                 user.getActiveCourse().getLanguageCode()
         );
 
-        log.info("User successfully authenticated: {}", user.getEmail());
+        log.info("auth.login.completed");
         return new AuthResult(response, refreshToken);
     }
 
@@ -304,7 +304,7 @@ public class AuthenticationService {
                             .build();
 
                     String newAccessToken = jwtService.generateSessionToken(userDetails, session.getRefreshTokenId());
-                    log.info("Access token successfully refreshed for user: {}", user.getEmail());
+                    log.info("auth.refresh.completed");
 
                     return new AuthResponse(
                             newAccessToken,

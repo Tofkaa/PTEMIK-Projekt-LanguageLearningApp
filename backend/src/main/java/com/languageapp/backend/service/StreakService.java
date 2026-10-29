@@ -19,6 +19,9 @@ import java.time.Clock;
 @Service
 @RequiredArgsConstructor
 public class StreakService {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.languageapp.backend.observability.OperationsMetrics operations;
+
     private final Clock clock;
 
     private final UserRepository userRepository;
@@ -40,7 +43,7 @@ public class StreakService {
             user.setStreak(1);
         } else if (lastActivity.equals(today)) {
             // Already studied today, do nothing to the streak
-            log.debug("User {} already completed an activity today. Streak remains {}.", user.getEmail(), user.getStreak());
+            log.debug("streak.unchanged");
             return;
         } else if (lastActivity.equals(today.minusDays(1))) {
             // Studied yesterday, increment the streak safely
@@ -52,7 +55,7 @@ public class StreakService {
 
         user.setLastActivityDate(today);
         userRepository.save(user);
-        log.info("Streak activity updated for user {}. New streak: {}", user.getEmail(), user.getStreak());
+        log.info("streak.updated");
     }
 
     /**
@@ -63,11 +66,17 @@ public class StreakService {
     @Scheduled(cron = "0 5 0 * * *", zone = "Europe/Budapest")
     @Transactional
     public void resetExpiredStreaks() {
+        var work=operations==null?null:operations.begin(com.languageapp.backend.observability.OperationsMetrics.Operation.STREAK_RESET);
+        boolean successful=true;
+        try {
         log.info("Starting scheduled night-job: Streak reset...");
         LocalDate yesterday = LocalDate.now(clock.withZone(ZoneId.of("Europe/Budapest"))).minusDays(1);
 
         int resetCount = userRepository.resetExpiredStreaks(yesterday);
 
-        log.info("Scheduled streak reset completed successfully. Reset {} user(s) to 0 streak.", resetCount);
+        log.info("job.streak.completed");
+        }catch(RuntimeException failure){successful=false;throw failure;}
+        finally{if(work!=null)operations.finishJob(work,successful);}
+
     }
 }

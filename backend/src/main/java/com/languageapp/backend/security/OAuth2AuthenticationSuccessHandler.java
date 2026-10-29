@@ -52,7 +52,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         response.setHeader("Referrer-Policy","no-referrer");
         String redirectUrl=frontendUrl+"/oauth2/redirect#code="+code;
 
-        log.info("OAuth2 sign-in completed for account ID: {}", principal.userId());
+        log.info("auth.oauth.completed");
         response.sendRedirect(redirectUrl);
     }
 }

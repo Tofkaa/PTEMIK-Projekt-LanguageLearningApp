@@ -82,7 +82,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"message\": \"Invalid or expired JWT token.\"}");
+            com.languageapp.backend.observability.ApiErrors.write(request,response,401,"Invalid or expired JWT token.");
             return;
 
         } catch (Exception e) {
@@ -91,7 +91,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"message\": \"An unexpected error occurred.\"}");
+            com.languageapp.backend.observability.ApiErrors.write(request,response,401,"An unexpected error occurred.");
             return;
         }
 

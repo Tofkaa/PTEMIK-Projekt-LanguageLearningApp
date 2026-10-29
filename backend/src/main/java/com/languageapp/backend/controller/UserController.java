@@ -31,7 +31,7 @@ public class UserController {
      */
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUserProfile(Authentication authentication) {
-        log.info("REST request to get profile for authenticated user");
+        log.debug("REST request to get profile for authenticated user");
         return ResponseEntity.ok(userService.getUserProfile(authentication.getName()));
     }
 
@@ -40,7 +40,7 @@ public class UserController {
      */
     @GetMapping("/me/progress")
     public ResponseEntity<List<ProgressResponse>> getCurrentUserProgress(Authentication authentication) {
-        log.info("REST request to get progress for authenticated user");
+        log.debug("REST request to get progress for authenticated user");
         return ResponseEntity.ok(userService.getUserProgress(authentication.getName()));
     }
 
@@ -58,7 +58,7 @@ public class UserController {
             @RequestParam String courseCode, @RequestParam long expectedRevision, @RequestParam java.util.UUID intentId,
             Authentication authentication) {
 
-        log.info("REST request to change active course to '{}' for user: {}", courseCode, authentication.getName());
+        log.info("profile.course.requested");
         UserResponse updatedUser = userService.changeActiveCourse(authentication.getName(), courseCode, expectedRevision, intentId);
         return ResponseEntity.ok(updatedUser);
     }
@@ -71,7 +71,7 @@ public class UserController {
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
 
-        log.info("REST request to upload profile picture for user: {}", authentication.getName());
+        log.info("profile.picture.requested");
 
         String newImageUrl = userService.updateProfilePicture(authentication.getName(), file);
 
@@ -86,7 +86,7 @@ public class UserController {
             @RequestBody UpdateNameRequest request,
             Authentication authentication) {
 
-        log.info("REST request to update name for user: {}", authentication.getName());
+        log.info("profile.name.requested");
         UserResponse updatedUser = userService.updateUserName(authentication.getName(), request.getName());
         return ResponseEntity.ok(updatedUser);
     }
@@ -99,7 +99,7 @@ public class UserController {
             @RequestBody ChangePasswordRequest request,
             Authentication authentication) {
 
-        log.info("REST request to change password for user: {}", authentication.getName());
+        log.info("profile.password.requested");
         userService.changePassword(
                 authentication.getName(),
                 request.getCurrentPassword(),
@@ -113,7 +113,7 @@ public class UserController {
             @RequestBody EmailChangeRequestDto request,
             Authentication authentication) {
 
-        log.info("REST request to initiate email change for user: {}", authentication.getName());
+        log.info("profile.email.change_requested");
         userService.requestEmailChange(
                 authentication.getName(),
                 request.getNewEmail(),
@@ -127,7 +127,7 @@ public class UserController {
             @RequestBody EmailChangeVerifyDto request,
             Authentication authentication) {
 
-        log.info("REST request to verify email change OTP for user: {}", authentication.getName());
+        log.info("profile.email.verify_requested");
         userService.verifyEmailChange(authentication.getName(), request.getOtpCode());
         return ResponseEntity.ok("E-mail cím sikeresen frissítve!");
     }

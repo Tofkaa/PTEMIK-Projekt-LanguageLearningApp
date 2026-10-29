@@ -12,4 +12,8 @@ public class ErrorResponse {
     private String error;
     private String message;
     private String path;
+    private String requestId;
+    public ErrorResponse(Instant timestamp,int status,String error,String message,String path) {
+        this(timestamp,status,error,message,path,com.languageapp.backend.observability.RequestDiagnostics.currentId());
+    }
 }

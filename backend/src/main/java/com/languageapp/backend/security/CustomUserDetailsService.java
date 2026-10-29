@@ -34,15 +34,15 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        log.debug("Attempting to load user details for email: {}", email);
+        log.debug("auth.account.load_requested");
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {
-                    log.warn("Authentication failed: User not found with email: {}", email);
+                    log.warn("auth.account.not_found");
                     return new UsernameNotFoundException("User not found with email: " + email);
                 });
 
-        log.debug("User details successfully loaded for email: {}", email);
+        log.debug("auth.account.loaded");
 
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getEmail())

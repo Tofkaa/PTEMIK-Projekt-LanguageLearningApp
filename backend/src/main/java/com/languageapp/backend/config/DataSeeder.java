@@ -62,19 +62,19 @@ public class DataSeeder implements CommandLineRunner {
             }
 
             for (Resource resource : resources) {
-                log.info("Tananyag betöltése fájlból: {}", resource.getFilename());
+                log.info("seed.curriculum.read");
                 try (InputStream inputStream = resource.getInputStream()) {
                     List<TopicImportRequest> topics = objectMapper.readValue(inputStream, new TypeReference<List<TopicImportRequest>>() {});
                     for (TopicImportRequest topicReq : topics) {
                         curriculumService.importTopicAndLessons(topicReq);
                     }
                 } catch (Exception e) {
-                    log.error("Hiba a {} fájl beolvasásakor: {}", resource.getFilename(), e.getMessage());
+                    log.error("seed.curriculum.read_failed");
                 }
             }
             log.info("Curriculum seed data initialization completed successfully.");
         } catch (Exception e) {
-            log.error("Failed to locate or read curriculum seed files: {}", e.getMessage(), e);
+            com.languageapp.backend.observability.SafeDiagnostics.failure(log,"seed.curriculum.unavailable",e);
         }
     }
 
@@ -94,12 +94,12 @@ public class DataSeeder implements CommandLineRunner {
 
             if (!newAchievements.isEmpty()) {
                 achievementRepository.saveAll(newAchievements);
-                log.info("Successfully seeded {} NEW achievements.", newAchievements.size());
+                log.info("seed.achievements.created");
             } else {
                 log.info("All achievements are already up to date.");
             }
         } catch (Exception e) {
-            log.error("Failed to sync achievements from JSON: {}", e.getMessage(), e);
+            com.languageapp.backend.observability.SafeDiagnostics.failure(log,"seed.achievements.failed",e);
         }
     }
 }

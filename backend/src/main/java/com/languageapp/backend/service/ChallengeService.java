@@ -120,7 +120,7 @@ public class ChallengeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Kihívás nem található."));
 
         if (challenge.getStatus() == ChallengeStatus.DRAFT && challenge.getChallenger().getUserId().equals(currentUserId)) {
-            log.info("Challenger finished! Changing status to PENDING for challenge: {}", challengeId);
+            log.info("challenge.pending");
             challenge.setStatus(ChallengeStatus.PENDING);
             challengeRepository.save(challenge);
 
@@ -130,7 +130,7 @@ public class ChallengeService {
         }
 
         if (challenge.getStatus() == ChallengeStatus.PENDING && challenge.getOpponent().getUserId().equals(currentUserId)) {
-            log.info("Opponent finished! Evaluating challenge: {}", challengeId);
+            log.info("challenge.evaluating");
 
             Result challengerResult = resultRepository.findByChallengeChallengeIdAndUserUserId(challengeId, challenge.getChallenger().getUserId())
                     .orElseThrow(() -> new IllegalStateException("Nem található a kihívó eredménye!"));

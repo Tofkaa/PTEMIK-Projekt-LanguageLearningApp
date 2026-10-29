@@ -16,7 +16,7 @@ public class SocialAchievementListener {
         for (var userId : event.userIds().stream().distinct().sorted().toList()) {
             try { achievementService.checkSocialAchievements(userId); }
             catch (RuntimeException error) {
-                log.error("Social achievement evaluation failed for {}", userId, error);
+                com.languageapp.backend.observability.SafeDiagnostics.failure(log,"achievement.social.failed",error);
             }
         }
     }

@@ -43,7 +43,7 @@ public class LessonController {
      */
     @GetMapping
     public ResponseEntity<List<LessonResponse>> getAllLessons(Authentication authentication, @RequestParam(required=false) UUID courseId) {
-        log.info("REST request to get all lessons for authenticated user");
+        log.debug("REST request to get all lessons for authenticated user");
 
         String userEmail = authentication.getName();
 
@@ -64,7 +64,7 @@ public class LessonController {
             @PathVariable UUID id,
             @RequestParam(required = false) UUID challengeId,
             Authentication authentication) {
-        log.info("REST request to fetch exercises for lesson ID: {}", id);
+        log.info("lesson.exercises.requested");
         return ResponseEntity.ok(lessonService.getExercisesByLessonId(id, authentication.getName(), challengeId));
     }
 
@@ -84,7 +84,7 @@ public class LessonController {
             @Valid @RequestBody LessonSubmitRequest request,
             Authentication authentication) {
 
-        log.info("REST request to submit answers for lesson ID: {}", id);
+        log.info("lesson.submit.requested");
         String userEmail = authentication.getName();
         UUID userId = userService.getUserProfile(userEmail).getUserId();
 
@@ -118,7 +118,7 @@ public class LessonController {
     public ResponseEntity<List<LessonResponse>> getAllLessonsForChallenge(
             @RequestParam(required = false) String courseCode,
             Authentication authentication) {
-        log.info("REST request to get all lessons for challenge dropdown. Requested course: {}", courseCode);
+        log.info("lesson.catalog.requested");
         return ResponseEntity.ok(lessonService.getAllLessonsForChallengeDropdown(authentication.getName(), courseCode));
     }
 }

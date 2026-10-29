@@ -17,6 +17,9 @@ import java.time.Clock;
 @Component
 @RequiredArgsConstructor
 public class ChallengeScheduler {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.languageapp.backend.observability.OperationsMetrics operations;
+
     private final Clock clock;
 
     private final ChallengeRepository challengeRepository;
@@ -30,6 +33,9 @@ public class ChallengeScheduler {
     @Scheduled(cron = "0 0 * * * *", zone = "UTC")
     @Transactional
     public void closeExpiredChallenges() {
+        var work=operations==null?null:operations.begin(com.languageapp.backend.observability.OperationsMetrics.Operation.CHALLENGE_EXPIRY);
+        boolean successful=true;
+        try {
         log.info("Cron Job indítva: Lejárt kihívások keresése...");
 
         List<ChallengeStatus> activeStatuses = Arrays.asList(ChallengeStatus.DRAFT, ChallengeStatus.PENDING);
@@ -46,18 +52,20 @@ public class ChallengeScheduler {
                 challenge.getChallenger().setXp(challenge.getChallenger().getXp() + 50); // XP bónusz
                 userRepository.save(challenge.getChallenger());
 
-                log.info("Kihívás (ID: {}) lejárt PENDING állapotban. Győztes: {}",
-                        challenge.getChallengeId(), challenge.getChallenger().getEmail());
+                log.info("job.challenge.pending_expired");
             } else if (challenge.getStatus() == ChallengeStatus.DRAFT) {
                 // The challenger started but never finished their own lesson -> No winner
                 challenge.setWinner(null);
-                log.info("Kihívás (ID: {}) lejárt DRAFT állapotban.", challenge.getChallengeId());
+                log.info("job.challenge.draft_expired");
             }
 
             challenge.setStatus(ChallengeStatus.EXPIRED);
             challengeRepository.save(challenge);
         }
 
-        log.info("Siker, {} db lejárt kihívás sikeresen lezárva.", expiredChallenges.size());
+        log.info("job.challenge.completed");
+        } catch(RuntimeException failure){successful=false;throw failure;}
+        finally{if(work!=null)operations.finishJob(work,successful);}
+
     }
 }

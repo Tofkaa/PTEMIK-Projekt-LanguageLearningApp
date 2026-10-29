@@ -135,11 +135,11 @@ public class AchievementService {
                     return masteredCount >= targetMastered;
 
                 default:
-                    log.warn("Unknown achievement criteria type: {}", type);
+                    log.warn("achievement.criteria.unknown");
                     return false;
             }
         } catch (Exception e) {
-            log.error("Error evaluating achievement criteria (ID: {}): {}", achievement.getAchievementId(), e.getMessage());
+            log.error("achievement.criteria.failed");
             return false;
         }
     }
@@ -214,7 +214,7 @@ public class AchievementService {
                 @Override public void afterCommit() { sseService.sendPing(email); }
             });
         }
-        log.info("🏆 Gamification: New achievement unlocked for user: {}, Achievement: {}", user.getEmail(), achievement.getName());
+        log.info("achievement.awarded");
         return newAward;
     }
     private AchievementFeedback toFeedback(UserAchievement award) {

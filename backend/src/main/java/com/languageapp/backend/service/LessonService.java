@@ -58,7 +58,7 @@ public class LessonService {
     public List<LessonResponse> getAllLessonsForUser(String userEmail) { return getAllLessonsForUser(userEmail,null); }
     @Transactional(readOnly = true)
     public List<LessonResponse> getAllLessonsForUser(String userEmail, UUID courseId) {
-        log.debug("Fetching ordered lessons for user: {}", userEmail);
+        log.debug("lesson.overview.requested");
 
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
@@ -107,7 +107,7 @@ public class LessonService {
 
     @Transactional(readOnly = true)
     public List<ExerciseResponse> getExercisesByLessonId(UUID lessonId, String userEmail, UUID challengeId) {
-        log.debug("Fetching exercises for lesson ID: {} for user: {}", lessonId, userEmail);
+        log.debug("lesson.exercises.loading");
 
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
@@ -278,7 +278,7 @@ public class LessonService {
             }
             return hexString.toString();
         } catch (Exception e) {
-            log.error("Critical error while generating hash!", e);
+            com.languageapp.backend.observability.SafeDiagnostics.failure(log,"crypto.answer_hash.failed",e);
             return null;
         }
     }

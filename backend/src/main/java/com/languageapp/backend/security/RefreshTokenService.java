@@ -56,11 +56,11 @@ public class RefreshTokenService {
     /** The persisted token ID is stable across refreshes and safe to include in signed JWTs. */
     @Transactional
     public Session createSession(UUID userId) {
-        log.debug("Creating new refresh token for user ID: {}", userId);
+        log.debug("auth.session.creating");
 
         User user = userRepository.findForSessionUpdate(userId)
                 .orElseThrow(() -> {
-                    log.error("Failed to create refresh token: User not found with ID {}", userId);
+                    log.error("auth.session.account_missing");
                     return new ResourceNotFoundException("No user found for token generation.");
                 });
 
@@ -77,7 +77,7 @@ public class RefreshTokenService {
 
         refreshTokenRepository.save(refreshToken);
 
-        log.info("Successfully created and stored refresh token hash for user ID: {}", userId);
+        log.info("auth.session.created");
         return new Session(refreshToken.getRefreshTokenId(), rawToken);
     }
 
@@ -92,7 +92,7 @@ public class RefreshTokenService {
     @Transactional(readOnly = true)
     public RefreshToken verifyExpiration(RefreshToken token) {
         if (!clock.instant().isBefore(token.getExpiryDate())) {
-            log.warn("Refresh token expired for user ID: {}.", token.getUser().getUserId());
+            log.warn("auth.session.expired");
 
             throw new BadRequestException("Session expired, please log in again.");
         }
@@ -127,7 +127,7 @@ public class RefreshTokenService {
         return findByRawToken(rawToken).map(token -> {
             String email = token.getUser().getEmail();
             refreshTokenRepository.revokeByTokenHash(token.getTokenHash());
-            log.debug("Refresh token successfully deleted for user: {}", email);
+            log.debug("auth.session.deleted");
             return email;
         }).orElse("Unknown user (deleted/expired token)");
     }
@@ -150,7 +150,7 @@ public class RefreshTokenService {
             byte[] encodedhash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(encodedhash);
         } catch (NoSuchAlgorithmException e) {
-            log.error("Critical Security Error: SHA-256 algorithm not found in the JVM!", e);
+            com.languageapp.backend.observability.SafeDiagnostics.failure(log,"crypto.digest.unavailable",e);
             throw new IllegalStateException("Critical server error while securing the token.", e);
         }
     }

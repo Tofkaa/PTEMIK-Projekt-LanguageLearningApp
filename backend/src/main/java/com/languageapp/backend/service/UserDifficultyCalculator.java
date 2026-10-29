@@ -56,8 +56,7 @@ public class UserDifficultyCalculator {
                 ? recentResults.getFirst().getDifficulty()
                 : "MEDIUM";
 
-        log.debug("Adaptive Eval -> User: {}, Course: {}, Last Difficulty: {}, Weighted Score: {}",
-                user.getEmail(), user.getActiveCourse().getLanguageCode(), lastDifficulty, String.format("%.2f", weightedScore));
+        log.debug("difficulty.evaluated");
 
         long totalLifetimeAttempts = resultRepository
                 .countByUserUserIdAndLesson_Topic_Course_CourseIdAndIsChallengeResultFalseAndManualPracticeFalseAndIsTestResultFalse(user.getUserId(), activeCourseId);
